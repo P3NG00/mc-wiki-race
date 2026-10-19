@@ -166,6 +166,14 @@ await ev("(s => { s.value = 'any'; s.dispatchEvent(new Event('change', { bubbles
 await sleep(500);
 await until("!document.querySelector('#btnPlay').disabled", 60000);
 
+// Ticking Checkpoint shows the checkpoint card with a third, different article; unticking hides it.
+const viaCard = "!document.querySelector('#cardVia').classList.contains('hidden')";
+await ev("document.querySelector('#rules input[value=checkpoint]').click()");
+check('Checkpoint adds a distinct checkpoint', await until(`${viaCard} && !document.querySelector('#btnPlay').disabled`, 60000) &&
+  await ev("new Set([setup.start.title, setup.via.title, setup.goal.title]).size === 3"), await ev("setup.via?.title"));
+await ev("document.querySelector('#rules input[value=checkpoint]').click()");
+check('unticking Checkpoint hides it', await ev(`!(${viaCard}) && !document.querySelector('#btnPlay').disabled`));
+
 // An interwiki title has no page in the API response; it must read as "not found", not a network error.
 await ev("(() => { const i = document.querySelector('[data-custom=start]'); i.value = 'de:Diamant'; i.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter' })); })()");
 check('interwiki title reports not found', await until("document.querySelector('#setupStatus').textContent.startsWith('No article named')", 15000),
@@ -226,6 +234,34 @@ await ev("document.querySelector('#gQuit').click()");
 check('daily result is recorded', await ev("store.get('mwg.history', [])[0].daily === '2026-01-01' && document.querySelector('#modal').textContent.includes('Daily 2026-01-01')"));
 await ev("document.querySelector('#mNew').click()");
 check('rerolling leaves the daily pair', await ev('setup.daily === null'));
+
+// Checkpoint game: reaching the target before the checkpoint doesn't count. A best with another checkpoint is not this
+// pair's best (the seeded 1-click game would otherwise make it "Your best").
+await send('browsingContext.navigate', { context: ctx, url: 'about:blank', wait: 'complete' });
+await send('browsingContext.navigate', { context: ctx, url: fileUrl + '#start=Diamond&via=Pickaxe&target=Diamond%20Pickaxe&rules=checkpoint', wait: 'complete' });
+await until("!document.querySelector('#btnPlay').disabled");
+check('challenge link sets the checkpoint', await ev(`setup.via?.title === 'Pickaxe' && rules().includes('checkpoint') && ${viaCard} && challengeLink().includes('&via=Pickaxe&')`),
+  await ev('challengeLink()'));
+await ev(`(h => { h.unshift({ start: 'Diamond', goal: 'Diamond Pickaxe', via: 'Zombie', rules: ['checkpoint'], won: true, clicks: 1, ms: 1000, at: Date.now(), path: [] });
+  store.set('mwg.history', h); })(store.get('mwg.history', []))`);
+await ev("document.querySelector('#btnPlay').click()");
+await until("game.path.length === 1 && !game.loading");
+const hudLbl = "document.querySelector('#hudLbl').textContent + ' ' + document.querySelector('#hudGoal').textContent";
+check('HUD shows the checkpoint first', await ev(hudLbl) === 'Checkpoint Pickaxe', await ev(hudLbl));
+f = await frameCtx();
+await ev("[...document.querySelectorAll('a.mwg-live')].find(a => /Diamond_Pickaxe/i.test(a.getAttribute('href'))).click()", f);
+await until("game.path.length === 2 && !game.loading");
+check('target before the checkpoint does not win', await ev("game.active") === true && await ev(hudLbl) === 'Checkpoint Pickaxe');
+f = await frameCtx();
+await ev("[...document.querySelectorAll('a.mwg-live')].find(a => a.getAttribute('href') === '/w/Pickaxe').click()", f);
+await until("game.path.length === 3 && !game.loading");
+check('reaching the checkpoint switches to the target', await ev(hudLbl) === 'Target Diamond Pickaxe' && await ev('game.path[2].via === true'), await ev(hudLbl));
+f = await frameCtx();
+await ev("[...document.querySelectorAll('a.mwg-live')].find(a => /Diamond_Pickaxe/i.test(a.getAttribute('href'))).click()", f);
+check('checkpoint game wins', await until("!game.active && !document.querySelector('#modalBg').classList.contains('hidden')"), `clicks=${await ev('clicks()')}`);
+const viaModal = await ev("document.querySelector('#modal').textContent");
+check('checkpoint is recorded and kept out of other bests', await ev("store.get('mwg.history', [])[0].via === 'Pickaxe'") &&
+  viaModal.includes('Diamond → Pickaxe → Diamond Pickaxe') && !/personal best|Your best/.test(viaModal));
 
 // A theme stylesheet added by the host page shows up in the picker and, marked data-mwg-default, wins over a saved
 // theme that no longer exists. A preload script stands in for the host page injecting it into <head>.

@@ -1,0 +1,714 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Minecraft Wiki Game</title>
+<style>
+  :root {
+    --bg: #f3f1ea;
+    --panel: #ffffff;
+    --ink: #1d1f1a;
+    --muted: #686c60;
+    --line: #d9d6cb;
+    --accent: #3f8a2e;
+    --accent-ink: #ffffff;
+    --accent-soft: #e3f0dc;
+    --target: #b8452f;
+    --target-soft: #f7e3dd;
+    --warn: #9a6a00;
+    --shadow: 0 1px 2px rgba(0,0,0,.06), 0 4px 16px rgba(0,0,0,.06);
+    color-scheme: light;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #161814; --panel: #1f221d; --ink: #e8e9e3; --muted: #9da196; --line: #33372f;
+      --accent: #6cbf55; --accent-ink: #0d1409; --accent-soft: #24331f;
+      --target: #ec8a73; --target-soft: #3a231d; --warn: #e2b54a;
+      --shadow: 0 1px 2px rgba(0,0,0,.4), 0 4px 16px rgba(0,0,0,.3);
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #161814; --panel: #1f221d; --ink: #e8e9e3; --muted: #9da196; --line: #33372f;
+    --accent: #6cbf55; --accent-ink: #0d1409; --accent-soft: #24331f;
+    --target: #ec8a73; --target-soft: #3a231d; --warn: #e2b54a;
+    --shadow: 0 1px 2px rgba(0,0,0,.4), 0 4px 16px rgba(0,0,0,.3);
+    color-scheme: dark;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body {
+    background: var(--bg); color: var(--ink);
+    font: 15px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  }
+  button, input, select { font: inherit; color: inherit; }
+  button {
+    border: 1px solid var(--line); background: var(--panel); border-radius: 8px;
+    padding: 7px 14px; cursor: pointer;
+  }
+  button:hover:not(:disabled) { border-color: var(--muted); }
+  button:disabled { opacity: .5; cursor: default; }
+  button.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); font-weight: 600; }
+  button.primary:hover:not(:disabled) { filter: brightness(1.07); border-color: var(--accent); }
+  button.link { border: 0; background: none; padding: 0; color: var(--accent); text-decoration: underline; }
+  .mono { font-variant-numeric: tabular-nums; }
+  .hidden { display: none !important; }
+
+  /* ---------- Setup screen ---------- */
+  #setup { max-width: 860px; margin: 0 auto; padding: 32px 16px 48px; }
+  #setup h1 { font-size: 28px; margin: 0 0 4px; letter-spacing: -.01em; }
+  #setup .sub { color: var(--muted); margin: 0 0 24px; }
+  .modes { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; }
+  .modes label {
+    display: flex; gap: 6px; align-items: center; padding: 6px 12px; border: 1px solid var(--line);
+    border-radius: 999px; background: var(--panel); cursor: pointer;
+  }
+  .modes label:has(input:checked) { border-color: var(--accent); background: var(--accent-soft); }
+  .modes input { accent-color: var(--accent); margin: 0; }
+  .mode-help { color: var(--muted); font-size: 13px; margin: -6px 0 18px; }
+  .pair { display: grid; grid-template-columns: 1fr auto 1fr; gap: 12px; align-items: stretch; }
+  .arrow { align-self: center; font-size: 22px; color: var(--muted); }
+  .card {
+    background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 14px;
+    box-shadow: var(--shadow); display: flex; flex-direction: column; gap: 8px; min-height: 230px;
+  }
+  .card .tag { font-size: 12px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; }
+  .card.start .tag { color: var(--accent); }
+  .card.goal .tag { color: var(--target); }
+  .card .row { display: flex; gap: 12px; align-items: flex-start; }
+  .card img { width: 72px; height: 72px; object-fit: contain; image-rendering: pixelated; flex: none; }
+  .card .title { font-size: 19px; font-weight: 650; margin: 0; }
+  .card .desc { color: var(--muted); font-size: 13.5px; margin: 0;
+    display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; }
+  .card .actions { margin-top: auto; display: flex; gap: 8px; flex-wrap: wrap; }
+  .card input[type=text] { flex: 1; min-width: 0; padding: 6px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); }
+  .setup-actions { display: flex; gap: 10px; align-items: center; margin-top: 20px; flex-wrap: wrap; }
+  .status { color: var(--muted); font-size: 13.5px; }
+  .status.err { color: var(--target); }
+  .history { margin-top: 36px; }
+  .history h2 { font-size: 15px; margin: 0 0 8px; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: .06em; }
+  .history table { width: 100%; border-collapse: collapse; font-size: 13.5px; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+  .history th, .history td { text-align: left; padding: 7px 10px; border-bottom: 1px solid var(--line); }
+  .history th { color: var(--muted); font-weight: 600; }
+  .history tr:last-child td { border-bottom: 0; }
+  .history .lost { color: var(--muted); }
+  .history-wrap { overflow-x: auto; }
+
+  /* ---------- Game screen ---------- */
+  #game { display: grid; grid-template-rows: auto 1fr; height: 100%; }
+  .hud {
+    display: flex; gap: 16px; align-items: center; padding: 8px 16px; background: var(--panel);
+    border-bottom: 1px solid var(--line); flex-wrap: wrap;
+  }
+  .hud .goal { display: flex; align-items: center; gap: 8px; min-width: 0; flex: 1; }
+  .hud .goal img { width: 32px; height: 32px; object-fit: contain; image-rendering: pixelated; }
+  .hud .goal .lbl { font-size: 11px; font-weight: 700; color: var(--target); letter-spacing: .06em; text-transform: uppercase; }
+  .hud .goal .name { font-weight: 650; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .stat { text-align: right; }
+  .stat .v { font-size: 20px; font-weight: 700; line-height: 1.1; }
+  .stat .k { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; }
+  .hud .btns { display: flex; gap: 8px; }
+  .main { display: grid; grid-template-columns: 220px 1fr; min-height: 0; }
+  .path {
+    border-right: 1px solid var(--line); padding: 12px; overflow-y: auto; background: var(--panel); font-size: 13.5px;
+  }
+  .path h3 { margin: 0 0 8px; font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; }
+  .path ol { margin: 0; padding-left: 22px; }
+  .path li { padding: 2px 0; word-break: break-word; }
+  .path li.cur { font-weight: 650; }
+  .path li.back { color: var(--muted); font-style: italic; }
+  .viewer { position: relative; min-height: 0; background: var(--bg); }
+  .viewer iframe { border: 0; width: 100%; height: 100%; display: block; background: var(--bg); }
+  .overlay {
+    position: absolute; inset: 0; display: grid; place-items: center; background: color-mix(in srgb, var(--bg) 75%, transparent);
+    color: var(--ink); font-weight: 600;
+  }
+  .overlay .box { background: var(--panel); border: 1px solid var(--line); padding: 16px 20px; border-radius: 12px; box-shadow: var(--shadow); text-align: center; max-width: 360px; }
+  .spinner { width: 22px; height: 22px; border: 3px solid var(--line); border-top-color: var(--accent); border-radius: 50%; animation: spin .8s linear infinite; margin: 0 auto 8px; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ---------- Modal ---------- */
+  .modal-bg { position: fixed; inset: 0; background: rgba(0,0,0,.45); display: grid; place-items: center; padding: 16px; z-index: 10; }
+  .modal { background: var(--panel); color: var(--ink); border-radius: 14px; padding: 22px; max-width: 520px; width: 100%; box-shadow: var(--shadow); max-height: 90vh; overflow-y: auto; }
+  .modal h2 { margin: 0 0 6px; font-size: 22px; }
+  .modal .big { display: flex; gap: 24px; margin: 14px 0; }
+  .modal .big .stat { text-align: left; }
+  .modal .big .v { font-size: 30px; }
+  .modal ol { padding-left: 22px; margin: 6px 0 16px; font-size: 14px; }
+  .modal .actions { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+  .modal .peek { display: flex; gap: 14px; align-items: flex-start; }
+  .modal .peek img { width: 96px; height: 96px; object-fit: contain; image-rendering: pixelated; flex: none; }
+  .modal p { margin: 0 0 12px; }
+  .note { color: var(--muted); font-size: 13px; }
+
+  @media (max-width: 720px) {
+    .pair { grid-template-columns: 1fr; }
+    .arrow { justify-self: center; transform: rotate(90deg); }
+    .main { grid-template-columns: 1fr; grid-template-rows: auto 1fr; }
+    .path { border-right: 0; border-bottom: 1px solid var(--line); max-height: 84px; padding: 8px 16px; }
+    .path ol { display: flex; flex-wrap: wrap; gap: 4px 14px; padding-left: 18px; }
+    .hud { gap: 10px; padding: 8px 16px; }
+    .stat .v { font-size: 17px; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ======================= SETUP ======================= -->
+<section id="setup">
+  <h1>Minecraft Wiki Game</h1>
+  <p class="sub">Get from the start article to the target article using only links inside minecraft.wiki articles. Fewest clicks and fastest time wins.</p>
+
+  <div class="modes" role="radiogroup" aria-label="Article pool">
+    <label><input type="radio" name="mode" value="classic" checked> Classic</label>
+    <label><input type="radio" name="mode" value="chaos"> Chaos</label>
+  </div>
+  <p class="mode-help" id="modeHelp"></p>
+
+  <div class="pair">
+    <div class="card start" id="cardStart">
+      <span class="tag">Start</span>
+      <div class="row"><img alt="" class="hidden"><div><p class="title">…</p><p class="desc"></p></div></div>
+      <div class="actions">
+        <button data-reroll="start">🎲 Reroll</button>
+        <input type="text" placeholder="or type an article…" data-custom="start" aria-label="Custom start article">
+      </div>
+    </div>
+    <div class="arrow">➜</div>
+    <div class="card goal" id="cardGoal">
+      <span class="tag">Target</span>
+      <div class="row"><img alt="" class="hidden"><div><p class="title">…</p><p class="desc"></p></div></div>
+      <div class="actions">
+        <button data-reroll="goal">🎲 Reroll</button>
+        <input type="text" placeholder="or type an article…" data-custom="goal" aria-label="Custom target article">
+      </div>
+    </div>
+  </div>
+
+  <div class="setup-actions">
+    <button class="primary" id="btnPlay" disabled>Start game</button>
+    <button id="btnRerollBoth">🎲 Reroll both</button>
+    <button id="btnSwap">⇄ Swap</button>
+    <button id="btnCopy" title="Copy a link that opens this exact pair">Copy challenge link</button>
+    <span class="status" id="setupStatus"></span>
+  </div>
+
+  <div class="history hidden" id="history">
+    <h2>Recent games</h2>
+    <div class="history-wrap"><table><thead><tr><th>Start</th><th>Target</th><th>Clicks</th><th>Time</th><th>When</th></tr></thead><tbody></tbody></table></div>
+  </div>
+</section>
+
+<!-- ======================= GAME ======================= -->
+<section id="game" class="hidden">
+  <div class="hud">
+    <div class="goal">
+      <img alt="" id="hudImg" class="hidden">
+      <div style="min-width:0">
+        <div class="lbl">Target</div>
+        <div class="name" id="hudGoal"></div>
+      </div>
+      <button class="link" id="btnPeek" style="margin-left:6px;font-size:13px">what is it?</button>
+    </div>
+    <div class="stat"><div class="v mono" id="hudClicks">0</div><div class="k">Clicks</div></div>
+    <div class="stat"><div class="v mono" id="hudTime">0:00</div><div class="k">Time</div></div>
+    <div class="btns">
+      <button id="btnBack" title="Go back to the previous article (counts as a click)">← Back</button>
+      <button id="btnGiveUp">Give up</button>
+    </div>
+  </div>
+  <div class="main">
+    <aside class="path"><h3>Your path</h3><ol id="pathList"></ol></aside>
+    <div class="viewer">
+      <iframe id="frame" title="Wiki article" sandbox="allow-scripts"></iframe>
+      <div class="overlay hidden" id="overlay"><div class="box" id="overlayBox"></div></div>
+    </div>
+  </div>
+</section>
+
+<div class="modal-bg hidden" id="modalBg"><div class="modal" id="modal" role="dialog" aria-modal="true"></div></div>
+
+<script>
+'use strict';
+
+const WIKI = 'https://minecraft.wiki';
+const API = WIKI + '/api.php';
+
+// Categories the Classic pool draws from: one is chosen uniformly, then one article from it.
+const POOL_CATEGORIES = [
+  'Blocks', 'Items', 'Hostile mobs', 'Passive mobs', 'Neutral mobs', 'Boss mobs',
+  'Overworld biomes', 'Nether biomes', 'End biomes', 'Generated structures',
+  'Enchantments', 'Effects', 'Food', 'Tools', 'Weapons', 'Armor', 'Redstone', 'Plants', 'Gameplay',
+];
+
+// Non-article namespaces on minecraft.wiki (from meta=siteinfo). Links into these are disabled.
+const NAMESPACES = [
+  'Media', 'Special', 'Talk', 'User', 'User talk', 'Minecraft Wiki', 'Minecraft Wiki talk', 'Project', 'Project talk',
+  'File', 'File talk', 'Image', 'Image talk', 'MediaWiki', 'MediaWiki talk', 'Template', 'Template talk',
+  'Help', 'Help talk', 'Category', 'Category talk', 'Module', 'Module talk', 'Bucket', 'Bucket talk',
+  'Dungeons', 'Dungeons talk', 'Earth', 'Earth talk', 'Story Mode', 'Story Mode talk', 'Legends', 'Legends talk',
+  'Forum', 'Forum talk', 'Tutorial', 'Tutorial talk', 'Movie', 'Movie talk', 'Dungeons II', 'Dungeons II talk',
+];
+
+// Chaos mode: list=random returns lots of version/changelog/history pages; skip those.
+const CHAOS_REJECT = /\/|\(disambiguation\)$|^(Java|Bedrock|Pocket|Education|Legacy Console|PlayStation \d|Xbox( 360| One)?|Nintendo|Wii U|New Nintendo 3DS|Pi|Minecraft Launcher|Launcher|Realms|China) Edition|^(Launcher|Minecraft Launcher|Bedrock Dedicated Server|Server) \d|^\d+w\d+[a-z]$|\b\d+\.\d+(\.\d+)?\b/i;
+
+const MIN_BACKLINKS = 5;   // a target must have at least this many incoming article links
+const WIKI_STYLES = [
+  'ext.embedVideo.styles|jquery.makeCollapsible.styles|jquery.tablesorter.styles|mediawiki.page.gallery.styles|skins.vector.styles.legacy',
+  'ext.gadget.site-styles|ext.gadget.sound-styles',
+  'site.styles',
+].map(m => `${WIKI}/load.php?lang=en&modules=${encodeURIComponent(m)}&only=styles&skin=vector`);
+
+const $ = (sel, root = document) => root.querySelector(sel);
+const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const pick = arr => arr[Math.floor(Math.random() * arr.length)];
+
+const store = {
+  get(k, d) { try { const v = localStorage.getItem(k); return v == null ? d : JSON.parse(v); } catch { return d; } },
+  set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch { /* storage unavailable */ } },
+};
+
+// ---------------------------------------------------------------- API helpers
+async function api(params) {
+  const url = new URL(API);
+  // origin=* is required for anonymous CORS from a file:// page.
+  for (const [k, v] of Object.entries({ format: 'json', formatversion: '2', origin: '*', ...params })) url.searchParams.set(k, v);
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  const data = await res.json();
+  if (data.error) throw new Error(data.error.info || data.error.code);
+  return data;
+}
+
+const categoryCache = new Map();
+async function categoryMembers(cat) {
+  if (categoryCache.has(cat)) return categoryCache.get(cat);
+  const titles = [];
+  let cont = {};
+  do {
+    const d = await api({ action: 'query', list: 'categorymembers', cmtitle: 'Category:' + cat, cmtype: 'page', cmnamespace: '0', cmlimit: '500', ...cont });
+    for (const m of d.query.categorymembers) titles.push(m.title);
+    cont = d.continue || null;
+  } while (cont);
+  const clean = titles.filter(t => !t.includes('/') && !/\(disambiguation\)$/.test(t));
+  categoryCache.set(cat, clean);
+  return clean;
+}
+
+async function randomChaosTitle() {
+  for (let i = 0; i < 6; i++) {
+    const d = await api({ action: 'query', list: 'random', rnnamespace: '0', rnfilterredir: 'nonredirects', rnlimit: '50' });
+    const ok = d.query.random.map(p => p.title).filter(t => !CHAOS_REJECT.test(t));
+    if (ok.length) return pick(ok);
+  }
+  throw new Error('Could not find a suitable random article');
+}
+
+async function randomTitle(mode) {
+  if (mode === 'chaos') return randomChaosTitle();
+  const list = await categoryMembers(pick(POOL_CATEGORIES));
+  return pick(list);
+}
+
+async function backlinkCount(title) {
+  const d = await api({ action: 'query', list: 'backlinks', bltitle: title, blnamespace: '0', bllimit: String(MIN_BACKLINKS), blfilterredir: 'nonredirects' });
+  return d.query.backlinks.length;
+}
+
+// Resolves redirects/normalisation and returns { title, desc, img, disambig } or null if missing.
+async function pageInfo(title) {
+  const d = await api({ action: 'query', titles: title, redirects: '1', prop: 'pageprops|pageimages', ppprop: 'description|disambiguation', piprop: 'thumbnail', pithumbsize: '160' });
+  const p = d.query.pages[0];
+  if (!p || p.missing || p.invalid || p.ns !== 0) return null;
+  return {
+    title: p.title,
+    desc: p.pageprops?.description || '',
+    img: p.thumbnail?.source || '',
+    disambig: p.pageprops && 'disambiguation' in p.pageprops,
+  };
+}
+
+// ---------------------------------------------------------------- Setup screen
+const setup = { start: null, goal: null, busy: 0 };
+
+function mode() { return document.querySelector('input[name=mode]:checked').value; }
+
+function updateModeHelp() {
+  $('#modeHelp').textContent = mode() === 'classic'
+    ? 'Classic: start and target are drawn from game content: blocks, items, mobs, biomes, structures, enchantments, effects and more.'
+    : 'Chaos: any article on the wiki (version and history pages filtered out). Expect obscure starting points.';
+}
+
+function renderCard(which) {
+  const card = which === 'start' ? $('#cardStart') : $('#cardGoal');
+  const info = setup[which];
+  const img = $('img', card);
+  $('.title', card).textContent = info ? info.title : '…';
+  $('.desc', card).textContent = info ? (info.desc || 'No description available.') : '';
+  if (info?.img) { img.src = info.img; img.classList.remove('hidden'); } else { img.removeAttribute('src'); img.classList.add('hidden'); }
+  const same = setup.start && setup.goal && setup.start.title === setup.goal.title;
+  $('#btnPlay').disabled = !(setup.start && setup.goal) || same || setup.busy > 0;
+  if (same && setup.busy === 0) setStatus('Start and target are the same article. Pick a different one.', true);
+}
+
+function setStatus(msg, isErr) {
+  const el = $('#setupStatus');
+  el.textContent = msg || '';
+  el.classList.toggle('err', !!isErr);
+}
+
+async function withBusy(fn) {
+  setup.busy++;
+  $('#btnPlay').disabled = true;
+  try { return await fn(); }
+  catch (e) { setStatus('Network error: ' + e.message + '. Check your connection and try again.', true); }
+  finally { setup.busy--; renderCard('start'); }
+}
+
+async function rollOne(which) {
+  const other = which === 'start' ? setup.goal : setup.start;
+  for (let attempt = 0; attempt < 12; attempt++) {
+    const info = await pageInfo(await randomTitle(mode()));
+    if (!info || info.disambig || (other && info.title === other.title)) continue;
+    if (which === 'goal' && (await backlinkCount(info.title)) < MIN_BACKLINKS) continue;
+    return info;
+  }
+  throw new Error('Gave up finding a good article');
+}
+
+async function reroll(which) {
+  const targets = which === 'both' ? ['start', 'goal'] : [which];
+  setStatus('Picking…');
+  await withBusy(async () => {
+    for (const w of targets) { setup[w] = null; renderCard(w); }
+    for (const w of targets) { setup[w] = await rollOne(w); renderCard(w); }
+    setStatus('');
+  });
+}
+
+async function setCustom(which, raw) {
+  const text = raw.trim();
+  if (!text) return;
+  setStatus('Looking up “' + text + '”…');
+  await withBusy(async () => {
+    const info = await pageInfo(text);
+    if (!info) { setStatus('No article named “' + text + '” on minecraft.wiki.', true); return; }
+    setup[which] = info;
+    renderCard(which);
+    setStatus(info.disambig ? 'Heads up: “' + info.title + '” is a disambiguation page.' : '');
+  });
+}
+
+function challengeLink() {
+  const base = location.href.split('#')[0];
+  return `${base}#start=${encodeURIComponent(setup.start.title)}&target=${encodeURIComponent(setup.goal.title)}`;
+}
+
+function renderHistory() {
+  const rows = store.get('mwg.history', []);
+  $('#history').classList.toggle('hidden', rows.length === 0);
+  $('#history tbody').innerHTML = rows.slice(0, 15).map(r => `
+    <tr class="${r.won ? '' : 'lost'}">
+      <td>${esc(r.start)}</td><td>${esc(r.goal)}</td>
+      <td class="mono">${r.won ? r.clicks : 'gave up'}</td>
+      <td class="mono">${fmtTime(r.ms)}</td>
+      <td>${esc(new Date(r.at).toLocaleDateString())}</td>
+    </tr>`).join('');
+}
+
+// ---------------------------------------------------------------- Game
+const game = {
+  active: false,
+  start: null, goal: null,
+  path: [],          // every article visited, in order (includes back-navigation)
+  stack: [],         // navigation stack for the Back button
+  elapsed: 0,        // ms of reading time; time spent loading articles is not counted
+  runningSince: 0,
+  loading: false,
+  navToken: 0,
+  timer: 0,
+};
+
+function fmtTime(ms) {
+  const s = Math.floor(ms / 1000);
+  const h = Math.floor(s / 3600), m = Math.floor(s / 60) % 60, sec = s % 60;
+  return (h ? h + ':' + String(m).padStart(2, '0') : m) + ':' + String(sec).padStart(2, '0');
+}
+function now() { return game.elapsed + (game.runningSince ? performance.now() - game.runningSince : 0); }
+function pauseClock() { if (game.runningSince) { game.elapsed += performance.now() - game.runningSince; game.runningSince = 0; } }
+function resumeClock() { if (!game.runningSince && game.active) game.runningSince = performance.now(); }
+function clicks() { return Math.max(0, game.path.length - 1); }
+
+function renderHud() {
+  $('#hudClicks').textContent = clicks();
+  $('#hudTime').textContent = fmtTime(now());
+  $('#btnBack').disabled = game.stack.length < 2 || game.loading || !game.active;
+  $('#pathList').innerHTML = game.path.map((p, i) =>
+    `<li class="${i === game.path.length - 1 ? 'cur' : ''} ${p.back ? 'back' : ''}">${esc(p.title)}${p.back ? ' (back)' : ''}</li>`).join('');
+  const pl = $('.path'); pl.scrollTop = pl.scrollHeight;
+}
+
+function showOverlay(html) { $('#overlayBox').innerHTML = html; $('#overlay').classList.remove('hidden'); }
+function hideOverlay() { $('#overlay').classList.add('hidden'); }
+
+function startGame() {
+  Object.assign(game, { active: true, start: setup.start, goal: setup.goal, path: [], stack: [], elapsed: 0, runningSince: 0 });
+  $('#hudGoal').textContent = game.goal.title;
+  const hi = $('#hudImg');
+  if (game.goal.img) { hi.src = game.goal.img; hi.classList.remove('hidden'); } else hi.classList.add('hidden');
+  $('#setup').classList.add('hidden');
+  $('#game').classList.remove('hidden');
+  clearInterval(game.timer);
+  game.timer = setInterval(() => { $('#hudTime').textContent = fmtTime(now()); }, 250);
+  history.replaceState(null, '', location.pathname + location.search);
+  navigate(game.start.title, null, { initial: true });
+}
+
+async function navigate(title, fragment, { initial = false, back = false } = {}) {
+  if (!game.active || game.loading) return;
+  const token = ++game.navToken;
+  game.loading = true;
+  pauseClock();
+  renderHud();
+  showOverlay(`<div class="spinner"></div>Loading ${esc(title)}…`);
+  let d;
+  try {
+    d = await api({ action: 'parse', page: title, prop: 'text|displaytitle', redirects: '1', disableeditsection: '1', disablelimitreport: '1' });
+  } catch (e) {
+    if (token !== game.navToken) return;
+    game.loading = false;
+    showOverlay(`Couldn’t load <b>${esc(title)}</b>.<br><span class="note">${esc(e.message)}</span><br><br>
+      <button class="primary" id="btnRetry">Retry</button> <button id="btnCancelNav">Cancel</button>`);
+    $('#btnRetry').onclick = () => navigate(title, fragment, { initial, back });
+    $('#btnCancelNav').onclick = () => { hideOverlay(); resumeClock(); renderHud(); };
+    return;
+  }
+  if (token !== game.navToken || !game.active) return;
+  const page = d.parse;
+  if (back) game.stack.pop(); else game.stack.push(page.title);
+  game.path.push({ title: page.title, back });
+  game.loading = false;
+  renderArticle(page, fragment);
+  hideOverlay();
+  renderHud();
+  // Compare the post-redirect title, so following a redirect onto the target counts as arriving.
+  if (page.title === game.goal.title) { finish(true); return; }
+  resumeClock();
+}
+
+function themeIsDark() {
+  const forced = document.documentElement.dataset.theme;
+  return forced ? forced === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches;
+}
+
+function renderArticle(page, fragment) {
+  const dark = themeIsDark();
+  // The article renders in a sandboxed iframe (opaque origin): the wiki's own CSS applies untouched,
+  // <base> resolves its relative image/CSS URLs, and the inline script reports clicks via postMessage.
+  const frameScript = `
+    const NS = ${JSON.stringify(NAMESPACES)};
+    const FRAG = ${JSON.stringify(fragment || '')};
+    function classify(a) {
+      const href = a.getAttribute('href') || '';
+      if (href.startsWith('#')) return { kind: 'anchor', id: decodeURIComponent(href.slice(1)) };
+      if (!href.startsWith('/w/') || a.classList.contains('new')) return null;
+      let rest = href.slice(3);
+      if (rest.includes('?')) return null;
+      let frag = '';
+      const h = rest.indexOf('#');
+      if (h >= 0) { frag = rest.slice(h + 1); rest = rest.slice(0, h); }
+      let t;
+      try { t = decodeURIComponent(rest).replace(/_/g, ' '); frag = decodeURIComponent(frag); } catch (e) { return null; }
+      const c = t.indexOf(':');
+      if (c > 0) {
+        const pre = t.slice(0, c).trim().toLowerCase();
+        if (NS.some(n => n.toLowerCase() === pre)) return null;
+      }
+      return { kind: 'article', title: t, frag };
+    }
+    function scrollToId(id) {
+      if (!id) return;
+      const el = document.getElementById(id) || document.getElementById(id.replace(/ /g, '_'));
+      if (el) el.scrollIntoView({ block: 'start' });
+    }
+    for (const a of document.querySelectorAll('a')) {
+      const c = classify(a);
+      if (!c) a.classList.add('mwg-dead');
+      else if (c.kind === 'article') a.classList.add('mwg-live');
+      a.removeAttribute('target');
+    }
+    document.addEventListener('click', e => {
+      const a = e.target.closest('a');
+      if (!a) return;
+      e.preventDefault();
+      const c = classify(a);
+      if (!c) return;
+      if (c.kind === 'anchor') scrollToId(c.id);
+      else parent.postMessage({ mwg: 'nav', title: c.title, frag: c.frag }, '*');
+    }, true);
+    document.addEventListener('submit', e => e.preventDefault(), true);
+    document.addEventListener('keydown', e => parent.postMessage({ mwg: 'key', key: e.key }, '*'));
+    scrollToId(FRAG);
+  `.replace(/<\/script/gi, '<\\/script');
+
+  const html = `<!doctype html>
+<html class="client-nojs" lang="en" dir="ltr"><head><meta charset="utf-8">
+<base href="${WIKI}/">
+${WIKI_STYLES.map(h => `<link rel="stylesheet" href="${esc(h)}">`).join('\n')}
+<style>
+  html, body { background: ${dark ? '#121212' : '#fff'} !important; }
+  body { margin: 0; }
+  #content { margin: 0 !important; border: 0 !important; padding: 20px 28px 60px !important; max-width: 1200px; background: transparent !important; }
+  .mw-editsection, iframe, .embedvideo, .mw-ext-embedvideo, audio, video { display: none !important; }
+  a.mwg-dead { color: inherit !important; text-decoration: none !important; cursor: not-allowed; opacity: .6; }
+  a.mwg-dead img { opacity: 1; }
+  a.mwg-live { cursor: pointer; }
+</style>
+</head><body class="mediawiki ltr sitedir-ltr ns-0 ns-subject skin-vector skin-vector-legacy action-view ${dark ? 'wgl-darkmode wgl-theme-dark' : 'wgl-lightmode wgl-theme-light'}">
+<div id="content" class="mw-body" role="main">
+  <h1 id="firstHeading" class="firstHeading mw-first-heading">${page.displaytitle || esc(page.title)}</h1>
+  <div id="bodyContent" class="vector-body"><div id="mw-content-text" class="mw-body-content mw-content-ltr">${page.text}</div></div>
+</div>
+<script>${frameScript}<\/script>
+</body></html>`;
+  $('#frame').srcdoc = html;
+}
+
+window.addEventListener('message', e => {
+  if (e.source !== $('#frame').contentWindow || !e.data) return;
+  if (e.data.mwg === 'nav') navigate(e.data.title, e.data.frag);
+  if (e.data.mwg === 'key' && e.data.key === 'Escape' && modalDismissable) closeModal();
+});
+
+function goBack() {
+  if (game.stack.length < 2 || game.loading) return;
+  navigate(game.stack[game.stack.length - 2], null, { back: true });
+}
+
+function finish(won) {
+  pauseClock();
+  game.active = false;
+  game.navToken++;
+  clearInterval(game.timer);
+  renderHud();
+  const ms = now();
+  const rec = { start: game.start.title, goal: game.goal.title, won, clicks: clicks(), ms, at: Date.now(), path: game.path.map(p => p.title) };
+  const hist = store.get('mwg.history', []);
+  const best = hist.filter(r => r.won && r.start === rec.start && r.goal === rec.goal)
+    .sort((a, b) => a.clicks - b.clicks || a.ms - b.ms)[0];
+  hist.unshift(rec);
+  store.set('mwg.history', hist.slice(0, 50));
+
+  const pathHtml = game.path.map(p => `<li>${esc(p.title)}${p.back ? ' <span class="note">(back)</span>' : ''}</li>`).join('');
+  let bestNote = '';
+  if (won && best) {
+    bestNote = (rec.clicks < best.clicks || (rec.clicks === best.clicks && rec.ms < best.ms))
+      ? '<p class="note">New personal best for this pair!</p>'
+      : `<p class="note">Your best for this pair: ${best.clicks} clicks in ${fmtTime(best.ms)}.</p>`;
+  }
+  openModal(`
+    <h2>${won ? '🎉 You made it!' : 'Game over'}</h2>
+    <p class="note">${esc(rec.start)} → ${esc(rec.goal)}</p>
+    <div class="big">
+      <div class="stat"><div class="v mono">${won ? rec.clicks : '—'}</div><div class="k">Clicks</div></div>
+      <div class="stat"><div class="v mono">${fmtTime(ms)}</div><div class="k">Time</div></div>
+      <div class="stat"><div class="v mono">${game.path.length}</div><div class="k">Pages seen</div></div>
+    </div>
+    ${bestNote}
+    <strong>Path</strong>
+    <ol>${pathHtml}</ol>
+    <div class="actions">
+      <button id="mCopy">Copy result</button>
+      <button id="mSame">Retry this pair</button>
+      <button class="primary" id="mNew">New game</button>
+    </div>`, false);
+  $('#mCopy').onclick = async () => {
+    const text = `Minecraft Wiki Game: ${rec.start} → ${rec.goal}\n` +
+      (won ? `${rec.clicks} clicks in ${fmtTime(ms)}\n` : `Gave up after ${fmtTime(ms)}\n`) +
+      rec.path.join(' → ');
+    try { await navigator.clipboard.writeText(text); $('#mCopy').textContent = 'Copied!'; }
+    catch { $('#mCopy').textContent = 'Copy failed'; }
+  };
+  $('#mSame').onclick = () => { closeModal(); startGame(); };
+  $('#mNew').onclick = () => { closeModal(); toSetup(); reroll('both'); };
+}
+
+function toSetup() {
+  game.active = false;
+  clearInterval(game.timer);
+  $('#frame').srcdoc = '';
+  $('#game').classList.add('hidden');
+  $('#setup').classList.remove('hidden');
+  renderHistory();
+}
+
+// ---------------------------------------------------------------- Modal
+let modalDismissable = true;
+function openModal(html, dismissable = true) {
+  modalDismissable = dismissable;
+  $('#modal').innerHTML = html;
+  $('#modalBg').classList.remove('hidden');
+}
+function closeModal() {
+  if ($('#modalBg').classList.contains('hidden')) return;
+  $('#modalBg').classList.add('hidden');
+  if (game.active && !game.loading) resumeClock();
+}
+$('#modalBg').addEventListener('click', e => { if (e.target === $('#modalBg') && modalDismissable) closeModal(); });
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && modalDismissable) closeModal(); });
+
+// ---------------------------------------------------------------- Wiring
+document.querySelectorAll('input[name=mode]').forEach(r => r.addEventListener('change', () => { updateModeHelp(); reroll('both'); }));
+document.querySelectorAll('[data-reroll]').forEach(b => b.addEventListener('click', () => reroll(b.dataset.reroll)));
+document.querySelectorAll('[data-custom]').forEach(inp => {
+  inp.addEventListener('keydown', e => { if (e.key === 'Enter') { setCustom(inp.dataset.custom, inp.value); inp.value = ''; } });
+});
+$('#btnRerollBoth').onclick = () => reroll('both');
+$('#btnSwap').onclick = () => { [setup.start, setup.goal] = [setup.goal, setup.start]; renderCard('start'); renderCard('goal'); };
+$('#btnPlay').onclick = startGame;
+$('#btnCopy').onclick = async () => {
+  if (!setup.start || !setup.goal) return;
+  try { await navigator.clipboard.writeText(challengeLink()); setStatus('Challenge link copied.'); }
+  catch { setStatus(challengeLink()); }
+};
+$('#btnBack').onclick = goBack;
+$('#btnGiveUp').onclick = () => {
+  if (!game.active) return;
+  pauseClock();
+  openModal(`<h2>Give up?</h2><p>Your time is paused.</p>
+    <div class="actions"><button id="gKeep">Keep going</button><button class="primary" id="gQuit">Give up</button></div>`);
+  $('#gKeep').onclick = closeModal;
+  $('#gQuit').onclick = () => { $('#modalBg').classList.add('hidden'); finish(false); };
+};
+$('#btnPeek').onclick = () => {
+  const g = game.goal;
+  openModal(`<h2>Target: ${esc(g.title)}</h2>
+    <div class="peek">${g.img ? `<img src="${esc(g.img)}" alt="">` : ''}<p>${esc(g.desc || 'No description available.')}</p></div>
+    <p class="note">The clock keeps running while you peek.</p>
+    <div class="actions"><button class="primary" id="pClose">Back to the hunt</button></div>`);
+  $('#pClose').onclick = closeModal;
+};
+// Initial load: a #start=…&target=… hash plays that exact pair, otherwise roll a random one.
+(async function init() {
+  updateModeHelp();
+  renderHistory();
+  const h = new URLSearchParams(location.hash.slice(1));
+  if (h.get('start') && h.get('target')) {
+    setStatus('Loading challenge…');
+    await withBusy(async () => {
+      const [s, g] = await Promise.all([pageInfo(h.get('start')), pageInfo(h.get('target'))]);
+      if (!s || !g) throw new Error('challenge articles not found');
+      setup.start = s; setup.goal = g;
+      renderCard('start'); renderCard('goal');
+      setStatus('Challenge loaded. Press Start when ready.');
+    });
+    if (!setup.start || !setup.goal) reroll('both');
+  } else {
+    reroll('both');
+  }
+})();
+</script>
+</body>
+</html>

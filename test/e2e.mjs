@@ -7,7 +7,8 @@ const [port, fileUrl, shotDir] = process.argv.slice(2);
 const ws = new WebSocket(`ws://127.0.0.1:${port}/session`);
 let id = 0;
 const pending = new Map();
-ws.onmessage = m => { const d = JSON.parse(m.data); if (d.id && pending.has(d.id)) { pending.get(d.id)(d); pending.delete(d.id); } };
+let onEvent = () => {};
+ws.onmessage = m => { const d = JSON.parse(m.data); if (d.id && pending.has(d.id)) { pending.get(d.id)(d); pending.delete(d.id); } else if (d.method) onEvent(d); };
 const send = (method, params) => new Promise(r => { const i = ++id; pending.set(i, r); ws.send(JSON.stringify({ id: i, method, params })); });
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
@@ -250,6 +251,40 @@ const nav = JSON.parse(await ev(`JSON.stringify({ boxes: document.querySelectorA
   shown: [...document.querySelectorAll('.navbox, #Navigation')].filter(e => e.checkVisibility()).length,
   liveInBox: document.querySelectorAll('.navbox a.mwg-live').length, live: document.querySelectorAll('a.mwg-live').length })`, f));
 check('No navboxes hides navboxes and kills their links', nav.boxes > 0 && nav.shown === 0 && nav.liveInBox === 0 && nav.live > 50, JSON.stringify(nav));
+
+// A failed image is loaded again once; one that fails twice gets mwg-broken, which keeps its box and hides its alt text.
+// Two icons are added to the article and their requests intercepted: the first fails once and then goes through to the
+// wiki, the second always fails.
+const icon = k => `https://minecraft.wiki/images/Invicon_Nether_Wart.png?mwg-${k}`;
+const tries = {};
+onEvent = d => {
+  if (d.method !== 'network.beforeRequestSent' || !d.params.isBlocked) return;
+  const { request, url } = d.params.request;
+  tries[url] = (tries[url] || 0) + 1;
+  send(tries[url] === 1 || url === icon('broken') ? 'network.failRequest' : 'network.continueRequest', { request });
+};
+await send('session.subscribe', { events: ['network.beforeRequestSent'] });
+const intercept = (await send('network.addIntercept', { phases: ['beforeRequestSent'],
+  urlPatterns: ['retry', 'broken'].map(k => ({ type: 'string', pattern: icon(k) })) })).result.intercept;
+await ev(`for (const k of ['retry', 'broken']) {
+  const img = document.createElement('img');
+  img.id = 'test-' + k;
+  img.alt = 'A long alt text that would run far out of a 32 pixel inventory slot';
+  img.width = img.height = 32;
+  document.body.prepend(img);
+  img.src = '/images/Invicon_Nether_Wart.png?mwg-' + k;
+}`, f);
+const retried = "document.getElementById('test-retry')", broken = "document.getElementById('test-broken')";
+check('a failed image is retried and loads', await until(`${retried}.naturalWidth > 0 && !${retried}.classList.contains('mwg-broken')`, 15000, f)
+  && tries[icon('retry')] === 2, `tries=${JSON.stringify(tries)}`);
+const brokenLook = `(r => r.width + 'x' + r.height + ' ' + getComputedStyle(${broken}).color)(${broken}.getBoundingClientRect())`;
+check('an image that fails twice keeps its box and hides its alt text', await until(`${broken}.classList.contains('mwg-broken')`, 15000, f)
+  && await ev(`${brokenLook} === '32x32 rgba(0, 0, 0, 0)'`, f) && tries[icon('broken')] === 2,
+  `${await ev(brokenLook, f)} tries=${JSON.stringify(tries)}`);
+await shot('5-broken-image');
+await send('network.removeIntercept', { intercept });
+await send('session.unsubscribe', { events: ['network.beforeRequestSent'] });
+onEvent = () => {};
 
 // Daily: #daily=<date> loads that day's pair and rule, the same on every call, a different pair the next day. 2026-01-02's
 // rule is Checkpoint, so it also fixes the checkpoint; 2026-01-01's is No Back, which picks none. The result records it.

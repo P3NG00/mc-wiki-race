@@ -953,6 +953,18 @@ function renderArticle(page, fragment, token, blocked = []) {
   const html = `<!doctype html>
 <html class="client-nojs" lang="en" dir="ltr"><head><meta charset="utf-8">
 <base href="${WIKI}/">
+<script>
+  // Ahead of the stylesheets, so it runs without waiting for them and sees images that fail while the body is parsed.
+  // A failed image is loaded again once after a pause. If that fails too, mwg-broken hides its alt text, which would
+  // otherwise run out of the image's box (on inventory icons it is a whole sentence).
+  document.addEventListener('error', e => {
+    const img = e.target;
+    if (img.tagName !== 'IMG') return;
+    if (img.mwgRetried) { img.classList.add('mwg-broken'); return; }
+    img.mwgRetried = true;
+    setTimeout(() => img.setAttribute('src', img.getAttribute('src')), 2000);
+  }, true);
+<\/script>
 ${WIKI_STYLES.map(h => `<link rel="stylesheet" href="${esc(h)}">`).join('\n')}
 <style>
   html, body { background: #fff !important; }
@@ -963,6 +975,7 @@ ${WIKI_STYLES.map(h => `<link rel="stylesheet" href="${esc(h)}">`).join('\n')}
   a.mwg-dead { color: inherit !important; text-decoration: none !important; cursor: not-allowed; opacity: .6; }
   a.mwg-dead img { opacity: 1; }
   a.mwg-live { cursor: pointer; }
+  img.mwg-broken { display: inline-block; overflow: hidden; color: transparent; }
   ${noNav ? '.navbox, .mw-heading:has(> #Navigation) { display: none !important; }' : ''}
 </style>
 </head><body class="mediawiki ltr sitedir-ltr ns-0 ns-subject skin-vector skin-vector-legacy action-view ${WGL_THEME_CLASSES[dark ? 'dark' : 'light'].join(' ')}">

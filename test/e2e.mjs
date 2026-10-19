@@ -332,6 +332,8 @@ f = await frameCtx();
 await ev("[...document.querySelectorAll('a.mwg-live')].find(a => a.getAttribute('href') === '/w/Pickaxe').click()", f);
 await until("game.path.length === 3 && !game.loading");
 check('reaching the checkpoint switches to the target', await ev(hudLbl) === 'Target Diamond Pickaxe' && await ev('game.path[2].via === true'), await ev(hudLbl));
+check('reaching the checkpoint is celebrated', await ev("!document.querySelector('#toast').classList.contains('hidden') && document.querySelector('#toast').textContent.includes('Diamond Pickaxe') && document.querySelector('.hud .goal').classList.contains('reached') && document.querySelector('#pathList li.via')?.textContent.includes('Pickaxe')"));
+await shot('6-checkpoint');
 f = await frameCtx();
 await ev("[...document.querySelectorAll('a.mwg-live')].find(a => /Diamond_Pickaxe/i.test(a.getAttribute('href'))).click()", f);
 check('checkpoint game wins', await until("!game.active && !document.querySelector('#modalBg').classList.contains('hidden')"), `clicks=${await ev('clicks()')}`);

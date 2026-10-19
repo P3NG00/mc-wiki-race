@@ -141,6 +141,7 @@
   .path li { padding: 2px 0; word-break: break-word; }
   .path li.cur { font-weight: 650; }
   .path li.back { color: var(--muted); font-style: italic; }
+  .path li.via { color: var(--accent); }
   .viewer { position: relative; min-height: 0; background: var(--bg); }
   .viewer iframe { border: 0; width: 100%; height: 100%; display: block; background: var(--bg); }
   .overlay {
@@ -150,6 +151,16 @@
   .overlay .box { background: var(--panel); border: 1px solid var(--line); padding: 16px 20px; border-radius: var(--radius-lg); box-shadow: var(--shadow); text-align: center; max-width: 360px; }
   .spinner { width: 22px; height: 22px; border: 3px solid var(--line); border-top-color: var(--accent); border-radius: 50%; animation: spin .8s linear infinite; margin: 0 auto 8px; }
   @keyframes spin { to { transform: rotate(360deg); } }
+  /* Reaching the checkpoint: a banner over the article and a flash of the HUD objective, once the article has rendered. */
+  .toast {
+    position: absolute; top: 14px; left: 50%; transform: translateX(-50%); z-index: 1; pointer-events: none;
+    background: var(--accent); color: var(--accent-ink); font-weight: 600; padding: 8px 16px; border-radius: var(--radius-pill);
+    box-shadow: var(--shadow); max-width: calc(100% - 32px); text-align: center; animation: toast 3s ease both;
+  }
+  @keyframes toast { from { opacity: 0; translate: 0 -12px; } 10%, 85% { opacity: 1; translate: 0; } to { opacity: 0; } }
+  .hud .goal.reached { animation: reached 1.2s ease-out; border-radius: var(--radius); }
+  @keyframes reached { from { background: var(--accent-soft); box-shadow: 0 0 0 6px var(--accent-soft); } }
+  @media (prefers-reduced-motion: reduce) { .toast, .hud .goal.reached { animation: none; } }
 
   /* ---------- Modal ---------- */
   .modal-bg { position: fixed; inset: 0; background: rgba(0,0,0,.45); display: grid; place-items: center; padding: 16px; z-index: 10; }
@@ -291,6 +302,7 @@ const THEMES = [...new Set(['auto', 'light', 'dark', ...Array.from(document.quer
     <div class="viewer">
       <iframe id="frame" title="Wiki article" sandbox="allow-scripts"></iframe>
       <div class="overlay hidden" id="overlay"><div class="box" id="overlayBox"></div></div>
+      <div class="toast hidden" id="toast" role="status"></div>
     </div>
   </div>
 </section>
@@ -768,7 +780,7 @@ function renderHud() {
   $('#btnBack').disabled = game.stack.length < 2 || game.loading || !game.active;
   $('#btnGiveUp').disabled = game.loading || !game.active;
   $('#pathList').innerHTML = game.path.map((p, i) =>
-    `<li class="${i === game.path.length - 1 ? 'cur' : ''} ${p.back ? 'back' : ''}">${esc(p.title)}${p.back ? ' (back)' : ''}${p.via ? ' (checkpoint)' : ''}</li>`).join('');
+    `<li class="${i === game.path.length - 1 ? 'cur' : ''} ${p.back ? 'back' : ''} ${p.via ? 'via' : ''}">${esc(p.title)}${p.back ? ' (back)' : ''}${p.via ? ' ✓ checkpoint' : ''}</li>`).join('');
   const pl = $('.path-list'); pl.scrollTop = pl.scrollHeight;
 }
 
@@ -780,17 +792,28 @@ function renderObjective() {
   setImg($('#hudImg'), game.rules.includes('blind') ? '' : objective().img);
 }
 
+// Called once the checkpoint's article has rendered, so the banner isn't hidden behind the loading overlay.
+// The 3 s matches the .toast animation; the timer also hides it when reduced motion turns the animation off.
+function celebrateCheckpoint() {
+  $('#toast').textContent = `✓ Checkpoint reached! Now find ${game.goal.title}`;
+  $('#toast').classList.remove('hidden');
+  $('.hud .goal').classList.add('reached');
+  game.toastTimer = setTimeout(hideToast, 3000);
+}
+function hideToast() { clearTimeout(game.toastTimer); $('#toast').classList.add('hidden'); $('.hud .goal').classList.remove('reached'); }
+
 function showOverlay(html) { $('#overlayBox').innerHTML = html; $('#overlay').classList.remove('hidden'); }
 function hideOverlay() { $('#overlay').classList.add('hidden'); }
 
 function startGame() {
   const r = rules();
-  Object.assign(game, { active: true, start: setup.start, goal: setup.goal, via: r.includes('checkpoint') ? setup.via : null, viaReached: false,
+  Object.assign(game, { active: true, start: setup.start, goal: setup.goal, via: r.includes('checkpoint') ? setup.via : null, viaReached: false, celebrate: false,
     daily: setup.daily, rules: r, path: [], stack: [], elapsed: 0, runningSince: 0, loading: false });
   $('#btnBack').classList.toggle('hidden', game.rules.includes('noback'));
   $('#btnPeek').classList.toggle('hidden', game.rules.includes('blind'));
   renderObjective();
   hideOverlay();
+  hideToast();
   $('#credit').textContent = '';
   $('#setup').classList.add('hidden');
   $('#game').classList.remove('hidden');
@@ -814,6 +837,7 @@ async function navigate(title, fragment, { back = false } = {}) {
   const token = ++game.navToken;
   game.loading = true;   // stays set until the frame reports it has rendered (frameReady)
   pauseClock();
+  hideToast();
   renderHud();
   showOverlay(`<div class="spinner"></div>Loading ${esc(title)}…`);
   let page, hubs;
@@ -839,7 +863,7 @@ async function navigate(title, fragment, { back = false } = {}) {
   if (back) game.stack.pop(); else game.stack.push(page.title);
   const via = !game.viaReached && page.title === game.via?.title;
   game.path.push({ title: page.title, back, ...(via && { via }) });
-  if (via) { game.viaReached = true; renderObjective(); }
+  if (via) { game.viaReached = game.celebrate = true; renderObjective(); }
   $('#credit').innerHTML = `<a href="${esc(wikiUrl(page.title))}" target="_blank" rel="noopener">View on minecraft.wiki</a> · ` +
     `<a href="${LICENSE_URL}" target="_blank" rel="noopener">CC BY-NC-SA 3.0</a>`;
   // The target and checkpoint stay reachable even if they are hubs.
@@ -860,6 +884,7 @@ function frameReady(token) {
   hideOverlay();
   renderHud();
   resumeClock();
+  if (game.celebrate) { game.celebrate = false; celebrateCheckpoint(); }
 }
 
 // ---------------------------------------------------------------- Themes

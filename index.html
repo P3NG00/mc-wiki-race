@@ -72,6 +72,7 @@
   }
   .modes label:has(input:checked) { border-color: var(--accent); background: var(--accent-soft); }
   .modes input { accent-color: var(--accent); margin: 0; }
+  .modes .lbl { align-self: center; color: var(--muted); font-size: 13.5px; }
   .mode-help { color: var(--muted); font-size: 13px; margin: -6px 0 18px; }
   .pair { display: grid; grid-template-columns: 1fr auto 1fr; gap: 12px; align-items: stretch; }
   .arrow { align-self: center; font-size: 22px; color: var(--muted); }
@@ -187,6 +188,7 @@ const THEMES = [...new Set(['auto', 'light', 'dark', ...Array.from(document.quer
     <label><input type="radio" name="mode" value="chaos"> Chaos</label>
   </div>
   <p class="mode-help" id="modeHelp"></p>
+  <div class="modes" role="group" aria-label="Rules" id="rules"></div>
 
   <div class="pair">
     <div class="card start" id="cardStart">
@@ -218,7 +220,7 @@ const THEMES = [...new Set(['auto', 'light', 'dark', ...Array.from(document.quer
 
   <div class="history hidden" id="history">
     <h2>Recent games</h2>
-    <div class="history-wrap"><table><thead><tr><th>Start</th><th>Target</th><th>Clicks</th><th>Time</th><th>When</th></tr></thead><tbody></tbody></table></div>
+    <div class="history-wrap"><table><thead><tr><th>Start</th><th>Target</th><th>Rules</th><th>Clicks</th><th>Time</th><th>When</th></tr></thead><tbody></tbody></table></div>
   </div>
 </section>
 
@@ -393,6 +395,16 @@ const MODE_HELP = {
 };
 function updateModeHelp() { $('#modeHelp').textContent = MODE_HELP[mode()]; }
 
+// Optional rules, as checkboxes under the modes. The ones in play are stored with each result
+// (personal bests only compare games with the same rules) and carried in challenge links.
+const RULES = {
+  noback: { label: 'No Back', help: 'The Back button is gone: every click is final.' },
+};
+function rules() { return Object.keys(RULES).filter(k => $(`#rules input[value=${k}]`).checked); }
+function setRules(keys) { for (const k in RULES) $(`#rules input[value=${k}]`).checked = keys.includes(k); }
+const rulesText = keys => (keys || []).map(k => RULES[k]?.label || k).join(', ');
+const sameRules = (a, b) => (a.rules || []).join() === (b.rules || []).join();
+
 function renderCard(which) {
   const card = which === 'start' ? $('#cardStart') : $('#cardGoal');
   const info = setup[which];
@@ -477,7 +489,9 @@ async function setCustom(which, raw) {
 
 function challengeLink() {
   const base = location.href.split('#')[0];
-  return `${base}#start=${encodeURIComponent(setup.start.title)}&target=${encodeURIComponent(setup.goal.title)}`;
+  const r = rules();
+  return `${base}#start=${encodeURIComponent(setup.start.title)}&target=${encodeURIComponent(setup.goal.title)}` +
+    (r.length ? '&rules=' + r.join(',') : '');
 }
 
 function renderHistory() {
@@ -485,7 +499,7 @@ function renderHistory() {
   $('#history').classList.toggle('hidden', rows.length === 0);
   $('#history tbody').innerHTML = rows.slice(0, 15).map(r => `
     <tr class="${r.won ? '' : 'lost'}">
-      <td>${esc(r.start)}</td><td>${esc(r.goal)}</td>
+      <td>${esc(r.start)}</td><td>${esc(r.goal)}</td><td>${esc(rulesText(r.rules))}</td>
       <td class="mono">${r.won ? r.clicks : 'gave up'}</td>
       <td class="mono">${fmtTime(r.ms)}</td>
       <td>${esc(new Date(r.at).toLocaleDateString())}</td>
@@ -496,6 +510,7 @@ function renderHistory() {
 const game = {
   active: false,
   start: null, goal: null,
+  rules: [],         // rule keys in play, read from the checkboxes at start
   path: [],          // every article visited, in order (includes back-navigation)
   stack: [],         // navigation stack for the Back button
   elapsed: 0,        // ms of reading time; time spent loading articles is not counted
@@ -529,7 +544,8 @@ function showOverlay(html) { $('#overlayBox').innerHTML = html; $('#overlay').cl
 function hideOverlay() { $('#overlay').classList.add('hidden'); }
 
 function startGame() {
-  Object.assign(game, { active: true, start: setup.start, goal: setup.goal, path: [], stack: [], elapsed: 0, runningSince: 0, loading: false });
+  Object.assign(game, { active: true, start: setup.start, goal: setup.goal, rules: rules(), path: [], stack: [], elapsed: 0, runningSince: 0, loading: false });
+  $('#btnBack').classList.toggle('hidden', game.rules.includes('noback'));
   $('#hudGoal').textContent = game.goal.title;
   setImg($('#hudImg'), game.goal.img);
   hideOverlay();
@@ -707,7 +723,7 @@ window.addEventListener('message', e => {
 });
 
 function goBack() {
-  if (game.stack.length < 2 || game.loading) return;
+  if (game.stack.length < 2 || game.loading || game.rules.includes('noback')) return;
   navigate(game.stack[game.stack.length - 2], null, { back: true });
 }
 
@@ -718,9 +734,10 @@ function finish(won) {
   clearInterval(game.timer);
   renderHud();
   const ms = now();
-  const rec = { start: game.start.title, goal: game.goal.title, won, clicks: clicks(), ms, at: Date.now(), path: game.path.map(p => p.title) };
+  const rec = { start: game.start.title, goal: game.goal.title, rules: game.rules, won, clicks: clicks(), ms, at: Date.now(), path: game.path.map(p => p.title) };
+  const rulesNote = rulesText(rec.rules);
   const hist = store.get('mwg.history', []);
-  const best = hist.filter(r => r.won && r.start === rec.start && r.goal === rec.goal)
+  const best = hist.filter(r => r.won && r.start === rec.start && r.goal === rec.goal && sameRules(r, rec))
     .sort((a, b) => a.clicks - b.clicks || a.ms - b.ms)[0];
   hist.unshift(rec);
   store.set('mwg.history', hist.slice(0, 50));
@@ -734,7 +751,7 @@ function finish(won) {
   }
   openModal(`
     <h2>${won ? '🎉 You made it!' : 'Game over'}</h2>
-    <p class="note">${esc(rec.start)} → ${esc(rec.goal)}</p>
+    <p class="note">${esc(rec.start)} → ${esc(rec.goal)}${rulesNote ? ' · ' + esc(rulesNote) : ''}</p>
     <div class="big">
       <div class="stat"><div class="v mono">${won ? rec.clicks : '—'}</div><div class="k">Clicks</div></div>
       <div class="stat"><div class="v mono">${fmtTime(ms)}</div><div class="k">Time</div></div>
@@ -749,7 +766,7 @@ function finish(won) {
       <button class="primary" id="mNew">New game</button>
     </div>`, false);
   $('#mCopy').onclick = async () => {
-    const text = `Minecraft Wiki Game: ${rec.start} → ${rec.goal}\n` +
+    const text = `Minecraft Wiki Game: ${rec.start} → ${rec.goal}${rulesNote ? ` (${rulesNote})` : ''}\n` +
       (won ? `${rec.clicks} clicks in ${fmtTime(ms)}\n` : `Gave up after ${fmtTime(ms)}\n`) +
       rec.path.join(' → ');
     try { await navigator.clipboard.writeText(text); $('#mCopy').textContent = 'Copied!'; }
@@ -785,6 +802,8 @@ $('#modalBg').addEventListener('click', e => { if (e.target === $('#modalBg') &&
 document.addEventListener('keydown', e => { if (e.key === 'Escape' && modalDismissable) closeModal(); });
 
 // ---------------------------------------------------------------- Wiring
+$('#rules').innerHTML = '<span class="lbl">Rules</span>' + Object.entries(RULES).map(([k, r]) =>
+  `<label title="${esc(r.help)}"><input type="checkbox" value="${k}"> ${esc(r.label)}</label>`).join('');
 $('#themeSelect').innerHTML = THEMES.map(t => `<option value="${esc(t)}">${esc(THEME_LABELS[t] || t)}</option>`).join('');
 $('#themeSelect').value = document.documentElement.dataset.theme || 'auto';
 $('#themeSelect').onchange = e => setTheme(e.target.value);
@@ -824,6 +843,7 @@ $('#btnPeek').onclick = () => {
   updateModeHelp();
   renderHistory();
   const h = new URLSearchParams(location.hash.slice(1));
+  if (h.has('rules')) setRules(h.get('rules').split(','));
   if (h.get('start') && h.get('target')) {
     setStatus('Loading challenge…');
     let missing = null;
@@ -832,7 +852,8 @@ $('#btnPeek').onclick = () => {
       if (!s || !g) { missing = !s ? h.get('start') : h.get('target'); return; }
       setup.start = s; setup.goal = g;
       renderCard('start'); renderCard('goal');
-      setStatus('Challenge loaded. Press Start when ready.');
+      const r = rulesText(rules());
+      setStatus(`Challenge loaded${r ? ' with ' + r : ''}. Press Start when ready.`);
     });
     if (!setup.start || !setup.goal) {
       await reroll('both');

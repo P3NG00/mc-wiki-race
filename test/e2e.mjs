@@ -91,6 +91,28 @@ await ev("document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' })
 await sleep(500);
 check('Escape keeps the win modal open', await ev("!document.querySelector('#modalBg').classList.contains('hidden')"));
 
+// No Back: the button is gone and goBack() does nothing. The rule goes into the challenge link and the result, and the
+// earlier 3-click win without rules must not count as this pair's best (2 clicks would otherwise be a new best).
+await ev("document.querySelector('#rules input[value=noback]').click()");
+check('challenge link carries rules', await ev("challengeLink().endsWith('&rules=noback')"), await ev('challengeLink()'));
+await ev("document.querySelector('#mSame').click()");
+await until("game.path.length === 1 && !game.loading");
+check('No Back hides Back', await ev("document.querySelector('#btnBack').classList.contains('hidden')"));
+f = await frameCtx();
+await ev("[...document.querySelectorAll('a.mwg-live')].find(a => a.getAttribute('href') === '/w/Pickaxe').click()", f);
+await until("game.path.length === 2 && !game.loading");
+await ev("goBack()");
+await sleep(1000);
+check('No Back blocks goBack()', await ev("game.path.length === 2 && !game.loading"), await ev("game.path.map(p => p.title).join(' > ')"));
+f = await frameCtx();
+await ev("[...document.querySelectorAll('a.mwg-live')].find(a => /Diamond_Pickaxe/i.test(a.getAttribute('href'))).click()", f);
+check('No Back game wins', await until("!game.active && !document.querySelector('#modalBg').classList.contains('hidden')"), `clicks=${await ev('clicks()')}`);
+const modal = await ev("document.querySelector('#modal').textContent");
+check('result records the rules', await ev("JSON.stringify(store.get('mwg.history', [])[0].rules) === '[\"noback\"]'") && modal.includes('No Back'),
+  await ev("JSON.stringify(store.get('mwg.history', [])[0].rules)"));
+check('personal best ignores games with other rules', !/personal best|Your best/.test(modal));
+await ev("document.querySelector('#rules input[value=noback]').click()");
+
 // Random rolls in both modes.
 await ev("document.querySelector('#mNew').click()");
 check('Classic roll', await until("!document.querySelector('#btnPlay').disabled", 60000), await ev("setup.start.title + ' -> ' + setup.goal.title"));
@@ -113,8 +135,9 @@ check('identical start/target disables Play', await ev("setup.goal.title === set
 // Image-map <area> links must be intercepted like <a> links.
 // A hash-only change would not reload the page, so go through about:blank.
 await send('browsingContext.navigate', { context: ctx, url: 'about:blank', wait: 'complete' });
-await send('browsingContext.navigate', { context: ctx, url: fileUrl + '#start=Icons.png&target=Diamond', wait: 'complete' });
+await send('browsingContext.navigate', { context: ctx, url: fileUrl + '#start=Icons.png&target=Diamond&rules=noback', wait: 'complete' });
 await until("!document.querySelector('#btnPlay').disabled");
+check('challenge link sets the rules', await ev("rules().join() === 'noback' && document.querySelector('#rules input[value=noback]').checked && document.querySelector('#setupStatus').textContent.includes('with No Back')"));
 await ev("document.querySelector('#btnPlay').click()");
 await until("game.path.length === 1 && !game.loading");
 await sleep(1000);

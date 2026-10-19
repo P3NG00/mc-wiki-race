@@ -113,6 +113,21 @@ check('result records the rules', await ev("JSON.stringify(store.get('mwg.histor
 check('personal best ignores games with other rules', !/personal best|Your best/.test(modal));
 await ev("document.querySelector('#rules input[value=noback]').click()");
 
+// Six clicks: the HUD counts down to the limit and the game is lost on the last click that misses the target.
+// Pickaxe and Back alternate, so every article after the first comes from the parse cache.
+await ev("document.querySelector('#rules input[value=limit]').click()");
+await ev("document.querySelector('#mSame').click()");
+await until("game.path.length === 1 && !game.loading");
+check('Six clicks shows the limit', await ev("document.querySelector('#hudClicks').textContent === '0/6'"), await ev("document.querySelector('#hudClicks').textContent"));
+for (let i = 1; i <= 6; i++) {
+  await ev(i % 2 ? "navigate('Pickaxe', null)" : 'goBack()');
+  await until(`game.path.length === ${i + 1} && !game.loading`);
+}
+check('running out of clicks ends the game', await until("!game.active && document.querySelector('#modal h2').textContent === 'Out of clicks'", 5000),
+  await ev("game.path.map(p => p.title).join(' > ')"));
+check('result records running out of clicks', await ev("(([r]) => r.outOfClicks === true && !r.won && r.clicks === 6)(store.get('mwg.history', []))"));
+await ev("document.querySelector('#rules input[value=limit]').click()");
+
 // Random rolls in both modes.
 await ev("document.querySelector('#mNew').click()");
 check('Classic roll', await until("!document.querySelector('#btnPlay').disabled", 60000), await ev("setup.start.title + ' -> ' + setup.goal.title"));

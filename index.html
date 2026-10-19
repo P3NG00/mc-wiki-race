@@ -279,6 +279,7 @@ const NAMESPACES = [
 const CHAOS_REJECT = /\/|\(disambiguation\)$|^(Java|Bedrock|Pocket|Education|Legacy Console|PlayStation \d|Xbox( 360| One)?|Nintendo|Wii U|New Nintendo 3DS|Pi|Minecraft Launcher|Launcher|Realms|China) Edition|^(Launcher|Minecraft Launcher|Bedrock Dedicated Server|Server) \d|^\d+w\d+[a-z]$|\b\d+\.\d+(\.\d+)?\b/i;
 
 const MIN_BACKLINKS = 5;   // a target must have at least this many incoming article links
+const CLICK_LIMIT = 6;     // Six clicks rule: the game is lost once this many clicks haven't reached the target
 
 // No hubs rule: links to these pages (and to redirects to them) are dead. Picked from pages with the most incoming
 // and outgoing article links, leaving out specific content (Diamond, Chest, Water…) that makes a fair target.
@@ -429,6 +430,7 @@ const RULES = {
   noback: { label: 'No Back', help: 'The Back button is gone: every click is final.' },
   nohubs: { label: 'No hubs', help: 'Links to big overview pages (Block, Item, Mob, Crafting, Java Edition…) are dead.' },
   blind: { label: 'Blind target', help: 'You only get the target’s name: no picture or description.' },
+  limit: { label: 'Six clicks', help: `Reach the target in ${CLICK_LIMIT} clicks or fewer (Back counts).` },
 };
 function rules() { return Object.keys(RULES).filter(k => $(`#rules input[value=${k}]`).checked); }
 function setRules(keys) { for (const k in RULES) $(`#rules input[value=${k}]`).checked = keys.includes(k); }
@@ -531,7 +533,7 @@ function renderHistory() {
   $('#history tbody').innerHTML = rows.slice(0, 15).map(r => `
     <tr class="${r.won ? '' : 'lost'}">
       <td>${esc(r.start)}</td><td>${esc(r.goal)}</td><td>${esc(rulesText(r.rules))}</td>
-      <td class="mono">${r.won ? r.clicks : 'gave up'}</td>
+      <td class="mono">${r.won ? r.clicks : r.outOfClicks ? 'out of clicks' : 'gave up'}</td>
       <td class="mono">${fmtTime(r.ms)}</td>
       <td>${esc(new Date(r.at).toLocaleDateString())}</td>
     </tr>`).join('');
@@ -562,7 +564,7 @@ function resumeClock() { if (!game.runningSince && game.active) game.runningSinc
 function clicks() { return Math.max(0, game.path.length - 1); }
 
 function renderHud() {
-  $('#hudClicks').textContent = clicks();
+  $('#hudClicks').textContent = clicks() + (game.rules.includes('limit') ? '/' + CLICK_LIMIT : '');
   $('#hudTime').textContent = fmtTime(now());
   $('#btnBack').disabled = game.stack.length < 2 || game.loading || !game.active;
   $('#btnGiveUp').disabled = game.loading || !game.active;
@@ -632,7 +634,8 @@ async function navigate(title, fragment, { back = false } = {}) {
   renderArticle(page, fragment, token, hubs ? [...hubs.keys()].filter(t => hubs.get(t) !== game.goal.title) : []);
   setTimeout(() => frameReady(token), 15000);   // a stalled stylesheet must not leave Back and Give up disabled
   // Compare the post-redirect title, so following a redirect onto the target counts as arriving.
-  if (page.title === game.goal.title) { game.loading = false; hideOverlay(); finish(true); return; }
+  const won = page.title === game.goal.title;
+  if (won || (game.rules.includes('limit') && clicks() >= CLICK_LIMIT)) { game.loading = false; hideOverlay(); finish(won, !won); return; }
   renderHud();
 }
 
@@ -768,14 +771,14 @@ function goBack() {
   navigate(game.stack[game.stack.length - 2], null, { back: true });
 }
 
-function finish(won) {
+function finish(won, outOfClicks = false) {
   pauseClock();
   game.active = false;
   game.navToken++;
   clearInterval(game.timer);
   renderHud();
   const ms = now();
-  const rec = { start: game.start.title, goal: game.goal.title, rules: game.rules, won, clicks: clicks(), ms, at: Date.now(), path: game.path.map(p => p.title) };
+  const rec = { start: game.start.title, goal: game.goal.title, rules: game.rules, won, ...(outOfClicks && { outOfClicks }), clicks: clicks(), ms, at: Date.now(), path: game.path.map(p => p.title) };
   const rulesNote = rulesText(rec.rules);
   const hist = store.get('mwg.history', []);
   const best = hist.filter(r => r.won && r.start === rec.start && r.goal === rec.goal && sameRules(r, rec))
@@ -791,7 +794,7 @@ function finish(won) {
       : `<p class="note">Your best for this pair: ${best.clicks} clicks in ${fmtTime(best.ms)}.</p>`;
   }
   openModal(`
-    <h2>${won ? '🎉 You made it!' : 'Game over'}</h2>
+    <h2>${won ? '🎉 You made it!' : outOfClicks ? 'Out of clicks' : 'Game over'}</h2>
     <p class="note">${esc(rec.start)} → ${esc(rec.goal)}${rulesNote ? ' · ' + esc(rulesNote) : ''}</p>
     <div class="big">
       <div class="stat"><div class="v mono">${won ? rec.clicks : '—'}</div><div class="k">Clicks</div></div>
@@ -808,7 +811,7 @@ function finish(won) {
     </div>`, false);
   $('#mCopy').onclick = async () => {
     const text = `Minecraft Wiki Game: ${rec.start} → ${rec.goal}${rulesNote ? ` (${rulesNote})` : ''}\n` +
-      (won ? `${rec.clicks} clicks in ${fmtTime(ms)}\n` : `Gave up after ${fmtTime(ms)}\n`) +
+      (won ? `${rec.clicks} clicks in ${fmtTime(ms)}\n` : `${outOfClicks ? 'Out of clicks' : 'Gave up'} after ${fmtTime(ms)}\n`) +
       rec.path.join(' → ');
     try { await navigator.clipboard.writeText(text); $('#mCopy').textContent = 'Copied!'; }
     catch { $('#mCopy').textContent = 'Copy failed'; }

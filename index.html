@@ -188,6 +188,7 @@ const THEMES = [...new Set(['auto', 'light', 'dark', ...Array.from(document.quer
     <label><input type="radio" name="mode" value="chaos"> Chaos</label>
   </div>
   <p class="mode-help" id="modeHelp"></p>
+  <div class="modes" role="radiogroup" aria-label="Target difficulty" id="difficulty"></div>
   <div class="modes" role="group" aria-label="Rules" id="rules"></div>
 
   <div class="pair">
@@ -279,6 +280,14 @@ const NAMESPACES = [
 const CHAOS_REJECT = /\/|\(disambiguation\)$|^(Java|Bedrock|Pocket|Education|Legacy Console|PlayStation \d|Xbox( 360| One)?|Nintendo|Wii U|New Nintendo 3DS|Pi|Minecraft Launcher|Launcher|Realms|China) Edition|^(Launcher|Minecraft Launcher|Bedrock Dedicated Server|Server) \d|^\d+w\d+[a-z]$|\b\d+\.\d+(\.\d+)?\b/i;
 
 const MIN_BACKLINKS = 5;   // a target must have at least this many incoming article links
+// Target difficulty. Easy and Hard roll DIFFICULTY_SAMPLES targets and keep the best- or least-linked one, so they adapt to
+// the pool: fixed counts don't work, since navboxes link most items and mobs from 500+ articles but no biome gets there.
+const DIFFICULTY_SAMPLES = 5;
+const DIFFICULTY = {
+  any: { label: 'Any', help: 'Any target linked from at least 5 articles.' },
+  easy: { label: 'Easy', better: (a, b) => a.backlinks > b.backlinks, help: `The best-linked of ${DIFFICULTY_SAMPLES} random targets.` },
+  hard: { label: 'Hard', better: (a, b) => a.backlinks < b.backlinks, help: `The least-linked of ${DIFFICULTY_SAMPLES} random targets.` },
+};
 const CLICK_LIMIT = 6;     // Six clicks rule: the game is lost once this many clicks haven't reached the target
 
 // No hubs rule: links to these pages (and to redirects to them) are dead. Picked from pages with the most incoming
@@ -355,7 +364,8 @@ async function fetchHubTitles() {
 }
 
 const INFO_PARAMS = { prop: 'pageprops|pageimages', ppprop: 'description|disambiguation', piprop: 'thumbnail', pithumbsize: '160' };
-const BACKLINK_PARAMS = { list: 'backlinks', blnamespace: '0', bllimit: String(MIN_BACKLINKS), blfilterredir: 'nonredirects' };
+// limit: how many incoming links to count up to (bllimit).
+const backlinkParams = (title, limit) => ({ list: 'backlinks', bltitle: title, blnamespace: '0', bllimit: String(limit), blfilterredir: 'nonredirects' });
 
 function toInfo(p) {
   if (!p || p.missing || p.invalid || p.ns !== 0) return null;
@@ -367,14 +377,22 @@ function toInfo(p) {
   };
 }
 
-// One request returns 50 random articles with their info; one is picked uniformly among those that pass the filters.
+// One request returns 50 random articles with their info. Those that pass the filters are queued and drawn uniformly
+// without replacement, so the next rolls (and rejected targets) don't need a new request. Concurrent refills share one.
+const chaosQueue = [];
+let chaosRefill = null;
+function refillChaos() {
+  return chaosRefill ||= api({ action: 'query', generator: 'random', grnnamespace: '0', grnfilterredir: 'nonredirects', grnlimit: '50', ...INFO_PARAMS })
+    .then(d => { chaosQueue.push(...(d.query?.pages || []).map(toInfo).filter(p => p && !p.disambig && !CHAOS_REJECT.test(p.title))); })
+    .finally(() => { chaosRefill = null; });
+}
+
 async function randomChaosInfo() {
-  for (let i = 0; i < 6; i++) {
-    const d = await api({ action: 'query', generator: 'random', grnnamespace: '0', grnfilterredir: 'nonredirects', grnlimit: '50', ...INFO_PARAMS });
-    const ok = (d.query?.pages || []).map(toInfo).filter(p => p && !p.disambig && !CHAOS_REJECT.test(p.title));
-    if (ok.length) return pick(ok);
+  for (let i = 0; !chaosQueue.length; i++) {
+    if (i === 6) throw new Error('Could not find a suitable random article');
+    await refillChaos();
   }
-  throw new Error('Could not find a suitable random article');
+  return chaosQueue.splice(Math.floor(Math.random() * chaosQueue.length), 1)[0];
 }
 
 function pickWeighted(arr, weight) {
@@ -392,18 +410,18 @@ async function randomPoolTitle(mode) {
   return pick(pickWeighted(lists, l => Math.sqrt(l.length)));
 }
 
-async function backlinkCount(title) {
-  const d = await api({ action: 'query', bltitle: title, ...BACKLINK_PARAMS });
+async function backlinkCount(title, limit) {
+  const d = await api({ action: 'query', ...backlinkParams(title, limit) });
   return d.query.backlinks.length;
 }
 
 // Resolves redirects/normalisation and returns { title, desc, img, disambig } or null if missing.
-// With backlinks, also counts incoming links (up to MIN_BACKLINKS) in the same request.
-async function pageInfo(title, { backlinks = false } = {}) {
-  const d = await api({ action: 'query', titles: title, redirects: '1', ...INFO_PARAMS, ...(backlinks && { bltitle: title, ...BACKLINK_PARAMS }) });
+// With backlinks (a limit), also counts incoming links up to that limit in the same request.
+async function pageInfo(title, { backlinks = 0 } = {}) {
+  const d = await api({ action: 'query', titles: title, redirects: '1', ...INFO_PARAMS, ...(backlinks && backlinkParams(title, backlinks)) });
   const info = toInfo(d.query.pages?.[0]);   // pages is absent for interwiki titles such as de:Diamant
   // bltitle is the title as given; if it redirected, count links to the real article instead.
-  if (info && backlinks) info.backlinks = info.title === title ? d.query.backlinks.length : await backlinkCount(info.title);
+  if (info && backlinks) info.backlinks = info.title === title ? d.query.backlinks.length : await backlinkCount(info.title, backlinks);
   return info;
 }
 
@@ -411,6 +429,7 @@ async function pageInfo(title, { backlinks = false } = {}) {
 const setup = { start: null, goal: null, busy: 0, rolls: { start: 0, goal: 0 } };   // rolls: per-card token, so superseded rolls are dropped
 
 function mode() { return $('input[name=mode]:checked').value; }
+function difficulty() { return DIFFICULTY[$('input[name=diff]:checked').value]; }
 
 function setImg(img, src) {
   if (src) { img.src = src; img.classList.remove('hidden'); } else { img.removeAttribute('src'); img.classList.add('hidden'); }
@@ -468,22 +487,26 @@ async function withBusy(fn) {
   finally { setup.busy--; updatePlay(); }
 }
 
-async function candidate(which) {
-  const goal = which === 'goal';
-  if (mode() !== 'chaos') return pageInfo(await randomPoolTitle(mode()), { backlinks: goal });
+// limit: for a target, how many incoming links to count up to (0 for a start).
+async function candidate(limit) {
+  if (mode() !== 'chaos') return pageInfo(await randomPoolTitle(mode()), { backlinks: limit });
   const info = await randomChaosInfo();
-  if (goal) info.backlinks = await backlinkCount(info.title);
+  if (limit) info.backlinks = await backlinkCount(info.title, limit);
   return info;
 }
 
 async function rollOne(which) {
+  const goal = which === 'goal', d = difficulty();
+  // Easy and Hard compare counts, so those count up to the API's cap of 500.
+  const limit = !goal ? 0 : d.better ? 500 : MIN_BACKLINKS;
+  const batch = goal && d.better ? DIFFICULTY_SAMPLES : 1;
   for (let attempt = 0; attempt < 12; attempt++) {
-    const info = await candidate(which);
+    const infos = await Promise.all(Array.from({ length: batch }, () => candidate(limit)));
     // Read the other card now, not before the await: both cards may be rolling at once.
-    const other = which === 'start' ? setup.goal : setup.start;
-    if (!info || info.disambig || (other && info.title === other.title)) continue;
-    if (which === 'goal' && info.backlinks < MIN_BACKLINKS) continue;
-    return info;
+    const other = goal ? setup.start : setup.goal;
+    const ok = infos.filter(i => i && !i.disambig && i.title !== other?.title && (!goal || i.backlinks >= MIN_BACKLINKS));
+    // On a tie the first one wins, which is as random as any.
+    if (ok.length) return ok.reduce((best, i) => d.better?.(i, best) ? i : best);
   }
   throw new Error('Gave up finding a good article');
 }
@@ -848,6 +871,9 @@ document.addEventListener('keydown', e => { if (e.key === 'Escape' && modalDismi
 // ---------------------------------------------------------------- Wiring
 $('#rules').innerHTML = '<span class="lbl">Rules</span>' + Object.entries(RULES).map(([k, r]) =>
   `<label title="${esc(r.help)}"><input type="checkbox" value="${k}"> ${esc(r.label)}</label>`).join('');
+$('#difficulty').innerHTML = '<span class="lbl">Target</span>' + Object.entries(DIFFICULTY).map(([k, d]) =>
+  `<label title="${esc(d.help)}"><input type="radio" name="diff" value="${k}"${k === 'any' ? ' checked' : ''}> ${esc(d.label)}</label>`).join('');
+$('#difficulty').addEventListener('change', () => reroll('goal'));
 $('#rules').addEventListener('change', () => renderCard('goal'));
 $('#themeSelect').innerHTML = THEMES.map(t => `<option value="${esc(t)}">${esc(THEME_LABELS[t] || t)}</option>`).join('');
 $('#themeSelect').value = document.documentElement.dataset.theme || 'auto';

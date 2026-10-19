@@ -137,6 +137,26 @@ for (const m of ['balanced', 'even', 'chaos']) {
   check(`${m} roll`, await until("!document.querySelector('#btnPlay').disabled", 60000), await ev("setup.start.title + ' -> ' + setup.goal.title"));
 }
 
+// Difficulty rerolls only the target. Easy and Hard keep the best- or least-linked of five candidates, Any takes the first.
+// candidate() is stubbed with known counts, so this tests the selection rather than the wiki's link graph.
+await ev("document.querySelector('input[name=diff][value=hard]').click()");
+await sleep(500);
+check('Hard roll (Chaos)', await until("!document.querySelector('#btnPlay').disabled", 60000) && await ev('setup.goal.backlinks >= 5'),
+  await ev("setup.goal.title + ' ' + setup.goal.backlinks"));
+const startBefore = await ev('setup.start.title');
+await ev(`window.candidate = Object.assign(async limit => {
+  const i = candidate.n++;
+  return { title: 'Fake ' + i, desc: '', img: '', disambig: false, backlinks: [300, 50, 500, 500, 120][i % 5], limit };
+}, { orig: candidate, n: 0 })`);
+for (const [diff, want] of [['easy', 'Fake 2 500 500'], ['hard', 'Fake 1 50 500'], ['any', 'Fake 0 300 5']]) {
+  await ev(`candidate.n = 0; document.querySelector('input[name=diff][value=${diff}]').click()`);
+  await sleep(300);
+  await until("!document.querySelector('#btnPlay').disabled", 15000);
+  const got = await ev("setup.goal.title + ' ' + setup.goal.backlinks + ' ' + setup.goal.limit");
+  check(`${diff} target selection`, got === want && await ev('setup.start.title') === startBefore, got);
+}
+await ev('window.candidate = candidate.orig');
+
 // An interwiki title has no page in the API response; it must read as "not found", not a network error.
 await ev("(() => { const i = document.querySelector('[data-custom=start]'); i.value = 'de:Diamant'; i.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter' })); })()");
 check('interwiki title reports not found', await until("document.querySelector('#setupStatus').textContent.startsWith('No article named')", 15000),

@@ -13,6 +13,7 @@ Open `index.html` in a browser. Opening it straight from disk (`file://`) works 
   - **Balanced:** the same content, with bigger categories picked more often.
   - **Even:** the same content, with every article equally likely.
   - **Chaos:** any article on the wiki.
+- **Target** difficulty goes by how many articles link to the target. **Any** takes any target linked from at least 5 articles, **Easy** the best-linked of 5 random targets and **Hard** the least-linked of 5. Changing it rerolls only the target, and a target you type yourself skips it.
 - **Reroll** either card, or type your own article.
 - **Back** returns to the previous article and counts as a click. The clock pauses while an article loads.
 - **Rules** are optional extras you can switch on:

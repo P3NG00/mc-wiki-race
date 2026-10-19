@@ -428,6 +428,7 @@ function updateModeHelp() { $('#modeHelp').textContent = MODE_HELP[mode()]; }
 const RULES = {
   noback: { label: 'No Back', help: 'The Back button is gone: every click is final.' },
   nohubs: { label: 'No hubs', help: 'Links to big overview pages (Block, Item, Mob, Crafting, Java Edition…) are dead.' },
+  blind: { label: 'Blind target', help: 'You only get the target’s name: no picture or description.' },
 };
 function rules() { return Object.keys(RULES).filter(k => $(`#rules input[value=${k}]`).checked); }
 function setRules(keys) { for (const k in RULES) $(`#rules input[value=${k}]`).checked = keys.includes(k); }
@@ -437,9 +438,10 @@ const sameRules = (a, b) => (a.rules || []).join() === (b.rules || []).join();
 function renderCard(which) {
   const card = which === 'start' ? $('#cardStart') : $('#cardGoal');
   const info = setup[which];
+  const blind = which === 'goal' && rules().includes('blind');
   $('.title', card).textContent = info ? info.title : '…';
-  $('.desc', card).textContent = info ? (info.desc || 'No description available.') : '';
-  setImg($('img', card), info?.img);
+  $('.desc', card).textContent = !info ? '' : blind ? 'Hidden: Blind target.' : info.desc || 'No description available.';
+  setImg($('img', card), blind ? '' : info?.img);
   updatePlay();
 }
 
@@ -575,8 +577,10 @@ function hideOverlay() { $('#overlay').classList.add('hidden'); }
 function startGame() {
   Object.assign(game, { active: true, start: setup.start, goal: setup.goal, rules: rules(), path: [], stack: [], elapsed: 0, runningSince: 0, loading: false });
   $('#btnBack').classList.toggle('hidden', game.rules.includes('noback'));
+  const blind = game.rules.includes('blind');
   $('#hudGoal').textContent = game.goal.title;
-  setImg($('#hudImg'), game.goal.img);
+  setImg($('#hudImg'), blind ? '' : game.goal.img);
+  $('#btnPeek').classList.toggle('hidden', blind);
   hideOverlay();
   $('#setup').classList.add('hidden');
   $('#game').classList.remove('hidden');
@@ -841,6 +845,7 @@ document.addEventListener('keydown', e => { if (e.key === 'Escape' && modalDismi
 // ---------------------------------------------------------------- Wiring
 $('#rules').innerHTML = '<span class="lbl">Rules</span>' + Object.entries(RULES).map(([k, r]) =>
   `<label title="${esc(r.help)}"><input type="checkbox" value="${k}"> ${esc(r.label)}</label>`).join('');
+$('#rules').addEventListener('change', () => renderCard('goal'));
 $('#themeSelect').innerHTML = THEMES.map(t => `<option value="${esc(t)}">${esc(THEME_LABELS[t] || t)}</option>`).join('');
 $('#themeSelect').value = document.documentElement.dataset.theme || 'auto';
 $('#themeSelect').onchange = e => setTheme(e.target.value);

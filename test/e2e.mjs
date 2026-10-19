@@ -146,11 +146,18 @@ const areas = JSON.parse(await ev("JSON.stringify({ all: document.querySelectorA
 check('image-map links are clickable', areas.live > 0, `areas=${areas.all} live=${areas.live}`);
 
 // No hubs: links to hubs and their redirects are dead, except a hub that is the target.
+// Blind target: no target picture or description on the card or in the HUD, and no peek.
 await send('browsingContext.navigate', { context: ctx, url: 'about:blank', wait: 'complete' });
-await send('browsingContext.navigate', { context: ctx, url: fileUrl + '#start=Diamond&target=Crafting&rules=nohubs', wait: 'complete' });
+await send('browsingContext.navigate', { context: ctx, url: fileUrl + '#start=Diamond&target=Crafting&rules=nohubs,blind', wait: 'complete' });
 await until("!document.querySelector('#btnPlay').disabled");
+const blindCard = "document.querySelector('#cardGoal .desc').textContent + ' ' + document.querySelector('#cardGoal img').classList.contains('hidden')";
+check('Blind target hides the target card', await ev(blindCard) === 'Hidden: Blind target. true', await ev(blindCard));
+await ev("document.querySelector('#rules input[value=blind]').click()");
+check('turning Blind target off shows it again', !(await ev(blindCard)).startsWith('Hidden'), await ev(blindCard));
+await ev("document.querySelector('#rules input[value=blind]').click()");
 await ev("document.querySelector('#btnPlay').click()");
 check('No hubs game loads', await until("game.path.length === 1 && !game.loading"));
+check('Blind target hides the HUD picture and peek', await ev("document.querySelector('#hudImg').classList.contains('hidden') && document.querySelector('#btnPeek').classList.contains('hidden')"));
 check('hub redirects are known', await ev("hubTitles().then(m => m.get('Blocks') === 'Block' && m.get('Mining') === 'Breaking')"));
 f = await frameCtx();
 const hubLinks = JSON.parse(await ev(`JSON.stringify(Object.fromEntries(['Item', 'Java_Edition', 'Crafting', 'Pickaxe'].map(t =>

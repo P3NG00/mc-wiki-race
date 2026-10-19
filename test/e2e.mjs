@@ -210,6 +210,23 @@ const allAre = (t, s) => hubLinks[t].length > 0 && hubLinks[t].every(x => x === 
 check('No hubs disables hub links', allAre('Item', 'dead') && allAre('Java_Edition', 'dead'), JSON.stringify(hubLinks));
 check('No hubs keeps the target and other links live', allAre('Crafting', 'live') && allAre('Pickaxe', 'live'));
 
+// Daily: #daily=<date> loads that day's pair, the same on every call, a different one the next day. The result records it.
+await send('browsingContext.navigate', { context: ctx, url: 'about:blank', wait: 'complete' });
+await send('browsingContext.navigate', { context: ctx, url: fileUrl + '#daily=2026-01-01', wait: 'complete' });
+check('daily pair loads', await until("!document.querySelector('#btnPlay').disabled && setup.daily === '2026-01-01'", 60000),
+  await ev("setup.start?.title + ' -> ' + setup.goal?.title"));
+const pairOf = p => `${p}.start.title + ' -> ' + ${p}.goal.title`;
+const daily = await ev(pairOf('setup'));
+check('daily pair is deterministic', await ev(`dailyPair('2026-01-01').then(p => ${pairOf('p')})`) === daily &&
+  await ev(`dailyPair('2026-01-02').then(p => ${pairOf('p')})`) !== daily, daily);
+await ev("document.querySelector('#btnPlay').click()");
+await until("game.path.length === 1 && !game.loading");
+await ev("document.querySelector('#btnGiveUp').click()");
+await ev("document.querySelector('#gQuit').click()");
+check('daily result is recorded', await ev("store.get('mwg.history', [])[0].daily === '2026-01-01' && document.querySelector('#modal').textContent.includes('Daily 2026-01-01')"));
+await ev("document.querySelector('#mNew').click()");
+check('rerolling leaves the daily pair', await ev('setup.daily === null'));
+
 // A theme stylesheet added by the host page shows up in the picker and, marked data-mwg-default, wins over a saved
 // theme that no longer exists. A preload script stands in for the host page injecting it into <head>.
 await ev("localStorage.setItem('mwg.theme', JSON.stringify('Gone'))");

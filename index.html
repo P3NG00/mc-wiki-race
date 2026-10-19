@@ -73,6 +73,7 @@
   .modes label:has(input:checked) { border-color: var(--accent); background: var(--accent-soft); }
   .modes input { accent-color: var(--accent); margin: 0; }
   .modes .lbl { align-self: center; color: var(--muted); font-size: 13.5px; }
+  .modes select { padding: 6px 12px; border: 1px solid var(--line); border-radius: var(--radius-pill); background: var(--panel); }
   .mode-help { color: var(--muted); font-size: 13px; margin: -6px 0 18px; }
   .pair { display: grid; grid-template-columns: 1fr auto 1fr; gap: 12px; align-items: stretch; }
   .arrow { align-self: center; font-size: 22px; color: var(--muted); }
@@ -188,7 +189,7 @@ const THEMES = [...new Set(['auto', 'light', 'dark', ...Array.from(document.quer
     <label><input type="radio" name="mode" value="chaos"> Chaos</label>
   </div>
   <p class="mode-help" id="modeHelp"></p>
-  <div class="modes" role="radiogroup" aria-label="Target difficulty" id="difficulty"></div>
+  <div class="modes" role="group" aria-label="Target" id="difficulty"></div>
   <div class="modes" role="group" aria-label="Rules" id="rules"></div>
 
   <div class="pair">
@@ -282,6 +283,16 @@ const CHAOS_REJECT = /\/|\(disambiguation\)$|^(Java|Bedrock|Pocket|Education|Leg
 const MIN_BACKLINKS = 5;   // a target must have at least this many incoming article links
 // Target difficulty. Easy and Hard roll DIFFICULTY_SAMPLES targets and keep the best- or least-linked one, so they adapt to
 // the pool: fixed counts don't work, since navboxes link most items and mobs from 500+ articles but no biome gets there.
+// Target topics: a topic draws the target uniformly from its categories, whatever the mode (Classic would roll Wither
+// 12.5% of the time in Mobs). The start still comes from the mode: same-topic pairs are mostly one click, via the navbox.
+const TOPICS = {
+  any: { label: 'Any topic' },
+  blocks: { label: 'Blocks', cats: ['Blocks', 'Redstone', 'Plants'] },
+  items: { label: 'Items', cats: ['Items', 'Food', 'Tools', 'Weapons', 'Armor'] },
+  mobs: { label: 'Mobs', cats: ['Hostile mobs', 'Passive mobs', 'Neutral mobs', 'Boss mobs'] },
+  world: { label: 'Biomes & structures', cats: ['Overworld biomes', 'Nether biomes', 'End biomes', 'Generated structures'] },
+  magic: { label: 'Enchantments & effects', cats: ['Enchantments', 'Effects'] },
+};
 const DIFFICULTY_SAMPLES = 5;
 const DIFFICULTY = {
   any: { label: 'Any', help: 'Any target linked from at least 5 articles.' },
@@ -430,6 +441,7 @@ const setup = { start: null, goal: null, busy: 0, rolls: { start: 0, goal: 0 } }
 
 function mode() { return $('input[name=mode]:checked').value; }
 function difficulty() { return DIFFICULTY[$('input[name=diff]:checked').value]; }
+function topic() { return TOPICS[$('#topic').value]; }
 
 function setImg(img, src) {
   if (src) { img.src = src; img.classList.remove('hidden'); } else { img.removeAttribute('src'); img.classList.add('hidden'); }
@@ -487,8 +499,9 @@ async function withBusy(fn) {
   finally { setup.busy--; updatePlay(); }
 }
 
-// limit: for a target, how many incoming links to count up to (0 for a start).
-async function candidate(limit) {
+// limit: for a target, how many incoming links to count up to (0 for a start). cats: the target's topic, if any.
+async function candidate(limit, cats) {
+  if (cats) return pageInfo(pick([...new Set((await Promise.all(cats.map(categoryMembers))).flat())]), { backlinks: limit });
   if (mode() !== 'chaos') return pageInfo(await randomPoolTitle(mode()), { backlinks: limit });
   const info = await randomChaosInfo();
   if (limit) info.backlinks = await backlinkCount(info.title, limit);
@@ -500,8 +513,9 @@ async function rollOne(which) {
   // Easy and Hard compare counts, so those count up to the API's cap of 500.
   const limit = !goal ? 0 : d.better ? 500 : MIN_BACKLINKS;
   const batch = goal && d.better ? DIFFICULTY_SAMPLES : 1;
+  const cats = goal && topic().cats;
   for (let attempt = 0; attempt < 12; attempt++) {
-    const infos = await Promise.all(Array.from({ length: batch }, () => candidate(limit)));
+    const infos = await Promise.all(Array.from({ length: batch }, () => candidate(limit, cats)));
     // Read the other card now, not before the await: both cards may be rolling at once.
     const other = goal ? setup.start : setup.goal;
     const ok = infos.filter(i => i && !i.disambig && i.title !== other?.title && (!goal || i.backlinks >= MIN_BACKLINKS));
@@ -873,6 +887,8 @@ $('#rules').innerHTML = '<span class="lbl">Rules</span>' + Object.entries(RULES)
   `<label title="${esc(r.help)}"><input type="checkbox" value="${k}"> ${esc(r.label)}</label>`).join('');
 $('#difficulty').innerHTML = '<span class="lbl">Target</span>' + Object.entries(DIFFICULTY).map(([k, d]) =>
   `<label title="${esc(d.help)}"><input type="radio" name="diff" value="${k}"${k === 'any' ? ' checked' : ''}> ${esc(d.label)}</label>`).join('');
+$('#difficulty').insertAdjacentHTML('beforeend', `<select id="topic" aria-label="Target topic" title="Only targets from this topic. The start still comes from the mode.">
+  ${Object.entries(TOPICS).map(([k, t]) => `<option value="${k}">${esc(t.label)}</option>`).join('')}</select>`);
 $('#difficulty').addEventListener('change', () => reroll('goal'));
 $('#rules').addEventListener('change', () => renderCard('goal'));
 $('#themeSelect').innerHTML = THEMES.map(t => `<option value="${esc(t)}">${esc(THEME_LABELS[t] || t)}</option>`).join('');

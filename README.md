@@ -13,7 +13,7 @@ Open `index.html` in a browser. Opening it straight from disk (`file://`) works 
   - **Balanced:** the same content, with bigger categories picked more often.
   - **Even:** the same content, with every article equally likely.
   - **Chaos:** any article on the wiki.
-- **Target** difficulty goes by how many articles link to the target. **Any** takes any target linked from at least 5 articles, **Easy** the best-linked of 5 random targets and **Hard** the least-linked of 5. Changing it rerolls only the target, and a target you type yourself skips it.
+- **Target** difficulty goes by how many articles link to the target. **Any** takes any target linked from at least 5 articles, **Easy** the best-linked of 5 random targets and **Hard** the least-linked of 5. A **topic** (Blocks, Items, Mobs, Biomes & structures, Enchantments & effects) picks the target from that part of the wiki, in any mode. The start still comes from the mode, because two articles from the same topic are usually one click apart. Changing difficulty or topic rerolls only the target, and a target you type yourself skips both.
 - **Reroll** either card, or type your own article.
 - **Back** returns to the previous article and counts as a click. The clock pauses while an article loads.
 - **Rules** are optional extras you can switch on:

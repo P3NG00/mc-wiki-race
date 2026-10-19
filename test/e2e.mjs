@@ -157,6 +157,15 @@ for (const [diff, want] of [['easy', 'Fake 2 500 500'], ['hard', 'Fake 1 50 500'
 }
 await ev('window.candidate = candidate.orig');
 
+// A topic rerolls only the target, from the topic's categories, even in Chaos.
+await ev("(s => { s.value = 'mobs'; s.dispatchEvent(new Event('change', { bubbles: true })); })(document.querySelector('#topic'))");
+await sleep(500);
+check('Mobs topic target', await until("!document.querySelector('#btnPlay').disabled", 60000) && await ev('setup.start.title') === startBefore &&
+  await ev("Promise.all(TOPICS.mobs.cats.map(categoryMembers)).then(l => l.flat().includes(setup.goal.title))"), await ev("setup.goal.title"));
+await ev("(s => { s.value = 'any'; s.dispatchEvent(new Event('change', { bubbles: true })); })(document.querySelector('#topic'))");
+await sleep(500);
+await until("!document.querySelector('#btnPlay').disabled", 60000);
+
 // An interwiki title has no page in the API response; it must read as "not found", not a network error.
 await ev("(() => { const i = document.querySelector('[data-custom=start]'); i.value = 'de:Diamant'; i.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter' })); })()");
 check('interwiki title reports not found', await until("document.querySelector('#setupStatus').textContent.startsWith('No article named')", 15000),

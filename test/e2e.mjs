@@ -306,6 +306,17 @@ check('host-page theme is listed and used as the default', injected === 'auto,li
 await send('script.removePreloadScript', { script: preload });
 await ev("localStorage.removeItem('mwg.theme')");
 
+// Clear history asks first: Cancel keeps the games, confirming removes them and hides the table.
+const histLen = "store.get('mwg.history', []).length";
+await ev("document.querySelector('#btnClearHistory').click()");
+await shot('4-clear-history');
+await ev("document.querySelector('#hKeep').click()");
+check('cancelling Clear history keeps it', await ev(`${histLen} > 0 && !document.querySelector('#history').classList.contains('hidden')`), await ev(histLen));
+await ev("document.querySelector('#btnClearHistory').click()");
+await ev("document.querySelector('#hClear').click()");
+check('Clear history empties it', await ev(`${histLen} === 0 && document.querySelector('#history').classList.contains('hidden') && document.querySelector('#modalBg').classList.contains('hidden')`),
+  await ev(histLen));
+
 await send('session.end', {});
 console.log(failures ? `${failures} check(s) failed` : 'All checks passed');
 process.exit(failures ? 1 : 0);

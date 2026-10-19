@@ -16,7 +16,27 @@ Open `index.html` in a browser. Opening it straight from disk (`file://`) works 
 - **Reroll** either card, or type your own article.
 - **Back** returns to the previous article and counts as a click. The clock pauses while an article loads.
 - **Copy challenge link** shares the exact pair you're looking at, as `index.html#start=<Title>&target=<Title>`.
-- Your last 50 games and your personal best for each pair are kept in the browser.
+- **Theme** (top right of the setup screen): Auto follows your system's light or dark setting. Articles switch to the wiki's own dark theme to match.
+- Your last 50 games, your personal best for each pair and your theme are kept in the browser.
+
+## Hosting
+
+Serve `index.html` as a static file. To add a theme without editing it, put a stylesheet in its `<head>` marked with `data-mwg-theme`. It shows up in the theme picker, and `data-mwg-default` makes it the default:
+
+```html
+<link rel="stylesheet" href="my-theme.css" data-mwg-theme="My site" data-mwg-default>
+```
+
+```css
+:root[data-theme="My site"] {
+  --bg: #101010; --panel: #202020; --ink: #fff; --muted: #aaa; --line: #333;
+  --accent: #fff; --accent-ink: #000; --accent-soft: #333; --target: #f87;
+  --shadow: none; --font: monospace; --radius: 0; --radius-lg: 0; --radius-pill: 0;
+  color-scheme: dark;   /* the article uses the wiki's dark theme */
+}
+```
+
+Any variable you leave out keeps its light-theme value, and the names `auto`, `light` and `dark` are taken by the built-in themes. If the server sends a Content-Security-Policy, it has to allow `https://minecraft.wiki` in `connect-src`, `img-src`, `style-src`, `font-src` and `base-uri`, and allow inline scripts and styles. The article frame inherits the page's policy.
 
 ## Dev options
 

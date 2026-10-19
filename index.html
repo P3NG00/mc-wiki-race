@@ -16,10 +16,15 @@
     --accent-soft: #e3f0dc;
     --target: #b8452f;
     --shadow: 0 1px 2px rgba(0,0,0,.06), 0 4px 16px rgba(0,0,0,.06);
-    color-scheme: light;
+    --font: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    --radius: 8px;        /* buttons, inputs */
+    --radius-lg: 12px;    /* cards, tables, dialogs */
+    --radius-pill: 999px; /* mode chips */
+    color-scheme: light;  /* also decides whether the article uses the wiki's light or dark theme */
   }
+  /* Auto is no data-theme attribute, so an explicit theme (light, dark or one added by the host page) gets only its own rule. */
   @media (prefers-color-scheme: dark) {
-    :root:not([data-theme="light"]) {
+    :root:not([data-theme]) {
       --bg: #161814; --panel: #1f221d; --ink: #e8e9e3; --muted: #9da196; --line: #33372f;
       --accent: #6cbf55; --accent-ink: #0d1409; --accent-soft: #24331f;
       --target: #ec8a73;
@@ -38,11 +43,11 @@
   html, body { height: 100%; margin: 0; }
   body {
     background: var(--bg); color: var(--ink);
-    font: 15px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    font: 15px/1.45 var(--font);
   }
   button, input, select { font: inherit; color: inherit; }
   button {
-    border: 1px solid var(--line); background: var(--panel); border-radius: 8px;
+    border: 1px solid var(--line); background: var(--panel); border-radius: var(--radius);
     padding: 7px 14px; cursor: pointer;
   }
   button:hover:not(:disabled) { border-color: var(--muted); }
@@ -55,12 +60,15 @@
 
   /* ---------- Setup screen ---------- */
   #setup { max-width: 860px; margin: 0 auto; padding: 32px 16px 48px; }
+  .setup-head { display: flex; justify-content: space-between; align-items: baseline; gap: 4px 16px; flex-wrap: wrap; }
   #setup h1 { font-size: 28px; margin: 0 0 4px; letter-spacing: -.01em; }
+  .theme-pick { color: var(--muted); font-size: 13.5px; }
+  .theme-pick select { margin-left: 4px; padding: 3px 6px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--panel); }
   #setup .sub { color: var(--muted); margin: 0 0 24px; }
   .modes { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; }
   .modes label {
     display: flex; gap: 6px; align-items: center; padding: 6px 12px; border: 1px solid var(--line);
-    border-radius: 999px; background: var(--panel); cursor: pointer;
+    border-radius: var(--radius-pill); background: var(--panel); cursor: pointer;
   }
   .modes label:has(input:checked) { border-color: var(--accent); background: var(--accent-soft); }
   .modes input { accent-color: var(--accent); margin: 0; }
@@ -68,7 +76,7 @@
   .pair { display: grid; grid-template-columns: 1fr auto 1fr; gap: 12px; align-items: stretch; }
   .arrow { align-self: center; font-size: 22px; color: var(--muted); }
   .card {
-    background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 14px;
+    background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius-lg); padding: 14px;
     box-shadow: var(--shadow); display: flex; flex-direction: column; gap: 8px; min-height: 230px;
   }
   .card .tag { font-size: 12px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; }
@@ -80,13 +88,13 @@
   .card .desc { color: var(--muted); font-size: 13.5px; margin: 0;
     display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; }
   .card .actions { margin-top: auto; display: flex; gap: 8px; flex-wrap: wrap; }
-  .card input[type=text] { flex: 1; min-width: 0; padding: 6px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); }
+  .card input[type=text] { flex: 1; min-width: 0; padding: 6px 10px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--bg); }
   .setup-actions { display: flex; gap: 10px; align-items: center; margin-top: 20px; flex-wrap: wrap; }
   .status { color: var(--muted); font-size: 13.5px; }
   .status.err { color: var(--target); }
   .history { margin-top: 36px; }
   .history h2 { font-size: 15px; margin: 0 0 8px; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: .06em; }
-  .history table { width: 100%; border-collapse: collapse; font-size: 13.5px; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+  .history table { width: 100%; border-collapse: collapse; font-size: 13.5px; background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius-lg); overflow: hidden; }
   .history th, .history td { text-align: left; padding: 7px 10px; border-bottom: 1px solid var(--line); }
   .history th { color: var(--muted); font-weight: 600; }
   .history tr:last-child td { border-bottom: 0; }
@@ -122,13 +130,13 @@
     position: absolute; inset: 0; display: grid; place-items: center; background: color-mix(in srgb, var(--bg) 75%, transparent);
     color: var(--ink); font-weight: 600;
   }
-  .overlay .box { background: var(--panel); border: 1px solid var(--line); padding: 16px 20px; border-radius: 12px; box-shadow: var(--shadow); text-align: center; max-width: 360px; }
+  .overlay .box { background: var(--panel); border: 1px solid var(--line); padding: 16px 20px; border-radius: var(--radius-lg); box-shadow: var(--shadow); text-align: center; max-width: 360px; }
   .spinner { width: 22px; height: 22px; border: 3px solid var(--line); border-top-color: var(--accent); border-radius: 50%; animation: spin .8s linear infinite; margin: 0 auto 8px; }
   @keyframes spin { to { transform: rotate(360deg); } }
 
   /* ---------- Modal ---------- */
   .modal-bg { position: fixed; inset: 0; background: rgba(0,0,0,.45); display: grid; place-items: center; padding: 16px; z-index: 10; }
-  .modal { background: var(--panel); color: var(--ink); border-radius: 14px; padding: 22px; max-width: 520px; width: 100%; box-shadow: var(--shadow); max-height: 90vh; overflow-y: auto; }
+  .modal { background: var(--panel); color: var(--ink); border-radius: var(--radius-lg); padding: 22px; max-width: 520px; width: 100%; box-shadow: var(--shadow); max-height: 90vh; overflow-y: auto; }
   .modal h2 { margin: 0 0 6px; font-size: 22px; }
   .modal .big { display: flex; gap: 24px; margin: 14px 0; }
   .modal .big .stat { text-align: left; }
@@ -152,10 +160,24 @@
 </style>
 </head>
 <body>
+<script id="theme-boot">
+// Runs before first paint, after any theme stylesheets the host page added to <head> (see setTheme).
+// Applies the saved theme if it still exists, else the one marked data-mwg-default, else Auto.
+const THEMES = [...new Set(['auto', 'light', 'dark', ...Array.from(document.querySelectorAll('[data-mwg-theme]'), el => el.dataset.mwgTheme)])];
+{
+  let saved;
+  try { saved = JSON.parse(localStorage.getItem('mwg.theme')); } catch { /* storage unavailable */ }
+  const t = THEMES.includes(saved) ? saved : document.querySelector('[data-mwg-theme][data-mwg-default]')?.dataset.mwgTheme || 'auto';
+  if (t !== 'auto') document.documentElement.dataset.theme = t;
+}
+</script>
 
 <!-- ======================= SETUP ======================= -->
 <section id="setup">
-  <h1>Minecraft Wiki Game</h1>
+  <div class="setup-head">
+    <h1>Minecraft Wiki Game</h1>
+    <label class="theme-pick">Theme <select id="themeSelect"></select></label>
+  </div>
   <p class="sub">Get from the start article to the target article using only links inside minecraft.wiki articles. Fewest clicks and fastest time wins.</p>
 
   <div class="modes" role="radiogroup" aria-label="Article pool">
@@ -259,6 +281,9 @@ const WIKI_STYLES = [
   'ext.embedVideo.styles|jquery.makeCollapsible.styles|jquery.tablesorter.styles|mediawiki.page.gallery.styles|skins.vector.styles.legacy',
   'ext.gadget.site-styles|ext.gadget.sound-styles',
   'site.styles',
+  // The wiki's dark theme. Apart from a few rules that change nothing visible here, it is scoped to
+  // body.wgl-theme-dark, so it is always loaded and switching the article's theme is a body class change.
+  'wgl.theme.dark',
 ].map(m => `${WIKI}/load.php?lang=en&modules=${encodeURIComponent(m)}&only=styles&skin=vector`);
 
 const $ = (sel, root = document) => root.querySelector(sel);
@@ -568,10 +593,32 @@ function frameReady(token) {
   resumeClock();
 }
 
-function themeIsDark() {
-  const forced = document.documentElement.dataset.theme;
-  return forced ? forced === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches;
+// ---------------------------------------------------------------- Themes
+// Auto (no data-theme attribute) follows the OS. The page serving the game can add themes with
+// <link rel="stylesheet" data-mwg-theme="Name"> or <style data-mwg-theme="Name"> in <head>, defining
+// :root[data-theme="Name"] { --bg: …; color-scheme: dark; } (any variable left out keeps its light value).
+// data-mwg-default on one makes it the default. The names auto, light and dark are the built-in themes'.
+// THEMES and the initial theme come from #theme-boot.
+const THEME_LABELS = { auto: 'Auto', light: 'Light', dark: 'Dark' };
+// The wiki's body classes for its two themes: set in the article's srcdoc, swapped by the frame script.
+const WGL_THEME_CLASSES = { dark: ['wgl-darkmode', 'wgl-theme-dark'], light: ['wgl-lightmode', 'wgl-theme-light'] };
+
+function setTheme(t) {
+  if (t === 'auto') delete document.documentElement.dataset.theme;
+  else document.documentElement.dataset.theme = t;
+  store.set('mwg.theme', t);
+  syncFrameTheme();
 }
+
+// The article uses the wiki's light or dark theme, matching the game theme's color-scheme.
+function themeIsDark() {
+  const cs = getComputedStyle(document.documentElement).colorScheme.split(' ');
+  if (cs.includes('dark') !== cs.includes('light')) return cs.includes('dark');
+  return matchMedia('(prefers-color-scheme: dark)').matches;   // "normal" or "light dark"
+}
+
+// Restyles the loaded article in place. Also sent when a frame reports ready, in case the theme changed while it loaded.
+function syncFrameTheme() { $('#frame').contentWindow?.postMessage({ mwg: 'theme', dark: themeIsDark() }, '*'); }
 
 function renderArticle(page, fragment, token) {
   const dark = themeIsDark();
@@ -580,6 +627,7 @@ function renderArticle(page, fragment, token) {
   const frameScript = `
     const NS = new Set(${JSON.stringify(NAMESPACES.map(n => n.toLowerCase()))});
     const FRAG = ${JSON.stringify(fragment || '')};
+    const WGL = ${JSON.stringify(WGL_THEME_CLASSES)};
     function classify(a) {
       const href = a.getAttribute('href') || '';
       if (href.startsWith('#')) { try { return { kind: 'anchor', id: decodeURIComponent(href.slice(1)) }; } catch (e) { return null; } }
@@ -618,6 +666,11 @@ function renderArticle(page, fragment, token) {
     }, true);
     document.addEventListener('submit', e => e.preventDefault(), true);
     document.addEventListener('keydown', e => parent.postMessage({ mwg: 'key', key: e.key }, '*'));
+    addEventListener('message', e => {
+      if (e.source !== parent || e.data?.mwg !== 'theme') return;
+      for (const c of WGL.dark) document.body.classList.toggle(c, e.data.dark);
+      for (const c of WGL.light) document.body.classList.toggle(c, !e.data.dark);
+    });
     scrollToId(FRAG);
   `.replace(/<\/script/gi, '<\\/script');
 
@@ -626,7 +679,8 @@ function renderArticle(page, fragment, token) {
 <base href="${WIKI}/">
 ${WIKI_STYLES.map(h => `<link rel="stylesheet" href="${esc(h)}">`).join('\n')}
 <style>
-  html, body { background: ${dark ? '#121212' : '#fff'} !important; }
+  html, body { background: #fff !important; }
+  html:has(body.wgl-theme-dark), body.wgl-theme-dark { background: #121212 !important; }
   body { margin: 0; }
   #content { margin: 0 !important; border: 0 !important; padding: 20px 28px 60px !important; max-width: 1200px; background: transparent !important; }
   .mw-editsection, iframe, .embedvideo, .mw-ext-embedvideo, audio, video { display: none !important; }
@@ -634,7 +688,7 @@ ${WIKI_STYLES.map(h => `<link rel="stylesheet" href="${esc(h)}">`).join('\n')}
   a.mwg-dead img { opacity: 1; }
   a.mwg-live { cursor: pointer; }
 </style>
-</head><body class="mediawiki ltr sitedir-ltr ns-0 ns-subject skin-vector skin-vector-legacy action-view ${dark ? 'wgl-darkmode wgl-theme-dark' : 'wgl-lightmode wgl-theme-light'}">
+</head><body class="mediawiki ltr sitedir-ltr ns-0 ns-subject skin-vector skin-vector-legacy action-view ${WGL_THEME_CLASSES[dark ? 'dark' : 'light'].join(' ')}">
 <div id="content" class="mw-body" role="main">
   <h1 id="firstHeading" class="firstHeading mw-first-heading">${page.displaytitle || esc(page.title)}</h1>
   <div id="bodyContent" class="vector-body"><div id="mw-content-text" class="mw-body-content mw-content-ltr">${page.text}</div></div>
@@ -648,7 +702,7 @@ ${WIKI_STYLES.map(h => `<link rel="stylesheet" href="${esc(h)}">`).join('\n')}
 window.addEventListener('message', e => {
   if (e.source !== $('#frame').contentWindow || !e.data) return;
   if (e.data.mwg === 'nav') navigate(e.data.title, e.data.frag);
-  if (e.data.mwg === 'ready') frameReady(e.data.token);
+  if (e.data.mwg === 'ready') { syncFrameTheme(); frameReady(e.data.token); }
   if (e.data.mwg === 'key' && e.data.key === 'Escape' && modalDismissable) closeModal();
 });
 
@@ -731,6 +785,10 @@ $('#modalBg').addEventListener('click', e => { if (e.target === $('#modalBg') &&
 document.addEventListener('keydown', e => { if (e.key === 'Escape' && modalDismissable) closeModal(); });
 
 // ---------------------------------------------------------------- Wiring
+$('#themeSelect').innerHTML = THEMES.map(t => `<option value="${esc(t)}">${esc(THEME_LABELS[t] || t)}</option>`).join('');
+$('#themeSelect').value = document.documentElement.dataset.theme || 'auto';
+$('#themeSelect').onchange = e => setTheme(e.target.value);
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change', syncFrameTheme);
 document.querySelectorAll('input[name=mode]').forEach(r => r.addEventListener('change', () => { updateModeHelp(); reroll('both'); }));
 document.querySelectorAll('[data-reroll]').forEach(b => b.addEventListener('click', () => reroll(b.dataset.reroll)));
 document.querySelectorAll('[data-custom]').forEach(inp => {

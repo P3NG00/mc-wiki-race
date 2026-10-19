@@ -27,9 +27,9 @@ const ev = async (expr, c = ctx) => {
   return r.result?.result?.value ?? JSON.stringify(r.error || r.result?.exceptionDetails?.text);
 };
 const frameCtx = async () => (await send('browsingContext.getTree', {})).result.contexts[0].children[0]?.context;
-const until = async (expr, ms = 30000) => {
+const until = async (expr, ms = 30000, c = ctx) => {
   const t = Date.now();
-  while (Date.now() - t < ms) { if (await ev(expr) === true) return true; await sleep(300); }
+  while (Date.now() - t < ms) { if (await ev(expr, c) === true) return true; await sleep(300); }
   return false;
 };
 const shot = async name => {
@@ -64,6 +64,20 @@ await ev("document.querySelector('#btnBack').click()");
 check('Back loads from cache', await until("game.path.length === 3 && !game.loading") && await ev('apiCalls === 0'),
   `${await ev("game.path.map(p => p.title).join(' > ')")} apiCalls=${await ev('apiCalls')}`);
 await ev("window.api = window.api.orig");
+
+// Switching theme restyles the loaded article in place: same document, wiki dark/light body class swapped.
+f = await frameCtx();
+await ev("window.mwgMarker = 1", f);
+const frameTheme = "(window.mwgMarker === 1 ? '' : 'reloaded ') + (document.body.classList.contains('wgl-theme-dark') ? 'dark' : 'light') + ' ' + getComputedStyle(document.documentElement).backgroundColor";
+await ev("setTheme('dark')");
+check('dark theme switches the article in place', await until(`${frameTheme} === 'dark rgb(18, 18, 18)'`, 5000, f) && await ev("themeIsDark()") === true, await ev(frameTheme, f));
+await ev("setTheme('light')");
+check('light theme switches the article in place', await until(`${frameTheme} === 'light rgb(255, 255, 255)'`, 5000, f) && await ev("themeIsDark()") === false, await ev(frameTheme, f));
+// A theme change made while the article is still loading reaches it once the frame reports ready.
+await ev("renderArticle(parseCache.get('Diamond'), null, game.navToken); setTheme('dark')");
+check('theme change during load is applied', await until("window.mwgMarker === undefined && document.body.classList.contains('wgl-theme-dark')", 15000, f),
+  await ev(frameTheme, f));
+await ev("setTheme('auto')");
 
 f = await frameCtx();
 await ev("[...document.querySelectorAll('a.mwg-live')].find(a => /Diamond_Pickaxe/i.test(a.getAttribute('href'))).click()", f);
@@ -107,6 +121,20 @@ await sleep(1000);
 f = await frameCtx();
 const areas = JSON.parse(await ev("JSON.stringify({ all: document.querySelectorAll('area').length, live: document.querySelectorAll('area.mwg-live').length })", f));
 check('image-map links are clickable', areas.live > 0, `areas=${areas.all} live=${areas.live}`);
+
+// A theme stylesheet added by the host page shows up in the picker and, marked data-mwg-default, wins over a saved
+// theme that no longer exists. A preload script stands in for the host page injecting it into <head>.
+await ev("localStorage.setItem('mwg.theme', JSON.stringify('Gone'))");
+const preload = (await send('script.addPreloadScript', { functionDeclaration: `() => {
+  const add = () => document.head.insertAdjacentHTML('beforeend', '<style data-mwg-theme="Test" data-mwg-default>:root[data-theme="Test"] { --bg: #000; color-scheme: dark; }</style>');
+  if (document.head) add(); else new MutationObserver((_, o) => { if (document.head) { o.disconnect(); add(); } }).observe(document, { childList: true, subtree: true });
+}` })).result.script;
+await send('browsingContext.navigate', { context: ctx, url: 'about:blank', wait: 'complete' });
+await send('browsingContext.navigate', { context: ctx, url: fileUrl, wait: 'complete' });
+const injected = await ev("[...document.querySelectorAll('#themeSelect option')].map(o => o.value).join(',') + ' ' + document.querySelector('#themeSelect').value + ' ' + document.documentElement.dataset.theme + ' ' + themeIsDark() + ' ' + getComputedStyle(document.body).backgroundColor");
+check('host-page theme is listed and used as the default', injected === 'auto,light,dark,Test Test Test true rgb(0, 0, 0)', injected);
+await send('script.removePreloadScript', { script: preload });
+await ev("localStorage.removeItem('mwg.theme')");
 
 await send('session.end', {});
 console.log(failures ? `${failures} check(s) failed` : 'All checks passed');

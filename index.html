@@ -294,7 +294,7 @@ const NAMESPACES = [
 // Chaos mode: generator=random returns lots of version/changelog/history pages; skip those.
 const CHAOS_REJECT = /\/|\(disambiguation\)$|^(Java|Bedrock|Pocket|Education|Legacy Console|PlayStation \d|Xbox( 360| One)?|Nintendo|Wii U|New Nintendo 3DS|Pi|Minecraft Launcher|Launcher|Realms|China) Edition|^(Launcher|Minecraft Launcher|Bedrock Dedicated Server|Server) \d|^\d+w\d+[a-z]$|\b\d+\.\d+(\.\d+)?\b/i;
 
-const MIN_BACKLINKS = 5;   // a target must have at least this many incoming article links
+const MIN_BACKLINKS = 5;   // a target or checkpoint must have at least this many incoming article links
 // Target difficulty. Easy and Hard roll DIFFICULTY_SAMPLES targets and keep the best- or least-linked one, so they adapt to
 // the pool: fixed counts don't work, since navboxes link most items and mobs from 500+ articles but no biome gets there.
 // Target topics: a topic draws the target uniformly from its categories, whatever the mode (Classic would roll Wither

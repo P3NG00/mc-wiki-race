@@ -155,11 +155,11 @@ await ev(`window.candidate = Object.assign(async limit => {
   const i = candidate.n++;
   return { title: 'Fake ' + i, desc: '', img: '', disambig: false, backlinks: [300, 50, 500, 500, 120][i % 5], limit };
 }, { orig: candidate, n: 0 })`);
-for (const [diff, want] of [['easy', 'Fake 2 500 500'], ['hard', 'Fake 1 50 500'], ['any', 'Fake 0 300 5']]) {
+for (const [diff, want] of [['easy', 'Fake 2 500 500 easy'], ['hard', 'Fake 1 50 500 hard'], ['any', 'Fake 0 300 5 any']]) {
   await ev(`candidate.n = 0; document.querySelector('input[name=diff][value=${diff}]').click()`);
   await sleep(300);
   await until("!document.querySelector('#btnPlay').disabled", 15000);
-  const got = await ev("setup.goal.title + ' ' + setup.goal.backlinks + ' ' + setup.goal.limit");
+  const got = await ev("[setup.goal.title, setup.goal.backlinks, setup.goal.limit, setup.goal.difficulty].join(' ')");
   check(`${diff} target selection`, got === want && await ev('setup.start.title') === startBefore, got);
 }
 await ev('window.candidate = candidate.orig');
@@ -169,6 +169,16 @@ await ev("(s => { s.value = 'mobs'; s.dispatchEvent(new Event('change', { bubble
 await sleep(500);
 check('Mobs topic target', await until("!document.querySelector('#btnPlay').disabled", 60000) && await ev('setup.start.title') === startBefore &&
   await ev("Promise.all(TOPICS.mobs.cats.map(categoryMembers)).then(l => l.flat().includes(setup.goal.title))"), await ev("setup.goal.title"));
+// The result keeps how its target was rolled, and shows the topic.
+await ev("document.querySelector('#btnPlay').click()");
+await until("game.path.length === 1 && !game.loading");
+await ev("document.querySelector('#btnGiveUp').click()");
+await ev("document.querySelector('#gQuit').click()");
+const rolled = await ev("(([r]) => r.difficulty + ' ' + r.topic)(store.get('mwg.history', []))");
+check('result records difficulty and topic', rolled === 'any mobs' && await ev("document.querySelector('#modal .note').textContent.endsWith('· Mobs')"),
+  `${rolled} | ${await ev("document.querySelector('#modal .note').textContent")}`);
+await ev("document.querySelector('#mNew').click()");
+await until("!document.querySelector('#btnPlay').disabled", 60000);
 await ev("(s => { s.value = 'any'; s.dispatchEvent(new Event('change', { bubbles: true })); })(document.querySelector('#topic'))");
 await sleep(500);
 await until("!document.querySelector('#btnPlay').disabled", 60000);

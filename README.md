@@ -26,7 +26,7 @@ Open `index.html` in a browser. Opening it straight from disk (`file://`) works 
   - **Checkpoint:** a third card. You have to visit that article on the way, and reaching the target before it doesn't count.
 - **Copy challenge link** shares the exact pair you're looking at, plus any checkpoint and rules, as `index.html#start=<Title>&target=<Title>&via=<Title>&rules=checkpoint`.
 - **Theme** (top right of the setup screen): Auto follows your system's light or dark setting. Articles switch to the wiki's own dark theme to match.
-- Your last 50 games, your personal best for each pair and your theme are kept in the browser. Personal bests are kept separately for each combination of rules.
+- Your last 50 games, your personal best for each pair and your theme are kept in the browser. Personal bests are kept separately for each combination of rules. Each result also notes the target difficulty and topic it was rolled with, so you can see whether Hard really plays harder.
 
 ## Hosting
 

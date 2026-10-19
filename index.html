@@ -236,7 +236,7 @@ const THEMES = [...new Set(['auto', 'light', 'dark', ...Array.from(document.quer
 
   <div class="history hidden" id="history">
     <h2>Recent games</h2>
-    <div class="history-wrap"><table><thead><tr><th>Start</th><th>Target</th><th>Rules</th><th>Clicks</th><th>Time</th><th>When</th></tr></thead><tbody></tbody></table></div>
+    <div class="history-wrap"><table><thead><tr><th>Start</th><th>Target</th><th>Settings</th><th>Clicks</th><th>Time</th><th>When</th></tr></thead><tbody></tbody></table></div>
   </div>
 </section>
 
@@ -471,8 +471,6 @@ const setup = { start: null, via: null, goal: null, daily: null, busy: 0, rolls:
 const cardKeys = () => rules().includes('checkpoint') ? ['start', 'via', 'goal'] : ['start', 'goal'];
 
 function mode() { return $('input[name=mode]:checked').value; }
-function difficulty() { return DIFFICULTY[$('input[name=diff]:checked').value]; }
-function topic() { return TOPICS[$('#topic').value]; }
 
 function setImg(img, src) {
   if (src) { img.src = src; img.classList.remove('hidden'); } else { img.removeAttribute('src'); img.classList.add('hidden'); }
@@ -499,6 +497,9 @@ const RULES = {
 function rules() { return Object.keys(RULES).filter(k => $(`#rules input[value=${k}]`).checked); }
 function setRules(keys) { for (const k in RULES) $(`#rules input[value=${k}]`).checked = keys.includes(k); }
 const rulesText = keys => (keys || []).map(k => RULES[k]?.label || k).join(', ');
+// A result's rules plus how its target was rolled, when that wasn't Any.
+const settingsText = r => [r.difficulty && r.difficulty !== 'any' && `${DIFFICULTY[r.difficulty]?.label || r.difficulty} target`,
+  r.topic && r.topic !== 'any' && (TOPICS[r.topic]?.label || r.topic), rulesText(r.rules)].filter(Boolean).join(', ');
 const sameRules = (a, b) => (a.rules || []).join() === (b.rules || []).join();
 
 function renderCard(which) {
@@ -553,18 +554,21 @@ async function candidate(limit, cats) {
 
 // A checkpoint needs incoming links like a target, but difficulty and topic only apply to the target.
 async function rollOne(which) {
-  const linked = which !== 'start', goal = which === 'goal', d = goal ? difficulty() : DIFFICULTY.any;
+  const linked = which !== 'start', goal = which === 'goal';
+  // How a target was picked goes onto it, and from there into the result (see finish).
+  const picked = goal && { difficulty: $('input[name=diff]:checked').value, topic: $('#topic').value };
+  const d = goal ? DIFFICULTY[picked.difficulty] : DIFFICULTY.any;
   // Easy and Hard compare counts, so those count up to the API's cap of 500.
   const limit = !linked ? 0 : d.better ? 500 : MIN_BACKLINKS;
   const batch = d.better ? DIFFICULTY_SAMPLES : 1;
-  const cats = goal && topic().cats;
+  const cats = goal && TOPICS[picked.topic].cats;
   for (let attempt = 0; attempt < 12; attempt++) {
     const infos = await Promise.all(Array.from({ length: batch }, () => candidate(limit, cats)));
     // Read the other cards now, not before the await: they may be rolling at the same time.
     const others = cardKeys().filter(w => w !== which).map(w => setup[w]?.title);
     const ok = infos.filter(i => i && !i.disambig && !others.includes(i.title) && (!linked || i.backlinks >= MIN_BACKLINKS));
     // On a tie the first one wins, which is as random as any.
-    if (ok.length) return ok.reduce((best, i) => d.better?.(i, best) ? i : best);
+    if (ok.length) return Object.assign(ok.reduce((best, i) => d.better?.(i, best) ? i : best), picked);
   }
   throw new Error('Gave up finding a good article');
 }
@@ -665,7 +669,7 @@ function renderHistory() {
   $('#history').classList.toggle('hidden', rows.length === 0);
   $('#history tbody').innerHTML = rows.slice(0, 15).map(r => `
     <tr class="${r.won ? '' : 'lost'}">
-      <td>${esc(r.start)}</td><td>${esc(r.goal)}${r.via ? ` <span class="note">via ${esc(r.via)}</span>` : ''}</td><td>${esc(rulesText(r.rules))}</td>
+      <td>${esc(r.start)}</td><td>${esc(r.goal)}${r.via ? ` <span class="note">via ${esc(r.via)}</span>` : ''}</td><td>${esc(settingsText(r))}</td>
       <td class="mono">${r.won ? r.clicks : r.outOfClicks ? 'out of clicks' : 'gave up'}</td>
       <td class="mono">${fmtTime(r.ms)}</td>
       <td>${esc(new Date(r.at).toLocaleDateString())}</td>
@@ -929,8 +933,9 @@ function finish(won, outOfClicks = false) {
   clearInterval(game.timer);
   renderHud();
   const ms = now();
-  const rec = { start: game.start.title, goal: game.goal.title, ...(game.via && { via: game.via.title }), ...(game.daily && { daily: game.daily }), rules: game.rules, won, ...(outOfClicks && { outOfClicks }), clicks: clicks(), ms, at: Date.now(), path: game.path.map(p => p.title) };
-  const rulesNote = rulesText(rec.rules);
+  const rec = { start: game.start.title, goal: game.goal.title, ...(game.via && { via: game.via.title }), ...(game.daily && { daily: game.daily }),
+    ...(game.goal.difficulty && { difficulty: game.goal.difficulty, topic: game.goal.topic }), rules: game.rules, won, ...(outOfClicks && { outOfClicks }), clicks: clicks(), ms, at: Date.now(), path: game.path.map(p => p.title) };
+  const settingsNote = settingsText(rec);
   const hist = store.get('mwg.history', []);
   const best = hist.filter(r => r.won && r.start === rec.start && r.goal === rec.goal && r.via === rec.via && sameRules(r, rec))
     .sort((a, b) => a.clicks - b.clicks || a.ms - b.ms)[0];
@@ -947,7 +952,7 @@ function finish(won, outOfClicks = false) {
   }
   openModal(`
     <h2>${won ? '🎉 You made it!' : outOfClicks ? 'Out of clicks' : 'Game over'}</h2>
-    <p class="note">${rec.daily ? `Daily ${rec.daily}: ` : ''}${esc(route)}${rulesNote ? ' · ' + esc(rulesNote) : ''}</p>
+    <p class="note">${rec.daily ? `Daily ${rec.daily}: ` : ''}${esc(route)}${settingsNote ? ' · ' + esc(settingsNote) : ''}</p>
     <div class="big">
       <div class="stat"><div class="v mono">${won ? rec.clicks : '—'}</div><div class="k">Clicks</div></div>
       <div class="stat"><div class="v mono">${fmtTime(ms)}</div><div class="k">Time</div></div>
@@ -962,7 +967,7 @@ function finish(won, outOfClicks = false) {
       <button class="primary" id="mNew">New game</button>
     </div>`, false);
   $('#mCopy').onclick = async () => {
-    const text = `Minecraft Wiki Game${rec.daily ? ` daily ${rec.daily}` : ''}: ${route}${rulesNote ? ` (${rulesNote})` : ''}\n` +
+    const text = `Minecraft Wiki Game${rec.daily ? ` daily ${rec.daily}` : ''}: ${route}${settingsNote ? ` (${settingsNote})` : ''}\n` +
       (won ? `${rec.clicks} clicks in ${fmtTime(ms)}\n` : `${outOfClicks ? 'Out of clicks' : 'Gave up'} after ${fmtTime(ms)}\n`) +
       rec.path.join(' → ');
     try { await navigator.clipboard.writeText(text); $('#mCopy').textContent = 'Copied!'; }

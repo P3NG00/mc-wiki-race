@@ -131,11 +131,18 @@ await ev("document.querySelector('#rules input[value=limit]').click()");
 // Random rolls in both modes.
 await ev("document.querySelector('#mNew').click()");
 check('Classic roll', await until("!document.querySelector('#btnPlay').disabled", 60000), await ev("setup.start.title + ' -> ' + setup.goal.title"));
+// Balanced fetches every category at once, so it also checks that no more than API_CONCURRENCY requests are in flight.
+await ev(`window.inFlight = 0; window.maxInFlight = 0; window.fetch = Object.assign(async (...a) => {
+  maxInFlight = Math.max(maxInFlight, ++inFlight);
+  try { return await fetch.orig(...a); } finally { inFlight--; }
+}, { orig: fetch.bind(window) })`);
 for (const m of ['balanced', 'even', 'chaos']) {
   await ev(`document.querySelector('input[value=${m}]').click()`);
   await sleep(500);
   check(`${m} roll`, await until("!document.querySelector('#btnPlay').disabled", 60000), await ev("setup.start.title + ' -> ' + setup.goal.title"));
 }
+await ev('window.fetch = fetch.orig');
+check('at most API_CONCURRENCY requests at once', await ev('maxInFlight === API_CONCURRENCY'), `max=${await ev('maxInFlight')}`);
 
 // Difficulty rerolls only the target. Easy and Hard keep the best- or least-linked of five candidates, Any takes the first.
 // candidate() is stubbed with known counts, so this tests the selection rather than the wiki's link graph.

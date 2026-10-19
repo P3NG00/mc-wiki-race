@@ -343,13 +343,27 @@ const store = {
 };
 
 // ---------------------------------------------------------------- API helpers
+// MediaWiki asks clients not to send many requests at once, so at most API_CONCURRENCY are in flight and the rest
+// wait in order. A finished request hands its slot straight to the next one, so the limit holds without races, and
+// each request times out after 30 s so a stalled one can't hold a slot for good.
+const API_CONCURRENCY = 4;
+let apiActive = 0;
+const apiQueue = [];
+
 async function api(params) {
-  // origin=* is required for anonymous CORS from a file:// page.
-  const res = await fetch(`${API}?${new URLSearchParams({ format: 'json', formatversion: '2', origin: '*', ...params })}`);
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  const data = await res.json();
-  if (data.error) throw new Error(data.error.info || data.error.code);
-  return data;
+  if (apiActive < API_CONCURRENCY) apiActive++;
+  else await new Promise(r => apiQueue.push(r));
+  try {
+    // origin=* is required for anonymous CORS from a file:// page.
+    const res = await fetch(`${API}?${new URLSearchParams({ format: 'json', formatversion: '2', origin: '*', ...params })}`, { signal: AbortSignal.timeout(30000) });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    if (data.error) throw new Error(data.error.info || data.error.code);
+    return data;
+  } finally {
+    const next = apiQueue.shift();
+    if (next) next(); else apiActive--;
+  }
 }
 
 // Caches the promise, so concurrent rolls share one fetch; a failed fetch is evicted.

@@ -14,7 +14,7 @@ A `#start=<Title>&target=<Title>` URL hash loads a fixed pair (this is what "Cop
 
 ## Testing
 
-`test/run-e2e.sh [screenshot-dir]` starts headless Firefox with WebDriver BiDi and runs `test/e2e.mjs`. The test opens `index.html` from `file://` and plays a real game against the live wiki: challenge-hash load, rendering, link classification, navigation, the win condition, Escape handling, random rolls in both modes and the same-article guard. It needs `firefox` and Node ≥ 22 (for the global `WebSocket`), plus network access. It runs as a single script; to focus on one behavior, edit or comment out checks in `e2e.mjs`. Code inside the article iframe is evaluated in the frame's own browsing context (`frameCtx()`).
+`test/run-e2e.sh [screenshot-dir]` starts headless Firefox with WebDriver BiDi and runs `test/e2e.mjs`. The test opens `index.html` from `file://` and plays a real game against the live wiki: challenge-hash load, rendering, link classification, navigation, the win condition, Escape handling, random rolls in both modes, interwiki titles, the same-article guard and image-map links. It needs `firefox` and Node ≥ 22 (for the global `WebSocket`), plus network access. It runs as a single script; to focus on one behavior, edit or comment out checks in `e2e.mjs`. Code inside the article iframe is evaluated in the frame's own browsing context (`frameCtx()`).
 
 Quick syntax check of the inline script:
 ```sh
@@ -33,7 +33,7 @@ python3 -c "import re;h=open('index.html').read();open('/tmp/m.js','w').write(re
 **Rendering articles.** Each article is written into a sandboxed iframe (`sandbox="allow-scripts"`, so it gets an opaque origin) via `srcdoc`. This design is deliberate:
 - The wiki's own stylesheets (`WIKI_STYLES`, loaded from `load.php`) apply without leaking into the game UI. They rely on `:root` and `body.wgl-theme-*` selectors, which is why a shadow root doesn't work.
 - `<base href="https://minecraft.wiki/">` resolves the parse output's relative `/images/...` URLs, `srcset` values and CSS `url()` values without any rewriting.
-- An inline script inside the iframe classifies every `<a>` and intercepts clicks. Same-page `#anchors` scroll locally. Main-namespace `/w/Title#frag` links are sent to the parent with `postMessage({mwg:'nav', title, frag})`. Everything else gets the `mwg-dead` class and does nothing: other namespaces (`NAMESPACES`, including `Tutorial:`, `File:` and `Category:`), red links (`.new`), external links and `?query` links.
+- An inline script inside the iframe classifies every `<a>` and image-map `<area>` and intercepts clicks. Same-page `#anchors` scroll locally. Main-namespace `/w/Title#frag` links are sent to the parent with `postMessage({mwg:'nav', title, frag})`. Everything else gets the `mwg-dead` class and does nothing: other namespaces (`NAMESPACES`, including `Tutorial:`, `File:` and `Category:`), red links (`.new`), external links and `?query` links.
 - The iframe theme follows `prefers-color-scheme` through the wiki's `wgl-theme-dark` body class.
 
 **Game rules / state** (`game` object):

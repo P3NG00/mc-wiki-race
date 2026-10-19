@@ -15,8 +15,6 @@
     --accent-ink: #ffffff;
     --accent-soft: #e3f0dc;
     --target: #b8452f;
-    --target-soft: #f7e3dd;
-    --warn: #9a6a00;
     --shadow: 0 1px 2px rgba(0,0,0,.06), 0 4px 16px rgba(0,0,0,.06);
     color-scheme: light;
   }
@@ -24,7 +22,7 @@
     :root:not([data-theme="light"]) {
       --bg: #161814; --panel: #1f221d; --ink: #e8e9e3; --muted: #9da196; --line: #33372f;
       --accent: #6cbf55; --accent-ink: #0d1409; --accent-soft: #24331f;
-      --target: #ec8a73; --target-soft: #3a231d; --warn: #e2b54a;
+      --target: #ec8a73;
       --shadow: 0 1px 2px rgba(0,0,0,.4), 0 4px 16px rgba(0,0,0,.3);
       color-scheme: dark;
     }
@@ -32,7 +30,7 @@
   :root[data-theme="dark"] {
     --bg: #161814; --panel: #1f221d; --ink: #e8e9e3; --muted: #9da196; --line: #33372f;
     --accent: #6cbf55; --accent-ink: #0d1409; --accent-soft: #24331f;
-    --target: #ec8a73; --target-soft: #3a231d; --warn: #e2b54a;
+    --target: #ec8a73;
     --shadow: 0 1px 2px rgba(0,0,0,.4), 0 4px 16px rgba(0,0,0,.3);
     color-scheme: dark;
   }
@@ -272,19 +270,22 @@ const store = {
 
 // ---------------------------------------------------------------- API helpers
 async function api(params) {
-  const url = new URL(API);
   // origin=* is required for anonymous CORS from a file:// page.
-  for (const [k, v] of Object.entries({ format: 'json', formatversion: '2', origin: '*', ...params })) url.searchParams.set(k, v);
-  const res = await fetch(url);
+  const res = await fetch(`${API}?${new URLSearchParams({ format: 'json', formatversion: '2', origin: '*', ...params })}`);
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   const data = await res.json();
   if (data.error) throw new Error(data.error.info || data.error.code);
   return data;
 }
 
+// Caches the promise, so concurrent rolls share one fetch; a failed fetch is evicted.
 const categoryCache = new Map();
-async function categoryMembers(cat) {
-  if (categoryCache.has(cat)) return categoryCache.get(cat);
+function categoryMembers(cat) {
+  if (!categoryCache.has(cat)) categoryCache.set(cat, fetchCategory(cat).catch(e => { categoryCache.delete(cat); throw e; }));
+  return categoryCache.get(cat);
+}
+
+async function fetchCategory(cat) {
   const titles = [];
   let cont = {};
   do {
@@ -292,9 +293,7 @@ async function categoryMembers(cat) {
     for (const m of d.query.categorymembers) titles.push(m.title);
     cont = d.continue || null;
   } while (cont);
-  const clean = titles.filter(t => !t.includes('/') && !/\(disambiguation\)$/.test(t));
-  categoryCache.set(cat, clean);
-  return clean;
+  return titles.filter(t => !t.includes('/') && !/\(disambiguation\)$/.test(t));
 }
 
 async function randomChaosTitle() {
@@ -320,7 +319,7 @@ async function backlinkCount(title) {
 // Resolves redirects/normalisation and returns { title, desc, img, disambig } or null if missing.
 async function pageInfo(title) {
   const d = await api({ action: 'query', titles: title, redirects: '1', prop: 'pageprops|pageimages', ppprop: 'description|disambiguation', piprop: 'thumbnail', pithumbsize: '160' });
-  const p = d.query.pages[0];
+  const p = d.query.pages?.[0];   // absent for interwiki titles such as de:Diamant
   if (!p || p.missing || p.invalid || p.ns !== 0) return null;
   return {
     title: p.title,
@@ -331,9 +330,13 @@ async function pageInfo(title) {
 }
 
 // ---------------------------------------------------------------- Setup screen
-const setup = { start: null, goal: null, busy: 0 };
+const setup = { start: null, goal: null, busy: 0, rolls: { start: 0, goal: 0 } };   // rolls: per-card token, so superseded rolls are dropped
 
-function mode() { return document.querySelector('input[name=mode]:checked').value; }
+function mode() { return $('input[name=mode]:checked').value; }
+
+function setImg(img, src) {
+  if (src) { img.src = src; img.classList.remove('hidden'); } else { img.removeAttribute('src'); img.classList.add('hidden'); }
+}
 
 function updateModeHelp() {
   $('#modeHelp').textContent = mode() === 'classic'
@@ -344,10 +347,14 @@ function updateModeHelp() {
 function renderCard(which) {
   const card = which === 'start' ? $('#cardStart') : $('#cardGoal');
   const info = setup[which];
-  const img = $('img', card);
   $('.title', card).textContent = info ? info.title : '…';
   $('.desc', card).textContent = info ? (info.desc || 'No description available.') : '';
-  if (info?.img) { img.src = info.img; img.classList.remove('hidden'); } else { img.removeAttribute('src'); img.classList.add('hidden'); }
+  setImg($('img', card), info?.img);
+  updatePlay();
+}
+
+// Enables Start only for two different articles with no lookup in flight.
+function updatePlay() {
   const same = setup.start && setup.goal && setup.start.title === setup.goal.title;
   $('#btnPlay').disabled = !(setup.start && setup.goal) || same || setup.busy > 0;
   if (same && setup.busy === 0) setStatus('Start and target are the same article. Pick a different one.', true);
@@ -361,10 +368,10 @@ function setStatus(msg, isErr) {
 
 async function withBusy(fn) {
   setup.busy++;
-  $('#btnPlay').disabled = true;
+  updatePlay();
   try { return await fn(); }
   catch (e) { setStatus('Network error: ' + e.message + '. Check your connection and try again.', true); }
-  finally { setup.busy--; renderCard('start'); }
+  finally { setup.busy--; updatePlay(); }
 }
 
 async function rollOne(which) {
@@ -380,11 +387,16 @@ async function rollOne(which) {
 
 async function reroll(which) {
   const targets = which === 'both' ? ['start', 'goal'] : [which];
+  const tokens = Object.fromEntries(targets.map(w => [w, ++setup.rolls[w]]));
+  const current = w => tokens[w] === setup.rolls[w];
   setStatus('Picking…');
   await withBusy(async () => {
     for (const w of targets) { setup[w] = null; renderCard(w); }
-    for (const w of targets) { setup[w] = await rollOne(w); renderCard(w); }
-    setStatus('');
+    for (const w of targets) {
+      const info = await rollOne(w);
+      if (current(w)) { setup[w] = info; renderCard(w); }
+    }
+    if (targets.every(current)) setStatus('');
   });
 }
 
@@ -395,6 +407,7 @@ async function setCustom(which, raw) {
   await withBusy(async () => {
     const info = await pageInfo(text);
     if (!info) { setStatus('No article named “' + text + '” on minecraft.wiki.', true); return; }
+    setup.rolls[which]++;
     setup[which] = info;
     renderCard(which);
     setStatus(info.disambig ? 'Heads up: “' + info.title + '” is a disambiguation page.' : '');
@@ -445,6 +458,7 @@ function renderHud() {
   $('#hudClicks').textContent = clicks();
   $('#hudTime').textContent = fmtTime(now());
   $('#btnBack').disabled = game.stack.length < 2 || game.loading || !game.active;
+  $('#btnGiveUp').disabled = game.loading || !game.active;
   $('#pathList').innerHTML = game.path.map((p, i) =>
     `<li class="${i === game.path.length - 1 ? 'cur' : ''} ${p.back ? 'back' : ''}">${esc(p.title)}${p.back ? ' (back)' : ''}</li>`).join('');
   const pl = $('.path'); pl.scrollTop = pl.scrollHeight;
@@ -454,19 +468,19 @@ function showOverlay(html) { $('#overlayBox').innerHTML = html; $('#overlay').cl
 function hideOverlay() { $('#overlay').classList.add('hidden'); }
 
 function startGame() {
-  Object.assign(game, { active: true, start: setup.start, goal: setup.goal, path: [], stack: [], elapsed: 0, runningSince: 0 });
+  Object.assign(game, { active: true, start: setup.start, goal: setup.goal, path: [], stack: [], elapsed: 0, runningSince: 0, loading: false });
   $('#hudGoal').textContent = game.goal.title;
-  const hi = $('#hudImg');
-  if (game.goal.img) { hi.src = game.goal.img; hi.classList.remove('hidden'); } else hi.classList.add('hidden');
+  setImg($('#hudImg'), game.goal.img);
+  hideOverlay();
   $('#setup').classList.add('hidden');
   $('#game').classList.remove('hidden');
   clearInterval(game.timer);
   game.timer = setInterval(() => { $('#hudTime').textContent = fmtTime(now()); }, 250);
   history.replaceState(null, '', location.pathname + location.search);
-  navigate(game.start.title, null, { initial: true });
+  navigate(game.start.title, null);
 }
 
-async function navigate(title, fragment, { initial = false, back = false } = {}) {
+async function navigate(title, fragment, { back = false } = {}) {
   if (!game.active || game.loading) return;
   const token = ++game.navToken;
   game.loading = true;
@@ -479,10 +493,12 @@ async function navigate(title, fragment, { initial = false, back = false } = {})
   } catch (e) {
     if (token !== game.navToken) return;
     game.loading = false;
+    renderHud();
     showOverlay(`Couldn’t load <b>${esc(title)}</b>.<br><span class="note">${esc(e.message)}</span><br><br>
       <button class="primary" id="btnRetry">Retry</button> <button id="btnCancelNav">Cancel</button>`);
-    $('#btnRetry').onclick = () => navigate(title, fragment, { initial, back });
-    $('#btnCancelNav').onclick = () => { hideOverlay(); resumeClock(); renderHud(); };
+    $('#btnRetry').onclick = () => navigate(title, fragment, { back });
+    // With no article loaded yet there is nothing to go back to, so return to setup.
+    $('#btnCancelNav').onclick = () => { hideOverlay(); if (!game.path.length) { toSetup(); return; } resumeClock(); renderHud(); };
     return;
   }
   if (token !== game.navToken || !game.active) return;
@@ -508,11 +524,11 @@ function renderArticle(page, fragment) {
   // The article renders in a sandboxed iframe (opaque origin): the wiki's own CSS applies untouched,
   // <base> resolves its relative image/CSS URLs, and the inline script reports clicks via postMessage.
   const frameScript = `
-    const NS = ${JSON.stringify(NAMESPACES)};
+    const NS = new Set(${JSON.stringify(NAMESPACES.map(n => n.toLowerCase()))});
     const FRAG = ${JSON.stringify(fragment || '')};
     function classify(a) {
       const href = a.getAttribute('href') || '';
-      if (href.startsWith('#')) return { kind: 'anchor', id: decodeURIComponent(href.slice(1)) };
+      if (href.startsWith('#')) { try { return { kind: 'anchor', id: decodeURIComponent(href.slice(1)) }; } catch (e) { return null; } }
       if (!href.startsWith('/w/') || a.classList.contains('new')) return null;
       let rest = href.slice(3);
       if (rest.includes('?')) return null;
@@ -522,10 +538,7 @@ function renderArticle(page, fragment) {
       let t;
       try { t = decodeURIComponent(rest).replace(/_/g, ' '); frag = decodeURIComponent(frag); } catch (e) { return null; }
       const c = t.indexOf(':');
-      if (c > 0) {
-        const pre = t.slice(0, c).trim().toLowerCase();
-        if (NS.some(n => n.toLowerCase() === pre)) return null;
-      }
+      if (c > 0 && NS.has(t.slice(0, c).trim().toLowerCase())) return null;
       return { kind: 'article', title: t, frag };
     }
     function scrollToId(id) {
@@ -533,14 +546,15 @@ function renderArticle(page, fragment) {
       const el = document.getElementById(id) || document.getElementById(id.replace(/ /g, '_'));
       if (el) el.scrollIntoView({ block: 'start' });
     }
-    for (const a of document.querySelectorAll('a')) {
+    // <area> covers image maps (ImageMap extension).
+    for (const a of document.querySelectorAll('a, area')) {
       const c = classify(a);
       if (!c) a.classList.add('mwg-dead');
       else if (c.kind === 'article') a.classList.add('mwg-live');
       a.removeAttribute('target');
     }
     document.addEventListener('click', e => {
-      const a = e.target.closest('a');
+      const a = e.target.closest('a, area');
       if (!a) return;
       e.preventDefault();
       const c = classify(a);
@@ -697,14 +711,18 @@ $('#btnPeek').onclick = () => {
   const h = new URLSearchParams(location.hash.slice(1));
   if (h.get('start') && h.get('target')) {
     setStatus('Loading challenge…');
+    let missing = null;
     await withBusy(async () => {
       const [s, g] = await Promise.all([pageInfo(h.get('start')), pageInfo(h.get('target'))]);
-      if (!s || !g) throw new Error('challenge articles not found');
+      if (!s || !g) { missing = !s ? h.get('start') : h.get('target'); return; }
       setup.start = s; setup.goal = g;
       renderCard('start'); renderCard('goal');
       setStatus('Challenge loaded. Press Start when ready.');
     });
-    if (!setup.start || !setup.goal) reroll('both');
+    if (!setup.start || !setup.goal) {
+      await reroll('both');
+      if (missing && setup.start && setup.goal) setStatus('The challenge link’s article “' + missing + '” doesn’t exist, so a random pair was rolled instead.', true);
+    }
   } else {
     reroll('both');
   }

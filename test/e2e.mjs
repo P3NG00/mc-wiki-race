@@ -50,9 +50,9 @@ await sleep(2000);
 await shot('2-game');
 
 let f = await frameCtx();
-const links = JSON.parse(await ev("JSON.stringify({ live: document.querySelectorAll('a.mwg-live').length, tutorialDead: [...document.querySelectorAll('a[href^=\"/w/Tutorial:\"]')].every(a => a.classList.contains('mwg-dead')), sheets: document.styleSheets.length })", f));
+const links = JSON.parse(await ev("JSON.stringify({ live: document.querySelectorAll('a.mwg-live').length, tutorial: document.querySelectorAll('a[href^=\"/w/Tutorial:\"]').length, tutorialLive: document.querySelectorAll('a.mwg-live[href^=\"/w/Tutorial:\"]').length, sheets: document.styleSheets.length })", f));
 check('article links are clickable', links.live > 100, `live=${links.live}`);
-check('Tutorial: links are disabled', links.tutorialDead);
+check('Tutorial: links are disabled', links.tutorial > 0 && links.tutorialLive === 0, `tutorial=${links.tutorial}`);
 check('wiki stylesheets loaded', links.sheets >= 4, `sheets=${links.sheets}`);
 
 await ev("[...document.querySelectorAll('a.mwg-live')].find(a => a.getAttribute('href') === '/w/Pickaxe').click()", f);
@@ -77,10 +77,27 @@ await ev("document.querySelector('input[value=chaos]').click()");
 await sleep(500);
 check('Chaos roll', await until("!document.querySelector('#btnPlay').disabled", 60000), await ev("setup.start.title + ' -> ' + setup.goal.title"));
 
+// An interwiki title has no page in the API response; it must read as "not found", not a network error.
+await ev("(() => { const i = document.querySelector('[data-custom=start]'); i.value = 'de:Diamant'; i.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter' })); })()");
+check('interwiki title reports not found', await until("document.querySelector('#setupStatus').textContent.startsWith('No article named')", 15000),
+  await ev("document.querySelector('#setupStatus').textContent"));
+
 // Same article as start and target must not be playable.
 await ev("(() => { const i = document.querySelector('[data-custom=goal]'); i.value = setup.start.title; i.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter' })); })()");
 await sleep(3000);
 check('identical start/target disables Play', await ev("setup.goal.title === setup.start.title && document.querySelector('#btnPlay').disabled"));
+
+// Image-map <area> links must be intercepted like <a> links.
+// A hash-only change would not reload the page, so go through about:blank.
+await send('browsingContext.navigate', { context: ctx, url: 'about:blank', wait: 'complete' });
+await send('browsingContext.navigate', { context: ctx, url: fileUrl + '#start=Icons.png&target=Diamond', wait: 'complete' });
+await until("!document.querySelector('#btnPlay').disabled");
+await ev("document.querySelector('#btnPlay').click()");
+await until("game.path.length === 1 && !game.loading");
+await sleep(1000);
+f = await frameCtx();
+const areas = JSON.parse(await ev("JSON.stringify({ all: document.querySelectorAll('area').length, live: document.querySelectorAll('area.mwg-live').length })", f));
+check('image-map links are clickable', areas.live > 0, `areas=${areas.all} live=${areas.live}`);
 
 await send('session.end', {});
 console.log(failures ? `${failures} check(s) failed` : 'All checks passed');

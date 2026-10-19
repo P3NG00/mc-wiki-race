@@ -662,9 +662,9 @@ async function setCustom(which, raw) {
 }
 
 // ---------------------------------------------------------------- Daily challenge
-// The same pair for everyone on the same (local) date, from the whole game-content pool whatever the mode, topic and
-// difficulty. Every article is ranked by a hash of the date and its title and the lowest wins, so pages joining or
-// leaving the categories only change a day's pair if they would have ranked first.
+// The same pair and rule for everyone on the same (local) date, from the whole game-content pool whatever the mode,
+// topic and difficulty. Every article is ranked by a hash of the date and its title and the lowest wins, so pages joining
+// or leaving the categories only change a day's pair if they would have ranked first. The rule is ranked the same way.
 function hash32(s) {
   let h = 2166136261;   // FNV-1a, then a murmur3 finaliser to spread similar strings apart
   for (let i = 0; i < s.length; i++) h = Math.imul(h ^ s.charCodeAt(i), 16777619);
@@ -678,34 +678,41 @@ function today() {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
+// items ordered by the hash of the date, a salt and the item: the day's ranking.
+const ranked = (date, salt, items) => items.map(t => [hash32(`${date}|${salt}|${t}`), t]).sort((a, b) => a[0] - b[0]).map(([, t]) => t);
+// Six clicks is left out: it's the only rule you can lose by, and nothing checks that a daily pair can be done in six.
+const DAILY_RULES = ['noback', 'nohubs', 'nonav', 'blind', 'checkpoint'];
+const dailyRule = date => ranked(date, 'rule', DAILY_RULES)[0];
+
 async function dailyPair(date) {
+  const rule = dailyRule(date);
   const pool = [...new Set((await Promise.all(POOL_CATEGORIES.map(categoryMembers))).flat())];
-  const ranked = salt => pool.map(t => [hash32(`${date}|${salt}|${t}`), t]).sort((a, b) => a[0] - b[0]).map(([, t]) => t);
   const first = async (titles, ok) => {
     for (const t of titles.slice(0, 20)) { const info = await ok(t); if (info) return info; }
     throw new Error('No daily pair found');
   };
-  const start = await first(ranked('start'), async t => { const i = await pageInfo(t); return i && !i.disambig && i; });
-  const linked = (salt, not) => first(ranked(salt), async t => {
+  const start = await first(ranked(date, 'start', pool), async t => { const i = await pageInfo(t); return i && !i.disambig && i; });
+  const linked = (salt, not) => first(ranked(date, salt, pool), async t => {
     const i = await pageInfo(t, { backlinks: MIN_BACKLINKS });
     return i && !i.disambig && !not.includes(i.title) && i.backlinks >= MIN_BACKLINKS && i;
   });
   const goal = await linked('target', [start.title]);
-  // Always picked, so turning Checkpoint on after loading the daily still gives everyone the same checkpoint.
-  const via = await linked('via', [start.title, goal.title]);
-  return { start, via, goal };
+  const via = rule === 'checkpoint' ? await linked('via', [start.title, goal.title]) : null;
+  return { rule, start, via, goal };
 }
 
 async function loadDaily(date = today()) {
   const keys = ['start', 'via', 'goal'], tokens = keys.map(w => ++setup.rolls[w]);
   setStatus('Loading the daily challenge…');
   await withBusy(async () => {
-    const pair = await dailyPair(date);
+    const { rule, start, via, goal } = await dailyPair(date);
     if (keys.some((w, i) => tokens[i] !== setup.rolls[w])) return;
-    Object.assign(setup, pair, { daily: date });
+    Object.assign(setup, { start, via, goal, daily: date });
+    setRules([rule]);
+    syncVia();
     keys.forEach(renderCard);
     const done = store.get('mwg.history', []).find(r => r.daily === date && r.won);
-    setStatus(`Daily challenge for ${date}.` + (done ? ` You did it in ${done.clicks} clicks (${fmtTime(done.ms)}).` : ' Press Start when ready.'));
+    setStatus(`Daily challenge for ${date}, with ${RULES[rule].label}.` + (done ? ` You did it in ${done.clicks} clicks (${fmtTime(done.ms)}).` : ' Press Start when ready.'));
   });
 }
 
@@ -721,7 +728,7 @@ function renderHistory() {
   $('#history').classList.toggle('hidden', rows.length === 0);
   $('#history tbody').innerHTML = rows.slice(0, 15).map(r => `
     <tr class="${r.won ? '' : 'lost'}">
-      <td>${esc(r.start)}</td><td>${esc(r.goal)}${r.via ? ` <span class="note">via ${esc(r.via)}</span>` : ''}</td><td>${esc(settingsText(r))}</td>
+      <td>${esc(r.start)}</td><td>${esc(r.goal)}${r.via ? ` <span class="note">via ${esc(r.via)}</span>` : ''}</td><td>${esc([r.daily && `Daily ${r.daily}`, settingsText(r)].filter(Boolean).join(', '))}</td>
       <td class="mono">${r.won ? r.clicks : r.outOfClicks ? 'out of clicks' : 'gave up'}</td>
       <td class="mono">${fmtTime(r.ms)}</td>
       <td>${esc(new Date(r.at).toLocaleDateString())}</td>
@@ -1065,7 +1072,11 @@ $('#difficulty').innerHTML = '<span class="lbl">Target</span>' + Object.entries(
 $('#difficulty').insertAdjacentHTML('beforeend', `<select id="topic" aria-label="Target topic" title="Only targets from this topic. The start still comes from the mode.">
   ${Object.entries(TOPICS).map(([k, t]) => `<option value="${k}">${esc(t.label)}</option>`).join('')}</select>`);
 $('#difficulty').addEventListener('change', () => reroll('goal'));
-$('#rules').addEventListener('change', () => { syncVia(); renderCard('via'); renderCard('goal'); });
+// The daily is its pair and its rule, so other rules make it an ordinary game.
+$('#rules').addEventListener('change', () => {
+  if (setup.daily) { setup.daily = null; setStatus('With other rules, this pair no longer counts as the daily challenge.'); }
+  syncVia(); renderCard('via'); renderCard('goal');
+});
 $('#themeSelect').innerHTML = THEMES.map(t => `<option value="${esc(t)}">${esc(THEME_LABELS[t] || t)}</option>`).join('');
 $('#themeSelect').value = document.documentElement.dataset.theme || 'auto';
 $('#themeSelect').onchange = e => setTheme(e.target.value);
@@ -1095,7 +1106,7 @@ $('#btnGiveUp').onclick = () => {
 };
 $('#btnClearHistory').onclick = () => {
   const n = store.get('mwg.history', []).length;
-  openModal(`<h2>Clear history?</h2><p>This deletes ${n === 1 ? 'the 1 recorded game' : `all ${n} recorded games`}, personal bests included. It can’t be undone.</p>
+  openModal(`<h2>Clear history?</h2><p>This deletes ${n === 1 ? 'the 1 recorded game' : `all ${n} recorded games`}, personal bests and dailies included. It can’t be undone.</p>
     <div class="actions"><button id="hKeep">Cancel</button><button class="primary" id="hClear">Clear history</button></div>`);
   $('#hKeep').onclick = closeModal;
   $('#hClear').onclick = () => { store.set('mwg.history', []); renderHistory(); closeModal(); };
@@ -1108,8 +1119,8 @@ $('#btnPeek').onclick = () => {
     <div class="actions"><button class="primary" id="pClose">Back to the hunt</button></div>`);
   $('#pClose').onclick = closeModal;
 };
-// Initial load: a #start=…&target=… hash plays that exact pair, #daily (or #daily=YYYY-MM-DD) that day's pair, otherwise
-// roll a random one.
+// Initial load: a #start=…&target=… hash plays that exact pair, #daily (or #daily=YYYY-MM-DD) that day's pair and rule,
+// otherwise roll a random one.
 (async function init() {
   updateModeHelp();
   renderHistory();

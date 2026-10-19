@@ -251,22 +251,30 @@ const nav = JSON.parse(await ev(`JSON.stringify({ boxes: document.querySelectorA
   liveInBox: document.querySelectorAll('.navbox a.mwg-live').length, live: document.querySelectorAll('a.mwg-live').length })`, f));
 check('No navboxes hides navboxes and kills their links', nav.boxes > 0 && nav.shown === 0 && nav.liveInBox === 0 && nav.live > 50, JSON.stringify(nav));
 
-// Daily: #daily=<date> loads that day's pair, the same on every call, a different one the next day. The result records it.
+// Daily: #daily=<date> loads that day's pair and rule, the same on every call, a different pair the next day. 2026-01-02's
+// rule is Checkpoint, so it also fixes the checkpoint; 2026-01-01's is No Back, which picks none. The result records it.
 await send('browsingContext.navigate', { context: ctx, url: 'about:blank', wait: 'complete' });
-await send('browsingContext.navigate', { context: ctx, url: fileUrl + '#daily=2026-01-01', wait: 'complete' });
-check('daily pair loads', await until("!document.querySelector('#btnPlay').disabled && setup.daily === '2026-01-01'", 60000),
+await send('browsingContext.navigate', { context: ctx, url: fileUrl + '#daily=2026-01-02&rules=limit', wait: 'complete' });
+check('daily pair loads', await until("!document.querySelector('#btnPlay').disabled && setup.daily === '2026-01-02'", 60000),
   await ev("setup.start?.title + ' -> ' + setup.goal?.title"));
-const pairOf = p => `${p}.start.title + ' -> ' + ${p}.goal.title`;
+check('daily sets its rule and checkpoint', await ev("rules().join() === 'checkpoint' && !!setup.via && !document.querySelector('#cardVia').classList.contains('hidden') && document.querySelector('#setupStatus').textContent.includes('with Checkpoint')"));
+const pairOf = p => `${p}.start.title + ' -> ' + ${p}.via?.title + ' -> ' + ${p}.goal.title`;
 const daily = await ev(pairOf('setup'));
-check('daily pair is deterministic', await ev(`dailyPair('2026-01-01').then(p => ${pairOf('p')})`) === daily &&
-  await ev(`dailyPair('2026-01-02').then(p => ${pairOf('p')})`) !== daily, daily);
+check('daily pair is deterministic', await ev(`dailyPair('2026-01-02').then(p => p.rule === 'checkpoint' && ${pairOf('p')})`) === daily &&
+  await ev(`dailyPair('2026-01-01').then(p => p.rule === 'noback' && !p.via && ${pairOf('p')} !== ${JSON.stringify(daily)})`), daily);
 await ev("document.querySelector('#btnPlay').click()");
 await until("game.path.length === 1 && !game.loading");
 await ev("document.querySelector('#btnGiveUp').click()");
 await ev("document.querySelector('#gQuit').click()");
-check('daily result is recorded', await ev("store.get('mwg.history', [])[0].daily === '2026-01-01' && document.querySelector('#modal').textContent.includes('Daily 2026-01-01')"));
+check('daily result is recorded', await ev("(r => r.daily === '2026-01-02' && r.via === setup.via.title && r.rules.join() === 'checkpoint')(store.get('mwg.history', [])[0]) && document.querySelector('#modal').textContent.includes('Daily 2026-01-02')"));
 await ev("document.querySelector('#mNew').click()");
 check('rerolling leaves the daily pair', await ev('setup.daily === null'));
+check('history marks the daily', await ev("document.querySelector('#history tbody tr').textContent.includes('Daily 2026-01-02, Checkpoint')"));
+await ev("loadDaily('2026-01-02')");
+await until("setup.daily === '2026-01-02' && setup.busy === 0", 60000);
+await ev("document.querySelector('#rules input[value=limit]').click()");
+check('another rule leaves the daily', await ev("setup.daily === null && document.querySelector('#setupStatus').textContent.includes('no longer counts')"));
+await ev("document.querySelector('#rules input[value=limit]').click()");
 
 // Checkpoint game: reaching the target before the checkpoint doesn't count. A best with another checkpoint is not this
 // pair's best (the seeded 1-click game would otherwise make it "Your best").

@@ -58,3 +58,9 @@ test/run-e2e.sh [screenshot-dir]
 Plays a real game in headless Firefox against the live wiki. Needs `firefox`, Node 22 or newer, and network access.
 
 See `CLAUDE.md` for how the game works internally.
+
+## License
+
+[MIT](LICENSE). Article content shown in the game comes from [minecraft.wiki](https://minecraft.wiki), is licensed under [CC BY-NC-SA 3.0](https://creativecommons.org/licenses/by-nc-sa/3.0/) unless noted otherwise on the wiki, and is not covered by this license. The game credits it in the footer and with a link to each article it shows.
+
+Not an official Minecraft product. Not affiliated with or endorsed by Mojang Studios, Microsoft, Minecraft or minecraft.wiki.

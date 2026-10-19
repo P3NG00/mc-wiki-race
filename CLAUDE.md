@@ -10,6 +10,8 @@ A "Wiki Game" (like thewikigame.com) for minecraft.wiki: the player gets a rando
 
 Open `index.html` directly in a browser (`file://` works; no server needed). `python3 -m http.server` also works if a real origin is wanted.
 
+The setup screen ends with a footer (GitHub link, MIT license, credit for the wiki's CC BY-NC-SA 3.0 content, a non-affiliation notice). That licence asks reusers to link the pages they show, so during play the bottom of the path sidebar (`#credit`, set in `navigate`) links the current article on minecraft.wiki (`wikiUrl`) and the licence, and the result dialog links every page in the path. Without JavaScript, a `<noscript>` style in `<head>` hides the setup controls and a `<noscript>` notice under the intro explains why.
+
 A `#start=<Title>&target=<Title>` URL hash loads a fixed pair (this is what "Copy challenge link" produces), which is handy for testing a specific route. `#daily` loads today's daily pair and `#daily=YYYY-MM-DD` any day's. An optional `&rules=noback` (comma-separated rule keys) sets the rule checkboxes; it is applied even if the pair fails to load. `&via=<Title>` adds a checkpoint and turns the Checkpoint rule on.
 
 ## Testing

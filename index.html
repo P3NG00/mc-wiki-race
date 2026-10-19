@@ -105,6 +105,11 @@
   .history tr:last-child td { border-bottom: 0; }
   .history .lost { color: var(--muted); }
   .history-wrap { overflow-x: auto; }
+  .noscript { background: var(--panel); border: 1px solid var(--target); border-radius: var(--radius-lg); padding: 14px; margin: 0 0 24px; }
+  .noscript p { margin: 0; }
+  .site-foot { margin-top: 36px; padding-top: 12px; border-top: 1px solid var(--line); color: var(--muted); font-size: 13px; }
+  .site-foot p { margin: 0 0 4px; }
+  .site-foot a { color: var(--accent); }
 
   /* ---------- Game screen ---------- */
   #game { display: grid; grid-template-rows: auto 1fr; height: 100%; }
@@ -122,8 +127,13 @@
   .hud .btns { display: flex; gap: 8px; }
   .main { display: grid; grid-template-columns: 220px 1fr; min-height: 0; }
   .path {
-    border-right: 1px solid var(--line); padding: 12px; overflow-y: auto; background: var(--panel); font-size: 13.5px;
+    border-right: 1px solid var(--line); padding: 12px; background: var(--panel); font-size: 13.5px;
+    display: flex; flex-direction: column; min-height: 0;
   }
+  .path-list { flex: 1; min-height: 0; overflow-y: auto; }
+  .path .credit { margin: 8px 0 0; padding-top: 8px; border-top: 1px solid var(--line); color: var(--muted); font-size: 12px; }
+  .path .credit a, .modal ol a { color: var(--accent); }
+  .path .credit a { white-space: nowrap; }
   .path h3 { margin: 0 0 8px; font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; }
   .path ol { margin: 0; padding-left: 22px; }
   .path li { padding: 2px 0; word-break: break-word; }
@@ -158,12 +168,15 @@
     .pair.has-via .card input[type=text] { flex-basis: auto; }
     .arrow { justify-self: center; transform: rotate(90deg); }
     .main { grid-template-columns: 1fr; grid-template-rows: auto 1fr; }
-    .path { border-right: 0; border-bottom: 1px solid var(--line); max-height: 84px; padding: 8px 16px; }
+    .path { border-right: 0; border-bottom: 1px solid var(--line); max-height: 108px; padding: 8px 16px; }
+    .path .credit { margin-top: 4px; padding-top: 4px; }
     .path ol { display: flex; flex-wrap: wrap; gap: 4px 14px; padding-left: 18px; }
     .hud { gap: 10px; padding: 8px 16px; }
     .stat .v { font-size: 17px; }
   }
 </style>
+<!-- Without JavaScript nothing on the setup screen works, so only the heading, the notice and the footer are shown. -->
+<noscript><style>.theme-pick, .modes, .mode-help, .pair, .setup-actions { display: none !important; }</style></noscript>
 </head>
 <body>
 <script id="theme-boot">
@@ -185,6 +198,7 @@ const THEMES = [...new Set(['auto', 'light', 'dark', ...Array.from(document.quer
     <label class="theme-pick">Theme <select id="themeSelect"></select></label>
   </div>
   <p class="sub">Get from the start article to the target article using only links inside minecraft.wiki articles. Fewest clicks and fastest time wins.</p>
+  <noscript><div class="noscript"><p><strong>This game needs JavaScript.</strong> It fetches articles from minecraft.wiki as you play, so turn JavaScript on for this page and reload it.</p></div></noscript>
 
   <div class="modes" role="radiogroup" aria-label="Article pool">
     <label><input type="radio" name="mode" value="classic" checked> Classic</label>
@@ -238,6 +252,12 @@ const THEMES = [...new Set(['auto', 'light', 'dark', ...Array.from(document.quer
     <h2>Recent games</h2>
     <div class="history-wrap"><table><thead><tr><th>Start</th><th>Target</th><th>Settings</th><th>Clicks</th><th>Time</th><th>When</th></tr></thead><tbody></tbody></table></div>
   </div>
+
+  <footer class="site-foot">
+    <p><a href="https://github.com/P3NG00/minecraft-wiki-game">Source on GitHub</a> · MIT License</p>
+    <p>Articles and images are from <a href="https://minecraft.wiki">minecraft.wiki</a>. Article text is licensed under <a href="https://creativecommons.org/licenses/by-nc-sa/3.0/">CC BY-NC-SA 3.0</a> unless noted otherwise on the wiki.</p>
+    <p>Not an official Minecraft product. Not affiliated with or endorsed by Mojang Studios, Microsoft, Minecraft or minecraft.wiki.</p>
+  </footer>
 </section>
 
 <!-- ======================= GAME ======================= -->
@@ -259,7 +279,11 @@ const THEMES = [...new Set(['auto', 'light', 'dark', ...Array.from(document.quer
     </div>
   </div>
   <div class="main">
-    <aside class="path"><h3>Your path</h3><ol id="pathList"></ol></aside>
+    <aside class="path">
+      <div class="path-list"><h3>Your path</h3><ol id="pathList"></ol></div>
+      <!-- Attribution the wiki's licence asks for: a link to the article being shown and to the licence. -->
+      <p class="credit" id="credit"></p>
+    </aside>
     <div class="viewer">
       <iframe id="frame" title="Wiki article" sandbox="allow-scripts"></iframe>
       <div class="overlay hidden" id="overlay"><div class="box" id="overlayBox"></div></div>
@@ -335,6 +359,9 @@ const WIKI_STYLES = [
 
 const $ = (sel, root = document) => root.querySelector(sel);
 const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+// minecraft.wiki article content is CC BY-NC-SA 3.0, which asks reusers to link the pages they show.
+const LICENSE_URL = 'https://creativecommons.org/licenses/by-nc-sa/3.0/';
+const wikiUrl = title => `${WIKI}/w/${encodeURIComponent(title.replace(/ /g, '_')).replace(/%2F/g, '/').replace(/%3A/g, ':')}`;
 const pick = arr => arr[Math.floor(Math.random() * arr.length)];
 
 const store = {
@@ -710,7 +737,7 @@ function renderHud() {
   $('#btnGiveUp').disabled = game.loading || !game.active;
   $('#pathList').innerHTML = game.path.map((p, i) =>
     `<li class="${i === game.path.length - 1 ? 'cur' : ''} ${p.back ? 'back' : ''}">${esc(p.title)}${p.back ? ' (back)' : ''}${p.via ? ' (checkpoint)' : ''}</li>`).join('');
-  const pl = $('.path'); pl.scrollTop = pl.scrollHeight;
+  const pl = $('.path-list'); pl.scrollTop = pl.scrollHeight;
 }
 
 // What the player is heading for: the checkpoint until it is reached, then the target.
@@ -732,6 +759,7 @@ function startGame() {
   $('#btnPeek').classList.toggle('hidden', game.rules.includes('blind'));
   renderObjective();
   hideOverlay();
+  $('#credit').textContent = '';
   $('#setup').classList.add('hidden');
   $('#game').classList.remove('hidden');
   clearInterval(game.timer);
@@ -780,6 +808,8 @@ async function navigate(title, fragment, { back = false } = {}) {
   const via = !game.viaReached && page.title === game.via?.title;
   game.path.push({ title: page.title, back, ...(via && { via }) });
   if (via) { game.viaReached = true; renderObjective(); }
+  $('#credit').innerHTML = `<a href="${esc(wikiUrl(page.title))}" target="_blank" rel="noopener">View on minecraft.wiki</a> · ` +
+    `<a href="${LICENSE_URL}" target="_blank" rel="noopener">CC BY-NC-SA 3.0</a>`;
   // The target and checkpoint stay reachable even if they are hubs.
   const keep = [game.goal.title, game.via?.title];
   renderArticle(page, fragment, token, hubs ? [...hubs.keys()].filter(t => !keep.includes(hubs.get(t))) : []);
@@ -943,7 +973,7 @@ function finish(won, outOfClicks = false) {
   store.set('mwg.history', hist.slice(0, 50));
 
   const route = [rec.start, rec.via, rec.goal].filter(Boolean).join(' → ');
-  const pathHtml = game.path.map(p => `<li>${esc(p.title)}${p.back ? ' <span class="note">(back)</span>' : ''}${p.via ? ' <span class="note">(checkpoint)</span>' : ''}</li>`).join('');
+  const pathHtml = game.path.map(p => `<li><a href="${esc(wikiUrl(p.title))}" target="_blank" rel="noopener">${esc(p.title)}</a>${p.back ? ' <span class="note">(back)</span>' : ''}${p.via ? ' <span class="note">(checkpoint)</span>' : ''}</li>`).join('');
   let bestNote = '';
   if (won && best) {
     bestNote = (rec.clicks < best.clicks || (rec.clicks === best.clicks && rec.ms < best.ms))

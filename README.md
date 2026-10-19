@@ -22,6 +22,7 @@ Open `index.html` in a browser. Opening it straight from disk (`file://`) works 
   - **No hubs:** links to big overview pages like Block, Item, Mob, Crafting or Java Edition are dead, unless that page is the target.
   - **Blind target:** you only get the target's name, with no picture or description.
   - **Six clicks:** reach the target in 6 clicks or fewer, Back included, or the game is over.
+  - **No navboxes:** the big link tables at the bottom of articles are gone, so you have to use links in the article itself.
   - **Checkpoint:** a third card. You have to visit that article on the way, and reaching the target before it doesn't count.
 - **Copy challenge link** shares the exact pair you're looking at, plus any checkpoint and rules, as `index.html#start=<Title>&target=<Title>&via=<Title>&rules=checkpoint`.
 - **Theme** (top right of the setup screen): Auto follows your system's light or dark setting. Articles switch to the wiki's own dark theme to match.

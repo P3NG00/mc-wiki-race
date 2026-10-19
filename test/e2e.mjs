@@ -218,6 +218,18 @@ const allAre = (t, s) => hubLinks[t].length > 0 && hubLinks[t].every(x => x === 
 check('No hubs disables hub links', allAre('Item', 'dead') && allAre('Java_Edition', 'dead'), JSON.stringify(hubLinks));
 check('No hubs keeps the target and other links live', allAre('Crafting', 'live') && allAre('Pickaxe', 'live'));
 
+// No navboxes: the navbox tables (and their Navigation heading) are hidden and their links dead; links in the text still work.
+await send('browsingContext.navigate', { context: ctx, url: 'about:blank', wait: 'complete' });
+await send('browsingContext.navigate', { context: ctx, url: fileUrl + '#start=Diamond&target=Diamond%20Pickaxe&rules=nonav', wait: 'complete' });
+await until("!document.querySelector('#btnPlay').disabled");
+await ev("document.querySelector('#btnPlay').click()");
+await until("game.path.length === 1 && !game.loading");
+f = await frameCtx();
+const nav = JSON.parse(await ev(`JSON.stringify({ boxes: document.querySelectorAll('.navbox').length,
+  shown: [...document.querySelectorAll('.navbox, #Navigation')].filter(e => e.checkVisibility()).length,
+  liveInBox: document.querySelectorAll('.navbox a.mwg-live').length, live: document.querySelectorAll('a.mwg-live').length })`, f));
+check('No navboxes hides navboxes and kills their links', nav.boxes > 0 && nav.shown === 0 && nav.liveInBox === 0 && nav.live > 50, JSON.stringify(nav));
+
 // Daily: #daily=<date> loads that day's pair, the same on every call, a different one the next day. The result records it.
 await send('browsingContext.navigate', { context: ctx, url: 'about:blank', wait: 'complete' });
 await send('browsingContext.navigate', { context: ctx, url: fileUrl + '#daily=2026-01-01', wait: 'complete' });

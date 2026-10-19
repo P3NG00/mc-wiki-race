@@ -480,6 +480,7 @@ const RULES = {
   blind: { label: 'Blind target', help: 'You only get the target’s name: no picture or description.' },
   limit: { label: 'Six clicks', help: `Reach the target in ${CLICK_LIMIT} clicks or fewer, Back and the way through a checkpoint included.` },
   checkpoint: { label: 'Checkpoint', help: 'A third article you have to visit on the way to the target.' },
+  nonav: { label: 'No navboxes', help: 'The link tables at the bottom of articles are gone: only links in the article itself count.' },
 };
 function rules() { return Object.keys(RULES).filter(k => $(`#rules input[value=${k}]`).checked); }
 function setRules(keys) { for (const k in RULES) $(`#rules input[value=${k}]`).checked = keys.includes(k); }
@@ -811,6 +812,7 @@ function syncFrameTheme() { $('#frame').contentWindow?.postMessage({ mwg: 'theme
 // blocked: titles whose links are dead for this game (No hubs).
 function renderArticle(page, fragment, token, blocked = []) {
   const dark = themeIsDark();
+  const noNav = game.rules.includes('nonav');
   // The article renders in a sandboxed iframe (opaque origin): the wiki's own CSS applies untouched,
   // <base> resolves its relative image/CSS URLs, and the inline script reports clicks via postMessage.
   const frameScript = `
@@ -818,7 +820,9 @@ function renderArticle(page, fragment, token, blocked = []) {
     const FRAG = ${JSON.stringify(fragment || '')};
     const WGL = ${JSON.stringify(WGL_THEME_CLASSES)};
     const BLOCKED = new Set(${JSON.stringify(blocked)});
+    const NO_NAV = ${noNav};
     function classify(a) {
+      if (NO_NAV && a.closest('.navbox')) return null;   // hidden too; this keeps them dead whatever the CSS does
       const href = a.getAttribute('href') || '';
       if (href.startsWith('#')) { try { return { kind: 'anchor', id: decodeURIComponent(href.slice(1)) }; } catch (e) { return null; } }
       if (!href.startsWith('/w/') || a.classList.contains('new')) return null;
@@ -879,6 +883,7 @@ ${WIKI_STYLES.map(h => `<link rel="stylesheet" href="${esc(h)}">`).join('\n')}
   a.mwg-dead { color: inherit !important; text-decoration: none !important; cursor: not-allowed; opacity: .6; }
   a.mwg-dead img { opacity: 1; }
   a.mwg-live { cursor: pointer; }
+  ${noNav ? '.navbox, .mw-heading:has(> #Navigation) { display: none !important; }' : ''}
 </style>
 </head><body class="mediawiki ltr sitedir-ltr ns-0 ns-subject skin-vector skin-vector-legacy action-view ${WGL_THEME_CLASSES[dark ? 'dark' : 'light'].join(' ')}">
 <div id="content" class="mw-body" role="main">

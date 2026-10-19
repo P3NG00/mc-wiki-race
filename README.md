@@ -17,6 +17,7 @@ Open `index.html` in a browser. Opening it straight from disk (`file://`) works 
 - **Back** returns to the previous article and counts as a click. The clock pauses while an article loads.
 - **Rules** are optional extras you can switch on:
   - **No Back:** the Back button is gone, so every click is final.
+  - **No hubs:** links to big overview pages like Block, Item, Mob, Crafting or Java Edition are dead, unless that page is the target.
 - **Copy challenge link** shares the exact pair you're looking at, plus any rules, as `index.html#start=<Title>&target=<Title>&rules=noback`.
 - **Theme** (top right of the setup screen): Auto follows your system's light or dark setting. Articles switch to the wiki's own dark theme to match.
 - Your last 50 games, your personal best for each pair and your theme are kept in the browser. Personal bests are kept separately for each combination of rules.

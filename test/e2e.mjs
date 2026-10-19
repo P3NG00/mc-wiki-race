@@ -145,6 +145,20 @@ f = await frameCtx();
 const areas = JSON.parse(await ev("JSON.stringify({ all: document.querySelectorAll('area').length, live: document.querySelectorAll('area.mwg-live').length })", f));
 check('image-map links are clickable', areas.live > 0, `areas=${areas.all} live=${areas.live}`);
 
+// No hubs: links to hubs and their redirects are dead, except a hub that is the target.
+await send('browsingContext.navigate', { context: ctx, url: 'about:blank', wait: 'complete' });
+await send('browsingContext.navigate', { context: ctx, url: fileUrl + '#start=Diamond&target=Crafting&rules=nohubs', wait: 'complete' });
+await until("!document.querySelector('#btnPlay').disabled");
+await ev("document.querySelector('#btnPlay').click()");
+check('No hubs game loads', await until("game.path.length === 1 && !game.loading"));
+check('hub redirects are known', await ev("hubTitles().then(m => m.get('Blocks') === 'Block' && m.get('Mining') === 'Breaking')"));
+f = await frameCtx();
+const hubLinks = JSON.parse(await ev(`JSON.stringify(Object.fromEntries(['Item', 'Java_Edition', 'Crafting', 'Pickaxe'].map(t =>
+  [t, [...document.querySelectorAll('a[href^="/w/' + t + '"]')].filter(a => a.getAttribute('href').split('#')[0] === '/w/' + t).map(a => a.classList.contains('mwg-live') ? 'live' : 'dead')])))`, f));
+const allAre = (t, s) => hubLinks[t].length > 0 && hubLinks[t].every(x => x === s);
+check('No hubs disables hub links', allAre('Item', 'dead') && allAre('Java_Edition', 'dead'), JSON.stringify(hubLinks));
+check('No hubs keeps the target and other links live', allAre('Crafting', 'live') && allAre('Pickaxe', 'live'));
+
 // A theme stylesheet added by the host page shows up in the picker and, marked data-mwg-default, wins over a saved
 // theme that no longer exists. A preload script stands in for the host page injecting it into <head>.
 await ev("localStorage.setItem('mwg.theme', JSON.stringify('Gone'))");

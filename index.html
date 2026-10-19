@@ -279,6 +279,16 @@ const NAMESPACES = [
 const CHAOS_REJECT = /\/|\(disambiguation\)$|^(Java|Bedrock|Pocket|Education|Legacy Console|PlayStation \d|Xbox( 360| One)?|Nintendo|Wii U|New Nintendo 3DS|Pi|Minecraft Launcher|Launcher|Realms|China) Edition|^(Launcher|Minecraft Launcher|Bedrock Dedicated Server|Server) \d|^\d+w\d+[a-z]$|\b\d+\.\d+(\.\d+)?\b/i;
 
 const MIN_BACKLINKS = 5;   // a target must have at least this many incoming article links
+
+// No hubs rule: links to these pages (and to redirects to them) are dead. Picked from pages with the most incoming
+// and outgoing article links, leaving out specific content (Diamond, Chest, Water…) that makes a fair target.
+// At most 50, so their redirects come from a single titles= query.
+const HUBS = [
+  'Minecraft', 'Java Edition', 'Bedrock Edition', 'Edition', 'Minecraft Education', 'Java Edition version history',
+  'Bedrock Edition version history', 'Commands', 'Identifier', 'Block', 'Item', 'Mob', 'Biome', 'Structure', 'Overworld',
+  'The Nether', 'The End', 'Player', 'Creative', 'Crafting', 'Smelting', 'Breaking', 'Drops', 'Renewable resource', 'Food',
+  'Tool', 'Armor', 'Weapon', 'Ore', 'Trading', 'Enchantment', 'Effect', 'Advancement', 'Achievement',
+];
 const WIKI_STYLES = [
   'ext.embedVideo.styles|jquery.makeCollapsible.styles|jquery.tablesorter.styles|mediawiki.page.gallery.styles|skins.vector.styles.legacy',
   'ext.gadget.site-styles|ext.gadget.sound-styles',
@@ -323,6 +333,24 @@ async function fetchCategory(cat) {
     cont = d.continue || null;
   } while (cont);
   return titles.filter(t => !t.includes('/') && !/\(disambiguation\)$/.test(t));
+}
+
+// Every title that leads to a hub, mapped to the hub: the hubs themselves plus all their redirects (about 600).
+// Fetched once per session, the first time a No hubs game loads an article.
+let hubTitlesPromise = null;
+function hubTitles() {
+  return hubTitlesPromise ||= fetchHubTitles().catch(e => { hubTitlesPromise = null; throw e; });
+}
+
+async function fetchHubTitles() {
+  const map = new Map(HUBS.map(t => [t, t]));
+  let cont = {};
+  do {
+    const d = await api({ action: 'query', titles: HUBS.join('|'), prop: 'redirects', rdnamespace: '0', rdlimit: 'max', ...cont });
+    for (const p of d.query.pages) for (const r of p.redirects || []) map.set(r.title, p.title);
+    cont = d.continue || null;
+  } while (cont);
+  return map;
 }
 
 const INFO_PARAMS = { prop: 'pageprops|pageimages', ppprop: 'description|disambiguation', piprop: 'thumbnail', pithumbsize: '160' };
@@ -399,6 +427,7 @@ function updateModeHelp() { $('#modeHelp').textContent = MODE_HELP[mode()]; }
 // (personal bests only compare games with the same rules) and carried in challenge links.
 const RULES = {
   noback: { label: 'No Back', help: 'The Back button is gone: every click is final.' },
+  nohubs: { label: 'No hubs', help: 'Links to big overview pages (Block, Item, Mob, Crafting, Java Edition…) are dead.' },
 };
 function rules() { return Object.keys(RULES).filter(k => $(`#rules input[value=${k}]`).checked); }
 function setRules(keys) { for (const k in RULES) $(`#rules input[value=${k}]`).checked = keys.includes(k); }
@@ -573,10 +602,13 @@ async function navigate(title, fragment, { back = false } = {}) {
   pauseClock();
   renderHud();
   showOverlay(`<div class="spinner"></div>Loading ${esc(title)}…`);
-  let page;
+  let page, hubs;
   try {
-    page = parseCache.get(title) ||
-      (await api({ action: 'parse', page: title, prop: 'text|displaytitle', redirects: '1', disableeditsection: '1', disablelimitreport: '1' })).parse;
+    [page, hubs] = await Promise.all([
+      parseCache.get(title) ||
+        api({ action: 'parse', page: title, prop: 'text|displaytitle', redirects: '1', disableeditsection: '1', disablelimitreport: '1' }).then(d => d.parse),
+      game.rules.includes('nohubs') && hubTitles(),
+    ]);
   } catch (e) {
     if (token !== game.navToken) return;
     game.loading = false;
@@ -592,7 +624,8 @@ async function navigate(title, fragment, { back = false } = {}) {
   cacheParse([title, page.title], page);
   if (back) game.stack.pop(); else game.stack.push(page.title);
   game.path.push({ title: page.title, back });
-  renderArticle(page, fragment, token);
+  // The target stays reachable even if it is a hub.
+  renderArticle(page, fragment, token, hubs ? [...hubs.keys()].filter(t => hubs.get(t) !== game.goal.title) : []);
   setTimeout(() => frameReady(token), 15000);   // a stalled stylesheet must not leave Back and Give up disabled
   // Compare the post-redirect title, so following a redirect onto the target counts as arriving.
   if (page.title === game.goal.title) { game.loading = false; hideOverlay(); finish(true); return; }
@@ -636,7 +669,8 @@ function themeIsDark() {
 // Restyles the loaded article in place. Also sent when a frame reports ready, in case the theme changed while it loaded.
 function syncFrameTheme() { $('#frame').contentWindow?.postMessage({ mwg: 'theme', dark: themeIsDark() }, '*'); }
 
-function renderArticle(page, fragment, token) {
+// blocked: titles whose links are dead for this game (No hubs).
+function renderArticle(page, fragment, token, blocked = []) {
   const dark = themeIsDark();
   // The article renders in a sandboxed iframe (opaque origin): the wiki's own CSS applies untouched,
   // <base> resolves its relative image/CSS URLs, and the inline script reports clicks via postMessage.
@@ -644,6 +678,7 @@ function renderArticle(page, fragment, token) {
     const NS = new Set(${JSON.stringify(NAMESPACES.map(n => n.toLowerCase()))});
     const FRAG = ${JSON.stringify(fragment || '')};
     const WGL = ${JSON.stringify(WGL_THEME_CLASSES)};
+    const BLOCKED = new Set(${JSON.stringify(blocked)});
     function classify(a) {
       const href = a.getAttribute('href') || '';
       if (href.startsWith('#')) { try { return { kind: 'anchor', id: decodeURIComponent(href.slice(1)) }; } catch (e) { return null; } }
@@ -657,6 +692,7 @@ function renderArticle(page, fragment, token) {
       try { t = decodeURIComponent(rest).replace(/_/g, ' '); frag = decodeURIComponent(frag); } catch (e) { return null; }
       const c = t.indexOf(':');
       if (c > 0 && NS.has(t.slice(0, c).trim().toLowerCase())) return null;
+      if (BLOCKED.has(t.charAt(0).toUpperCase() + t.slice(1))) return { kind: 'blocked' };
       return { kind: 'article', title: t, frag };
     }
     function scrollToId(id) {
@@ -667,8 +703,9 @@ function renderArticle(page, fragment, token) {
     // <area> covers image maps (ImageMap extension).
     for (const a of document.querySelectorAll('a, area')) {
       const c = classify(a);
-      if (!c) a.classList.add('mwg-dead');
+      if (!c || c.kind === 'blocked') a.classList.add('mwg-dead');
       else if (c.kind === 'article') a.classList.add('mwg-live');
+      if (c?.kind === 'blocked') a.title = 'Off limits: No hubs';
       a.removeAttribute('target');
     }
     document.addEventListener('click', e => {
@@ -676,7 +713,7 @@ function renderArticle(page, fragment, token) {
       if (!a) return;
       e.preventDefault();
       const c = classify(a);
-      if (!c) return;
+      if (!c || c.kind === 'blocked') return;
       if (c.kind === 'anchor') scrollToId(c.id);
       else parent.postMessage({ mwg: 'nav', title: c.title, frag: c.frag }, '*');
     }, true);

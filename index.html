@@ -527,11 +527,11 @@ const RULES = {
 };
 function rules() { return Object.keys(RULES).filter(k => $(`#rules input[value=${k}]`).checked); }
 function setRules(keys) { for (const k in RULES) $(`#rules input[value=${k}]`).checked = keys.includes(k); }
-const rulesText = keys => (keys || []).map(k => RULES[k]?.label || k).join(', ');
+const rulesText = keys => keys.map(k => RULES[k].label).join(', ');
 // A result's rules plus how its target was rolled, when that wasn't Any.
-const settingsText = r => [r.difficulty && r.difficulty !== 'any' && `${DIFFICULTY[r.difficulty]?.label || r.difficulty} target`,
-  r.topic && r.topic !== 'any' && (TOPICS[r.topic]?.label || r.topic), rulesText(r.rules)].filter(Boolean).join(', ');
-const sameRules = (a, b) => (a.rules || []).join() === (b.rules || []).join();
+const settingsText = r => [r.difficulty && r.difficulty !== 'any' && `${DIFFICULTY[r.difficulty].label} target`,
+  r.topic && r.topic !== 'any' && TOPICS[r.topic].label, rulesText(r.rules)].filter(Boolean).join(', ');
+const sameRules = (a, b) => a.rules.join() === b.rules.join();
 
 function renderCard(which) {
   const card = $({ start: '#cardStart', via: '#cardVia', goal: '#cardGoal' }[which]);

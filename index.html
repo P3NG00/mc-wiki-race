@@ -160,6 +160,8 @@
 
   <div class="modes" role="radiogroup" aria-label="Article pool">
     <label><input type="radio" name="mode" value="classic" checked> Classic</label>
+    <label><input type="radio" name="mode" value="balanced"> Balanced</label>
+    <label><input type="radio" name="mode" value="even"> Even</label>
     <label><input type="radio" name="mode" value="chaos"> Chaos</label>
   </div>
   <p class="mode-help" id="modeHelp"></p>
@@ -233,7 +235,7 @@
 const WIKI = 'https://minecraft.wiki';
 const API = WIKI + '/api.php';
 
-// Categories the Classic pool draws from: one is chosen uniformly, then one article from it.
+// Game-content categories the Classic, Balanced and Even modes draw from (see randomPoolTitle).
 const POOL_CATEGORIES = [
   'Blocks', 'Items', 'Hostile mobs', 'Passive mobs', 'Neutral mobs', 'Boss mobs',
   'Overworld biomes', 'Nether biomes', 'End biomes', 'Generated structures',
@@ -249,7 +251,7 @@ const NAMESPACES = [
   'Forum', 'Forum talk', 'Tutorial', 'Tutorial talk', 'Movie', 'Movie talk', 'Dungeons II', 'Dungeons II talk',
 ];
 
-// Chaos mode: list=random returns lots of version/changelog/history pages; skip those.
+// Chaos mode: generator=random returns lots of version/changelog/history pages; skip those.
 const CHAOS_REJECT = /\/|\(disambiguation\)$|^(Java|Bedrock|Pocket|Education|Legacy Console|PlayStation \d|Xbox( 360| One)?|Nintendo|Wii U|New Nintendo 3DS|Pi|Minecraft Launcher|Launcher|Realms|China) Edition|^(Launcher|Minecraft Launcher|Bedrock Dedicated Server|Server) \d|^\d+w\d+[a-z]$|\b\d+\.\d+(\.\d+)?\b/i;
 
 const MIN_BACKLINKS = 5;   // a target must have at least this many incoming article links
@@ -296,37 +298,57 @@ async function fetchCategory(cat) {
   return titles.filter(t => !t.includes('/') && !/\(disambiguation\)$/.test(t));
 }
 
-async function randomChaosTitle() {
-  for (let i = 0; i < 6; i++) {
-    const d = await api({ action: 'query', list: 'random', rnnamespace: '0', rnfilterredir: 'nonredirects', rnlimit: '50' });
-    const ok = d.query.random.map(p => p.title).filter(t => !CHAOS_REJECT.test(t));
-    if (ok.length) return pick(ok);
-  }
-  throw new Error('Could not find a suitable random article');
-}
+const INFO_PARAMS = { prop: 'pageprops|pageimages', ppprop: 'description|disambiguation', piprop: 'thumbnail', pithumbsize: '160' };
+const BACKLINK_PARAMS = { list: 'backlinks', blnamespace: '0', bllimit: String(MIN_BACKLINKS), blfilterredir: 'nonredirects' };
 
-async function randomTitle(mode) {
-  if (mode === 'chaos') return randomChaosTitle();
-  const list = await categoryMembers(pick(POOL_CATEGORIES));
-  return pick(list);
-}
-
-async function backlinkCount(title) {
-  const d = await api({ action: 'query', list: 'backlinks', bltitle: title, blnamespace: '0', bllimit: String(MIN_BACKLINKS), blfilterredir: 'nonredirects' });
-  return d.query.backlinks.length;
-}
-
-// Resolves redirects/normalisation and returns { title, desc, img, disambig } or null if missing.
-async function pageInfo(title) {
-  const d = await api({ action: 'query', titles: title, redirects: '1', prop: 'pageprops|pageimages', ppprop: 'description|disambiguation', piprop: 'thumbnail', pithumbsize: '160' });
-  const p = d.query.pages?.[0];   // absent for interwiki titles such as de:Diamant
+function toInfo(p) {
   if (!p || p.missing || p.invalid || p.ns !== 0) return null;
   return {
     title: p.title,
     desc: p.pageprops?.description || '',
     img: p.thumbnail?.source || '',
-    disambig: p.pageprops && 'disambiguation' in p.pageprops,
+    disambig: !!p.pageprops && 'disambiguation' in p.pageprops,
   };
+}
+
+// One request returns 50 random articles with their info; one is picked uniformly among those that pass the filters.
+async function randomChaosInfo() {
+  for (let i = 0; i < 6; i++) {
+    const d = await api({ action: 'query', generator: 'random', grnnamespace: '0', grnfilterredir: 'nonredirects', grnlimit: '50', ...INFO_PARAMS });
+    const ok = (d.query?.pages || []).map(toInfo).filter(p => p && !p.disambig && !CHAOS_REJECT.test(p.title));
+    if (ok.length) return pick(ok);
+  }
+  throw new Error('Could not find a suitable random article');
+}
+
+function pickWeighted(arr, weight) {
+  let r = Math.random() * arr.reduce((s, x) => s + weight(x), 0);
+  for (const x of arr) if ((r -= weight(x)) < 0) return x;
+  return arr[arr.length - 1];
+}
+
+// classic: uniform category, then uniform member. balanced: categories weighted by the square root of their size.
+// even: every article in the pool equally likely. The last two need every category, fetched once per session.
+async function randomPoolTitle(mode) {
+  if (mode === 'classic') return pick(await categoryMembers(pick(POOL_CATEGORIES)));
+  const lists = await Promise.all(POOL_CATEGORIES.map(categoryMembers));
+  if (mode === 'even') return pick([...new Set(lists.flat())]);
+  return pick(pickWeighted(lists, l => Math.sqrt(l.length)));
+}
+
+async function backlinkCount(title) {
+  const d = await api({ action: 'query', bltitle: title, ...BACKLINK_PARAMS });
+  return d.query.backlinks.length;
+}
+
+// Resolves redirects/normalisation and returns { title, desc, img, disambig } or null if missing.
+// With backlinks, also counts incoming links (up to MIN_BACKLINKS) in the same request.
+async function pageInfo(title, { backlinks = false } = {}) {
+  const d = await api({ action: 'query', titles: title, redirects: '1', ...INFO_PARAMS, ...(backlinks && { bltitle: title, ...BACKLINK_PARAMS }) });
+  const info = toInfo(d.query.pages?.[0]);   // pages is absent for interwiki titles such as de:Diamant
+  // bltitle is the title as given; if it redirected, count links to the real article instead.
+  if (info && backlinks) info.backlinks = info.title === title ? d.query.backlinks.length : await backlinkCount(info.title);
+  return info;
 }
 
 // ---------------------------------------------------------------- Setup screen
@@ -338,11 +360,13 @@ function setImg(img, src) {
   if (src) { img.src = src; img.classList.remove('hidden'); } else { img.removeAttribute('src'); img.classList.add('hidden'); }
 }
 
-function updateModeHelp() {
-  $('#modeHelp').textContent = mode() === 'classic'
-    ? 'Classic: start and target are drawn from game content: blocks, items, mobs, biomes, structures, enchantments, effects and more.'
-    : 'Chaos: any article on the wiki (version and history pages filtered out). Expect obscure starting points.';
-}
+const MODE_HELP = {
+  classic: 'Classic: game content (blocks, items, mobs, biomes, structures, enchantments, effects and more). Each category is equally likely, so small ones like bosses come up often.',
+  balanced: 'Balanced: the same game content, with bigger categories picked more often (by the square root of their size). Bosses and rare biomes still show up, just less.',
+  even: 'Even: the same game content, with every article equally likely. Mostly blocks and items.',
+  chaos: 'Chaos: any article on the wiki (version and history pages filtered out). Expect obscure starting points.',
+};
+function updateModeHelp() { $('#modeHelp').textContent = MODE_HELP[mode()]; }
 
 function renderCard(which) {
   const card = which === 'start' ? $('#cardStart') : $('#cardGoal');
@@ -374,12 +398,21 @@ async function withBusy(fn) {
   finally { setup.busy--; updatePlay(); }
 }
 
+async function candidate(which) {
+  const goal = which === 'goal';
+  if (mode() !== 'chaos') return pageInfo(await randomPoolTitle(mode()), { backlinks: goal });
+  const info = await randomChaosInfo();
+  if (goal) info.backlinks = await backlinkCount(info.title);
+  return info;
+}
+
 async function rollOne(which) {
-  const other = which === 'start' ? setup.goal : setup.start;
   for (let attempt = 0; attempt < 12; attempt++) {
-    const info = await pageInfo(await randomTitle(mode()));
+    const info = await candidate(which);
+    // Read the other card now, not before the await: both cards may be rolling at once.
+    const other = which === 'start' ? setup.goal : setup.start;
     if (!info || info.disambig || (other && info.title === other.title)) continue;
-    if (which === 'goal' && (await backlinkCount(info.title)) < MIN_BACKLINKS) continue;
+    if (which === 'goal' && info.backlinks < MIN_BACKLINKS) continue;
     return info;
   }
   throw new Error('Gave up finding a good article');
@@ -392,10 +425,13 @@ async function reroll(which) {
   setStatus('Picking…');
   await withBusy(async () => {
     for (const w of targets) { setup[w] = null; renderCard(w); }
-    for (const w of targets) {
+    // allSettled, so one card failing doesn't end the busy state while the other is still rolling.
+    const results = await Promise.allSettled(targets.map(async w => {
       const info = await rollOne(w);
       if (current(w)) { setup[w] = info; renderCard(w); }
-    }
+    }));
+    const failed = results.find(r => r.status === 'rejected');
+    if (failed) throw failed.reason;
     if (targets.every(current)) setStatus('');
   });
 }
@@ -480,16 +516,26 @@ function startGame() {
   navigate(game.start.title, null);
 }
 
+// Parse results by requested and resolved title, so Back and "Retry this pair" don't refetch.
+// The API marks parse responses uncacheable, so the browser cache doesn't help here. Cleared on return to setup.
+const parseCache = new Map();
+const PARSE_CACHE_MAX = 40;
+function cacheParse(keys, page) {
+  for (const k of keys) { parseCache.delete(k); parseCache.set(k, page); }
+  while (parseCache.size > PARSE_CACHE_MAX) parseCache.delete(parseCache.keys().next().value);
+}
+
 async function navigate(title, fragment, { back = false } = {}) {
   if (!game.active || game.loading) return;
   const token = ++game.navToken;
-  game.loading = true;
+  game.loading = true;   // stays set until the frame reports it has rendered (frameReady)
   pauseClock();
   renderHud();
   showOverlay(`<div class="spinner"></div>Loading ${esc(title)}…`);
-  let d;
+  let page;
   try {
-    d = await api({ action: 'parse', page: title, prop: 'text|displaytitle', redirects: '1', disableeditsection: '1', disablelimitreport: '1' });
+    page = parseCache.get(title) ||
+      (await api({ action: 'parse', page: title, prop: 'text|displaytitle', redirects: '1', disableeditsection: '1', disablelimitreport: '1' })).parse;
   } catch (e) {
     if (token !== game.navToken) return;
     game.loading = false;
@@ -502,15 +548,23 @@ async function navigate(title, fragment, { back = false } = {}) {
     return;
   }
   if (token !== game.navToken || !game.active) return;
-  const page = d.parse;
+  cacheParse([title, page.title], page);
   if (back) game.stack.pop(); else game.stack.push(page.title);
   game.path.push({ title: page.title, back });
+  renderArticle(page, fragment, token);
+  setTimeout(() => frameReady(token), 15000);   // a stalled stylesheet must not leave Back and Give up disabled
+  // Compare the post-redirect title, so following a redirect onto the target counts as arriving.
+  if (page.title === game.goal.title) { game.loading = false; hideOverlay(); finish(true); return; }
+  renderHud();
+}
+
+// The frame posts 'ready' once its stylesheets have loaded and its links are wired up; only then does the clock resume.
+// It is sent from a separate <script>, so an error in the main frame script can't leave the game stuck loading.
+function frameReady(token) {
+  if (token !== game.navToken || !game.active || !game.loading) return;
   game.loading = false;
-  renderArticle(page, fragment);
   hideOverlay();
   renderHud();
-  // Compare the post-redirect title, so following a redirect onto the target counts as arriving.
-  if (page.title === game.goal.title) { finish(true); return; }
   resumeClock();
 }
 
@@ -519,7 +573,7 @@ function themeIsDark() {
   return forced ? forced === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches;
 }
 
-function renderArticle(page, fragment) {
+function renderArticle(page, fragment, token) {
   const dark = themeIsDark();
   // The article renders in a sandboxed iframe (opaque origin): the wiki's own CSS applies untouched,
   // <base> resolves its relative image/CSS URLs, and the inline script reports clicks via postMessage.
@@ -586,6 +640,7 @@ ${WIKI_STYLES.map(h => `<link rel="stylesheet" href="${esc(h)}">`).join('\n')}
   <div id="bodyContent" class="vector-body"><div id="mw-content-text" class="mw-body-content mw-content-ltr">${page.text}</div></div>
 </div>
 <script>${frameScript}<\/script>
+<script>parent.postMessage({ mwg: 'ready', token: ${token} }, '*');<\/script>
 </body></html>`;
   $('#frame').srcdoc = html;
 }
@@ -593,6 +648,7 @@ ${WIKI_STYLES.map(h => `<link rel="stylesheet" href="${esc(h)}">`).join('\n')}
 window.addEventListener('message', e => {
   if (e.source !== $('#frame').contentWindow || !e.data) return;
   if (e.data.mwg === 'nav') navigate(e.data.title, e.data.frag);
+  if (e.data.mwg === 'ready') frameReady(e.data.token);
   if (e.data.mwg === 'key' && e.data.key === 'Escape' && modalDismissable) closeModal();
 });
 
@@ -652,6 +708,7 @@ function finish(won) {
 function toSetup() {
   game.active = false;
   clearInterval(game.timer);
+  parseCache.clear();
   $('#frame').srcdoc = '';
   $('#game').classList.add('hidden');
   $('#setup').classList.remove('hidden');

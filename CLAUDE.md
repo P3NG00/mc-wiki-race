@@ -14,7 +14,7 @@ A `#start=<Title>&target=<Title>` URL hash loads a fixed pair (this is what "Cop
 
 ## Testing
 
-`test/run-e2e.sh [screenshot-dir]` starts headless Firefox with WebDriver BiDi and runs `test/e2e.mjs`. The test opens `index.html` from `file://` and plays a real game against the live wiki: challenge-hash load, rendering, link classification, navigation, the win condition, Escape handling, random rolls in both modes, interwiki titles, the same-article guard and image-map links. It needs `firefox` and Node ≥ 22 (for the global `WebSocket`), plus network access. It runs as a single script; to focus on one behavior, edit or comment out checks in `e2e.mjs`. Code inside the article iframe is evaluated in the frame's own browsing context (`frameCtx()`).
+`test/run-e2e.sh [screenshot-dir]` starts headless Firefox with WebDriver BiDi and runs `test/e2e.mjs`. The test opens `index.html` from `file://` and plays a real game against the live wiki: challenge-hash load, rendering, link classification, navigation, Back served from the parse cache, the win condition, Escape handling, random rolls in all four modes, interwiki titles, the same-article guard and image-map links. It needs `firefox` and Node ≥ 22 (for the global `WebSocket`), plus network access. It runs as a single script; to focus on one behavior, edit or comment out checks in `e2e.mjs`. Code inside the article iframe is evaluated in the frame's own browsing context (`frameCtx()`).
 
 Quick syntax check of the inline script:
 ```sh
@@ -23,11 +23,15 @@ python3 -c "import re;h=open('index.html').read();open('/tmp/m.js','w').write(re
 
 ## Architecture (all in `index.html`)
 
-**API access.** Every request goes through `api()`, which always adds `origin=*`. That parameter is mandatory: it is what makes MediaWiki send `Access-Control-Allow-Origin: *` for anonymous requests, and without it the page cannot fetch anything from `file://`. Calls used: `list=categorymembers` (Classic pool), `list=random` (Chaos pool), `list=backlinks` (target reachability), `prop=pageprops|pageimages` (description and thumbnail, redirect resolution), `action=parse` (article HTML).
+**API access.** Every request goes through `api()`, which always adds `origin=*`. That parameter is mandatory: it is what makes MediaWiki send `Access-Control-Allow-Origin: *` for anonymous requests, and without it the page cannot fetch anything from `file://`. Calls used: `list=categorymembers` (pool modes), `generator=random` (Chaos pool), `list=backlinks` (target reachability), `prop=pageprops|pageimages` (description and thumbnail, redirect resolution), `action=parse` (article HTML). Nothing polls; every request comes from a player action. `pageInfo(title, { backlinks: true })` gets the info and the backlink count in one request.
 
-**Picking articles.**
-- *Classic*: choose a category uniformly from `POOL_CATEGORIES`, then a member uniformly. `categoryMembers()` follows `cmcontinue` (Blocks has more than 500 pages) and caches per session. It drops subpages (`/`) and disambiguation pages.
-- *Chaos*: `list=random`, filtered by the `CHAOS_REJECT` regex, because raw random results are mostly version, changelog and render-history pages.
+**Picking articles.** Start and target are rolled in parallel. `rollOne` reads the other card after each await, so the two normally don't land on the same article. If they do, `updatePlay` disables Start.
+- *Pool modes* draw from `POOL_CATEGORIES`. `categoryMembers()` follows `cmcontinue` (Blocks has more than 500 pages) and caches per session. It drops subpages (`/`) and disambiguation pages. The modes are being play-tested side by side:
+  - *Classic*: a category chosen uniformly, then a member chosen uniformly. Small categories are heavily over-represented (Wither and Ender Dragon about 2.75% each per roll). Only the chosen category is fetched.
+  - *Balanced*: categories weighted by the square root of their size.
+  - *Even*: uniform over the de-duplicated union of all categories.
+  - Balanced and Even fetch every category on first use (about 21 requests in parallel, once per session).
+- *Chaos*: one `generator=random` request returns 50 articles with their info. They are filtered by the `CHAOS_REJECT` regex (raw random results are mostly version, changelog and render-history pages) and for disambiguation pages, then one is picked uniformly.
 - A target must have at least `MIN_BACKLINKS` incoming main-namespace links, and start ≠ target.
 
 **Rendering articles.** Each article is written into a sandboxed iframe (`sandbox="allow-scripts"`, so it gets an opaque origin) via `srcdoc`. This design is deliberate:
@@ -40,7 +44,8 @@ python3 -c "import re;h=open('index.html').read();open('/tmp/m.js','w').write(re
 - `path` records every visit in order and drives the click count (`path.length - 1`).
 - `stack` is the navigation stack for Back. Going back is recorded in `path` and counts as a click.
 - The win check compares `parse.title`, which is the title after redirects, against the target's resolved title. Following a redirect to the target therefore counts as arriving.
-- The clock pauses while an article is loading and while the Give-up confirmation is open. It keeps running while the player peeks at the target description.
-- `navToken` throws away responses from navigations that have been superseded.
+- The clock pauses while an article is loading and rendering, and while the Give-up confirmation is open. It keeps running while the player peeks at the target description. `game.loading` stays set until the frame posts `{mwg:'ready', token}`. That message comes from its own `<script>` after the main frame script, so it is sent only after the render-blocking stylesheets have loaded. A 15 s timeout calls `frameReady` anyway.
+- `navToken` throws away responses from navigations that have been superseded, and stale `ready` messages too.
+- `parseCache` keeps up to `PARSE_CACHE_MAX` parse results, stored under both the requested and the resolved title, and is cleared on return to setup. Back and "Retry this pair" don't refetch. The API marks parse responses uncacheable, so the browser's HTTP cache can't do this.
 
 **Persistence.** `localStorage` key `mwg.history` holds the last 50 results and is used for the recent-games table and the per-pair personal best. Access goes through the `store` wrapper, which swallows storage errors.

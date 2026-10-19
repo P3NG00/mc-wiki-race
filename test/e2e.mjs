@@ -58,6 +58,13 @@ check('wiki stylesheets loaded', links.sheets >= 4, `sheets=${links.sheets}`);
 await ev("[...document.querySelectorAll('a.mwg-live')].find(a => a.getAttribute('href') === '/w/Pickaxe').click()", f);
 check('clicking a link navigates', await until("game.path.length === 2 && !game.loading"), await ev("game.path.map(p => p.title).join(' > ')"));
 
+// Back reuses the cached article instead of calling the API again.
+await ev("window.apiCalls = 0; { const orig = api; window.api = Object.assign(p => (apiCalls++, orig(p)), { orig }); }");
+await ev("document.querySelector('#btnBack').click()");
+check('Back loads from cache', await until("game.path.length === 3 && !game.loading") && await ev('apiCalls === 0'),
+  `${await ev("game.path.map(p => p.title).join(' > ')")} apiCalls=${await ev('apiCalls')}`);
+await ev("window.api = window.api.orig");
+
 f = await frameCtx();
 await ev("[...document.querySelectorAll('a.mwg-live')].find(a => /Diamond_Pickaxe/i.test(a.getAttribute('href'))).click()", f);
 check('reaching the target wins', await until("!game.active && !document.querySelector('#modalBg').classList.contains('hidden')"),
@@ -73,9 +80,11 @@ check('Escape keeps the win modal open', await ev("!document.querySelector('#mod
 // Random rolls in both modes.
 await ev("document.querySelector('#mNew').click()");
 check('Classic roll', await until("!document.querySelector('#btnPlay').disabled", 60000), await ev("setup.start.title + ' -> ' + setup.goal.title"));
-await ev("document.querySelector('input[value=chaos]').click()");
-await sleep(500);
-check('Chaos roll', await until("!document.querySelector('#btnPlay').disabled", 60000), await ev("setup.start.title + ' -> ' + setup.goal.title"));
+for (const m of ['balanced', 'even', 'chaos']) {
+  await ev(`document.querySelector('input[value=${m}]').click()`);
+  await sleep(500);
+  check(`${m} roll`, await until("!document.querySelector('#btnPlay').disabled", 60000), await ev("setup.start.title + ' -> ' + setup.goal.title"));
+}
 
 // An interwiki title has no page in the API response; it must read as "not found", not a network error.
 await ev("(() => { const i = document.querySelector('[data-custom=start]'); i.value = 'de:Diamant'; i.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter' })); })()");

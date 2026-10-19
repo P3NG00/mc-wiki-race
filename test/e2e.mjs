@@ -142,6 +142,10 @@ for (const m of ['balanced', 'even', 'chaos']) {
   check(`${m} roll`, await until("!document.querySelector('#btnPlay').disabled", 60000), await ev("setup.start.title + ' -> ' + setup.goal.title"));
 }
 await ev('window.fetch = fetch.orig');
+check('Chaos rolls get descriptions', await ev('chaosQueue.some(i => i.desc)'));
+// pageprops' description on infobox pages is the infobox caption ("Java Edition"); the intro's first paragraph is used.
+const zpDesc = await ev("pageInfo('Zombified Piglin').then(i => i.desc)");
+check('description is the first paragraph', zpDesc.startsWith('Zombified piglins are') && !zpDesc.includes('\n'), zpDesc);
 check('at most API_CONCURRENCY requests at once', await ev('maxInFlight === API_CONCURRENCY'), `max=${await ev('maxInFlight')}`);
 
 // Difficulty rerolls only the target. Easy and Hard keep the best- or least-linked of five candidates, Any takes the first.

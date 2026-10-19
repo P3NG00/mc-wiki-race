@@ -433,7 +433,12 @@ async function fetchHubTitles() {
   return map;
 }
 
-const INFO_PARAMS = { prop: 'pageprops|pageimages', ppprop: 'description|disambiguation', piprop: 'thumbnail', pithumbsize: '160' };
+// The description is the first paragraph of the plain-text intro. pageprops' description is unusable here: on pages
+// with an infobox it is often the infobox caption ("Java Edition", "Adult"), and it keeps HTML entities such as &#91;.
+// TextExtracts returns at most 20 intros per request (exlimit).
+const EXTRACT_PARAMS = { exintro: '1', explaintext: '1', exlimit: 'max' };
+const INFO_PARAMS = { prop: 'pageprops|pageimages|extracts', ppprop: 'disambiguation', piprop: 'thumbnail', pithumbsize: '160', ...EXTRACT_PARAMS };
+const firstParagraph = text => (text || '').trim().split('\n')[0].trim();
 // limit: how many incoming links to count up to (bllimit).
 const backlinkParams = (title, limit) => ({ list: 'backlinks', bltitle: title, blnamespace: '0', bllimit: String(limit), blfilterredir: 'nonredirects' });
 
@@ -441,19 +446,35 @@ function toInfo(p) {
   if (!p || p.missing || p.invalid || p.ns !== 0) return null;
   return {
     title: p.title,
-    desc: p.pageprops?.description || '',
+    desc: firstParagraph(p.extract),
     img: p.thumbnail?.source || '',
     disambig: !!p.pageprops && 'disambiguation' in p.pageprops,
   };
 }
 
+// Fills in desc for infos fetched without extracts, 20 titles per request.
+async function addDescs(infos) {
+  const chunks = [];
+  for (let i = 0; i < infos.length; i += 20) chunks.push(infos.slice(i, i + 20));
+  await Promise.all(chunks.map(async chunk => {
+    const d = await api({ action: 'query', titles: chunk.map(i => i.title).join('|'), prop: 'extracts', ...EXTRACT_PARAMS });
+    const byTitle = new Map((d.query?.pages || []).map(p => [p.title, p.extract]));
+    for (const info of chunk) info.desc = firstParagraph(byTitle.get(info.title));
+  }));
+}
+
 // One request returns 50 random articles with their info. Those that pass the filters are queued and drawn uniformly
 // without replacement, so the next rolls (and rejected targets) don't need a new request. Concurrent refills share one.
+// Extracts are fetched afterwards for the survivors only, since one request can't carry 50 of them.
 const chaosQueue = [];
 let chaosRefill = null;
 function refillChaos() {
-  return chaosRefill ||= api({ action: 'query', generator: 'random', grnnamespace: '0', grnfilterredir: 'nonredirects', grnlimit: '50', ...INFO_PARAMS })
-    .then(d => { chaosQueue.push(...(d.query?.pages || []).map(toInfo).filter(p => p && !p.disambig && !CHAOS_REJECT.test(p.title))); })
+  return chaosRefill ||= api({ action: 'query', generator: 'random', grnnamespace: '0', grnfilterredir: 'nonredirects', grnlimit: '50', ...INFO_PARAMS, prop: 'pageprops|pageimages' })
+    .then(async d => {
+      const infos = (d.query?.pages || []).map(toInfo).filter(p => p && !p.disambig && !CHAOS_REJECT.test(p.title));
+      await addDescs(infos);
+      chaosQueue.push(...infos);
+    })
     .finally(() => { chaosRefill = null; });
 }
 

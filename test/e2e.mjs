@@ -67,6 +67,19 @@ const links = JSON.parse(await ev("JSON.stringify({ live: document.querySelector
 check('article links are clickable', links.live > 100, `live=${links.live}`);
 check('Tutorial: links are disabled', links.tutorial > 0 && links.tutorialLive === 0, `tutorial=${links.tutorial}`);
 check('wiki stylesheets loaded', links.sheets >= 4, `sheets=${links.sheets}`);
+// Hovering a live link tints it. The pointer moves to the link itself (an element origin, which works inside the frame)
+// and back to the page's corner, so no later link stays hovered.
+const pickaxeLink = "[...document.querySelectorAll('a.mwg-live')].find(a => a.getAttribute('href') === '/w/Pickaxe')";
+const linkRef = (await send('script.evaluate', { target: { context: f }, expression: `(a => (a.scrollIntoView({ block: 'center' }), a))(${pickaxeLink})`, awaitPromise: false })).result?.result?.sharedId;
+const linkBg = () => ev(`getComputedStyle(${pickaxeLink}).backgroundColor`, f);
+const plainBg = await linkBg();
+const moveTo = origin => send('input.performActions', { context: f, actions: [{ type: 'pointer', id: 'mouse', actions: [{ type: 'pointerMove', x: 0, y: 0, origin }] }] });
+const moved = await moveTo({ type: 'element', element: { sharedId: linkRef } });
+await sleep(300);
+const hoverBg = await linkBg();
+check('hovering a live link tints it', !!linkRef && !moved.error && /\/ 0\.14\)$/.test(hoverBg) && hoverBg !== plainBg, `${plainBg} -> ${hoverBg} ${moved.error || ''}`);
+await moveTo('viewport');
+await send('input.releaseActions', { context: ctx });
 
 await ev("[...document.querySelectorAll('a.mwg-live')].find(a => a.getAttribute('href') === '/w/Pickaxe').click()", f);
 check('clicking a link navigates', await until("game.path.length === 2 && !game.loading"), await ev("game.path.map(p => p.title).join(' > ')"));

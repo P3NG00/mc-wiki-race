@@ -1035,7 +1035,14 @@ ${WIKI_STYLES.map(h => `<link rel="stylesheet" href="${esc(h)}">`).join('\n')}
   .mw-editsection, iframe, .embedvideo, .mw-ext-embedvideo, audio, video { display: none !important; }
   a.mwg-dead { color: inherit !important; text-decoration: none !important; cursor: not-allowed; opacity: .6; }
   a.mwg-dead img { opacity: 1; }
-  a.mwg-live { cursor: pointer; }
+  /* A live text link gets a tint of its own colour on hover, so it stands out from the dead ones around it. On a link
+     around an image the tint would only cover a strip of its line box. */
+  a.mwg-live { cursor: pointer; border-radius: 3px; box-decoration-break: clone; transition: background-color .1s, box-shadow .1s; }
+  a.mwg-live:not(:has(img)):hover {
+    background-color: color-mix(in srgb, currentColor 14%, transparent);
+    box-shadow: 0 0 0 2px color-mix(in srgb, currentColor 14%, transparent);
+  }
+  .mwg-live:focus-visible { outline: 2px solid currentColor; outline-offset: 1px; }
   img.mwg-broken { display: inline-block; overflow: hidden; color: transparent; }
   ${noNav ? '.navbox, .mw-heading:has(> #Navigation) { display: none !important; }' : ''}
 </style>

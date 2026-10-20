@@ -484,6 +484,16 @@ const store = {
   get(k, d) { try { const v = localStorage.getItem(k); return v == null ? d : JSON.parse(v); } catch { return d; } },
   set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch { /* storage unavailable */ } },
 };
+// Recorded games, newest first. Storage is shared with every page on the origin and open to the player, so anything
+// that isn't a record finish() would write is left out rather than allowed to stop the setup screen or a result.
+const isKey = (obj, k) => typeof k === 'string' && Object.hasOwn(obj, k);
+const optional = (v, ok) => v === undefined || ok(v);
+const isRecord = r => typeof r === 'object' && r !== null && typeof r.start === 'string' && typeof r.goal === 'string' &&
+  optional(r.via, v => typeof v === 'string') && optional(r.daily, v => typeof v === 'string') &&
+  optional(r.difficulty, v => isKey(DIFFICULTY, v)) && optional(r.topic, v => isKey(TOPICS, v)) &&
+  Array.isArray(r.rules) && r.rules.every(k => isKey(RULES, k)) && typeof r.won === 'boolean' &&
+  [r.clicks, r.ms, r.at].every(Number.isFinite);
+const savedGames = () => { const h = store.get('mwr.history', []); return Array.isArray(h) ? h.filter(isRecord) : []; };
 
 // ---------------------------------------------------------------- API helpers
 // MediaWiki asks clients not to send many requests at once, so at most API_CONCURRENCY are in flight and the rest
@@ -832,7 +842,7 @@ async function loadDaily(date = today()) {
     setRules([rule]);
     syncVia();
     keys.forEach(renderCard);
-    const done = store.get('mwr.history', []).find(r => r.daily === date && r.won);
+    const done = savedGames().find(r => r.daily === date && r.won);
     setStatus(`Daily challenge for ${date}, with ${RULES[rule].label}.` + (done ? ` You did it in ${done.clicks} clicks (${fmtTime(done.ms)}).` : ' Press Start when ready.'));
   });
 }
@@ -845,7 +855,7 @@ function challengeLink() {
 }
 
 function renderHistory() {
-  const rows = store.get('mwr.history', []);
+  const rows = savedGames();
   $('#history').classList.toggle('hidden', rows.length === 0);
   $('#history tbody').innerHTML = rows.slice(0, 15).map(r => `
     <tr class="${r.won ? '' : 'lost'}">
@@ -1177,7 +1187,7 @@ function finish(won, outOfClicks = false) {
   const rec = { start: game.start.title, goal: game.goal.title, ...(game.via && { via: game.via.title }), ...(game.daily && { daily: game.daily }),
     ...(game.goal.difficulty && { difficulty: game.goal.difficulty, topic: game.goal.topic }), rules: game.rules, won, ...(outOfClicks && { outOfClicks }), clicks: clicks(), ms, at: Date.now(), path: game.path.map(p => p.title) };
   const settingsNote = settingsText(rec);
-  const hist = store.get('mwr.history', []);
+  const hist = savedGames();
   const best = hist.filter(r => r.won && r.start === rec.start && r.goal === rec.goal && r.via === rec.via && sameRules(r, rec))
     .sort((a, b) => a.clicks - b.clicks || a.ms - b.ms)[0];
   hist.unshift(rec);
@@ -1305,7 +1315,7 @@ $('#btnGiveUp').onclick = () => {
   $('#gQuit').onclick = () => { $('#modalBg').classList.add('hidden'); finish(false); };
 };
 $('#btnClearHistory').onclick = () => {
-  const n = store.get('mwr.history', []).length;
+  const n = savedGames().length;
   openModal(`<h2>Clear history?</h2><p>This deletes ${n === 1 ? 'the 1 recorded game' : `all ${n} recorded games`}, personal bests and dailies included. It can’t be undone.</p>
     <div class="actions"><button id="hKeep">Cancel</button><button class="primary" id="hClear">Clear history</button></div>`);
   $('#hKeep').onclick = closeModal;

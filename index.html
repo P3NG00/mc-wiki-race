@@ -700,6 +700,14 @@ function setStatus(msg, isErr) {
   el.classList.toggle('err', !!isErr);
 }
 
+// The daily is its pair and its rule, so any change to either makes it an ordinary game. Every change says so the same way.
+const LEFT_DAILY = 'Any change to the daily challenge makes it an ordinary game.';
+function leaveDaily() {
+  const was = !!setup.daily;
+  setup.daily = null;
+  return was;
+}
+
 async function withBusy(fn) {
   setup.busy++;
   updatePlay();
@@ -744,7 +752,7 @@ async function reroll(which) {
   if (which === 'all' && !targets.includes('via')) setup.via = null;
   const tokens = Object.fromEntries(targets.map(w => [w, ++setup.rolls[w]]));
   const current = w => tokens[w] === setup.rolls[w];
-  setup.daily = null;
+  const left = leaveDaily();
   setStatus('Picking…');
   await withBusy(async () => {
     for (const w of targets) { setup[w] = null; renderCard(w); }
@@ -755,7 +763,7 @@ async function reroll(which) {
     }));
     const failed = results.find(r => r.status === 'rejected');
     if (failed) throw failed.reason;
-    if (targets.every(current)) setStatus('');
+    if (targets.every(current)) setStatus(left ? LEFT_DAILY : '');
   });
 }
 
@@ -768,9 +776,9 @@ async function setCustom(which, raw) {
     if (!info) { setStatus('No article named “' + text + '” on minecraft.wiki.', true); return; }
     setup.rolls[which]++;
     setup[which] = info;
-    setup.daily = null;
+    const left = leaveDaily();
     renderCard(which);
-    setStatus(info.disambig ? 'Heads up: “' + info.title + '” is a disambiguation page.' : '');
+    setStatus([info.disambig && 'Heads up: “' + info.title + '” is a disambiguation page.', left && LEFT_DAILY].filter(Boolean).join(' '));
   });
 }
 
@@ -1203,7 +1211,8 @@ function finish(won, outOfClicks = false) {
     catch { $('#mCopy').textContent = 'Copy failed'; }
   };
   $('#mSame').onclick = () => { closeModal(); startGame(); };
-  $('#mNew').onclick = () => { closeModal(); toSetup(); reroll('all'); };
+  // Leaving a finished daily isn't a change to it, so no notice.
+  $('#mNew').onclick = () => { closeModal(); toSetup(); setup.daily = null; reroll('all'); };
 }
 
 function toSetup() {
@@ -1239,9 +1248,8 @@ $('#difficulty').innerHTML = '<span class="lbl">Target</span>' + Object.entries(
 $('#difficulty').insertAdjacentHTML('beforeend', `<select id="topic" aria-label="Target topic" title="Only targets from this topic. The start still comes from the mode.">
   ${Object.entries(TOPICS).map(([k, t]) => `<option value="${k}">${esc(t.label)}</option>`).join('')}</select>`);
 $('#difficulty').addEventListener('change', () => reroll('goal'));
-// The daily is its pair and its rule, so other rules make it an ordinary game.
 $('#rules').addEventListener('change', () => {
-  if (setup.daily) { setup.daily = null; setStatus('With other rules, this pair no longer counts as the daily challenge.'); }
+  if (leaveDaily()) setStatus(LEFT_DAILY);
   syncVia(); renderCard('via'); renderCard('goal');
 });
 // The path sidebar can collapse to a small box over the article. The choice is remembered.
@@ -1271,7 +1279,11 @@ document.querySelectorAll('[data-custom]').forEach(inp => {
   inp.addEventListener('keydown', e => { if (e.key === 'Enter') { setCustom(inp.dataset.custom, inp.value); inp.value = ''; } });
 });
 $('#btnRerollAll').onclick = () => reroll('all');
-$('#btnSwap').onclick = () => { [setup.start, setup.goal] = [setup.goal, setup.start]; setup.daily = null; renderCard('start'); renderCard('goal'); };
+$('#btnSwap').onclick = () => {
+  [setup.start, setup.goal] = [setup.goal, setup.start];
+  if (leaveDaily()) setStatus(LEFT_DAILY);
+  renderCard('start'); renderCard('goal');
+};
 $('#btnDaily').onclick = () => loadDaily();
 $('#btnPlay').onclick = startGame;
 $('#btnCopy').onclick = async () => {

@@ -355,13 +355,23 @@ await ev("document.querySelector('#btnGiveUp').click()");
 await ev("document.querySelector('#gQuit').click()");
 check('daily result is recorded', await ev("(r => r.daily === '2026-01-02' && r.via === setup.via.title && r.rules.join() === 'checkpoint')(store.get('mwr.history', [])[0]) && document.querySelector('#modal').textContent.includes('Daily 2026-01-02')"));
 await ev("document.querySelector('#mNew').click()");
-check('rerolling leaves the daily pair', await ev('setup.daily === null'));
+await until('setup.busy === 0', 60000);
+check('New game leaves the daily without the notice', await ev("setup.daily === null && document.querySelector('#setupStatus').textContent !== LEFT_DAILY"));
 check('history marks the daily', await ev("document.querySelector('#history tbody tr').textContent.includes('Daily 2026-01-02, Checkpoint')"));
 await ev("loadDaily('2026-01-02')");
 await until("setup.daily === '2026-01-02' && setup.busy === 0", 60000);
 await ev("document.querySelector('#rules input[value=limit]').click()");
-check('another rule leaves the daily', await ev("setup.daily === null && document.querySelector('#setupStatus').textContent.includes('no longer counts')"));
+check('another rule leaves the daily', await ev("setup.daily === null && document.querySelector('#setupStatus').textContent === LEFT_DAILY"));
 await ev("document.querySelector('#rules input[value=limit]').click()");
+await ev("loadDaily('2026-01-02')");
+await until("setup.daily === '2026-01-02' && setup.busy === 0", 60000);
+await ev("document.querySelector('#btnSwap').click()");
+check('swapping leaves the daily', await ev("setup.daily === null && document.querySelector('#setupStatus').textContent === LEFT_DAILY"));
+await ev("loadDaily('2026-01-02')");
+await until("setup.daily === '2026-01-02' && setup.busy === 0", 60000);
+await ev("document.querySelector('[data-reroll=goal]').click()");
+await until("setup.busy === 0 && !!setup.goal", 60000);
+check('rerolling a card leaves the daily', await ev("setup.daily === null && document.querySelector('#setupStatus').textContent === LEFT_DAILY"));
 
 // Checkpoint game: reaching the target before the checkpoint doesn't count. A best with another checkpoint is not this
 // pair's best (the seeded 1-click game would otherwise make it "Your best").

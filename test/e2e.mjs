@@ -224,14 +224,14 @@ check('image-map links are clickable', areas.live > 0, `areas=${areas.all} live=
 await send('browsingContext.navigate', { context: ctx, url: 'about:blank', wait: 'complete' });
 await send('browsingContext.navigate', { context: ctx, url: fileUrl + '#start=Diamond&target=Crafting&rules=nohubs,blind', wait: 'complete' });
 await until("!document.querySelector('#btnPlay').disabled");
-const blindCard = "document.querySelector('#cardGoal .desc').textContent + ' ' + document.querySelector('#cardGoal img').classList.contains('hidden')";
+const blindCard = "document.querySelector('#cardGoal .desc').textContent + ' ' + [...document.querySelectorAll('#cardGoal img')].every(i => i.classList.contains('hidden'))";
 check('Blind target hides the target card', await ev(blindCard) === 'Hidden: Blind target. true', await ev(blindCard));
 await ev("document.querySelector('#rules input[value=blind]').click()");
 check('turning Blind target off shows it again', !(await ev(blindCard)).startsWith('Hidden'), await ev(blindCard));
 await ev("document.querySelector('#rules input[value=blind]').click()");
 await ev("document.querySelector('#btnPlay').click()");
 check('No hubs game loads', await until("game.path.length === 1 && !game.loading"));
-check('Blind target hides the HUD picture and peek', await ev("document.querySelector('#hudImg').classList.contains('hidden') && document.querySelector('#btnPeek').classList.contains('hidden')"));
+check('Blind target hides the HUD and path pictures and peek', await ev("document.querySelector('#hudImg').classList.contains('hidden') && document.querySelector('#pathArt').classList.contains('hidden') && document.querySelector('#btnPeek').classList.contains('hidden')"));
 check('hub redirects are known', await ev("hubTitles().then(m => m.get('Blocks') === 'Block' && m.get('Mining') === 'Breaking')"));
 f = await frameCtx();
 const hubLinks = JSON.parse(await ev(`JSON.stringify(Object.fromEntries(['Item', 'Java_Edition', 'Crafting', 'Pickaxe'].map(t =>
@@ -324,6 +324,7 @@ await ev("document.querySelector('#btnPlay').click()");
 await until("game.path.length === 1 && !game.loading");
 const hudLbl = "document.querySelector('#hudLbl').textContent + ' ' + document.querySelector('#hudGoal').textContent";
 check('HUD shows the checkpoint first', await ev(hudLbl) === 'Checkpoint Pickaxe', await ev(hudLbl));
+check('the path picture is the checkpoint', await ev("document.querySelector('#pathArt').src === game.via.img && !!game.via.img"));
 f = await frameCtx();
 await ev("[...document.querySelectorAll('a.mwg-live')].find(a => /Diamond_Pickaxe/i.test(a.getAttribute('href'))).click()", f);
 await until("game.path.length === 2 && !game.loading");
@@ -331,7 +332,8 @@ check('target before the checkpoint does not win', await ev("game.active") === t
 f = await frameCtx();
 await ev("[...document.querySelectorAll('a.mwg-live')].find(a => a.getAttribute('href') === '/w/Pickaxe').click()", f);
 await until("game.path.length === 3 && !game.loading");
-check('reaching the checkpoint switches to the target', await ev(hudLbl) === 'Target Diamond Pickaxe' && await ev('game.path[2].via === true'), await ev(hudLbl));
+check('reaching the checkpoint switches to the target', await ev(hudLbl) === 'Target Diamond Pickaxe' && await ev('game.path[2].via === true') &&
+  await ev("document.querySelector('#pathArt').src === game.goal.img && !!game.goal.img"), await ev(hudLbl));
 check('reaching the checkpoint is celebrated', await ev("!document.querySelector('#toast').classList.contains('hidden') && document.querySelector('#toast').textContent.includes('Diamond Pickaxe') && document.querySelector('.hud .goal').classList.contains('reached') && document.querySelector('#pathList li.via')?.textContent.includes('Pickaxe')"));
 await shot('6-checkpoint');
 f = await frameCtx();

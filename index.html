@@ -20,6 +20,7 @@
     --radius: 8px;        /* buttons, inputs */
     --radius-lg: 12px;    /* cards, tables, dialogs */
     --radius-pill: 999px; /* mode chips */
+    --art-opacity: .13;   /* the large faded picture behind the setup cards and the path */
     color-scheme: light;  /* also decides whether the article uses the wiki's light or dark theme */
   }
   /* Auto is no data-theme attribute, so an explicit theme (light, dark or one added by the host page) gets only its own rule. */
@@ -29,6 +30,7 @@
       --accent: #6cbf55; --accent-ink: #0d1409; --accent-soft: #24331f;
       --target: #ec8a73;
       --shadow: 0 1px 2px rgba(0,0,0,.4), 0 4px 16px rgba(0,0,0,.3);
+      --art-opacity: .17;
       color-scheme: dark;
     }
   }
@@ -37,6 +39,7 @@
     --accent: #6cbf55; --accent-ink: #0d1409; --accent-soft: #24331f;
     --target: #ec8a73;
     --shadow: 0 1px 2px rgba(0,0,0,.4), 0 4px 16px rgba(0,0,0,.3);
+    --art-opacity: .17;
     color-scheme: dark;
   }
   * { box-sizing: border-box; }
@@ -57,6 +60,15 @@
   button.link { border: 0; background: none; padding: 0; color: var(--accent); text-decoration: underline; }
   .mono { font-variant-numeric: tabular-nums; }
   .hidden { display: none !important; }
+  /* Pictures are pixel art drawn with hard edges. A /thumb/ URL is one the wiki scaled down from a bigger original
+     (a render or a screenshot), which is drawn smoothly; small sprites are served at their own size, without /thumb/. */
+  img[src*="/thumb/"] { image-rendering: auto !important; }
+  /* A large faded copy of a card's or the objective's picture, behind the content and cut off by the box's edges. */
+  .art {
+    position: absolute; z-index: -1; object-fit: contain; image-rendering: pixelated; pointer-events: none;
+    opacity: var(--art-opacity);
+  }
+  .art[src*="/thumb/"] { mask-image: radial-gradient(closest-side, #000 65%, transparent); }   /* softens a screenshot's hard edges */
 
   /* ---------- Setup screen ---------- */
   #setup { max-width: 860px; margin: 0 auto; padding: 32px 16px 48px; }
@@ -82,6 +94,7 @@
   .card {
     background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius-lg); padding: 14px;
     box-shadow: var(--shadow); display: flex; flex-direction: column; gap: 8px; min-height: 230px;
+    position: relative; overflow: hidden; isolation: isolate;
   }
   .card .tag { font-size: 12px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; }
   .card.start .tag { color: var(--accent); }
@@ -89,6 +102,7 @@
   .card.via .tag { color: var(--ink); }
   .card .row { display: flex; gap: 12px; align-items: flex-start; }
   .card img { width: 72px; height: 72px; object-fit: contain; image-rendering: pixelated; flex: none; }
+  .card img.art { width: 220px; height: 220px; right: -28px; bottom: -28px; }
   .card .title { font-size: 19px; font-weight: 650; margin: 0; }
   .card .desc { color: var(--muted); font-size: 13.5px; margin: 0;
     display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; }
@@ -130,8 +144,9 @@
   .main { display: grid; grid-template-columns: 220px 1fr; min-height: 0; }
   .path {
     border-right: 1px solid var(--line); padding: 12px; background: var(--panel); font-size: 13.5px;
-    display: flex; flex-direction: column; min-height: 0;
+    display: flex; flex-direction: column; min-height: 0; position: relative; overflow: hidden; isolation: isolate;
   }
+  .path .art { width: 280px; height: 280px; right: -60px; bottom: -20px; }
   .path-list { flex: 1; min-height: 0; overflow-y: auto; }
   .path .credit { margin: 8px 0 0; padding-top: 8px; border-top: 1px solid var(--line); color: var(--muted); font-size: 12px; }
   .path .credit a, .modal ol a { color: var(--accent); }
@@ -184,6 +199,7 @@
     .main { grid-template-columns: 1fr; grid-template-rows: auto 1fr; }
     .path { border-right: 0; border-bottom: 1px solid var(--line); max-height: 108px; padding: 8px 16px; }
     .path .credit { margin-top: 4px; padding-top: 4px; }
+    .path .art { display: none; }
     .path ol { display: flex; flex-wrap: wrap; gap: 4px 14px; padding-left: 18px; }
     .hud { gap: 10px; padding: 8px 16px; }
     .stat .v { font-size: 17px; }
@@ -228,29 +244,32 @@ const THEMES = [...new Set(['auto', 'light', 'dark', ...Array.from(document.quer
   <div class="pair">
     <div class="card start" id="cardStart">
       <span class="tag">Start</span>
-      <div class="row"><img alt="" class="hidden"><div><p class="title">…</p><p class="desc"></p></div></div>
+      <div class="row"><img alt="" class="icon hidden"><div><p class="title">…</p><p class="desc"></p></div></div>
       <div class="actions">
         <button data-reroll="start">🎲 Reroll</button>
         <input type="text" placeholder="or type an article…" data-custom="start" aria-label="Custom start article">
       </div>
+      <img alt="" class="art hidden">
     </div>
     <div class="arrow">➜</div>
     <div class="card via via-part hidden" id="cardVia">
       <span class="tag">Checkpoint</span>
-      <div class="row"><img alt="" class="hidden"><div><p class="title">…</p><p class="desc"></p></div></div>
+      <div class="row"><img alt="" class="icon hidden"><div><p class="title">…</p><p class="desc"></p></div></div>
       <div class="actions">
         <button data-reroll="via">🎲 Reroll</button>
         <input type="text" placeholder="or type an article…" data-custom="via" aria-label="Custom checkpoint article">
       </div>
+      <img alt="" class="art hidden">
     </div>
     <div class="arrow via-part hidden">➜</div>
     <div class="card goal" id="cardGoal">
       <span class="tag">Target</span>
-      <div class="row"><img alt="" class="hidden"><div><p class="title">…</p><p class="desc"></p></div></div>
+      <div class="row"><img alt="" class="icon hidden"><div><p class="title">…</p><p class="desc"></p></div></div>
       <div class="actions">
         <button data-reroll="goal">🎲 Reroll</button>
         <input type="text" placeholder="or type an article…" data-custom="goal" aria-label="Custom target article">
       </div>
+      <img alt="" class="art hidden">
     </div>
   </div>
 
@@ -298,6 +317,7 @@ const THEMES = [...new Set(['auto', 'light', 'dark', ...Array.from(document.quer
       <div class="path-list"><h3>Your path</h3><ol id="pathList"></ol></div>
       <!-- Attribution the wiki's licence asks for: a link to the article being shown and to the licence. -->
       <p class="credit" id="credit"></p>
+      <img alt="" class="art hidden" id="pathArt">
     </aside>
     <div class="viewer">
       <iframe id="frame" title="Wiki article" sandbox="allow-scripts"></iframe>
@@ -449,7 +469,7 @@ async function fetchHubTitles() {
 // with an infobox it is often the infobox caption ("Java Edition", "Adult"), and it keeps HTML entities such as &#91;.
 // TextExtracts returns at most 20 intros per request (exlimit).
 const EXTRACT_PARAMS = { exintro: '1', explaintext: '1', exlimit: 'max' };
-const INFO_PARAMS = { prop: 'pageprops|pageimages|extracts', ppprop: 'disambiguation', piprop: 'thumbnail', pithumbsize: '160', ...EXTRACT_PARAMS };
+const INFO_PARAMS = { prop: 'pageprops|pageimages|extracts', ppprop: 'disambiguation', piprop: 'thumbnail', pithumbsize: '400', ...EXTRACT_PARAMS };
 const firstParagraph = text => (text || '').trim().split('\n')[0].trim();
 // limit: how many incoming links to count up to (bllimit).
 const backlinkParams = (title, limit) => ({ list: 'backlinks', bltitle: title, blnamespace: '0', bllimit: String(limit), blfilterredir: 'nonredirects' });
@@ -572,7 +592,8 @@ function renderCard(which) {
   const blind = which !== 'start' && rules().includes('blind');
   $('.title', card).textContent = info ? info.title : '…';
   $('.desc', card).textContent = !info ? '' : blind ? 'Hidden: Blind target.' : info.desc || 'No description available.';
-  setImg($('img', card), blind ? '' : info?.img);
+  setImg($('img.icon', card), blind ? '' : info?.img);
+  setImg($('img.art', card), blind ? '' : info?.img);
   updatePlay();
 }
 
@@ -789,7 +810,9 @@ const objective = () => game.via && !game.viaReached ? game.via : game.goal;
 function renderObjective() {
   $('#hudLbl').textContent = objective() === game.goal ? 'Target' : 'Checkpoint';
   $('#hudGoal').textContent = objective().title;
-  setImg($('#hudImg'), game.rules.includes('blind') ? '' : objective().img);
+  const img = game.rules.includes('blind') ? '' : objective().img;
+  setImg($('#hudImg'), img);
+  setImg($('#pathArt'), img);
 }
 
 // Called once the checkpoint's article has rendered, so the banner isn't hidden behind the loading overlay.
@@ -1152,9 +1175,10 @@ $('#btnClearHistory').onclick = () => {
 $('#btnPeek').onclick = () => {
   const g = objective();
   openModal(`<h2>${g === game.goal ? 'Target' : 'Checkpoint'}: ${esc(g.title)}</h2>
-    <div class="peek">${g.img ? `<img src="${esc(g.img)}" alt="">` : ''}<p>${esc(g.desc || 'No description available.')}</p></div>
+    <div class="peek"><img alt="" class="hidden"><p>${esc(g.desc || 'No description available.')}</p></div>
     <p class="note">The clock keeps running while you peek.</p>
     <div class="actions"><button class="primary" id="pClose">Back to the hunt</button></div>`);
+  setImg($('.peek img'), g.img);
   $('#pClose').onclick = closeModal;
 };
 // Initial load: a #start=…&target=… hash plays that exact pair, #daily (or #daily=YYYY-MM-DD) that day's pair and rule,

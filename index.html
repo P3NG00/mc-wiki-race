@@ -936,6 +936,11 @@ function hideToast() { clearTimeout(game.toastTimer); $('#toast').classList.add(
 function showOverlay(html) { $('#overlayBox').innerHTML = html; $('#overlay').classList.remove('hidden'); }
 function hideOverlay() { $('#overlay').classList.add('hidden'); }
 
+// During a game, closing the tab, reloading or leaving the page asks first (the browser's "Leave page?" dialog). The
+// listener is only there while a game is on, since a page with one may be kept out of the back/forward cache.
+// returnValue (any value but the empty string) is for browsers from before preventDefault was enough.
+const guardLeaving = e => { e.preventDefault(); e.returnValue = true; };
+
 function startGame() {
   const r = rules();
   Object.assign(game, { active: true, start: setup.start, goal: setup.goal, via: r.includes('checkpoint') ? setup.via : null, viaReached: false, celebrate: false,
@@ -950,6 +955,7 @@ function startGame() {
   $('#game').classList.remove('hidden');
   clearInterval(game.timer);
   game.timer = setInterval(() => { $('#hudTime').textContent = fmtTime(now()); }, 250);
+  addEventListener('beforeunload', guardLeaving);
   history.replaceState(null, '', location.pathname + location.search);
   navigate(game.start.title, null);
 }
@@ -1189,6 +1195,7 @@ function goBack() {
 function finish(won, outOfClicks = false) {
   pauseClock();
   game.active = false;
+  removeEventListener('beforeunload', guardLeaving);
   game.navToken++;
   clearInterval(game.timer);
   renderHud();
@@ -1240,6 +1247,7 @@ function finish(won, outOfClicks = false) {
 
 function toSetup() {
   game.active = false;
+  removeEventListener('beforeunload', guardLeaving);
   clearInterval(game.timer);
   parseCache.clear();
   $('#frame').srcdoc = '';

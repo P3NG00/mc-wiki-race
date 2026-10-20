@@ -563,6 +563,33 @@ check('only real records are shown', await ev("document.querySelectorAll('#histo
   `rows=${await ev("document.querySelectorAll('#history tbody tr').length")}`);
 await ev("localStorage.removeItem('mwr.history')");
 
+// Leaving the page during a game asks first, and after the game it doesn't. Browsers only ask once the page has had a
+// real click or key press, so Start is pressed with a real click. BiDi accepts the "Leave page?" dialog by default and
+// reports it as browsingContext.userPromptOpened.
+let prompts = [];
+onEvent = d => { if (d.method === 'browsingContext.userPromptOpened') prompts.push(d.params.type); };
+await send('session.subscribe', { events: ['browsingContext.userPromptOpened'] });
+const leaveAfter = async giveUp => {
+  await send('browsingContext.navigate', { context: ctx, url: 'about:blank', wait: 'complete' });
+  await send('browsingContext.navigate', { context: ctx, url: fileUrl + '#start=Diamond&target=Diamond%20Pickaxe', wait: 'complete' });
+  await until("!document.querySelector('#btnPlay').disabled");
+  const play = (await send('script.evaluate', { target: { context: ctx }, expression: "document.querySelector('#btnPlay')", awaitPromise: false })).result?.result?.sharedId;
+  await send('input.performActions', { context: ctx, actions: [{ type: 'pointer', id: 'mouse', actions: [
+    { type: 'pointerMove', x: 0, y: 0, origin: { type: 'element', element: { sharedId: play } } }, { type: 'pointerDown', button: 0 }, { type: 'pointerUp', button: 0 }] }] });
+  await send('input.releaseActions', { context: ctx });
+  await until("game.path.length === 1 && !game.loading");
+  if (giveUp) await ev("document.querySelector('#btnGiveUp').click(), document.querySelector('#gQuit').click()");
+  prompts = [];
+  await send('browsingContext.navigate', { context: ctx, url: 'about:blank', wait: 'complete' });
+  await sleep(500);
+  return prompts.join();
+};
+const during = await leaveAfter(false), after = await leaveAfter(true);
+check('leaving the page during a game asks first', during === 'beforeunload', during);
+check('leaving after the game doesn’t ask', after === '', after);
+await send('session.unsubscribe', { events: ['browsingContext.userPromptOpened'] });
+onEvent = () => {};
+
 // Random play: a seeded run of link clicks (sometimes a second one while the first loads), Back (sometimes during a
 // load), theme switches, peeks and path toggles. After each step the game must settle with the click count, the path
 // list, the Back stack, the article shown and the clock agreeing. A win starts the pair again. The seed is printed;

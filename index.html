@@ -126,6 +126,7 @@
   .history tr:last-child td { border-bottom: 0; }
   .history .lost { color: var(--muted); }
   .history-wrap { overflow-x: auto; }
+  .history .unit { display: none; }
   .noscript { background: var(--panel); border: 1px solid var(--target); border-radius: var(--radius-lg); padding: 14px; margin: 0 0 24px; }
   .noscript p { margin: 0; }
   .site-foot { margin-top: 36px; padding-top: 12px; border-top: 1px solid var(--line); color: var(--muted); font-size: 13px; }
@@ -133,7 +134,7 @@
   .site-foot a { color: var(--accent); }
 
   /* ---------- Game screen ---------- */
-  #game { display: grid; grid-template-rows: auto 1fr; height: 100%; }
+  #game { display: grid; grid-template-rows: auto 1fr; height: 100%; height: 100dvh; }   /* dvh: not under a phone browser's toolbars */
   .hud {
     display: flex; gap: 16px; align-items: center; padding: 8px 16px; background: var(--panel);
     border-bottom: 1px solid var(--line); flex-wrap: wrap;
@@ -142,6 +143,7 @@
   .hud .goal img { width: 32px; height: 32px; object-fit: contain; image-rendering: pixelated; }
   .hud .goal .lbl { font-size: 11px; font-weight: 700; color: var(--target); letter-spacing: .06em; text-transform: uppercase; }
   .hud .goal .name { font-weight: 650; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .hud .peek-link { margin-left: 6px; font-size: 13px; flex: none; }
   .stat { text-align: right; }
   .stat .v { font-size: 20px; font-weight: 700; line-height: 1.1; }
   .stat .k { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; }
@@ -185,7 +187,7 @@
   @keyframes spin { to { transform: rotate(360deg); } }
   /* Reaching the checkpoint: a banner over the article and a flash of the HUD objective, once the article has rendered. */
   .toast {
-    position: absolute; top: 14px; left: 50%; transform: translateX(-50%); z-index: 1; pointer-events: none;
+    position: absolute; top: 14px; inset-inline: 0; margin-inline: auto; width: fit-content; z-index: 1; pointer-events: none;
     background: var(--accent); color: var(--accent-ink); font-weight: 600; padding: 8px 16px; border-radius: var(--radius-pill);
     box-shadow: var(--shadow); max-width: calc(100% - 32px); text-align: center; animation: toast 3s ease both;
   }
@@ -212,13 +214,59 @@
     .pair, .pair.has-via { grid-template-columns: 1fr; }
     .arrow { justify-self: center; transform: rotate(90deg); }
     .mode-help { margin-left: 0; }
-    .main { grid-template-columns: 1fr; grid-template-rows: auto 1fr; }
-    .path { border-right: 0; border-bottom: 1px solid var(--line); max-height: 108px; padding: 8px 16px; }
-    .path .credit { margin-top: 4px; padding-top: 4px; }
-    .path .art { display: none; }
-    .path ol { display: flex; flex-wrap: wrap; gap: 4px 14px; padding-left: 18px; }
-    .hud { gap: 10px; padding: 8px 16px; }
+    .setup-actions .primary { flex-basis: 100%; padding: 10px 14px; }
+    /* Recent games as two or three lines per game: the route, the settings, then clicks · time · date. */
+    .history thead { display: none; }
+    .history table, .history tbody { display: block; }
+    .history tr { display: flex; flex-wrap: wrap; gap: 2px 6px; padding: 8px 12px; border-bottom: 1px solid var(--line); }
+    .history tr:last-child { border-bottom: 0; }
+    .history td { padding: 0; border: 0; }
+    .history td:nth-child(2)::before { content: '→ '; color: var(--muted); }
+    .history td:nth-child(3) { flex-basis: 100%; }
+    .history td:nth-child(n+3) { color: var(--muted); font-size: 12.5px; }
+    .history td:nth-child(n+5)::before { content: '· '; }
+    .history .unit { display: inline; }
+  }
+  /* The game on a phone held upright (a short screen on its side keeps the sidebar, below). */
+  @media (max-width: 720px) and (min-height: 501px) {
+    /* The objective gets the header's first row; clicks, time and the buttons the second. */
+    .hud { gap: 6px 14px; padding: 8px 12px; }
+    .hud .goal { flex-basis: 100%; }
+    .hud .btns { margin-left: auto; }
     .stat .v { font-size: 17px; }
+    /* The path is one line of breadcrumbs that scrolls sideways, with Hide beside it and the credit under it. */
+    .main { grid-template-columns: 1fr; grid-template-rows: auto 1fr; }
+    .path {
+      display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 4px 10px;
+      border-right: 0; border-bottom: 1px solid var(--line); padding: 6px 12px;
+    }
+    .path-head { display: contents; }
+    .path h3 { display: none; }
+    .path-toggle { grid-column: 2; grid-row: 1; }
+    .path-list { grid-column: 1; grid-row: 1; overflow: auto hidden; scrollbar-width: none; }
+    .path-list.scrolled { mask-image: linear-gradient(to right, transparent, #000 24px); }   /* more path to the left */
+    .path ol { display: flex; gap: 6px; padding: 0; list-style: none; white-space: nowrap; }
+    .path li { padding: 0; word-break: normal; }
+    .path li + li::before { content: '→'; margin-right: 6px; color: var(--muted); font-weight: 400; font-style: normal; }
+    .path .credit { grid-column: 1 / -1; margin: 0; padding: 0; border: 0; font-size: 11.5px; }
+    .path .art { display: none; }
+    .main.collapsed .path { display: flex; }
+    .toast { top: 10px; font-size: 13.5px; padding: 6px 14px; }
+  }
+  @media (max-width: 480px) { .modal .peek { flex-direction: column; } }   /* the description gets the dialog's width */
+  /* Touch screens: bigger tap targets for the small controls, and 16 px inputs, as smaller text makes iOS zoom the
+     page on focus. */
+  @media (pointer: coarse) {
+    input, select { font-size: 16px; }
+    .path-toggle { min-height: 32px; padding: 4px 12px; }
+    .hud .peek-link { min-height: 32px; }
+  }
+  /* A phone on its side: a narrower path and a shorter header, leaving the article most of the screen. */
+  @media (max-height: 500px) {
+    .main { grid-template-columns: 160px 1fr; }
+    .path { padding: 8px 10px; }
+    .path .art { display: none; }
+    .hud { padding: 4px 16px; }
   }
 </style>
 <!-- Without JavaScript nothing on the setup screen works, so only the heading, the notice and the footer are shown. -->
@@ -319,7 +367,7 @@ const THEMES = [...new Set(['auto', 'light', 'dark', ...Array.from(document.quer
         <div class="lbl" id="hudLbl">Target</div>
         <div class="name" id="hudGoal"></div>
       </div>
-      <button class="link" id="btnPeek" style="margin-left:6px;font-size:13px">what is it?</button>
+      <button class="link peek-link" id="btnPeek">what is it?</button>
     </div>
     <div class="stat"><div class="v mono" id="hudClicks">0</div><div class="k">Clicks</div></div>
     <div class="stat"><div class="v mono" id="hudTime">0:00</div><div class="k">Time</div></div>
@@ -779,7 +827,7 @@ function renderHistory() {
   $('#history tbody').innerHTML = rows.slice(0, 15).map(r => `
     <tr class="${r.won ? '' : 'lost'}">
       <td>${esc(r.start)}</td><td>${esc(r.goal)}${r.via ? ` <span class="note">via ${esc(r.via)}</span>` : ''}</td><td>${esc([r.daily && `Daily ${r.daily}`, settingsText(r)].filter(Boolean).join(', '))}</td>
-      <td class="mono">${r.won ? r.clicks : r.outOfClicks ? 'out of clicks' : 'gave up'}</td>
+      <td class="mono">${r.won ? `${r.clicks}<span class="unit"> click${r.clicks === 1 ? '' : 's'}</span>` : r.outOfClicks ? 'out of clicks' : 'gave up'}</td>
       <td class="mono">${fmtTime(r.ms)}</td>
       <td>${esc(new Date(r.at).toLocaleDateString())}</td>
     </tr>`).join('');
@@ -819,8 +867,12 @@ function renderHud() {
   $('#btnGiveUp').disabled = game.loading || !game.active;
   $('#pathList').innerHTML = game.path.map((p, i) =>
     `<li class="${i === game.path.length - 1 ? 'cur' : ''} ${p.back ? 'back' : ''} ${p.via ? 'via' : ''}">${esc(p.title)}${p.back ? ' (back)' : ''}${p.via ? ' ✓ checkpoint' : ''}</li>`).join('');
-  const pl = $('.path-list'); pl.scrollTop = pl.scrollHeight;
+  scrollPathToEnd();
 }
+// Keeps the newest entry in view: at the bottom of the sidebar, or at the end of the one-line path on phones, whose
+// left edge fades while there is more of it to the left.
+function scrollPathToEnd() { const pl = $('.path-list'); pl.scrollTop = pl.scrollHeight; pl.scrollLeft = pl.scrollWidth; markPathScroll(); }
+function markPathScroll() { const pl = $('.path-list'); pl.classList.toggle('scrolled', pl.scrollLeft > 0); }
 
 // What the player is heading for: the checkpoint until it is reached, then the target.
 const objective = () => game.via && !game.viaReached ? game.via : game.goal;
@@ -1042,15 +1094,18 @@ ${WIKI_STYLES.map(h => `<link rel="stylesheet" href="${esc(h)}">`).join('\n')}
   html:has(body.wgl-theme-dark), body.wgl-theme-dark { background: #121212 !important; }
   body { margin: 0; }
   #content { margin: 0 !important; border: 0 !important; padding: 20px 28px 60px !important; max-width: 1200px; background: transparent !important; }
+  @media (max-width: 600px) { #content { padding: 14px 14px 60px !important; } }
   .mw-editsection, iframe, .embedvideo, .mw-ext-embedvideo, audio, video { display: none !important; }
   a.mwg-dead { color: inherit !important; text-decoration: none !important; cursor: not-allowed; opacity: .6; }
   a.mwg-dead img { opacity: 1; }
   /* A live text link gets a tint of its own colour on hover, so it stands out from the dead ones around it. On a link
      around an image the tint would only cover a strip of its line box. */
   a.mwg-live { cursor: pointer; border-radius: 3px; box-decoration-break: clone; transition: background-color .1s, box-shadow .1s; }
-  a.mwg-live:not(:has(img)):hover {
-    background-color: color-mix(in srgb, currentColor 14%, transparent);
-    box-shadow: 0 0 0 2px color-mix(in srgb, currentColor 14%, transparent);
+  @media (hover: hover) {   /* on a touch screen the tint would stay on the tapped link */
+    a.mwg-live:not(:has(img)):hover {
+      background-color: color-mix(in srgb, currentColor 14%, transparent);
+      box-shadow: 0 0 0 2px color-mix(in srgb, currentColor 14%, transparent);
+    }
   }
   /* Links to articles already on the path, in a visited-link purple with a dotted underline, or a dotted outline around
      an image (the browser can't track visits inside the frame). Links the wiki colours specially keep their colour. */
@@ -1185,10 +1240,12 @@ function setPathCollapsed(on) {
   b.title = on ? 'Show your path' : 'Hide your path';
   b.setAttribute('aria-expanded', String(!on));
   // renderHud can't scroll the list while it is hidden, so it opens at the current article.
-  if (!on) { const pl = $('.path-list'); pl.scrollTop = pl.scrollHeight; }
+  if (!on) scrollPathToEnd();
 }
 setPathCollapsed(store.get('mwg.pathCollapsed', false));
 $('#btnPath').onclick = () => setPathCollapsed(!pathCollapsed);
+$('.path-list').addEventListener('scroll', markPathScroll, { passive: true });
+addEventListener('resize', scrollPathToEnd);   // turning a phone switches between the sidebar and the one-line path
 $('#themeSelect').innerHTML = THEMES.map(t => `<option value="${esc(t)}">${esc(THEME_LABELS[t] || t)}</option>`).join('');
 $('#themeSelect').value = document.documentElement.dataset.theme || 'auto';
 $('#themeSelect').onchange = e => setTheme(e.target.value);

@@ -62,6 +62,25 @@ await shot('2b-collapsed');
 await ev("document.querySelector('#btnPath').click()");
 check('expanding the path shows it again', await ev(`${shown('#pathList')} && store.get('mwg.pathCollapsed') === false`) && await frameWidth() === wide);
 
+// At phone size: the objective's name and "what is it?" don't overlap, the path is one line, nothing scrolls the page
+// sideways, and a wide wiki table scrolls within itself so its links stay reachable.
+await send('browsingContext.setViewport', { context: ctx, viewport: { width: 390, height: 844 } });
+await sleep(500);
+const overlap = (a, b) => `(r => (s => r.right > s.left && s.right > r.left && r.bottom > s.top && s.bottom > r.top)(document.querySelector('${b}').getBoundingClientRect()))(document.querySelector('${a}').getBoundingClientRect())`;
+const phone = JSON.parse(await ev(`JSON.stringify({ labelOverPeek: ${overlap('#hudLbl', '#btnPeek')}, nameOverPeek: ${overlap('#hudGoal', '#btnPeek')},
+  nameCut: document.querySelector('#hudGoal').scrollWidth > document.querySelector('#hudGoal').clientWidth,
+  pathLine: document.querySelector('#pathList').getBoundingClientRect().height, pageScroll: document.documentElement.scrollWidth - document.documentElement.clientWidth })`));
+const phoneCtx = await frameCtx();
+const phoneFrame = JSON.parse(await ev(`JSON.stringify({ pageScroll: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+  tableScrolls: (t => !!t && (t.scrollLeft = 50, t.scrollLeft > 0))([...document.querySelectorAll('table')].find(t => t.scrollWidth > t.clientWidth + 20 && /auto|scroll/.test(getComputedStyle(t).overflowX))) })`, phoneCtx));
+check('phone: the objective and "what is it?" fit without overlapping', !phone.labelOverPeek && !phone.nameOverPeek && !phone.nameCut, JSON.stringify(phone));
+check('phone: the path is one line and nothing scrolls the page sideways', phone.pathLine < 30 && phone.pageScroll <= 0 && phoneFrame.pageScroll <= 0,
+  JSON.stringify({ ...phone, frame: phoneFrame }));
+check('phone: a wide wiki table scrolls within itself', phoneFrame.tableScrolls);
+await shot('2c-phone');
+await send('browsingContext.setViewport', { context: ctx, viewport: { width: 1280, height: 860 } });
+await sleep(300);
+
 let f = await frameCtx();
 const links = JSON.parse(await ev("JSON.stringify({ live: document.querySelectorAll('a.mwg-live').length, tutorial: document.querySelectorAll('a[href^=\"/w/Tutorial:\"]').length, tutorialLive: document.querySelectorAll('a.mwg-live[href^=\"/w/Tutorial:\"]').length, sheets: document.styleSheets.length })", f));
 check('article links are clickable', links.live > 100, `live=${links.live}`);

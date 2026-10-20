@@ -71,7 +71,8 @@
   .art[src*="/thumb/"] { mask-image: radial-gradient(closest-side, #000 65%, transparent); }   /* softens a screenshot's hard edges */
 
   /* ---------- Setup screen ---------- */
-  #setup { max-width: 860px; margin: 0 auto; padding: 32px 16px 48px; }
+  #setup { max-width: 1200px; margin: 0 auto; padding: 32px 16px 48px; }
+  #setup .sub, .mode-help, .noscript { max-width: 760px; }   /* the cards use the width, prose keeps a readable line */
   .setup-head { display: flex; justify-content: space-between; align-items: baseline; gap: 4px 16px; flex-wrap: wrap; }
   #setup h1 { font-size: 28px; margin: 0 0 4px; letter-spacing: -.01em; }
   .theme-pick { color: var(--muted); font-size: 13.5px; }
@@ -89,12 +90,11 @@
   .mode-help { color: var(--muted); font-size: 13px; margin: -6px 0 18px 54px; }
   .pair { display: grid; grid-template-columns: 1fr auto 1fr; gap: 12px; align-items: stretch; }
   .pair.has-via { grid-template-columns: 1fr auto 1fr auto 1fr; }
-  .pair.has-via .card input[type=text] { flex-basis: 100%; }   /* three cards are too narrow for button and input side by side */
   .arrow { align-self: center; font-size: 22px; color: var(--muted); }
   .card {
     background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius-lg); padding: 14px;
     box-shadow: var(--shadow); display: flex; flex-direction: column; gap: 8px; min-height: 230px;
-    position: relative; overflow: hidden; isolation: isolate;
+    position: relative; overflow: hidden; isolation: isolate; container-type: inline-size;
   }
   .card .tag { font-size: 12px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; }
   .card.start .tag { color: var(--accent); }
@@ -103,11 +103,16 @@
   .card .row { display: flex; gap: 12px; align-items: flex-start; }
   .card img { width: 72px; height: 72px; object-fit: contain; image-rendering: pixelated; flex: none; }
   .card img.art { width: 220px; height: 220px; right: -28px; bottom: -28px; }
-  .card .title { font-size: 19px; font-weight: 650; margin: 0; }
+  .card .title { font-size: 19px; font-weight: 650; margin: 0; overflow-wrap: anywhere; }
   .card .desc { color: var(--muted); font-size: 13.5px; margin: 0;
     display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; }
   .card .actions { margin-top: auto; display: flex; gap: 8px; flex-wrap: wrap; }
   .card input[type=text] { flex: 1; min-width: 0; padding: 6px 10px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--bg); }
+  /* A narrow card (three side by side in a smaller window) puts the picture above the text and the input under the button. */
+  @container (max-width: 300px) {
+    .card .row { flex-direction: column; gap: 8px; }
+    .card input[type=text] { flex-basis: 100%; }
+  }
   .setup-actions { display: flex; gap: 10px; align-items: center; margin-top: 20px; flex-wrap: wrap; }
   .status { color: var(--muted); font-size: 13.5px; }
   .status.err { color: var(--target); }
@@ -205,7 +210,6 @@
 
   @media (max-width: 720px) {
     .pair, .pair.has-via { grid-template-columns: 1fr; }
-    .pair.has-via .card input[type=text] { flex-basis: auto; }
     .arrow { justify-self: center; transform: rotate(90deg); }
     .mode-help { margin-left: 0; }
     .main { grid-template-columns: 1fr; grid-template-rows: auto 1fr; }

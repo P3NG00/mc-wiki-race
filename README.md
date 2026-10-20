@@ -1,8 +1,10 @@
-# Minecraft Wiki Game
+# MC Wiki Race
 
-A [Wiki Game](https://www.thewikigame.com/) for [minecraft.wiki](https://minecraft.wiki): you get a random start article and a target article, and have to reach the target by clicking only the links inside articles. Fewest clicks and fastest time win.
+A wiki race (like [The Wiki Game](https://www.thewikigame.com/)) through [minecraft.wiki](https://minecraft.wiki): you get a random start article and a target article, and have to reach the target by clicking only the links inside articles. Fewest clicks and fastest time win.
 
-The whole game is one `index.html`, with no build step and no dependencies. Articles are fetched live from the minecraft.wiki API.
+Play it at **[mcwikirace.com](https://mcwikirace.com/)**.
+
+The whole game is one `index.html`, with no build step and no dependencies. Next to it are only the icon (`favicon.ico`, `apple-touch-icon.png`) and the link-preview image (`og-image.png`). Articles are fetched live from the minecraft.wiki API.
 
 ## Playing
 
@@ -30,10 +32,10 @@ Open `index.html` in a browser. Opening it straight from disk (`file://`) works 
 
 ## Hosting
 
-Serve `index.html` as a static file. To add a theme without editing it, put a stylesheet in its `<head>` marked with `data-mwg-theme`. It shows up in the theme picker, and `data-mwg-default` makes it the default:
+Serve `index.html` as a static file, with `favicon.ico`, `apple-touch-icon.png` and `og-image.png` next to it. Its `canonical` link and Open Graph tags point at https://mcwikirace.com/, so search engines treat other copies as duplicates of that one. To add a theme without editing it, put a stylesheet in its `<head>` marked with `data-mwr-theme`. It shows up in the theme picker, and `data-mwr-default` makes it the default:
 
 ```html
-<link rel="stylesheet" href="my-theme.css" data-mwg-theme="My site" data-mwg-default>
+<link rel="stylesheet" href="my-theme.css" data-mwr-theme="My site" data-mwr-default>
 ```
 
 ```css
@@ -62,5 +64,7 @@ See `CLAUDE.md` for how the game works internally.
 ## License
 
 [MIT](LICENSE). Article content shown in the game comes from [minecraft.wiki](https://minecraft.wiki), is licensed under [CC BY-NC-SA 3.0](https://creativecommons.org/licenses/by-nc-sa/3.0/) unless noted otherwise on the wiki, and is not covered by this license. The game credits it in the footer and with a link to each article it shows.
+
+MC Wiki Race is not an official Minecraft product, and is not approved by or associated with Mojang or Microsoft. Contact: [BryantF.xyz+mcwikirace@gmail.com](mailto:BryantF.xyz+mcwikirace@gmail.com).
 
 Not an official Minecraft product. Not affiliated with or endorsed by Mojang Studios, Microsoft, Minecraft or minecraft.wiki.

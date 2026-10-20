@@ -3,7 +3,21 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Minecraft Wiki Game</title>
+<title>MC Wiki Race: a wiki race through the Minecraft Wiki</title>
+<meta name="description" content="Race from one Minecraft Wiki article to another using only the links inside them. Daily challenge, extra rules and challenge links. Free, no sign-up.">
+<link rel="canonical" href="https://mcwikirace.com/">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://mcwikirace.com/">
+<meta property="og:site_name" content="MC Wiki Race">
+<meta property="og:title" content="MC Wiki Race">
+<meta property="og:description" content="Race from one Minecraft Wiki article to another using only the links inside them. Daily challenge, extra rules and challenge links. Free, no sign-up.">
+<meta property="og:image" content="https://mcwikirace.com/og-image.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="MC Wiki Race: a wiki race through the Minecraft Wiki, from a start article to a target article">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" href="favicon.ico" sizes="16x16 32x32 48x48">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
 <style>
   :root {
     --bg: #f3f1ea;
@@ -275,12 +289,12 @@
 <body>
 <script id="theme-boot">
 // Runs before first paint, after any theme stylesheets the host page added to <head> (see setTheme).
-// Applies the saved theme if it still exists, else the one marked data-mwg-default, else Auto.
-const THEMES = [...new Set(['auto', 'light', 'dark', ...Array.from(document.querySelectorAll('[data-mwg-theme]'), el => el.dataset.mwgTheme)])];
+// Applies the saved theme if it still exists, else the one marked data-mwr-default, else Auto.
+const THEMES = [...new Set(['auto', 'light', 'dark', ...Array.from(document.querySelectorAll('[data-mwr-theme]'), el => el.dataset.mwrTheme)])];
 {
   let saved;
-  try { saved = JSON.parse(localStorage.getItem('mwg.theme')); } catch { /* storage unavailable */ }
-  const t = THEMES.includes(saved) ? saved : document.querySelector('[data-mwg-theme][data-mwg-default]')?.dataset.mwgTheme || 'auto';
+  try { saved = JSON.parse(localStorage.getItem('mwr.theme')); } catch { /* storage unavailable */ }
+  const t = THEMES.includes(saved) ? saved : document.querySelector('[data-mwr-theme][data-mwr-default]')?.dataset.mwrTheme || 'auto';
   if (t !== 'auto') document.documentElement.dataset.theme = t;
 }
 </script>
@@ -288,10 +302,10 @@ const THEMES = [...new Set(['auto', 'light', 'dark', ...Array.from(document.quer
 <!-- ======================= SETUP ======================= -->
 <section id="setup">
   <div class="setup-head">
-    <h1>Minecraft Wiki Game</h1>
+    <h1>MC Wiki Race</h1>
     <label class="theme-pick">Theme <select id="themeSelect"></select></label>
   </div>
-  <p class="sub">Get from the start article to the target article using only links inside minecraft.wiki articles. Fewest clicks and fastest time wins.</p>
+  <p class="sub">A wiki race through the Minecraft Wiki: get from the start article to the target article using only the links inside articles. Fewest clicks and fastest time wins.</p>
   <noscript><div class="noscript"><p><strong>This game needs JavaScript.</strong> It fetches articles from minecraft.wiki as you play, so turn JavaScript on for this page and reload it.</p></div></noscript>
 
   <div class="modes" role="radiogroup" aria-label="Article pool">
@@ -352,7 +366,8 @@ const THEMES = [...new Set(['auto', 'light', 'dark', ...Array.from(document.quer
   </div>
 
   <footer class="site-foot">
-    <p><a href="https://github.com/P3NG00/minecraft-wiki-game">Source on GitHub</a> · MIT License</p>
+    <p>Made and run by P3NG00 · Contact: <a href="mailto:BryantF.xyz+mcwikirace@gmail.com">BryantF.xyz+mcwikirace@gmail.com</a></p>
+    <p><a href="https://github.com/P3NG00/mc-wiki-race">Source on GitHub</a> · MIT License</p>
     <p>Articles and images are from <a href="https://minecraft.wiki">minecraft.wiki</a>. Article text is licensed under <a href="https://creativecommons.org/licenses/by-nc-sa/3.0/">CC BY-NC-SA 3.0</a> unless noted otherwise on the wiki.</p>
     <p>Not an official Minecraft product. Not affiliated with or endorsed by Mojang Studios, Microsoft, Minecraft or minecraft.wiki.</p>
   </footer>
@@ -809,7 +824,7 @@ async function loadDaily(date = today()) {
     setRules([rule]);
     syncVia();
     keys.forEach(renderCard);
-    const done = store.get('mwg.history', []).find(r => r.daily === date && r.won);
+    const done = store.get('mwr.history', []).find(r => r.daily === date && r.won);
     setStatus(`Daily challenge for ${date}, with ${RULES[rule].label}.` + (done ? ` You did it in ${done.clicks} clicks (${fmtTime(done.ms)}).` : ' Press Start when ready.'));
   });
 }
@@ -822,7 +837,7 @@ function challengeLink() {
 }
 
 function renderHistory() {
-  const rows = store.get('mwg.history', []);
+  const rows = store.get('mwr.history', []);
   $('#history').classList.toggle('hidden', rows.length === 0);
   $('#history tbody').innerHTML = rows.slice(0, 15).map(r => `
     <tr class="${r.won ? '' : 'lost'}">
@@ -984,9 +999,9 @@ function frameReady(token) {
 
 // ---------------------------------------------------------------- Themes
 // Auto (no data-theme attribute) follows the OS. The page serving the game can add themes with
-// <link rel="stylesheet" data-mwg-theme="Name"> or <style data-mwg-theme="Name"> in <head>, defining
+// <link rel="stylesheet" data-mwr-theme="Name"> or <style data-mwr-theme="Name"> in <head>, defining
 // :root[data-theme="Name"] { --bg: …; color-scheme: dark; } (any variable left out keeps its light value).
-// data-mwg-default on one makes it the default. The names auto, light and dark are the built-in themes'.
+// data-mwr-default on one makes it the default. The names auto, light and dark are the built-in themes'.
 // THEMES and the initial theme come from #theme-boot.
 const THEME_LABELS = { auto: 'Auto', light: 'Light', dark: 'Dark' };
 // The wiki's body classes for its two themes: set in the article's srcdoc, swapped by the frame script.
@@ -995,7 +1010,7 @@ const WGL_THEME_CLASSES = { dark: ['wgl-darkmode', 'wgl-theme-dark'], light: ['w
 function setTheme(t) {
   if (t === 'auto') delete document.documentElement.dataset.theme;
   else document.documentElement.dataset.theme = t;
-  store.set('mwg.theme', t);
+  store.set('mwr.theme', t);
   syncFrameTheme();
 }
 
@@ -1007,7 +1022,7 @@ function themeIsDark() {
 }
 
 // Restyles the loaded article in place. Also sent when a frame reports ready, in case the theme changed while it loaded.
-function syncFrameTheme() { $('#frame').contentWindow?.postMessage({ mwg: 'theme', dark: themeIsDark() }, '*'); }
+function syncFrameTheme() { $('#frame').contentWindow?.postMessage({ mwr: 'theme', dark: themeIsDark() }, '*'); }
 
 // blocked: titles whose links are dead for this game (No hubs). seen: titles visited this game, whose links are marked.
 function renderArticle(page, fragment, token, blocked = [], seen = []) {
@@ -1048,10 +1063,10 @@ function renderArticle(page, fragment, token, blocked = [], seen = []) {
     // <area> covers image maps (ImageMap extension).
     for (const a of document.querySelectorAll('a, area')) {
       const c = classify(a);
-      if (!c || c.kind === 'blocked') a.classList.add('mwg-dead');
-      else if (c.kind === 'article') a.classList.add('mwg-live');
+      if (!c || c.kind === 'blocked') a.classList.add('mwr-dead');
+      else if (c.kind === 'article') a.classList.add('mwr-live');
       if (c?.kind === 'blocked') a.title = 'Off limits: No hubs';
-      if (c?.seen) { a.classList.add('mwg-seen'); a.title = (a.title ? a.title + ' · ' : '') + 'already on your path'; }
+      if (c?.seen) { a.classList.add('mwr-seen'); a.title = (a.title ? a.title + ' · ' : '') + 'already on your path'; }
       a.removeAttribute('target');
     }
     document.addEventListener('click', e => {
@@ -1061,12 +1076,12 @@ function renderArticle(page, fragment, token, blocked = [], seen = []) {
       const c = classify(a);
       if (!c || c.kind === 'blocked') return;
       if (c.kind === 'anchor') scrollToId(c.id);
-      else parent.postMessage({ mwg: 'nav', title: c.title, frag: c.frag }, '*');
+      else parent.postMessage({ mwr: 'nav', title: c.title, frag: c.frag }, '*');
     }, true);
     document.addEventListener('submit', e => e.preventDefault(), true);
-    document.addEventListener('keydown', e => parent.postMessage({ mwg: 'key', key: e.key }, '*'));
+    document.addEventListener('keydown', e => parent.postMessage({ mwr: 'key', key: e.key }, '*'));
     addEventListener('message', e => {
-      if (e.source !== parent || e.data?.mwg !== 'theme') return;
+      if (e.source !== parent || e.data?.mwr !== 'theme') return;
       for (const c of WGL.dark) document.body.classList.toggle(c, e.data.dark);
       for (const c of WGL.light) document.body.classList.toggle(c, !e.data.dark);
     });
@@ -1078,13 +1093,13 @@ function renderArticle(page, fragment, token, blocked = [], seen = []) {
 <base href="${WIKI}/">
 <script>
   // Ahead of the stylesheets, so it runs without waiting for them and sees images that fail while the body is parsed.
-  // A failed image is loaded again once after a pause. If that fails too, mwg-broken hides its alt text, which would
+  // A failed image is loaded again once after a pause. If that fails too, mwr-broken hides its alt text, which would
   // otherwise run out of the image's box (on inventory icons it is a whole sentence).
   document.addEventListener('error', e => {
     const img = e.target;
     if (img.tagName !== 'IMG') return;
-    if (img.mwgRetried) { img.classList.add('mwg-broken'); return; }
-    img.mwgRetried = true;
+    if (img.mwrRetried) { img.classList.add('mwr-broken'); return; }
+    img.mwrRetried = true;
     setTimeout(() => img.setAttribute('src', img.getAttribute('src')), 2000);
   }, true);
 <\/script>
@@ -1096,25 +1111,25 @@ ${WIKI_STYLES.map(h => `<link rel="stylesheet" href="${esc(h)}">`).join('\n')}
   #content { margin: 0 !important; border: 0 !important; padding: 20px 28px 60px !important; max-width: 1200px; background: transparent !important; }
   @media (max-width: 600px) { #content { padding: 14px 14px 60px !important; } }
   .mw-editsection, iframe, .embedvideo, .mw-ext-embedvideo, audio, video { display: none !important; }
-  a.mwg-dead { color: inherit !important; text-decoration: none !important; cursor: not-allowed; opacity: .6; }
-  a.mwg-dead img { opacity: 1; }
+  a.mwr-dead { color: inherit !important; text-decoration: none !important; cursor: not-allowed; opacity: .6; }
+  a.mwr-dead img { opacity: 1; }
   /* A live text link gets a tint of its own colour on hover, so it stands out from the dead ones around it. On a link
      around an image the tint would only cover a strip of its line box. */
-  a.mwg-live { cursor: pointer; border-radius: 3px; box-decoration-break: clone; transition: background-color .1s, box-shadow .1s; }
+  a.mwr-live { cursor: pointer; border-radius: 3px; box-decoration-break: clone; transition: background-color .1s, box-shadow .1s; }
   @media (hover: hover) {   /* on a touch screen the tint would stay on the tapped link */
-    a.mwg-live:not(:has(img)):hover {
+    a.mwr-live:not(:has(img)):hover {
       background-color: color-mix(in srgb, currentColor 14%, transparent);
       box-shadow: 0 0 0 2px color-mix(in srgb, currentColor 14%, transparent);
     }
   }
   /* Links to articles already on the path, in a visited-link purple with a dotted underline, or a dotted outline around
      an image (the browser can't track visits inside the frame). Links the wiki colours specially keep their colour. */
-  a.mwg-seen { color: #6a60b0; text-decoration: underline dotted; }
-  body.wgl-theme-dark a.mwg-seen { color: #a99cf0; }
-  a.mwg-seen:has(img) { outline: 2px dotted #6a60b0; outline-offset: 1px; }
-  body.wgl-theme-dark a.mwg-seen:has(img) { outline-color: #a99cf0; }
-  .mwg-live:focus-visible { outline: 2px solid currentColor; outline-offset: 1px; }
-  img.mwg-broken { display: inline-block; overflow: hidden; color: transparent; }
+  a.mwr-seen { color: #6a60b0; text-decoration: underline dotted; }
+  body.wgl-theme-dark a.mwr-seen { color: #a99cf0; }
+  a.mwr-seen:has(img) { outline: 2px dotted #6a60b0; outline-offset: 1px; }
+  body.wgl-theme-dark a.mwr-seen:has(img) { outline-color: #a99cf0; }
+  .mwr-live:focus-visible { outline: 2px solid currentColor; outline-offset: 1px; }
+  img.mwr-broken { display: inline-block; overflow: hidden; color: transparent; }
   ${noNav ? '.navbox, .mw-heading:has(> #Navigation) { display: none !important; }' : ''}
 </style>
 </head><body class="mediawiki ltr sitedir-ltr ns-0 ns-subject skin-vector skin-vector-legacy action-view ${WGL_THEME_CLASSES[dark ? 'dark' : 'light'].join(' ')}">
@@ -1123,16 +1138,16 @@ ${WIKI_STYLES.map(h => `<link rel="stylesheet" href="${esc(h)}">`).join('\n')}
   <div id="bodyContent" class="vector-body"><div id="mw-content-text" class="mw-body-content mw-content-ltr">${page.text}</div></div>
 </div>
 <script>${frameScript}<\/script>
-<script>parent.postMessage({ mwg: 'ready', token: ${token} }, '*');<\/script>
+<script>parent.postMessage({ mwr: 'ready', token: ${token} }, '*');<\/script>
 </body></html>`;
   $('#frame').srcdoc = html;
 }
 
 window.addEventListener('message', e => {
   if (e.source !== $('#frame').contentWindow || !e.data) return;
-  if (e.data.mwg === 'nav') navigate(e.data.title, e.data.frag);
-  if (e.data.mwg === 'ready') { syncFrameTheme(); frameReady(e.data.token); }
-  if (e.data.mwg === 'key' && e.data.key === 'Escape' && modalDismissable) closeModal();
+  if (e.data.mwr === 'nav') navigate(e.data.title, e.data.frag);
+  if (e.data.mwr === 'ready') { syncFrameTheme(); frameReady(e.data.token); }
+  if (e.data.mwr === 'key' && e.data.key === 'Escape' && modalDismissable) closeModal();
 });
 
 function goBack() {
@@ -1150,11 +1165,11 @@ function finish(won, outOfClicks = false) {
   const rec = { start: game.start.title, goal: game.goal.title, ...(game.via && { via: game.via.title }), ...(game.daily && { daily: game.daily }),
     ...(game.goal.difficulty && { difficulty: game.goal.difficulty, topic: game.goal.topic }), rules: game.rules, won, ...(outOfClicks && { outOfClicks }), clicks: clicks(), ms, at: Date.now(), path: game.path.map(p => p.title) };
   const settingsNote = settingsText(rec);
-  const hist = store.get('mwg.history', []);
+  const hist = store.get('mwr.history', []);
   const best = hist.filter(r => r.won && r.start === rec.start && r.goal === rec.goal && r.via === rec.via && sameRules(r, rec))
     .sort((a, b) => a.clicks - b.clicks || a.ms - b.ms)[0];
   hist.unshift(rec);
-  store.set('mwg.history', hist.slice(0, 50));
+  store.set('mwr.history', hist.slice(0, 50));
 
   const route = [rec.start, rec.via, rec.goal].filter(Boolean).join(' → ');
   const pathHtml = game.path.map(p => `<li><a href="${esc(wikiUrl(p.title))}" target="_blank" rel="noopener">${esc(p.title)}</a>${p.back ? ' <span class="note">(back)</span>' : ''}${p.via ? ' <span class="note">(checkpoint)</span>' : ''}</li>`).join('');
@@ -1181,7 +1196,7 @@ function finish(won, outOfClicks = false) {
       <button class="primary" id="mNew">New game</button>
     </div>`, false);
   $('#mCopy').onclick = async () => {
-    const text = `Minecraft Wiki Game${rec.daily ? ` daily ${rec.daily}` : ''}: ${route}${settingsNote ? ` (${settingsNote})` : ''}\n` +
+    const text = `MC Wiki Race${rec.daily ? ` daily ${rec.daily}` : ''}: ${route}${settingsNote ? ` (${settingsNote})` : ''}\n` +
       (won ? `${rec.clicks} clicks in ${fmtTime(ms)}\n` : `${outOfClicks ? 'Out of clicks' : 'Gave up'} after ${fmtTime(ms)}\n`) +
       rec.path.join(' → ');
     try { await navigator.clipboard.writeText(text); $('#mCopy').textContent = 'Copied!'; }
@@ -1233,7 +1248,7 @@ $('#rules').addEventListener('change', () => {
 let pathCollapsed = false;
 function setPathCollapsed(on) {
   pathCollapsed = on;
-  store.set('mwg.pathCollapsed', on);
+  store.set('mwr.pathCollapsed', on);
   $('.main').classList.toggle('collapsed', on);
   const b = $('#btnPath');
   b.textContent = on ? 'Your path' : 'Hide';
@@ -1242,7 +1257,7 @@ function setPathCollapsed(on) {
   // renderHud can't scroll the list while it is hidden, so it opens at the current article.
   if (!on) scrollPathToEnd();
 }
-setPathCollapsed(store.get('mwg.pathCollapsed', false));
+setPathCollapsed(store.get('mwr.pathCollapsed', false));
 $('#btnPath').onclick = () => setPathCollapsed(!pathCollapsed);
 $('.path-list').addEventListener('scroll', markPathScroll, { passive: true });
 addEventListener('resize', scrollPathToEnd);   // turning a phone switches between the sidebar and the one-line path
@@ -1274,11 +1289,11 @@ $('#btnGiveUp').onclick = () => {
   $('#gQuit').onclick = () => { $('#modalBg').classList.add('hidden'); finish(false); };
 };
 $('#btnClearHistory').onclick = () => {
-  const n = store.get('mwg.history', []).length;
+  const n = store.get('mwr.history', []).length;
   openModal(`<h2>Clear history?</h2><p>This deletes ${n === 1 ? 'the 1 recorded game' : `all ${n} recorded games`}, personal bests and dailies included. It can’t be undone.</p>
     <div class="actions"><button id="hKeep">Cancel</button><button class="primary" id="hClear">Clear history</button></div>`);
   $('#hKeep').onclick = closeModal;
-  $('#hClear').onclick = () => { store.set('mwg.history', []); renderHistory(); closeModal(); };
+  $('#hClear').onclick = () => { store.set('mwr.history', []); renderHistory(); closeModal(); };
 };
 $('#btnPeek').onclick = () => {
   const g = objective();

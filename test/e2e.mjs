@@ -56,11 +56,11 @@ const frameWidth = () => ev("document.querySelector('#frame').clientWidth");
 const wide = await frameWidth();
 await ev("document.querySelector('#btnPath').click()");
 const shown = sel => `!!document.querySelector('${sel}').offsetParent`;
-check('collapsing the path hides it and keeps the credit', await ev(`!${shown('#pathList')} && ${shown('#credit')} && store.get('mwg.pathCollapsed') === true`) &&
+check('collapsing the path hides it and keeps the credit', await ev(`!${shown('#pathList')} && ${shown('#credit')} && store.get('mwr.pathCollapsed') === true`) &&
   await frameWidth() > wide, `frame ${wide} -> ${await frameWidth()}`);
 await shot('2b-collapsed');
 await ev("document.querySelector('#btnPath').click()");
-check('expanding the path shows it again', await ev(`${shown('#pathList')} && store.get('mwg.pathCollapsed') === false`) && await frameWidth() === wide);
+check('expanding the path shows it again', await ev(`${shown('#pathList')} && store.get('mwr.pathCollapsed') === false`) && await frameWidth() === wide);
 
 // At phone size: the objective's name and "what is it?" don't overlap, the path is one line, nothing scrolls the page
 // sideways, and a wide wiki table scrolls within itself so its links stay reachable.
@@ -82,13 +82,13 @@ await send('browsingContext.setViewport', { context: ctx, viewport: { width: 128
 await sleep(300);
 
 let f = await frameCtx();
-const links = JSON.parse(await ev("JSON.stringify({ live: document.querySelectorAll('a.mwg-live').length, tutorial: document.querySelectorAll('a[href^=\"/w/Tutorial:\"]').length, tutorialLive: document.querySelectorAll('a.mwg-live[href^=\"/w/Tutorial:\"]').length, sheets: document.styleSheets.length })", f));
+const links = JSON.parse(await ev("JSON.stringify({ live: document.querySelectorAll('a.mwr-live').length, tutorial: document.querySelectorAll('a[href^=\"/w/Tutorial:\"]').length, tutorialLive: document.querySelectorAll('a.mwr-live[href^=\"/w/Tutorial:\"]').length, sheets: document.styleSheets.length })", f));
 check('article links are clickable', links.live > 100, `live=${links.live}`);
 check('Tutorial: links are disabled', links.tutorial > 0 && links.tutorialLive === 0, `tutorial=${links.tutorial}`);
 check('wiki stylesheets loaded', links.sheets >= 4, `sheets=${links.sheets}`);
 // Hovering a live link tints it. The pointer moves to the link itself (an element origin, which works inside the frame)
 // and back to the page's corner, so no later link stays hovered.
-const pickaxeLink = "[...document.querySelectorAll('a.mwg-live')].find(a => a.getAttribute('href') === '/w/Pickaxe')";
+const pickaxeLink = "[...document.querySelectorAll('a.mwr-live')].find(a => a.getAttribute('href') === '/w/Pickaxe')";
 const linkRef = (await send('script.evaluate', { target: { context: f }, expression: `(a => (a.scrollIntoView({ block: 'center' }), a))(${pickaxeLink})`, awaitPromise: false })).result?.result?.sharedId;
 const linkBg = () => ev(`getComputedStyle(${pickaxeLink}).backgroundColor`, f);
 const plainBg = await linkBg();
@@ -100,11 +100,11 @@ check('hovering a live link tints it', !!linkRef && !moved.error && /\/ 0\.14\)$
 await moveTo('viewport');
 await send('input.releaseActions', { context: ctx });
 
-await ev("[...document.querySelectorAll('a.mwg-live')].find(a => a.getAttribute('href') === '/w/Pickaxe').click()", f);
+await ev("[...document.querySelectorAll('a.mwr-live')].find(a => a.getAttribute('href') === '/w/Pickaxe').click()", f);
 check('clicking a link navigates', await until("game.path.length === 2 && !game.loading"), await ev("game.path.map(p => p.title).join(' > ')"));
 f = await frameCtx();
 const seenLinks = JSON.parse(await ev(`JSON.stringify(['Diamond', 'Iron_Pickaxe'].map(t =>
-  [...document.querySelectorAll('a.mwg-live')].filter(a => a.getAttribute('href').split('#')[0] === '/w/' + t).map(a => a.classList.contains('mwg-seen'))))`, f));
+  [...document.querySelectorAll('a.mwr-live')].filter(a => a.getAttribute('href').split('#')[0] === '/w/' + t).map(a => a.classList.contains('mwr-seen'))))`, f));
 check('links to articles on the path are marked', seenLinks[0].length > 0 && seenLinks[0].every(Boolean) &&
   seenLinks[1].length > 0 && !seenLinks[1].some(Boolean), JSON.stringify(seenLinks));
 
@@ -117,20 +117,20 @@ await ev("window.api = window.api.orig");
 
 // Switching theme restyles the loaded article in place: same document, wiki dark/light body class swapped.
 f = await frameCtx();
-await ev("window.mwgMarker = 1", f);
-const frameTheme = "(window.mwgMarker === 1 ? '' : 'reloaded ') + (document.body.classList.contains('wgl-theme-dark') ? 'dark' : 'light') + ' ' + getComputedStyle(document.documentElement).backgroundColor";
+await ev("window.mwrMarker = 1", f);
+const frameTheme = "(window.mwrMarker === 1 ? '' : 'reloaded ') + (document.body.classList.contains('wgl-theme-dark') ? 'dark' : 'light') + ' ' + getComputedStyle(document.documentElement).backgroundColor";
 await ev("setTheme('dark')");
 check('dark theme switches the article in place', await until(`${frameTheme} === 'dark rgb(18, 18, 18)'`, 5000, f) && await ev("themeIsDark()") === true, await ev(frameTheme, f));
 await ev("setTheme('light')");
 check('light theme switches the article in place', await until(`${frameTheme} === 'light rgb(255, 255, 255)'`, 5000, f) && await ev("themeIsDark()") === false, await ev(frameTheme, f));
 // A theme change made while the article is still loading reaches it once the frame reports ready.
 await ev("renderArticle(parseCache.get('Diamond'), null, game.navToken); setTheme('dark')");
-check('theme change during load is applied', await until("window.mwgMarker === undefined && document.body.classList.contains('wgl-theme-dark')", 15000, f),
+check('theme change during load is applied', await until("window.mwrMarker === undefined && document.body.classList.contains('wgl-theme-dark')", 15000, f),
   await ev(frameTheme, f));
 await ev("setTheme('auto')");
 
 f = await frameCtx();
-await ev("[...document.querySelectorAll('a.mwg-live')].find(a => /Diamond_Pickaxe/i.test(a.getAttribute('href'))).click()", f);
+await ev("[...document.querySelectorAll('a.mwr-live')].find(a => /Diamond_Pickaxe/i.test(a.getAttribute('href'))).click()", f);
 check('reaching the target wins', await until("!game.active && !document.querySelector('#modalBg').classList.contains('hidden')"),
   `clicks=${await ev('clicks()')}`);
 await shot('3-win');
@@ -149,17 +149,17 @@ await ev("document.querySelector('#mSame').click()");
 await until("game.path.length === 1 && !game.loading");
 check('No Back hides Back', await ev("document.querySelector('#btnBack').classList.contains('hidden')"));
 f = await frameCtx();
-await ev("[...document.querySelectorAll('a.mwg-live')].find(a => a.getAttribute('href') === '/w/Pickaxe').click()", f);
+await ev("[...document.querySelectorAll('a.mwr-live')].find(a => a.getAttribute('href') === '/w/Pickaxe').click()", f);
 await until("game.path.length === 2 && !game.loading");
 await ev("goBack()");
 await sleep(1000);
 check('No Back blocks goBack()', await ev("game.path.length === 2 && !game.loading"), await ev("game.path.map(p => p.title).join(' > ')"));
 f = await frameCtx();
-await ev("[...document.querySelectorAll('a.mwg-live')].find(a => /Diamond_Pickaxe/i.test(a.getAttribute('href'))).click()", f);
+await ev("[...document.querySelectorAll('a.mwr-live')].find(a => /Diamond_Pickaxe/i.test(a.getAttribute('href'))).click()", f);
 check('No Back game wins', await until("!game.active && !document.querySelector('#modalBg').classList.contains('hidden')"), `clicks=${await ev('clicks()')}`);
 const modal = await ev("document.querySelector('#modal').textContent");
-check('result records the rules', await ev("JSON.stringify(store.get('mwg.history', [])[0].rules) === '[\"noback\"]'") && modal.includes('No Back'),
-  await ev("JSON.stringify(store.get('mwg.history', [])[0].rules)"));
+check('result records the rules', await ev("JSON.stringify(store.get('mwr.history', [])[0].rules) === '[\"noback\"]'") && modal.includes('No Back'),
+  await ev("JSON.stringify(store.get('mwr.history', [])[0].rules)"));
 check('personal best ignores games with other rules', !/personal best|Your best/.test(modal));
 await ev("document.querySelector('#rules input[value=noback]').click()");
 
@@ -175,7 +175,7 @@ for (let i = 1; i <= 6; i++) {
 }
 check('running out of clicks ends the game', await until("!game.active && document.querySelector('#modal h2').textContent === 'Out of clicks'", 5000),
   await ev("game.path.map(p => p.title).join(' > ')"));
-check('result records running out of clicks', await ev("(([r]) => r.outOfClicks === true && !r.won && r.clicks === 6)(store.get('mwg.history', []))"));
+check('result records running out of clicks', await ev("(([r]) => r.outOfClicks === true && !r.won && r.clicks === 6)(store.get('mwr.history', []))"));
 await ev("document.querySelector('#rules input[value=limit]').click()");
 
 // Random rolls in both modes.
@@ -228,7 +228,7 @@ await ev("document.querySelector('#btnPlay').click()");
 await until("game.path.length === 1 && !game.loading");
 await ev("document.querySelector('#btnGiveUp').click()");
 await ev("document.querySelector('#gQuit').click()");
-const rolled = await ev("(([r]) => r.difficulty + ' ' + r.topic)(store.get('mwg.history', []))");
+const rolled = await ev("(([r]) => r.difficulty + ' ' + r.topic)(store.get('mwr.history', []))");
 check('result records difficulty and topic', rolled === 'any mobs' && await ev("document.querySelector('#modal .note').textContent.endsWith('· Mobs')"),
   `${rolled} | ${await ev("document.querySelector('#modal .note').textContent")}`);
 await ev("document.querySelector('#mNew').click()");
@@ -265,12 +265,12 @@ await ev("document.querySelector('#btnPlay').click()");
 await until("game.path.length === 1 && !game.loading");
 await sleep(1000);
 f = await frameCtx();
-const areas = JSON.parse(await ev("JSON.stringify({ all: document.querySelectorAll('area').length, live: document.querySelectorAll('area.mwg-live').length })", f));
+const areas = JSON.parse(await ev("JSON.stringify({ all: document.querySelectorAll('area').length, live: document.querySelectorAll('area.mwr-live').length })", f));
 check('image-map links are clickable', areas.live > 0, `areas=${areas.all} live=${areas.live}`);
 
 // No hubs: links to hubs and their redirects are dead, except a hub that is the target.
 // Blind target: no target picture or description on the card or in the HUD, and no peek.
-await ev("store.set('mwg.pathCollapsed', true)");   // stands in for collapsing it before the reload
+await ev("store.set('mwr.pathCollapsed', true)");   // stands in for collapsing it before the reload
 await send('browsingContext.navigate', { context: ctx, url: 'about:blank', wait: 'complete' });
 await send('browsingContext.navigate', { context: ctx, url: fileUrl + '#start=Diamond&target=Crafting&rules=nohubs,blind', wait: 'complete' });
 await until("!document.querySelector('#btnPlay').disabled");
@@ -287,7 +287,7 @@ check('Blind target hides the HUD and path pictures and peek', await ev("documen
 check('hub redirects are known', await ev("hubTitles().then(m => m.get('Blocks') === 'Block' && m.get('Mining') === 'Breaking')"));
 f = await frameCtx();
 const hubLinks = JSON.parse(await ev(`JSON.stringify(Object.fromEntries(['Item', 'Java_Edition', 'Crafting', 'Pickaxe'].map(t =>
-  [t, [...document.querySelectorAll('a[href^="/w/' + t + '"]')].filter(a => a.getAttribute('href').split('#')[0] === '/w/' + t).map(a => a.classList.contains('mwg-live') ? 'live' : 'dead')])))`, f));
+  [t, [...document.querySelectorAll('a[href^="/w/' + t + '"]')].filter(a => a.getAttribute('href').split('#')[0] === '/w/' + t).map(a => a.classList.contains('mwr-live') ? 'live' : 'dead')])))`, f));
 const allAre = (t, s) => hubLinks[t].length > 0 && hubLinks[t].every(x => x === s);
 check('No hubs disables hub links', allAre('Item', 'dead') && allAre('Java_Edition', 'dead'), JSON.stringify(hubLinks));
 check('No hubs keeps the target and other links live', allAre('Crafting', 'live') && allAre('Pickaxe', 'live'));
@@ -301,13 +301,13 @@ await until("game.path.length === 1 && !game.loading");
 f = await frameCtx();
 const nav = JSON.parse(await ev(`JSON.stringify({ boxes: document.querySelectorAll('.navbox').length,
   shown: [...document.querySelectorAll('.navbox, #Navigation')].filter(e => e.checkVisibility()).length,
-  liveInBox: document.querySelectorAll('.navbox a.mwg-live').length, live: document.querySelectorAll('a.mwg-live').length })`, f));
+  liveInBox: document.querySelectorAll('.navbox a.mwr-live').length, live: document.querySelectorAll('a.mwr-live').length })`, f));
 check('No navboxes hides navboxes and kills their links', nav.boxes > 0 && nav.shown === 0 && nav.liveInBox === 0 && nav.live > 50, JSON.stringify(nav));
 
-// A failed image is loaded again once; one that fails twice gets mwg-broken, which keeps its box and hides its alt text.
+// A failed image is loaded again once; one that fails twice gets mwr-broken, which keeps its box and hides its alt text.
 // Two icons are added to the article and their requests intercepted: the first fails once and then goes through to the
 // wiki, the second always fails.
-const icon = k => `https://minecraft.wiki/images/Invicon_Nether_Wart.png?mwg-${k}`;
+const icon = k => `https://minecraft.wiki/images/Invicon_Nether_Wart.png?mwr-${k}`;
 const tries = {};
 onEvent = d => {
   if (d.method !== 'network.beforeRequestSent' || !d.params.isBlocked) return;
@@ -324,13 +324,13 @@ await ev(`for (const k of ['retry', 'broken']) {
   img.alt = 'A long alt text that would run far out of a 32 pixel inventory slot';
   img.width = img.height = 32;
   document.body.prepend(img);
-  img.src = '/images/Invicon_Nether_Wart.png?mwg-' + k;
+  img.src = '/images/Invicon_Nether_Wart.png?mwr-' + k;
 }`, f);
 const retried = "document.getElementById('test-retry')", broken = "document.getElementById('test-broken')";
-check('a failed image is retried and loads', await until(`${retried}.naturalWidth > 0 && !${retried}.classList.contains('mwg-broken')`, 15000, f)
+check('a failed image is retried and loads', await until(`${retried}.naturalWidth > 0 && !${retried}.classList.contains('mwr-broken')`, 15000, f)
   && tries[icon('retry')] === 2, `tries=${JSON.stringify(tries)}`);
 const brokenLook = `(r => r.width + 'x' + r.height + ' ' + getComputedStyle(${broken}).color)(${broken}.getBoundingClientRect())`;
-check('an image that fails twice keeps its box and hides its alt text', await until(`${broken}.classList.contains('mwg-broken')`, 15000, f)
+check('an image that fails twice keeps its box and hides its alt text', await until(`${broken}.classList.contains('mwr-broken')`, 15000, f)
   && await ev(`${brokenLook} === '32x32 rgba(0, 0, 0, 0)'`, f) && tries[icon('broken')] === 2,
   `${await ev(brokenLook, f)} tries=${JSON.stringify(tries)}`);
 await shot('5-broken-image');
@@ -353,7 +353,7 @@ await ev("document.querySelector('#btnPlay').click()");
 await until("game.path.length === 1 && !game.loading");
 await ev("document.querySelector('#btnGiveUp').click()");
 await ev("document.querySelector('#gQuit').click()");
-check('daily result is recorded', await ev("(r => r.daily === '2026-01-02' && r.via === setup.via.title && r.rules.join() === 'checkpoint')(store.get('mwg.history', [])[0]) && document.querySelector('#modal').textContent.includes('Daily 2026-01-02')"));
+check('daily result is recorded', await ev("(r => r.daily === '2026-01-02' && r.via === setup.via.title && r.rules.join() === 'checkpoint')(store.get('mwr.history', [])[0]) && document.querySelector('#modal').textContent.includes('Daily 2026-01-02')"));
 await ev("document.querySelector('#mNew').click()");
 check('rerolling leaves the daily pair', await ev('setup.daily === null'));
 check('history marks the daily', await ev("document.querySelector('#history tbody tr').textContent.includes('Daily 2026-01-02, Checkpoint')"));
@@ -371,38 +371,38 @@ await until("!document.querySelector('#btnPlay').disabled");
 check('challenge link sets the checkpoint', await ev(`setup.via?.title === 'Pickaxe' && rules().includes('checkpoint') && ${viaCard} && challengeLink().includes('&via=Pickaxe&')`),
   await ev('challengeLink()'));
 await ev(`(h => { h.unshift({ start: 'Diamond', goal: 'Diamond Pickaxe', via: 'Zombie', rules: ['checkpoint'], won: true, clicks: 1, ms: 1000, at: Date.now(), path: [] });
-  store.set('mwg.history', h); })(store.get('mwg.history', []))`);
+  store.set('mwr.history', h); })(store.get('mwr.history', []))`);
 await ev("document.querySelector('#btnPlay').click()");
 await until("game.path.length === 1 && !game.loading");
 const hudLbl = "document.querySelector('#hudLbl').textContent + ' ' + document.querySelector('#hudGoal').textContent";
 check('HUD shows the checkpoint first', await ev(hudLbl) === 'Checkpoint Pickaxe', await ev(hudLbl));
 check('the path picture is the checkpoint', await ev("document.querySelector('#pathArt').src === game.via.img && !!game.via.img"));
 f = await frameCtx();
-await ev("[...document.querySelectorAll('a.mwg-live')].find(a => /Diamond_Pickaxe/i.test(a.getAttribute('href'))).click()", f);
+await ev("[...document.querySelectorAll('a.mwr-live')].find(a => /Diamond_Pickaxe/i.test(a.getAttribute('href'))).click()", f);
 await until("game.path.length === 2 && !game.loading");
 check('target before the checkpoint does not win', await ev("game.active") === true && await ev(hudLbl) === 'Checkpoint Pickaxe');
 f = await frameCtx();
-await ev("[...document.querySelectorAll('a.mwg-live')].find(a => a.getAttribute('href') === '/w/Pickaxe').click()", f);
+await ev("[...document.querySelectorAll('a.mwr-live')].find(a => a.getAttribute('href') === '/w/Pickaxe').click()", f);
 await until("game.path.length === 3 && !game.loading");
 check('reaching the checkpoint switches to the target', await ev(hudLbl) === 'Target Diamond Pickaxe' && await ev('game.path[2].via === true') &&
   await ev("document.querySelector('#pathArt').src === game.goal.img && !!game.goal.img"), await ev(hudLbl));
 check('reaching the checkpoint is celebrated', await ev("!document.querySelector('#toast').classList.contains('hidden') && document.querySelector('#toast').textContent.includes('Diamond Pickaxe') && document.querySelector('.hud .goal').classList.contains('reached') && document.querySelector('#pathList li.via')?.textContent.includes('Pickaxe')"));
 f = await frameCtx();
-check('the target passed before the checkpoint is not marked as seen', await ev(`(links => links.length > 0 && !links.some(a => a.classList.contains('mwg-seen')))(
-  [...document.querySelectorAll('a.mwg-live')].filter(a => /^\\/w\\/Diamond_Pickaxe(#|$)/i.test(a.getAttribute('href'))))`, f));
+check('the target passed before the checkpoint is not marked as seen', await ev(`(links => links.length > 0 && !links.some(a => a.classList.contains('mwr-seen')))(
+  [...document.querySelectorAll('a.mwr-live')].filter(a => /^\\/w\\/Diamond_Pickaxe(#|$)/i.test(a.getAttribute('href'))))`, f));
 await shot('6-checkpoint');
 f = await frameCtx();
-await ev("[...document.querySelectorAll('a.mwg-live')].find(a => /Diamond_Pickaxe/i.test(a.getAttribute('href'))).click()", f);
+await ev("[...document.querySelectorAll('a.mwr-live')].find(a => /Diamond_Pickaxe/i.test(a.getAttribute('href'))).click()", f);
 check('checkpoint game wins', await until("!game.active && !document.querySelector('#modalBg').classList.contains('hidden')"), `clicks=${await ev('clicks()')}`);
 const viaModal = await ev("document.querySelector('#modal').textContent");
-check('checkpoint is recorded and kept out of other bests', await ev("store.get('mwg.history', [])[0].via === 'Pickaxe'") &&
+check('checkpoint is recorded and kept out of other bests', await ev("store.get('mwr.history', [])[0].via === 'Pickaxe'") &&
   viaModal.includes('Diamond → Pickaxe → Diamond Pickaxe') && !/personal best|Your best/.test(viaModal));
 
-// A theme stylesheet added by the host page shows up in the picker and, marked data-mwg-default, wins over a saved
+// A theme stylesheet added by the host page shows up in the picker and, marked data-mwr-default, wins over a saved
 // theme that no longer exists. A preload script stands in for the host page injecting it into <head>.
-await ev("localStorage.setItem('mwg.theme', JSON.stringify('Gone'))");
+await ev("localStorage.setItem('mwr.theme', JSON.stringify('Gone'))");
 const preload = (await send('script.addPreloadScript', { functionDeclaration: `() => {
-  const add = () => document.head.insertAdjacentHTML('beforeend', '<style data-mwg-theme="Test" data-mwg-default>:root[data-theme="Test"] { --bg: #000; color-scheme: dark; }</style>');
+  const add = () => document.head.insertAdjacentHTML('beforeend', '<style data-mwr-theme="Test" data-mwr-default>:root[data-theme="Test"] { --bg: #000; color-scheme: dark; }</style>');
   if (document.head) add(); else new MutationObserver((_, o) => { if (document.head) { o.disconnect(); add(); } }).observe(document, { childList: true, subtree: true });
 }` })).result.script;
 await send('browsingContext.navigate', { context: ctx, url: 'about:blank', wait: 'complete' });
@@ -410,10 +410,10 @@ await send('browsingContext.navigate', { context: ctx, url: fileUrl, wait: 'comp
 const injected = await ev("[...document.querySelectorAll('#themeSelect option')].map(o => o.value).join(',') + ' ' + document.querySelector('#themeSelect').value + ' ' + document.documentElement.dataset.theme + ' ' + themeIsDark() + ' ' + getComputedStyle(document.body).backgroundColor");
 check('host-page theme is listed and used as the default', injected === 'auto,light,dark,Test Test Test true rgb(0, 0, 0)', injected);
 await send('script.removePreloadScript', { script: preload });
-await ev("localStorage.removeItem('mwg.theme')");
+await ev("localStorage.removeItem('mwr.theme')");
 
 // Clear history asks first: Cancel keeps the games, confirming removes them and hides the table.
-const histLen = "store.get('mwg.history', []).length";
+const histLen = "store.get('mwr.history', []).length";
 await ev("document.querySelector('#btnClearHistory').click()");
 await shot('4-clear-history');
 await ev("document.querySelector('#hKeep').click()");

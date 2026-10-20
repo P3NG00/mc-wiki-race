@@ -722,7 +722,7 @@ async function withBusy(fn) {
   setup.busy++;
   updatePlay();
   try { return await fn(); }
-  catch (e) { setStatus('Network error: ' + e.message + '. Check your connection and try again.', true); }
+  catch (e) { setStatus('Network error: ' + e.message.replace(/\.$/, '') + '. Check your connection and try again.', true); }
   finally { setup.busy--; updatePlay(); }
 }
 
@@ -974,8 +974,11 @@ async function navigate(title, fragment, { back = false } = {}) {
   let page, hubs;
   try {
     [page, hubs] = await Promise.all([
+      // A reply without an article has to fail here, where Retry is offered: past this point the game would stay
+      // loading, with Give up disabled.
       parseCache.get(title) ||
-        api({ action: 'parse', page: title, prop: 'text|displaytitle', redirects: '1', disableeditsection: '1', disablelimitreport: '1' }).then(d => d.parse),
+        api({ action: 'parse', page: title, prop: 'text|displaytitle', redirects: '1', disableeditsection: '1', disablelimitreport: '1' })
+          .then(d => d.parse || Promise.reject(new Error('The wiki sent no article'))),
       game.rules.includes('nohubs') && hubTitles(),
     ]);
   } catch (e) {

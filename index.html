@@ -848,7 +848,7 @@ function hideOverlay() { $('#overlay').classList.add('hidden'); }
 function startGame() {
   const r = rules();
   Object.assign(game, { active: true, start: setup.start, goal: setup.goal, via: r.includes('checkpoint') ? setup.via : null, viaReached: false, celebrate: false,
-    daily: setup.daily, rules: r, path: [], stack: [], elapsed: 0, runningSince: 0, loading: false });
+    daily: setup.daily, rules: r, path: [], seen: new Map(), stack: [], elapsed: 0, runningSince: 0, loading: false });
   $('#btnBack').classList.toggle('hidden', game.rules.includes('noback'));
   $('#btnPeek').classList.toggle('hidden', game.rules.includes('blind'));
   renderObjective();
@@ -903,12 +903,15 @@ async function navigate(title, fragment, { back = false } = {}) {
   if (back) game.stack.pop(); else game.stack.push(page.title);
   const via = !game.viaReached && page.title === game.via?.title;
   game.path.push({ title: page.title, back, ...(via && { via }) });
+  game.seen.set(title, page.title).set(page.title, page.title);   // the link's title too, in case it was a redirect
   if (via) { game.viaReached = game.celebrate = true; renderObjective(); }
   $('#credit').innerHTML = `<a href="${esc(wikiUrl(page.title))}" target="_blank" rel="noopener">View on minecraft.wiki</a> · ` +
     `<a href="${LICENSE_URL}" target="_blank" rel="noopener">CC BY-NC-SA 3.0</a>`;
   // The target and checkpoint stay reachable even if they are hubs.
   const keep = [game.goal.title, game.via?.title];
-  renderArticle(page, fragment, token, hubs ? [...hubs.keys()].filter(t => !keep.includes(hubs.get(t))) : []);
+  // The objective is never marked: a target passed before the checkpoint still has to be reached again.
+  const seen = [...game.seen].filter(([, t]) => t !== objective().title).map(([k]) => k);
+  renderArticle(page, fragment, token, hubs ? [...hubs.keys()].filter(t => !keep.includes(hubs.get(t))) : [], seen);
   setTimeout(() => frameReady(token), 15000);   // a stalled stylesheet must not leave Back and Give up disabled
   // Compare the post-redirect title, so following a redirect onto the target counts as arriving.
   const won = page.title === game.goal.title && (!game.via || game.viaReached);
@@ -954,8 +957,8 @@ function themeIsDark() {
 // Restyles the loaded article in place. Also sent when a frame reports ready, in case the theme changed while it loaded.
 function syncFrameTheme() { $('#frame').contentWindow?.postMessage({ mwg: 'theme', dark: themeIsDark() }, '*'); }
 
-// blocked: titles whose links are dead for this game (No hubs).
-function renderArticle(page, fragment, token, blocked = []) {
+// blocked: titles whose links are dead for this game (No hubs). seen: titles visited this game, whose links are marked.
+function renderArticle(page, fragment, token, blocked = [], seen = []) {
   const dark = themeIsDark();
   const noNav = game.rules.includes('nonav');
   // The article renders in a sandboxed iframe (opaque origin): the wiki's own CSS applies untouched,
@@ -965,6 +968,7 @@ function renderArticle(page, fragment, token, blocked = []) {
     const FRAG = ${JSON.stringify(fragment || '')};
     const WGL = ${JSON.stringify(WGL_THEME_CLASSES)};
     const BLOCKED = new Set(${JSON.stringify(blocked)});
+    const SEEN = new Set(${JSON.stringify(seen)});
     const NO_NAV = ${noNav};
     function classify(a) {
       if (NO_NAV && a.closest('.navbox')) return null;   // hidden too; this keeps them dead whatever the CSS does
@@ -980,8 +984,9 @@ function renderArticle(page, fragment, token, blocked = []) {
       try { t = decodeURIComponent(rest).replace(/_/g, ' '); frag = decodeURIComponent(frag); } catch (e) { return null; }
       const c = t.indexOf(':');
       if (c > 0 && NS.has(t.slice(0, c).trim().toLowerCase())) return null;
-      if (BLOCKED.has(t.charAt(0).toUpperCase() + t.slice(1))) return { kind: 'blocked' };
-      return { kind: 'article', title: t, frag };
+      t = t.charAt(0).toUpperCase() + t.slice(1);   // as MediaWiki does, so titles match the blocked and seen lists
+      if (BLOCKED.has(t)) return { kind: 'blocked' };
+      return { kind: 'article', title: t, frag, seen: SEEN.has(t) };
     }
     function scrollToId(id) {
       if (!id) return;
@@ -994,6 +999,7 @@ function renderArticle(page, fragment, token, blocked = []) {
       if (!c || c.kind === 'blocked') a.classList.add('mwg-dead');
       else if (c.kind === 'article') a.classList.add('mwg-live');
       if (c?.kind === 'blocked') a.title = 'Off limits: No hubs';
+      if (c?.seen) { a.classList.add('mwg-seen'); a.title = (a.title ? a.title + ' · ' : '') + 'already on your path'; }
       a.removeAttribute('target');
     }
     document.addEventListener('click', e => {
@@ -1046,6 +1052,12 @@ ${WIKI_STYLES.map(h => `<link rel="stylesheet" href="${esc(h)}">`).join('\n')}
     background-color: color-mix(in srgb, currentColor 14%, transparent);
     box-shadow: 0 0 0 2px color-mix(in srgb, currentColor 14%, transparent);
   }
+  /* Links to articles already on the path, in a visited-link purple with a dotted underline, or a dotted outline around
+     an image (the browser can't track visits inside the frame). Links the wiki colours specially keep their colour. */
+  a.mwg-seen { color: #6a60b0; text-decoration: underline dotted; }
+  body.wgl-theme-dark a.mwg-seen { color: #a99cf0; }
+  a.mwg-seen:has(img) { outline: 2px dotted #6a60b0; outline-offset: 1px; }
+  body.wgl-theme-dark a.mwg-seen:has(img) { outline-color: #a99cf0; }
   .mwg-live:focus-visible { outline: 2px solid currentColor; outline-offset: 1px; }
   img.mwg-broken { display: inline-block; overflow: hidden; color: transparent; }
   ${noNav ? '.navbox, .mw-heading:has(> #Navigation) { display: none !important; }' : ''}

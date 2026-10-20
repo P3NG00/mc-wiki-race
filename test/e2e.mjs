@@ -83,6 +83,11 @@ await send('input.releaseActions', { context: ctx });
 
 await ev("[...document.querySelectorAll('a.mwg-live')].find(a => a.getAttribute('href') === '/w/Pickaxe').click()", f);
 check('clicking a link navigates', await until("game.path.length === 2 && !game.loading"), await ev("game.path.map(p => p.title).join(' > ')"));
+f = await frameCtx();
+const seenLinks = JSON.parse(await ev(`JSON.stringify(['Diamond', 'Iron_Pickaxe'].map(t =>
+  [...document.querySelectorAll('a.mwg-live')].filter(a => a.getAttribute('href').split('#')[0] === '/w/' + t).map(a => a.classList.contains('mwg-seen'))))`, f));
+check('links to articles on the path are marked', seenLinks[0].length > 0 && seenLinks[0].every(Boolean) &&
+  seenLinks[1].length > 0 && !seenLinks[1].some(Boolean), JSON.stringify(seenLinks));
 
 // Back reuses the cached article instead of calling the API again.
 await ev("window.apiCalls = 0; { const orig = api; window.api = Object.assign(p => (apiCalls++, orig(p)), { orig }); }");
@@ -363,6 +368,9 @@ await until("game.path.length === 3 && !game.loading");
 check('reaching the checkpoint switches to the target', await ev(hudLbl) === 'Target Diamond Pickaxe' && await ev('game.path[2].via === true') &&
   await ev("document.querySelector('#pathArt').src === game.goal.img && !!game.goal.img"), await ev(hudLbl));
 check('reaching the checkpoint is celebrated', await ev("!document.querySelector('#toast').classList.contains('hidden') && document.querySelector('#toast').textContent.includes('Diamond Pickaxe') && document.querySelector('.hud .goal').classList.contains('reached') && document.querySelector('#pathList li.via')?.textContent.includes('Pickaxe')"));
+f = await frameCtx();
+check('the target passed before the checkpoint is not marked as seen', await ev(`(links => links.length > 0 && !links.some(a => a.classList.contains('mwg-seen')))(
+  [...document.querySelectorAll('a.mwg-live')].filter(a => /^\\/w\\/Diamond_Pickaxe(#|$)/i.test(a.getAttribute('href'))))`, f));
 await shot('6-checkpoint');
 f = await frameCtx();
 await ev("[...document.querySelectorAll('a.mwg-live')].find(a => /Diamond_Pickaxe/i.test(a.getAttribute('href'))).click()", f);

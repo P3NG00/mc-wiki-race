@@ -808,6 +808,12 @@ function today() {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
+// The date a #daily= link asks for, or today for one that is malformed, doesn't exist (2026-02-31) or hasn't come yet.
+function dailyDate(s) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s);
+  const real = m && new Date(Date.UTC(m[1], m[2] - 1, m[3])).toISOString().slice(0, 10) === s;
+  return real && s <= today() ? s : today();
+}
 
 // items ordered by the hash of the date, a salt and the item: the day's ranking.
 const ranked = (date, salt, items) => items.map(t => [hash32(`${date}|${salt}|${t}`), t]).sort((a, b) => a[0] - b[0]).map(([, t]) => t);
@@ -1330,8 +1336,8 @@ $('#btnPeek').onclick = () => {
   setImg($('.peek img'), g.img);
   $('#pClose').onclick = closeModal;
 };
-// Initial load: a #start=…&target=… hash plays that exact pair, #daily (or #daily=YYYY-MM-DD) that day's pair and rule,
-// otherwise roll a random one.
+// Initial load: a #start=…&target=… hash plays that exact pair, #daily (or #daily=YYYY-MM-DD, a past day) that day's
+// pair and rule, otherwise roll a random one.
 (async function init() {
   updateModeHelp();
   renderHistory();
@@ -1355,7 +1361,7 @@ $('#btnPeek').onclick = () => {
       if (missing && setup.start && setup.goal) setStatus('The challenge link’s article “' + missing + '” doesn’t exist, so a random pair was rolled instead.', true);
     }
   } else if (h.has('daily')) {
-    await loadDaily(/^\d{4}-\d{2}-\d{2}$/.test(h.get('daily')) ? h.get('daily') : today());
+    await loadDaily(dailyDate(h.get('daily')));
     if (!setup.start || !setup.goal) await reroll('all');
   } else {
     await reroll('all');

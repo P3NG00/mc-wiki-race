@@ -8,13 +8,13 @@ const ws = new WebSocket(`ws://127.0.0.1:${port}/session`);
 let id = 0;
 const pending = new Map();
 let onEvent = () => {};
-// Uncaught errors and rejections in the page and the article frame, checked at the end. Firefox logs a web font whose
-// download is cut short (the frame replaced while the wiki's font loads) at the same level, so those are skipped.
+// Uncaught errors and rejections in the page and the article frame, reported by a preload script (below) and checked at
+// the end. Its listeners are on the window, so failed images, fonts and requests, which Firefox also logs, don't count.
 const jsErrors = [];
 ws.onmessage = m => {
   const d = JSON.parse(m.data);
   if (d.id && pending.has(d.id)) { pending.get(d.id)(d); pending.delete(d.id); }
-  else if (d.method === 'log.entryAdded') { const { type, level, text } = d.params; if (type === 'javascript' && level === 'error' && !text.startsWith('downloadable font:')) jsErrors.push(text); }
+  else if (d.method === 'script.message' && d.params.channel === 'mwr-errors') jsErrors.push(d.params.data.value);
   else if (d.method) onEvent(d);
 };
 const send = (method, params) => new Promise(r => { const i = ++id; pending.set(i, r); ws.send(JSON.stringify({ id: i, method, params })); });
@@ -28,7 +28,11 @@ function check(name, ok, extra = '') {
 
 await new Promise(r => ws.onopen = r);
 await send('session.new', { capabilities: {} });
-await send('session.subscribe', { events: ['log.entryAdded'] });
+await send('session.subscribe', { events: ['script.message'] });
+await send('script.addPreloadScript', { functionDeclaration: `report => {
+  addEventListener('error', e => report(String(e.message)));
+  addEventListener('unhandledrejection', e => report('Unhandled rejection: ' + (e.reason?.message ?? e.reason)));
+}`, arguments: [{ type: 'channel', value: { channel: 'mwr-errors' } }] });
 const ctx = (await send('browsingContext.getTree', {})).result.contexts[0].context;
 await send('browsingContext.setViewport', { context: ctx, viewport: { width: 1280, height: 860 } });
 
@@ -452,6 +456,100 @@ await ev("document.querySelector('#hClear').click()");
 check('Clear history empties it', await ev(`${histLen} === 0 && document.querySelector('#history').classList.contains('hidden') && document.querySelector('#modalBg').classList.contains('hidden')`),
   await ev(histLen));
 
+// Challenge links carry any title intact: ones with &, +, ?, %, =, /, :, quotes and accents survive challengeLink() and
+// the hash, and the frame reads the same title back from a link to it as wikiUrl writes one. The first three are real
+// articles, loaded through a link as start, checkpoint and target.
+const tricky = ['Gravelly Mountains+', 'How did we get here? (block)', 'Village & Pillage', 'Oxygène',
+  'Java Edition guides/Caves & Cliffs: Part I', '100% A=B; c+d', 'Steve\'s "quote"'];
+const trip = JSON.parse(await ev(`(() => {
+  const saved = { start: setup.start, via: setup.via, goal: setup.goal }, savedRules = rules();
+  const linkFor = (start, via, goal, r) => (Object.assign(setup, { start: { title: start }, via: { title: via }, goal: { title: goal } }), setRules(r), challengeLink());
+  const bad = ${JSON.stringify(tricky)}.filter(t => {
+    const h = new URLSearchParams(new URL(linkFor(t, t + ' via', t + ' goal', ['noback', 'checkpoint'])).hash.slice(1));
+    return h.get('start') !== t || h.get('via') !== t + ' via' || h.get('target') !== t + ' goal' || h.get('rules') !== rules().join();
+  });
+  const link = linkFor(...${JSON.stringify(tricky.slice(0, 3))}, ['checkpoint']);
+  Object.assign(setup, saved);
+  setRules(savedRules);
+  return JSON.stringify({ bad, link });
+})()`));
+check('challenge links keep awkward titles intact', trip.bad.length === 0, JSON.stringify(trip.bad));
+await send('browsingContext.navigate', { context: ctx, url: 'about:blank', wait: 'complete' });
+await send('browsingContext.navigate', { context: ctx, url: trip.link, wait: 'complete' });
+const loaded = "[setup.start?.title, setup.via?.title, setup.goal?.title].join(' | ')";
+check('a challenge link with awkward titles loads them unchanged', await until("!document.querySelector('#btnPlay').disabled") &&
+  await ev(loaded) === tricky.slice(0, 3).join(' | '), await ev(loaded));
+await ev("document.querySelector('#btnPlay').click()");
+await until("game.path.length === 1 && !game.loading");
+const hrefs = await ev(`JSON.stringify(${JSON.stringify(tricky)}.map(t => wikiUrl(t).slice(WIKI.length)))`);
+const read = await ev(`JSON.stringify(${hrefs}.map(h => { const a = document.createElement('a'); a.setAttribute('href', h); return classify(a)?.title; }))`, await frameCtx());
+check('the frame reads awkward titles back from their links', read === JSON.stringify(tricky), read);
+
+// API faults, made with a BiDi intercept on api.php: a request that fault.match accepts is failed outright, or given
+// fault.reply ([status, body]) instead. A failed article offers Retry and Cancel with the clock stopped, and Retry loads
+// it without counting the failed try. A failed roll says so, and the next roll works.
+let fault = null;
+onEvent = d => {
+  if (d.method !== 'network.beforeRequestSent' || !d.params.isBlocked) return;
+  const { request, url } = d.params.request;
+  if (!fault?.match(url)) return send('network.continueRequest', { request });
+  if (!fault.reply) return send('network.failRequest', { request });
+  const [statusCode, body] = fault.reply;
+  send('network.provideResponse', { request, statusCode, body: { type: 'string', value: body },
+    headers: [['Access-Control-Allow-Origin', '*'], ['Content-Type', 'application/json']].map(([name, value]) => ({ name, value: { type: 'string', value } })) });
+};
+await send('session.subscribe', { events: ['network.beforeRequestSent'] });
+const apiIntercept = (await send('network.addIntercept', { phases: ['beforeRequestSent'],
+  urlPatterns: [{ type: 'pattern', hostname: 'minecraft.wiki', pathname: '/api.php' }] })).result.intercept;
+const parseOf = t => url => url.includes('action=parse') && new URL(url).searchParams.get('page') === t;
+const overlayText = "document.querySelector('#overlayBox').textContent.trim().replace(/\\s+/g, ' ')";
+
+await send('browsingContext.navigate', { context: ctx, url: 'about:blank', wait: 'complete' });
+await send('browsingContext.navigate', { context: ctx, url: fileUrl + '#start=Diamond&target=Diamond%20Pickaxe', wait: 'complete' });
+await until("!document.querySelector('#btnPlay').disabled");
+fault = { match: parseOf('Diamond') };
+await ev("document.querySelector('#btnPlay').click()");
+const startFailed = await until("!!document.querySelector('#btnCancelNav') && !game.loading", 15000);
+await ev("document.querySelector('#btnCancelNav').click()");
+check('Cancel on a start article that failed returns to setup', startFailed &&
+  await ev("!document.querySelector('#setup').classList.contains('hidden') && !game.active"), await ev(overlayText));
+fault = null;
+await ev("document.querySelector('#btnPlay').click()");
+await until("game.path.length === 1 && !game.loading");
+for (const [kind, reply, title, message] of [
+  ['a network error', null, 'Iron Ingot', 'NetworkError'],
+  ['HTTP 500', [500, 'oops'], 'Gold Ingot', 'HTTP 500'],
+  ['a MediaWiki error', [200, '{"error":{"code":"maxlag","info":"Waiting for a database server"}}'], 'Coal', 'Waiting for a database server'],
+  ['a reply that isn’t JSON', [200, '<html>'], 'Emerald', 'JSON'],
+  ['a reply with no article', [200, '{}'], 'Redstone Dust', 'no article'],
+]) {
+  fault = { match: parseOf(title), reply };
+  const before = await ev('game.path.length');
+  await ev(`navigate(${JSON.stringify(title)})`);
+  const offered = await until("!!document.querySelector('#btnRetry') && !game.loading", 15000);
+  const shown = await ev(overlayText);
+  const t0 = await ev('now()');
+  await sleep(1000);
+  const stopped = await ev(`now() === ${t0}`);
+  fault = null;
+  await ev("document.querySelector('#btnRetry')?.click()");
+  check(`${kind} offers Retry with the clock stopped, and Retry loads the article`, offered && shown.includes(message) && stopped &&
+    await until(`game.path.length === ${before + 1} && game.path.at(-1).title === ${JSON.stringify(title)} && !game.loading`, 20000), shown);
+}
+
+fault = { match: () => true };
+await send('browsingContext.navigate', { context: ctx, url: 'about:blank', wait: 'complete' });
+await send('browsingContext.navigate', { context: ctx, url: fileUrl, wait: 'complete' });
+const status = "document.querySelector('#setupStatus').textContent";
+check('a roll that fails says so', await until(`${status}.startsWith('Network error') && !${status}.includes('..') && setup.busy === 0`, 15000), await ev(status));
+fault = null;
+await ev("document.querySelector('#btnRerollAll').click()");
+check('the next roll works', await until("!document.querySelector('#btnPlay').disabled", 30000), await ev(status));
+
+await send('network.removeIntercept', { intercept: apiIntercept });
+await send('session.unsubscribe', { events: ['network.beforeRequestSent'] });
+onEvent = () => {};
+
 // Storage is shared with the rest of the origin: history that isn't a list, or entries that aren't records, are left
 // out instead of stopping the setup screen.
 await ev(`localStorage.setItem('mwr.history', '{"oops":1}')`);
@@ -464,6 +562,69 @@ await ev(`store.set('mwr.history', [null, 5, { ...${rec}, clicks: '<b>2</b>' }, 
 check('only real records are shown', await ev("document.querySelectorAll('#history tbody tr').length === 1 && !document.querySelector('#history tbody b')"),
   `rows=${await ev("document.querySelectorAll('#history tbody tr').length")}`);
 await ev("localStorage.removeItem('mwr.history')");
+
+// Random play: a seeded run of link clicks (sometimes a second one while the first loads), Back (sometimes during a
+// load), theme switches, peeks and path toggles. After each step the game must settle with the click count, the path
+// list, the Back stack, the article shown and the clock agreeing. A win starts the pair again. The seed is printed;
+// MWR_SEED=<seed> replays the same choices, though the wiki may have changed since.
+const seed = Number(process.env.MWR_SEED) || Date.now() % 1e9;
+let rngState = seed | 0;
+const rand = () => {   // mulberry32
+  let t = (rngState += 0x6D2B79F5);
+  t = Math.imul(t ^ (t >>> 15), t | 1);
+  t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+  return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+};
+// The wiki may display a title with underscores or a lower-case first letter (DISPLAYTITLE).
+const titleKey = t => String(t).replace(/_/g, ' ').toLowerCase();
+// Done once the game has stopped loading and stays stopped: a second click can start a load just after the first ends.
+const settle = async () => {
+  let ok;
+  do { ok = await until('!game.loading', 20000); await sleep(500); } while (ok && await ev('game.loading'));
+  return ok;
+};
+const playPair = async () => {
+  await send('browsingContext.navigate', { context: ctx, url: 'about:blank', wait: 'complete' });
+  await send('browsingContext.navigate', { context: ctx, url: fileUrl + '#start=Diamond&target=Oxyg%C3%A8ne', wait: 'complete' });
+  await until("!document.querySelector('#btnPlay').disabled");
+  await ev("document.querySelector('#btnPlay').click()");
+  await until("game.path.length === 1 && !game.loading");
+};
+const clickLink = async () => ev(`(ls => !!ls.length && (ls[Math.floor(${rand()} * ls.length)].click(), true))(document.querySelectorAll('.mwr-live'))`,
+  await frameCtx());
+const clickBack = () => ev("document.querySelector('#btnBack').click()");
+const actions = [
+  [40, 'link', clickLink],
+  [15, 'two links', async () => { await clickLink(); await clickLink(); }],
+  [15, 'back', clickBack],
+  [10, 'link then back', async () => { await clickLink(); await clickBack(); }],
+  [10, 'theme', () => ev(`setTheme(${JSON.stringify(['light', 'dark', 'auto'][Math.floor(rand() * 3)])})`)],
+  [5, 'peek', () => ev("document.querySelector('#btnPeek').click(), closeModal()")],
+  [5, 'path', () => ev("document.querySelector('#btnPath').click()")],
+];
+const state = `JSON.stringify({ active: game.active, path: game.path.map(p => p.title), stack: game.stack,
+  hud: document.querySelector('#hudClicks').textContent, listed: document.querySelectorAll('#pathList li').length,
+  overlay: !document.querySelector('#overlay').classList.contains('hidden'), running: !!game.runningSince, now: now() })`;
+await playPair();
+const steps = [], problems = [];
+let wins = 0, lastNow = 0;
+for (let i = 0; i < 30 && problems.length === 0; i++) {
+  let r = rand() * 100, action = actions[0];
+  for (const a of actions) if ((r -= a[0]) < 0) { action = a; break; }
+  await action[2]();
+  steps.push(action[1]);
+  const settled = await settle();
+  const s = JSON.parse(await ev(state));
+  if (!s.active) { wins++; lastNow = 0; await playPair(); continue; }
+  const heading = await ev("document.querySelector('#firstHeading')?.textContent", await frameCtx());
+  const bad = [!settled && 'stuck loading', s.overlay && 'overlay still shown', s.hud !== String(s.path.length - 1) && 'HUD clicks',
+    s.listed !== s.path.length && 'path list', s.stack.at(-1) !== s.path.at(-1) && 'Back stack', titleKey(heading) !== titleKey(s.path.at(-1)) && `heading "${heading}"`,
+    s.now < lastNow && 'clock went back', !s.running && 'clock stopped'].filter(Boolean);
+  if (bad.length) problems.push(`step ${i + 1} (${action[1]}): ${bad.join(', ')} at ${s.path.at(-1)}`);
+  lastNow = s.now;
+}
+check(`random play stays consistent (seed ${seed})`, problems.length === 0, `${steps.join(', ')}; ${wins} win(s)${problems.length ? '; ' + problems[0] : ''}`);
+await ev("localStorage.removeItem('mwr.theme'); localStorage.removeItem('mwr.pathCollapsed')");
 
 check('no uncaught script errors', jsErrors.length === 0, jsErrors.slice(0, 5).join(' | '));
 

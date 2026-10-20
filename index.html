@@ -141,22 +141,34 @@
   .stat .v { font-size: 20px; font-weight: 700; line-height: 1.1; }
   .stat .k { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; }
   .hud .btns { display: flex; gap: 8px; }
-  .main { display: grid; grid-template-columns: 220px 1fr; min-height: 0; }
+  .main { display: grid; grid-template-columns: 220px 1fr; min-height: 0; position: relative; }
   .path {
     border-right: 1px solid var(--line); padding: 12px; background: var(--panel); font-size: 13.5px;
     display: flex; flex-direction: column; min-height: 0; position: relative; overflow: hidden; isolation: isolate;
   }
   .path .art { width: 280px; height: 280px; right: -60px; bottom: -20px; }
+  .path-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 8px; }
+  .path-toggle { padding: 1px 8px; font-size: 13px; }
   .path-list { flex: 1; min-height: 0; overflow-y: auto; }
   .path .credit { margin: 8px 0 0; padding-top: 8px; border-top: 1px solid var(--line); color: var(--muted); font-size: 12px; }
   .path .credit a, .modal ol a { color: var(--accent); }
   .path .credit a { white-space: nowrap; }
-  .path h3 { margin: 0 0 8px; font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; }
+  .path h3 { margin: 0; font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; }
   .path ol { margin: 0; padding-left: 22px; }
   .path li { padding: 2px 0; word-break: break-word; }
   .path li.cur { font-weight: 650; }
   .path li.back { color: var(--muted); font-style: italic; }
   .path li.via { color: var(--accent); }
+  /* Collapsed, the path is a small box over the article's bottom-left corner holding the button that shows it again
+     and the credit, which the licence asks to keep in view. */
+  .main.collapsed { grid-template: 1fr / 1fr; }
+  .main.collapsed .path {
+    position: absolute; left: 12px; bottom: 12px; z-index: 2; max-width: calc(100% - 24px); max-height: none;
+    flex-direction: row; align-items: center; gap: 10px; padding: 6px 10px;
+    border: 1px solid var(--line); border-radius: var(--radius-lg); box-shadow: var(--shadow);
+  }
+  .main.collapsed .path-list, .main.collapsed .path h3, .main.collapsed .path .art { display: none; }
+  .main.collapsed .path-head, .main.collapsed .path .credit { margin: 0; padding: 0; border: 0; }
   .viewer { position: relative; min-height: 0; background: var(--bg); }
   .viewer iframe { border: 0; width: 100%; height: 100%; display: block; background: var(--bg); }
   .overlay {
@@ -314,7 +326,8 @@ const THEMES = [...new Set(['auto', 'light', 'dark', ...Array.from(document.quer
   </div>
   <div class="main">
     <aside class="path">
-      <div class="path-list"><h3>Your path</h3><ol id="pathList"></ol></div>
+      <div class="path-head"><h3>Your path</h3><button class="path-toggle" id="btnPath" aria-controls="pathList"></button></div>
+      <div class="path-list"><ol id="pathList"></ol></div>
       <!-- Attribution the wiki's licence asks for: a link to the article being shown and to the licence. -->
       <p class="credit" id="credit"></p>
       <img alt="" class="art hidden" id="pathArt">
@@ -1138,6 +1151,21 @@ $('#rules').addEventListener('change', () => {
   if (setup.daily) { setup.daily = null; setStatus('With other rules, this pair no longer counts as the daily challenge.'); }
   syncVia(); renderCard('via'); renderCard('goal');
 });
+// The path sidebar can collapse to a small box over the article. The choice is remembered.
+let pathCollapsed = false;
+function setPathCollapsed(on) {
+  pathCollapsed = on;
+  store.set('mwg.pathCollapsed', on);
+  $('.main').classList.toggle('collapsed', on);
+  const b = $('#btnPath');
+  b.textContent = on ? 'Your path' : 'Hide';
+  b.title = on ? 'Show your path' : 'Hide your path';
+  b.setAttribute('aria-expanded', String(!on));
+  // renderHud can't scroll the list while it is hidden, so it opens at the current article.
+  if (!on) { const pl = $('.path-list'); pl.scrollTop = pl.scrollHeight; }
+}
+setPathCollapsed(store.get('mwg.pathCollapsed', false));
+$('#btnPath').onclick = () => setPathCollapsed(!pathCollapsed);
 $('#themeSelect').innerHTML = THEMES.map(t => `<option value="${esc(t)}">${esc(THEME_LABELS[t] || t)}</option>`).join('');
 $('#themeSelect').value = document.documentElement.dataset.theme || 'auto';
 $('#themeSelect').onchange = e => setTheme(e.target.value);

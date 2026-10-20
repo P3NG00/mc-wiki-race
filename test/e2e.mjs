@@ -50,6 +50,18 @@ check('start article renders', await until("document.querySelector('#overlay').c
 await sleep(2000);
 await shot('2-game');
 
+// Collapsing the path keeps the credit in view, widens the article and is remembered (a reload is checked with the
+// Blind target game below).
+const frameWidth = () => ev("document.querySelector('#frame').clientWidth");
+const wide = await frameWidth();
+await ev("document.querySelector('#btnPath').click()");
+const shown = sel => `!!document.querySelector('${sel}').offsetParent`;
+check('collapsing the path hides it and keeps the credit', await ev(`!${shown('#pathList')} && ${shown('#credit')} && store.get('mwg.pathCollapsed') === true`) &&
+  await frameWidth() > wide, `frame ${wide} -> ${await frameWidth()}`);
+await shot('2b-collapsed');
+await ev("document.querySelector('#btnPath').click()");
+check('expanding the path shows it again', await ev(`${shown('#pathList')} && store.get('mwg.pathCollapsed') === false`) && await frameWidth() === wide);
+
 let f = await frameCtx();
 const links = JSON.parse(await ev("JSON.stringify({ live: document.querySelectorAll('a.mwg-live').length, tutorial: document.querySelectorAll('a[href^=\"/w/Tutorial:\"]').length, tutorialLive: document.querySelectorAll('a.mwg-live[href^=\"/w/Tutorial:\"]').length, sheets: document.styleSheets.length })", f));
 check('article links are clickable', links.live > 100, `live=${links.live}`);
@@ -221,6 +233,7 @@ check('image-map links are clickable', areas.live > 0, `areas=${areas.all} live=
 
 // No hubs: links to hubs and their redirects are dead, except a hub that is the target.
 // Blind target: no target picture or description on the card or in the HUD, and no peek.
+await ev("store.set('mwg.pathCollapsed', true)");   // stands in for collapsing it before the reload
 await send('browsingContext.navigate', { context: ctx, url: 'about:blank', wait: 'complete' });
 await send('browsingContext.navigate', { context: ctx, url: fileUrl + '#start=Diamond&target=Crafting&rules=nohubs,blind', wait: 'complete' });
 await until("!document.querySelector('#btnPlay').disabled");
@@ -230,6 +243,8 @@ await ev("document.querySelector('#rules input[value=blind]').click()");
 check('turning Blind target off shows it again', !(await ev(blindCard)).startsWith('Hidden'), await ev(blindCard));
 await ev("document.querySelector('#rules input[value=blind]').click()");
 await ev("document.querySelector('#btnPlay').click()");
+check('a collapsed path stays collapsed after a reload', await ev("document.querySelector('.main').classList.contains('collapsed') && document.querySelector('#btnPath').getAttribute('aria-expanded') === 'false'"));
+await ev("document.querySelector('#btnPath').click()");
 check('No hubs game loads', await until("game.path.length === 1 && !game.loading"));
 check('Blind target hides the HUD and path pictures and peek', await ev("document.querySelector('#hudImg').classList.contains('hidden') && document.querySelector('#pathArt').classList.contains('hidden') && document.querySelector('#btnPeek').classList.contains('hidden')"));
 check('hub redirects are known', await ev("hubTitles().then(m => m.get('Blocks') === 'Block' && m.get('Mining') === 'Breaking')"));

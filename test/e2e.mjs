@@ -458,7 +458,7 @@ check('history that isn’t a list doesn’t stop the setup screen', await until
 const rec = JSON.stringify({ start: 'Diamond', goal: 'Iron Ingot', rules: [], won: true, clicks: 2, ms: 5000, at: Date.now() });
 await ev(`store.set('mwr.history', [null, 5, { ...${rec}, clicks: '<b>2</b>' }, { ...${rec}, rules: ['nope'] }, { ...${rec}, topic: 'constructor' }, ${rec}]); renderHistory()`);
 check('only real records are shown', await ev("document.querySelectorAll('#history tbody tr').length === 1 && !document.querySelector('#history tbody b')"),
-  await ev("document.querySelector('#history tbody').innerHTML.length"));
+  `rows=${await ev("document.querySelectorAll('#history tbody tr').length")}`);
 await ev("localStorage.removeItem('mwr.history')");
 
 check('no uncaught script errors', jsErrors.length === 0, jsErrors.slice(0, 5).join(' | '));

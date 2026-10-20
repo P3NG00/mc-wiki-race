@@ -8,7 +8,15 @@ const ws = new WebSocket(`ws://127.0.0.1:${port}/session`);
 let id = 0;
 const pending = new Map();
 let onEvent = () => {};
-ws.onmessage = m => { const d = JSON.parse(m.data); if (d.id && pending.has(d.id)) { pending.get(d.id)(d); pending.delete(d.id); } else if (d.method) onEvent(d); };
+// Uncaught errors and rejections in the page and the article frame, checked at the end. Firefox logs a web font whose
+// download is cut short (the frame replaced while the wiki's font loads) at the same level, so those are skipped.
+const jsErrors = [];
+ws.onmessage = m => {
+  const d = JSON.parse(m.data);
+  if (d.id && pending.has(d.id)) { pending.get(d.id)(d); pending.delete(d.id); }
+  else if (d.method === 'log.entryAdded') { const { type, level, text } = d.params; if (type === 'javascript' && level === 'error' && !text.startsWith('downloadable font:')) jsErrors.push(text); }
+  else if (d.method) onEvent(d);
+};
 const send = (method, params) => new Promise(r => { const i = ++id; pending.set(i, r); ws.send(JSON.stringify({ id: i, method, params })); });
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
@@ -20,6 +28,7 @@ function check(name, ok, extra = '') {
 
 await new Promise(r => ws.onopen = r);
 await send('session.new', { capabilities: {} });
+await send('session.subscribe', { events: ['log.entryAdded'] });
 const ctx = (await send('browsingContext.getTree', {})).result.contexts[0].context;
 await send('browsingContext.setViewport', { context: ctx, viewport: { width: 1280, height: 860 } });
 
@@ -338,6 +347,12 @@ await send('network.removeIntercept', { intercept });
 await send('session.unsubscribe', { events: ['network.beforeRequestSent'] });
 onEvent = () => {};
 
+// A link fragment that would open an HTML comment and a script inside the frame's script (the wiki renders
+// [[X#&lt;!--&lt;script&gt;]] as one) must not stop the next article's scripts from running.
+await ev(`(a => { a.href = '/w/Iron_Ingot#<!--<script>x'; a.textContent = 'x'; document.body.prepend(a); a.click(); })(document.createElement('a'))`, f);
+check('a fragment with <!--<script> still renders the article', await until("game.path.at(-1)?.title === 'Iron Ingot' && !game.loading", 10000) &&
+  await ev("document.querySelectorAll('a.mwr-live').length > 50", await frameCtx()), await ev("game.path.at(-1)?.title + ' loading=' + game.loading"));
+
 // Daily: #daily=<date> loads that day's pair and rule, the same on every call, a different pair the next day. 2026-01-02's
 // rule is Checkpoint, so it also fixes the checkpoint; 2026-01-01's is No Back, which picks none. The result records it.
 await send('browsingContext.navigate', { context: ctx, url: 'about:blank', wait: 'complete' });
@@ -432,6 +447,8 @@ await ev("document.querySelector('#btnClearHistory').click()");
 await ev("document.querySelector('#hClear').click()");
 check('Clear history empties it', await ev(`${histLen} === 0 && document.querySelector('#history').classList.contains('hidden') && document.querySelector('#modalBg').classList.contains('hidden')`),
   await ev(histLen));
+
+check('no uncaught script errors', jsErrors.length === 0, jsErrors.slice(0, 5).join(' | '));
 
 await send('session.end', {});
 console.log(failures ? `${failures} check(s) failed` : 'All checks passed');

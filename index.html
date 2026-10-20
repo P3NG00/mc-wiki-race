@@ -1038,12 +1038,16 @@ function renderArticle(page, fragment, token, blocked = [], seen = []) {
   const noNav = game.rules.includes('nonav');
   // The article renders in a sandboxed iframe (opaque origin): the wiki's own CSS applies untouched,
   // <base> resolves its relative image/CSS URLs, and the inline script reports clicks via postMessage.
+  // Values go into the script as JSON with < escaped: a link fragment that opens an HTML comment and then a script tag
+  // (the wiki allows one) would otherwise make the HTML parser run on past the closing tag, and neither of the frame's
+  // scripts would run. Not even this comment may spell that sequence out.
+  const js = v => JSON.stringify(v).replace(/</g, '\\u003c');
   const frameScript = `
-    const NS = new Set(${JSON.stringify(NAMESPACES.map(n => n.toLowerCase()))});
-    const FRAG = ${JSON.stringify(fragment || '')};
-    const WGL = ${JSON.stringify(WGL_THEME_CLASSES)};
-    const BLOCKED = new Set(${JSON.stringify(blocked)});
-    const SEEN = new Set(${JSON.stringify(seen)});
+    const NS = new Set(${js(NAMESPACES.map(n => n.toLowerCase()))});
+    const FRAG = ${js(fragment || '')};
+    const WGL = ${js(WGL_THEME_CLASSES)};
+    const BLOCKED = new Set(${js(blocked)});
+    const SEEN = new Set(${js(seen)});
     const NO_NAV = ${noNav};
     function classify(a) {
       if (NO_NAV && a.closest('.navbox')) return null;   // hidden too; this keeps them dead whatever the CSS does
@@ -1094,7 +1098,7 @@ function renderArticle(page, fragment, token, blocked = [], seen = []) {
       for (const c of WGL.light) document.body.classList.toggle(c, !e.data.dark);
     });
     scrollToId(FRAG);
-  `.replace(/<\/script/gi, '<\\/script');
+  `;
 
   const html = `<!doctype html>
 <html class="client-nojs" lang="en" dir="ltr"><head><meta charset="utf-8">

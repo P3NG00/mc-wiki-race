@@ -25,6 +25,10 @@ Quick syntax check of the inline script, which also fails on an HTML comment ope
 python3 -c "import re;h=open('index.html').read();s=re.findall(r'<script>\n(.*?)</script>\n</body>',h,re.S)[0];assert '<!--' not in s;open('/tmp/m.js','w').write(s)" && node --check /tmp/m.js
 ```
 
+## Offline copy of the wiki
+
+For reference only (the game never reads it): the English Kiwix ZIM of minecraft.wiki, linked from [Minecraft Wiki:Offline use](https://minecraft.wiki/w/Minecraft_Wiki:Offline_use) and rebuilt quarterly. It is downloaded by hand from `https://download.kiwix.org/zim/other/` into the repo root, where `.gitignore` keeps it out of git, and only its checksum is committed (`sha256sum -c minecraft.wiki_en_all_2026-08.zim.sha256`). Read it with the `libzim` package in an ignored venv: `python3 -m venv .venv && .venv/bin/pip install libzim`.
+
 ## Architecture (all in `index.html`)
 
 **API access.** Every request goes through `api()`, which always adds `origin=*`, allows at most `API_CONCURRENCY` (4) requests in flight with the rest queued in order (MediaWiki asks clients not to send many requests at once), and times each one out after 30 s. That parameter is mandatory: it is what makes MediaWiki send `Access-Control-Allow-Origin: *` for anonymous requests, and without it the page cannot fetch anything from `file://`. Calls used: `list=categorymembers` (pool modes), `generator=random` (Chaos pool), `list=backlinks` (target and checkpoint reachability, difficulty), `prop=pageprops|pageimages|categories|extracts` (disambiguation flag, fiction flag, thumbnail, redirect resolution, and the description: the first paragraph of the TextExtracts plain-text intro, since `pageprops.description` is often an infobox caption and keeps HTML entities), `prop=redirects` (No hubs), `action=parse` (article HTML). Nothing polls; every request comes from a player action. `pageInfo(title, { backlinks: limit })` gets the info and the backlink count, up to `limit`, in one request.

@@ -115,6 +115,45 @@ check('difficulty from a link\'s rules, and its words', await ev(`(() => {
   return got;
 })()`) === 'relaxed:Relaxed normal: hard:Hard normal:No Back');
 
+// Hot/cold: after a click, a hint says whether the page is closer to the objective than the one before, by the link graph,
+// shown over the article and kept on the path; a page the snapshot lacks gets no hint, and a game without the rule none.
+// A start two or more clicks from Crafting (Relaxed): the first step of its shortest route is warmer, going back colder.
+const far = JSON.parse(await ev(`(async () => {
+  for (const start of POOL_TITLES) {
+    const route = await parRoute({ start, goal: 'Crafting', rules: [] });
+    if (route?.length >= 3) return JSON.stringify(route);
+  }
+})()`));
+await open(`#start=${encodeURIComponent(far[0])}&target=Crafting&rules=hotcold`);
+await play();
+await ev(`navigate(${JSON.stringify(far[1])}, null)`);
+check('Hot/cold: a step along a shortest route is warmer, shown over the article and on the path', await until("game.path.at(-1).hint === 'warmer' && !game.loading") &&
+  await ev("!document.querySelector('#toast').classList.contains('hidden') && document.querySelector('#toast').textContent === HINTS.warmer.text") &&
+  await ev("document.querySelector('#pathList li.cur').textContent.endsWith(HINTS.warmer.icon)"), far.join(' → '));
+await ev(`navigate(${JSON.stringify(far[0])}, null)`);
+check('Hot/cold: going back is colder', await until("game.path.at(-1).hint === 'colder' && !game.loading"), await ev('game.path.at(-1).hint'));
+// A dead end, a page with no route anywhere (no links outside navboxes, no navboxes), counts as farthest: colder.
+const deadEnd = await ev(`linkGraph(true).then(g => WIKI_DATA.articles.map(([t]) => t).find(t => !spinoffOf(t) && !g.links[PAGE_IDS.get(t)].length && !g.carries[PAGE_IDS.get(t)].length))`);
+await ev(`navigate(${JSON.stringify(deadEnd)}, null)`);
+check('Hot/cold: walking into a dead end is colder', await until("game.path.at(-1).hint === 'colder' && !game.loading"), `${deadEnd}: ${await ev('game.path.at(-1).hint')}`);
+await ev("navigate('Brand New Mob', null)");
+check('Hot/cold has no hint for a page the snapshot lacks', await until("game.path.at(-1).hint === 'unknown' && !game.loading"));
+check('the rule is in the game\'s rules and its challenge link', await ev("game.rules.includes('hotcold') && challengeLink().includes('hotcold')"));
+await ev("finish(false); closeModal(); toSetup()");
+// With a checkpoint, the target reached before it isn't the objective yet, so it gets a hint too.
+await open('#start=Diamond&via=Creeper&target=Crafting&rules=hotcold');
+await play();
+await ev("navigate('Crafting', null)");
+check('Hot/cold hints the target reached before the checkpoint', await until("game.active && !!game.path.at(-1).hint && !game.loading"), await ev('game.path.at(-1).hint'));
+await ev("finish(false); closeModal(); toSetup()");
+await open('#start=Diamond&target=Crafting');
+await play();
+await ev("navigate('Diamond Pickaxe', null)");
+await until('game.path.length === 2 && !game.loading');
+await sleep(300);
+check('no hints without the rule', await ev('game.path.every(p => !p.hint)'));
+await ev("finish(false); closeModal(); toSetup()");
+
 // Rolls: each pool keeps to its tier, starts and targets come from different topics (Chaos aside), and targets are linked
 // well enough to be reached. planGroups and rollOne are called directly, with the pool's button set without a change event.
 check('a page without a hash rolls a pair on Normal', await open('') && await ev("level() === 'normal' && mode() === 'everyday'"));

@@ -603,6 +603,7 @@ const RULES = {
   nohubs: { label: 'No hubs', help: 'Links to big overview pages (Block, Item, Mob, Crafting, Java Edition…) are dead.' },
   nonav: { label: 'No navboxes', help: 'The link tables at the bottom of articles are gone: only links in the article itself count.' },
   blind: { label: 'Blind target', help: 'You only get the target’s name: no picture or description.' },
+  hotcold: { label: 'Hot/cold', help: 'After each click, a hint says whether you got closer to the target (warmer) or further away (colder).' },
   checkpoint: { label: 'Checkpoint', help: 'A third article you have to visit on the way to the target.' },
   limit: { label: 'Six clicks', help: `Reach the target in ${CLICK_LIMIT} clicks or fewer, Back and the way through a checkpoint included.` },
 };
@@ -936,7 +937,7 @@ function renderHud() {
   $('#btnBack').disabled = game.stack.length < 2 || game.loading || !game.active;
   $('#btnGiveUp').disabled = game.loading || !game.active;
   $('#pathList').innerHTML = game.path.map((p, i) =>
-    `<li class="${i === game.path.length - 1 ? 'cur' : ''} ${p.back ? 'back' : ''} ${p.via ? 'via' : ''}">${esc(p.title)}${p.back ? ' (back)' : ''}${p.via ? ' ✓ checkpoint' : ''}</li>`).join('');
+    `<li class="${i === game.path.length - 1 ? 'cur' : ''} ${p.back ? 'back' : ''} ${p.via ? 'via' : ''}">${esc(p.title)}${p.back ? ' (back)' : ''}${p.via ? ' ✓ checkpoint' : ''}${p.hint ? ` <span title="${esc(HINTS[p.hint].text)}">${HINTS[p.hint].icon}</span>` : ''}</li>`).join('');
   scrollPathToEnd();
 }
 // Keeps the newest entry in view: at the bottom of the sidebar, or at the end of the one-line path on phones, whose
@@ -956,11 +957,16 @@ function renderObjective() {
 
 // Called once the checkpoint's article has rendered, so the banner isn't hidden behind the loading overlay.
 // The 3 s matches the .toast animation; the timer also hides it when reduced motion turns the animation off.
-function celebrateCheckpoint() {
-  $('#toast').textContent = `✓ Checkpoint reached! Now find ${game.goal.title}`;
+// A banner over the article, gone after ms or on the next navigation.
+function showToast(text, ms) {
+  hideToast();
+  $('#toast').textContent = text;
   $('#toast').classList.remove('hidden');
+  game.toastTimer = setTimeout(hideToast, ms);
+}
+function celebrateCheckpoint() {
+  showToast(`✓ Checkpoint reached! Now find ${game.goal.title}`, 3000);
   $('.hud .goal').classList.add('reached');
-  game.toastTimer = setTimeout(hideToast, 3000);
   play('checkpoint');
 }
 function hideToast() { clearTimeout(game.toastTimer); $('#toast').classList.add('hidden'); $('.hud .goal').classList.remove('reached'); }
@@ -1040,6 +1046,16 @@ async function navigate(title, fragment, { back = false } = {}) {
   game.path.push({ title: page.title, back, ...(via && { via }) });
   game.seen.set(title, page.title).set(page.title, page.title);   // the link's title too, in case it was a redirect
   if (via) { game.viaReached = game.celebrate = true; renderObjective(); }
+  // Hot/cold, on every arrival but the first and the objective's own (a target passed before the checkpoint gets one):
+  // the hint goes onto the path and shows over the article once both are ready (showHint, here and in frameReady),
+  // unless the player has moved on by then.
+  if (game.rules.includes('hotcold') && game.path.length > 1 && !via && page.title !== objective().title) {
+    const entry = game.path.at(-1);
+    hotColdHint(game.path.at(-2).title, entry.title).then(hint => {
+      entry.hint = hint;
+      if (game.path.at(-1) === entry && game.active) { renderHud(); showHint(); }
+    }, () => {});
+  }
   $('#credit').innerHTML = `<a href="${esc(wikiUrl(page.title))}" target="_blank" rel="noopener">View on minecraft.wiki</a> · ` +
     `<a href="${LICENSE_URL}" target="_blank" rel="noopener">CC BY-NC-SA 3.0</a>`;
   // The target and checkpoint stay reachable even if they are hubs.
@@ -1064,6 +1080,7 @@ function frameReady(token) {
   renderHud();
   resumeClock();
   if (game.celebrate) { game.celebrate = false; celebrateCheckpoint(); }
+  else showHint();
 }
 
 // ---------------------------------------------------------------- Sounds
@@ -1432,14 +1449,40 @@ function shortestRoute(graph, from, to, usable) {
 // Relaxed, hubs are dead in Hard (the target's and the checkpoint's aside, as in play), and a spin-off's pages only count
 // when it is on. Null if there is none, or if a card's page isn't in the snapshot.
 async function parRoute({ start, via, goal, rules, content = [] }) {
-  const graph = await linkGraph(!rules.includes('nonav'));
+  const graph = await linkGraph(!rules.includes('nonav')), usable = routeUsable({ goal, via, rules, content });
+  const legs = (via ? [[start, via], [via, goal]] : [[start, goal]]).map(([a, b]) => shortestRoute(graph, a, b, usable));
+  return legs.every(Boolean) ? legs.reduce((route, leg) => route.concat(leg.slice(1))) : null;
+}
+// Which pages a route may go through, by page number: as in play, hubs are dead in Hard but the target and the
+// checkpoint, and a spin-off's pages only count when it is on.
+function routeUsable({ goal, via, rules, content = [] }) {
   const hubs = new Set(rules.includes('nohubs') ? HUB_TITLES.values() : []);
-  const usable = v => {
+  return v => {
     const title = WIKI_DATA.articles[v][0], spinoff = spinoffOf(title);
     return !(hubs.has(title) && title !== goal && title !== via) && (!spinoff || content.includes(spinoff));
   };
-  const legs = (via ? [[start, via], [via, goal]] : [[start, goal]]).map(([a, b]) => shortestRoute(graph, a, b, usable));
-  return legs.every(Boolean) ? legs.reduce((route, leg) => route.concat(leg.slice(1))) : null;
+}
+
+// Hot/cold: whether an arrival is closer to the objective than the page before it, going by the link graph under the
+// game's settings. It never says how close: only warmer, colder, the same, or unknown for a page the snapshot lacks. A
+// page with no route to the objective counts as farthest of all, so walking into a dead end is colder.
+const HINTS = {
+  warmer: { icon: '🔥', text: '🔥 Warmer' },
+  colder: { icon: '❄️', text: '❄️ Colder' },
+  same: { icon: '＝', text: 'Same distance' },
+  unknown: { icon: '?', text: 'No hint: this page isn’t in the wiki’s offline copy' },
+};
+async function hotColdHint(from, to) {
+  if (!PAGE_IDS.has(from) || !PAGE_IDS.has(to)) return 'unknown';
+  const aim = objective().title, usable = routeUsable({ goal: game.goal.title, via: game.via?.title, rules: game.rules, content: game.content });
+  const graph = await linkGraph(!game.rules.includes('nonav'));
+  const [before, after] = [from, to].map(t => shortestRoute(graph, t, aim, usable)?.length ?? Infinity);
+  return after < before ? 'warmer' : after > before ? 'colder' : 'same';
+}
+// Shows the latest arrival's hint over the article, once both the hint and the article are ready.
+function showHint() {
+  const hint = game.path.at(-1)?.hint;
+  if (hint && game.active && !game.loading) showToast(HINTS[hint].text, 2000);
 }
 
 // Golf: a win's clicks against par. Below par is only possible where the live wiki has a link the snapshot hasn't.

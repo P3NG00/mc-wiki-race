@@ -29,6 +29,7 @@ Open `index.html` in a browser. Opening it straight from disk (`file://`) works 
 - **Rules** are optional extras you can switch on:
   - **No Back:** the Back button is gone, so every click is final.
   - **Blind target:** you only get the target's name, with no picture or description.
+  - **Hot/cold:** after each click, a hint says whether you got closer to the target (🔥 warmer) or further away (❄️ colder), never how close.
   - **Six clicks:** reach the target in 6 clicks or fewer, Back included, or the game is over.
   - **Checkpoint:** a third card. You have to visit that article on the way, and reaching the target before it doesn't count.
 - **Copy challenge link** shares the exact pair you're looking at, plus any checkpoint, the difficulty and rules, as `index.html#start=<Title>&target=<Title>&via=<Title>&rules=nonav,checkpoint` (`nonav` is Normal, `nonav,nohubs` Hard, neither Relaxed).

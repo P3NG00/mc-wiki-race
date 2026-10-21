@@ -15,6 +15,21 @@
   "families_comment": "Content the player can add to the pool with the Content checkboxes (keys as in index.html's FAMILIES), by category. Articles in them are left out of the pool otherwise. Education is its four exact categories: the broad Minecraft Education category also holds Brewing, Charcoal and Dye.",
   "spinoffs": ["Dungeons", "Dungeons II", "Legends", "Earth", "Story Mode", "Movie"],
   "spinoffs_comment": "Namespaces of other games, each a Spin-offs checkbox: its pages can be rolled and links into it go live.",
+  "research": {
+    "topics": {
+      "blocks": ["Blocks", "Redstone", "Plants"],
+      "items": ["Items", "Food", "Tools", "Armor"],
+      "mobs": ["Hostile mobs", "Passive mobs", "Neutral mobs", "Boss mobs"],
+      "world": ["Overworld biomes", "Nether biomes", "End biomes", "Generated structures"],
+      "magic": ["Enchantments", "Effects"]
+    },
+    "not_content_categories": ["Minecraft 4k", "China Edition", "Set index pages", "Pages using MCRS diagrams"],
+    "variant_categories": ["Slabs", "Stairs", "Walls", "Pottery sherds", "Music discs", "Dyes", "Smithing templates", "Banner patterns"],
+    "famous_shares": [0.2, 0.25, 0.3],
+    "deep_cuts_shares": [0.33, 0.5],
+    "sweet_spot_first_clicks": [2, 15]
+  },
+  "research_comment": "Pool designs report.py compares (see RESEARCH.md): topics as in index.html's TOPICS, pages that aren't game content, variant groups, and the share of game content that Famous (best linked) and Deep cuts (least linked, per topic) take. Only report.py reads this; the game doesn't use it yet.",
   "disambiguation_categories": ["Disambiguation pages", "Version disambiguation pages"],
   "hubs": [
     "Minecraft", "Java Edition", "Bedrock Edition", "Edition", "Minecraft Education", "Java Edition version history",

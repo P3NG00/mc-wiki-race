@@ -1,10 +1,16 @@
-"""Writes a Markdown report on a snapshot: pool sizes, link counts, shortest routes between rolls, and hub candidates.
+"""Writes a Markdown report on a snapshot: pool sizes, link counts, dead ends, pool designs compared, and hub candidates.
 
     .venv/bin/python -I tools/wikidata/report.py tools/wikidata/cache/minecraft.wiki_en_all_2026-08.jsonl.gz [-o report.md]
 
-Shortest routes are sampled (--pairs start articles, each to --pairs targets) with a fixed seed, so a report is
-repeatable. "No hubs" removes the config's hubs from the graph, as the No hubs rule does. Pool means the articles
-build.py puts in the pool categories, and wide means every article linked from enough articles to be a target.
+The pool designs come from the config's research section (see RESEARCH.md for what they found). Each is measured on
+--pairs random pairs (200 by default, about 3 minutes in all) with a seed taken from its name, so a report is repeatable,
+in three graphs: all links, without navboxes (the No navboxes rule), and without navboxes or the config's hubs (both
+rules). Per design:
+  1, 2, 3, 4+, none   share of pairs by fewest clicks (none: no route at all)
+  good first clicks   how many links on the start page begin a shortest route (median)
+  only one            share of pairs with exactly one good first click
+  sweet spot          share of pairs taking 2+ clicks with a choice of good first clicks in the configured range
+  ends                how many articles link to the start and to the target from outside navboxes (medians)
 """
 import argparse, os, random, statistics, sys
 from collections import Counter, deque
@@ -16,7 +22,8 @@ from build import build
 MIN_BACKLINKS = 5   # as in index.html: a target needs this many linking articles outside navboxes
 
 
-def distances(adj, start, skip):
+def reach(adj, start, skip=frozenset()):
+    """Distance from start to every page it reaches in adj (pass the reversed graph for distances to start)."""
     dist = {start: 0}
     queue = deque([start])
     while queue:
@@ -28,20 +35,92 @@ def distances(adj, start, skip):
     return dist
 
 
-def route_table(rng, adj, starts, targets, skip, pairs):
-    hist, total = Counter(), 0
-    for s in rng.sample(starts, min(pairs, len(starts))):
-        dist = distances(adj, s, skip)
-        for t in rng.sample(targets, min(pairs, len(targets))):
-            if t != s:
-                hist[dist.get(t)] += 1
-                total += 1
-    share = lambda n: f'{n / total:.0%}' if n else ''
-    return [share(hist[k]) for k in range(1, 7)] + [share(sum(v for k, v in hist.items() if k and k >= 7)), share(hist[None])]
+def reverse(adj):
+    rev = [[] for _ in adj]
+    for u, vs in enumerate(adj):
+        for v in vs:
+            rev[v].append(u)
+    return rev
 
 
 def quartiles(values):
     return ' / '.join(f'{q:g}' for q in statistics.quantiles(values, n=4)) if len(values) > 1 else '–'
+
+
+def research_pools(snap, config, rows):
+    """The pools to compare, by name, plus each article's topic, the non-content pages left out and the variants."""
+    research = config['research']
+    links = lambda t: rows[t][2]
+    cats = lambda t: set(snap.pages[t]['cats'])
+    topic_of = {}
+    for topic, topic_cats in research['topics'].items():
+        for t in snap.articles:
+            if set(rows[t][3]) & set(topic_cats):
+                topic_of.setdefault(t, topic)
+    today = sorted(topic_of)
+    clean = [t for t in today if not cats(t) & set(research['not_content_categories'])]
+    variants = [t for t in clean if cats(t) & set(research['variant_categories'])]
+    everyday = [t for t in clean if not cats(t) & set(research['variant_categories'])]
+    best_linked = lambda ts, share: sorted(ts, key=links)[len(ts) - round(len(ts) * share):]
+    least_linked = lambda ts, share: sorted(ts, key=links)[:round(len(ts) * share)]
+
+    pools = {'Pool today': today, 'Cleaned, with variants': clean, 'Everyday (cleaned, no variants)': everyday}
+    for share in research['famous_shares']:
+        pools[f'Famous {share:.0%}'] = best_linked(everyday, share)
+    for share in research['deep_cuts_shares']:
+        pools[f'Deep cuts {share:.0%} per topic'] = [t for topic in research['topics'] for t in least_linked(
+            [t for t in everyday if topic_of[t] == topic and links(t) >= MIN_BACKLINKS], share)]
+    pools['Variants only'] = variants
+    return pools, topic_of, sorted(set(today) - set(clean)), variants
+
+
+def designs(pools, topic_of, rows, chaos):
+    """(name, draw) for each pool with any pair and with different topics, then Chaos. draw(rng) gives (start, target)."""
+    for name, pool in pools.items():
+        targets = [t for t in pool if rows[t][2] >= MIN_BACKLINKS]
+        if not targets:
+            continue
+        yield f'{name}, any pair', lambda rng, pool=pool, targets=targets: (rng.choice(pool), rng.choice(targets))
+        groups = {}
+        for t in pool:
+            groups.setdefault(topic_of[t], []).append(t)
+        aims = {k: [t for t in g if rows[t][2] >= MIN_BACKLINKS] for k, g in groups.items()}
+        usable = [k for k in groups if aims[k]]
+        if len(usable) >= 2:
+            yield f'{name}, different topics', lambda rng, groups=groups, aims=aims, usable=usable: (
+                lambda a, b: (rng.choice(groups[a]), rng.choice(aims[b])))(*rng.sample(usable, 2))
+    chaos_targets = [t for t in chaos if rows[t][2] >= MIN_BACKLINKS]
+    yield 'Chaos (every article)', lambda rng: (rng.choice(chaos), rng.choice(chaos_targets))
+
+
+def measure(draw, seed, graph, index, rows, cache, pairs, sweet_range):
+    adj, radj, skip = graph
+    rng = random.Random(seed)
+    hist, good, ends, sweet, n = Counter(), [], [], 0, 0
+    for _ in range(pairs * 20):   # a tiny pool may keep drawing the same article twice
+        if n == pairs:
+            break
+        s, t = draw(rng)
+        si, ti = index[s], index[t]
+        if s == t or si in skip or ti in skip:
+            continue
+        n += 1
+        if ti not in cache:
+            cache[ti] = reach(radj, ti, skip)
+        back = cache[ti]
+        clicks = back.get(si)
+        hist[None if clicks is None else min(clicks, 4)] += 1
+        if clicks:
+            g = sum(1 for v in adj[si] if v not in skip and back.get(v) == clicks - 1)
+            good.append(g)
+            sweet += clicks >= 2 and sweet_range[0] <= g <= sweet_range[1]
+        ends.append((rows[s][2], rows[t][2]))
+    if not n:
+        return None
+    share = lambda k: f'{hist[k] / n:.0%}' if hist[k] else ''
+    return [share(1), share(2), share(3), share(4), share(None), f'{statistics.median(good):.0f}' if good else '–',
+            f'{sum(g == 1 for g in good) / len(good):.0%}' if good else '–', f'{sweet / n:.0%}',
+            f'{statistics.median(e[0] for e in ends):.0f}/{statistics.median(e[1] for e in ends):.0f}']
 
 
 def report(snap, config, pairs):
@@ -53,6 +132,10 @@ def report(snap, config, pairs):
     pool = sorted(index[t] for t, r in rows.items() if r[3])
     wide = sorted(index[t] for t, r in rows.items() if t in index and r[2] >= MIN_BACKLINKS)
     hubs = {index[h] for h in config['hubs']}
+    full_rev, body_rev = reverse(full_adj), reverse(body)
+    # Dead ends, measured from the most linked article: pages that can't reach it can't reach most of the wiki either.
+    core = max(range(len(snap.articles)), key=lambda i: full_in[i])
+    to_core, from_core = reach(full_rev, core), reach(full_adj, core)
     out = []
     w = out.append
 
@@ -67,7 +150,10 @@ def report(snap, config, pairs):
     w(f'| In pool categories | {len(pool):,} |')
     w(f'| Possible targets (linked from {MIN_BACKLINKS}+ articles outside navboxes) | {len(wide):,} |')
     w(f'| Article links | {sum(map(len, full_adj)):,} ({sum(map(len, body)):,} outside navboxes) |')
-    w(f'| Articles no article links to | {sum(1 for c in full_in if not c):,} |\n')
+    w(f'| Articles no article links to | {sum(1 for c in full_in if not c):,} |')
+    w(f'| Dead ends: articles with no route to {snap.articles[core]} (a game starting there can\'t be won) | '
+      f'{len(snap.articles) - len(to_core):,} |')
+    w(f'| Articles no route from {snap.articles[core]} reaches (can never be reached) | {len(snap.articles) - len(from_core):,} |\n')
 
     w('## Pool categories\n')
     w('| Category | In pool | Left out | Under 5 links outside navboxes |\n|---|--:|--:|--:|')
@@ -92,17 +178,51 @@ def report(snap, config, pairs):
     w(f'| Linking articles | {quartiles([full_in[i] for i in pool])} |')
     w(f'| Outside navboxes | {quartiles([outside_in[i] for i in pool])} |\n')
 
-    w('## Shortest routes\n')
-    w(f'Share of sampled pairs ({pairs}×{pairs} per row) by fewest clicks. "None" means no route at all.\n')
-    w('| Graph | Pairs | 1 | 2 | 3 | 4 | 5 | 6 | 7+ | None |\n|---|---|--:|--:|--:|--:|--:|--:|--:|--:|')
-    rng = random.Random(1)
-    for label, adj, skip in (('All links', full_adj, set()), ('No navboxes', body, set()),
-                             ('No hubs', full_adj, hubs), ('No navboxes, no hubs', body, hubs)):
-        for plabel, targets in (('pool → pool', pool), ('pool → wide', wide)):
-            starts = [i for i in pool if i not in skip]
-            w(f'| {label} | {plabel} | ' + ' | '.join(route_table(rng, adj, starts, [t for t in targets if t not in skip], skip, pairs)) + ' |')
+    research = config['research']
+    pools, topic_of, not_content, variants = research_pools(snap, config, rows)
+    links = lambda t: rows[t][2]
+    w('## Pool definitions\n')
+    w(f'Topics and categories from the config\'s research section. Left out as not game content ({len(not_content)}): '
+      + (', '.join(not_content) or 'none') + '.')
+    w(f'Variants ({len(variants)}): ' + ', '.join(f'{c} {sum(c in snap.pages[t]["cats"] for t in variants)}' for c in research['variant_categories']) + '.\n')
+    w('| Pool | Articles | Links outside navboxes (median, range) | ' + ' | '.join(research['topics']) + ' |')
+    w('|---|--:|---|' + '--:|' * len(research['topics']))
+    for name, p in pools.items():
+        tc = Counter(topic_of[t] for t in p)
+        span = f'{statistics.median(map(links, p)):.0f} ({min(map(links, p))}–{max(map(links, p))})' if p else '–'
+        w(f'| {name} | {len(p):,} | {span} | ' + ' | '.join(str(tc[k]) for k in research['topics']) + ' |')
+    w('')
+    for name, p in pools.items():
+        if not p:
+            continue
+        edge = sorted(p, key=links)
+        line = f'- **{name}:** least linked ' + ', '.join(f'{t} ({links(t)})' for t in edge[:5])
+        if name.startswith('Famous'):
+            line += '; best linked ' + ', '.join(f'{t} ({links(t)})' for t in edge[-3:])
+        w(line + '; random ' + ', '.join(random.Random(name).sample(p, min(8, len(p)))) + '.')
+    w('')
 
-    w('\n## Hub candidates\n')
+    w('## Pool designs\n')
+    lo, hi = research['sweet_spot_first_clicks']
+    w(f'{pairs} random pairs per row.\n')
+    w('- **1, 2, 3, 4+, none:** share of pairs by fewest clicks (none: no route at all).')
+    w('- **Good first clicks:** how many links on the start page begin a shortest route (median).')
+    w('- **Only one:** share of pairs with exactly one good first click.')
+    w(f'- **Sweet spot:** share of pairs taking 2+ clicks with {lo}–{hi} good first clicks.')
+    w('- **Ends:** how many articles link to the start and to the target from outside navboxes (medians).\n')
+    for gname, graph in (('All links', (full_adj, full_rev, frozenset())), ('No navboxes', (body, body_rev, frozenset())),
+                         ('No navboxes, no hubs', (body, body_rev, frozenset(hubs)))):
+        w(f'### {gname}\n')
+        w('| Design | 1 | 2 | 3 | 4+ | none | good first clicks | only one | sweet spot | ends |')
+        w('|---|--:|--:|--:|--:|--:|--:|--:|--:|--:|')
+        cache = {}
+        for name, draw in designs(pools, topic_of, rows, snap.articles):
+            cells = measure(draw, name + gname, graph, index, rows, cache, pairs, (lo, hi))
+            if cells:
+                w(f'| {name} | ' + ' | '.join(cells) + ' |')
+        w('')
+
+    w('## Hub candidates\n')
     w('Articles with the most linking articles outside navboxes, times links out. ✓ marks the config\'s hubs.\n')
     w('| Article | Linked from | Outside navboxes | Links out | Hub |\n|---|--:|--:|--:|:-:|')
     score = sorted(range(len(snap.articles)), key=lambda i: -outside_in[i] * len(full_adj[i]))
@@ -118,7 +238,7 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__.split('\n')[0])
     ap.add_argument('snapshot')
     ap.add_argument('-o', '--out')
-    ap.add_argument('--pairs', type=int, default=100)
+    ap.add_argument('--pairs', type=int, default=200)
     args = ap.parse_args()
     text = report(Snapshot(args.snapshot), load_config(), args.pairs)
     if args.out:

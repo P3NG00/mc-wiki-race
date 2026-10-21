@@ -11,6 +11,7 @@ from common import Snapshot, load_config, read_data
 from extract import extract
 from build import build, render
 from diff import diff
+from report import report
 
 failures = 0
 
@@ -158,6 +159,11 @@ with tempfile.TemporaryDirectory() as tmp:
     check('hubs and redirects to them, sections included',
           data['hubs'] == {'Block': 'Block', 'Blocks': 'Block', 'Breaking': 'Breaking', 'Breaking/Mining': 'Breaking', 'Mining': 'Breaking'},
           data['hubs'])
+
+    research = {**CONFIG['research'], 'topics': {'items': ['Items', 'Tools'], 'mobs': ['Hostile mobs']}}
+    text = report(snap, {**CONFIG, 'research': research}, 20)
+    check('the report runs, with its pool definitions and designs',
+          all(h in text for h in ('## Pool definitions', '## Pool designs', '| Pool today, any pair |', 'Dead ends')), text[:400])
 
     out = os.path.join(tmp, 'wiki-data.js')
     with open(out, 'w', encoding='utf-8') as f:

@@ -114,8 +114,8 @@ check('the result shows par and a shortest route beside your path', await until(
   && /^Diamond → .*Crafting$/.test(${shortest}) && document.querySelector('#par').textContent.startsWith('Going by the wiki’s copy from ')`),
   await ev(shortest));
 check('the record keeps par, and the history shows it', await ev("Number.isInteger(savedGames()[0].par)") && await until(
-  "toSetup(), document.querySelector('#history tbody tr td:nth-child(5)').textContent === 'par ' + savedGames()[0].par"),
-  await ev("document.querySelector('#history tbody tr td:nth-child(5)').textContent"));
+  "toSetup(), document.querySelector('#history tbody tr .h-result .note').textContent.endsWith('par ' + savedGames()[0].par)"),
+  await ev("document.querySelector('#history tbody tr .h-result')?.textContent"));
 check('golf names a win against par, saying what each means', await ev("[[1, 1], [2, 2], [3, 2], [4, 2], [5, 2], [9, 2], [1, 2], [1, 3]].map(([c, p]) => golfText(golfScore(c, p))).join('|')")
   === 'Hole in one! (par 1 in one click)|Par (even with par)|Bogey (1 over par)|Double bogey (2 over par)|Triple bogey (3 over par)|7 over par|Birdie (1 under par)|Eagle (2 under par)');
 await ev('closeModal(); toSetup()');
@@ -289,7 +289,7 @@ await ev("navigate('Zombie', null)");
 check('reaching the target sooner loses: Too soon', await until('!game.active') && await ev(`(r => r.tooSoon && !r.won && r.exact === ${n})(store.get('mwr.history', [])[0])
   && document.querySelector('#modal h2').textContent === 'Too soon' && document.querySelector('#modal').textContent.includes('it had to be exactly ${n}')`));
 await ev("closeModal(); toSetup()");
-check('the history says too soon', await ev("document.querySelector('#history tbody tr').textContent.includes('too soon')"));
+check('the history says too soon, under the game\'s label', await ev("document.querySelector('#history tbody tr .res.lost').textContent === '✗ Too soon' && document.querySelector('#history tbody tr .tag.game').textContent === 'Exact clicks'"));
 await open('#start=Diamond&target=Zombie&rules=exact');
 await until(ready);
 await play();
@@ -302,6 +302,9 @@ check('on the count wins, with no golf score', await until('!game.active') && aw
   && document.querySelector('#mBestTitle').textContent === 'One way in exactly ${n}' && document.querySelectorAll('#mBest li').length === ${n + 1}`),
   await ev("document.querySelector('#mBestTitle')?.textContent"));
 await ev("closeModal(); toSetup()");
+check('the history marks the win as the pair\'s best, played today', await ev(`(tr => tr.querySelector('.res.won').textContent === '✓ ${n} clicks' && !!tr.querySelector('.best-tag')
+  && tr.querySelector('.h-when').textContent === 'Today' && tr.querySelector('.h-route').textContent.startsWith('Diamond → Zombie'))(document.querySelector('#history tbody tr'))`),
+  await ev("document.querySelector('#history tbody tr').textContent.replace(/\\s+/g, ' ').trim()"));
 await open('#start=Diamond&target=Zombie&rules=exact');
 await until(ready);
 await play();

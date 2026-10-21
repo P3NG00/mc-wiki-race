@@ -513,7 +513,8 @@ check('daily result is recorded', await ev("(r => r.daily === '2026-01-06' && r.
 await ev("document.querySelector('#mNew').click()");
 await until('setup.busy === 0', 60000);
 check('New game leaves the daily without the notice', await ev("setup.daily === null && document.querySelector('#setupStatus').textContent !== LEFT_DAILY"));
-check('history marks the daily', await ev("document.querySelector('#history tbody tr').textContent.includes('Daily 2026-01-06, Relay')"));
+check('history marks the daily', await ev("document.querySelector('#history tbody tr .tag.game').textContent === 'Relay' && document.querySelector('#history tbody tr .tag.daily').textContent === 'Daily ' + shortDate(new Date(2026, 0, 6))"),
+  await ev("document.querySelector('#history tbody tr .h-game').textContent"));
 await ev("loadDaily('2026-01-06')");
 await until("setup.daily === '2026-01-06' && setup.busy === 0", 60000);
 await ev("document.querySelector('#rules input[value=limit]').click()");

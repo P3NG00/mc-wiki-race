@@ -186,9 +186,19 @@
   .history th, .history td { text-align: left; padding: 7px 10px; border-bottom: 1px solid var(--line); }
   .history th { color: var(--muted); font-weight: 600; }
   .history tr:last-child td { border-bottom: 0; }
-  .history .lost { color: var(--muted); }
   .history-wrap { overflow-x: auto; }
-  .history .unit { display: none; }
+  .history td { vertical-align: top; }
+  .history .tags { display: flex; flex-wrap: wrap; gap: 4px; }
+  .tag.daily { background: var(--accent-soft); border-color: var(--accent-soft); color: var(--accent); }
+  .history .note { font-size: 12.5px; }
+  .history .h-result > span:first-child { display: inline-flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+  /* The outcome: green for a win, orange for a loss, grey for giving up; Best marks a personal best. */
+  .res { font-weight: 700; border-radius: var(--radius-pill); padding: 1px 9px; background: var(--bg); color: var(--muted); white-space: nowrap; }
+  .res.won { background: var(--accent-soft); color: var(--accent); }
+  .res.lost { background: var(--warm-soft); color: var(--warm); }
+  .best-tag { font-size: 11px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; border-radius: var(--radius-pill);
+    padding: 1px 7px; background: var(--warm-soft); color: var(--warm); }
+  .history .h-when { color: var(--muted); white-space: nowrap; }
   .noscript { background: var(--panel); border: 1px solid var(--target); border-radius: var(--radius-lg); padding: 14px; margin: 0 0 24px; }
   .noscript p { margin: 0; }
   .site-foot { margin-top: 36px; padding-top: 12px; border-top: 1px solid var(--line); color: var(--muted); font-size: 13px; }
@@ -205,9 +215,9 @@
   .hud .goal { display: flex; flex-direction: column; gap: 5px; min-width: 0; flex: 1; }
   .hud-top, .hud-tags { display: flex; flex-wrap: wrap; gap: 4px 6px; align-items: center; }
   .hud-top { gap: 4px 10px; }
-  .hud-tags .tag, .result-game .tag { font-size: 11px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; border-radius: var(--radius-pill);
+  .hud-tags .tag, .result-game .tag, .history .tag { font-size: 11px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; border-radius: var(--radius-pill);
     padding: 1px 8px; border: 1px solid var(--line); background: var(--bg); color: var(--muted); }
-  .hud-tags .tag.game, .result-game .tag.game { background: var(--ink); border-color: var(--ink); color: var(--panel); }
+  .hud-tags .tag.game, .result-game .tag.game, .history .tag.game { background: var(--ink); border-color: var(--ink); color: var(--panel); }
   .route-row { display: flex; gap: 8px; align-items: center; min-width: 0; }
   .route { position: relative; display: flex; gap: 6px; align-items: center; min-width: 0; overflow-x: auto; scrollbar-width: thin; padding: 2px; }
   .route .sep { flex: none; color: var(--muted); }
@@ -330,16 +340,15 @@
     .mode-help { margin-left: 0; }
     .setup-actions .primary { flex-basis: 100%; padding: 10px 14px; }
     /* Recent games as two or three lines per game: the route, the settings, then clicks · time · date. */
+    /* Recent games as a card each: the labels and when, the route, the result and time. */
     .history thead { display: none; }
     .history table, .history tbody { display: block; }
-    .history tr { display: flex; flex-wrap: wrap; gap: 2px 6px; padding: 8px 12px; border-bottom: 1px solid var(--line); }
+    .history tr { display: grid; grid-template-columns: 1fr auto; gap: 4px 10px; padding: 10px 12px; border-bottom: 1px solid var(--line); }
     .history tr:last-child { border-bottom: 0; }
     .history td { padding: 0; border: 0; }
-    .history td:nth-child(2)::before { content: '→ '; color: var(--muted); }
-    .history td:nth-child(3) { flex-basis: 100%; }
-    .history td:nth-child(n+3) { color: var(--muted); font-size: 12.5px; }
-    .history td:nth-child(n+5)::before { content: '· '; }
-    .history .unit { display: inline; }
+    .history td.h-route { grid-column: 1 / -1; grid-row: 2; }
+    .history td.h-when { grid-column: 2; grid-row: 1; text-align: right; }
+    .history td.h-time { align-self: center; color: var(--muted); }
   }
   /* The game on a phone held upright (a short screen on its side keeps the sidebar, below). */
   @media (max-width: 720px) and (min-height: 501px) {
@@ -502,7 +511,7 @@ const THEMES = [...new Set(['auto', 'light', 'dark', ...Array.from(document.quer
 
   <div class="history hidden" id="history">
     <div class="history-head"><h2>Recent games</h2><button class="link" id="btnClearHistory">Clear history</button></div>
-    <div class="history-wrap"><table><thead><tr><th>Start</th><th>Target</th><th>Settings</th><th>Clicks</th><th>Par</th><th>Time</th><th>When</th></tr></thead><tbody></tbody></table></div>
+    <div class="history-wrap"><table><thead><tr><th>Game</th><th>Route</th><th>Result</th><th>Time</th><th>When</th></tr></thead><tbody></tbody></table></div>
   </div>
 
   <footer class="site-foot">
@@ -1152,7 +1161,7 @@ function dailyText(date) {
 // The daily box at the top of the setup screen: today's game, and how you did if you have won it.
 function renderDailyBox() {
   const date = today(), done = savedGames().find(r => r.daily === date && r.won);
-  $('#dailyDate').textContent = new Date().toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
+  $('#dailyDate').textContent = shortDate(new Date());
   $('#dailyWhat').textContent = dailyText(date);
   $('#dailyDone').textContent = done ? `· done in ${done.clicks} clicks (${fmtTime(done.ms)})` : '';
 }
@@ -1234,18 +1243,39 @@ function challengeLink() {
     (r.length ? '&rules=' + r.join(',') : '');
 }
 
+// A day as "21 Oct" (with the year when it isn't this one), and a game's day as Today or Yesterday when it is.
+const shortDate = d => d.toLocaleDateString(undefined, { day: 'numeric', month: 'short', ...(d.getFullYear() !== new Date().getFullYear() && { year: 'numeric' }) });
+function whenText(at) {
+  const day = new Date(at).toDateString(), now = new Date();
+  return day === now.toDateString() ? 'Today' : day === new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1).toDateString() ? 'Yesterday' : shortDate(new Date(at));
+}
+// Recent games: each game's labels (the game, its extra rules, a daily's day), its route with the settings that aren't the
+// defaults, its result (and golf score and par), time and day. Best marks each pair's personal best.
 function renderHistory() {
   renderDailyBox();
-  const rows = savedGames();
+  const rows = savedGames(), best = new Map(), pair = r => recordKey(r) + '#' + r.rules.join();   // a personal best's key, as in finish
+  for (const r of rows) {
+    const b = best.get(pair(r));
+    if (r.won && (!b || r.clicks < b.clicks || (r.clicks === b.clicks && r.ms < b.ms))) best.set(pair(r), r);
+  }
   $('#history').classList.toggle('hidden', rows.length === 0);
-  $('#history tbody').innerHTML = rows.slice(0, 15).map(r => `
-    <tr class="${r.won ? '' : 'lost'}">
-      <td>${esc(r.start)}</td><td>${esc(targetText(r))}${r.vias ? ` <span class="note">via ${esc(r.vias.join(', '))}</span>` : ''}</td><td>${esc([r.daily && `Daily ${r.daily}`, settingsText(r)].filter(Boolean).join(', '))}</td>
-      <td class="mono">${r.won ? `${r.clicks}<span class="unit"> click${r.clicks === 1 ? '' : 's'}</span>` : LOSSES[lossOf(r)]?.toLowerCase() ?? 'gave up'}</td>
-      <td class="mono">${r.par === undefined ? '–' : `<span class="unit">par </span>${r.par}${r.won && !r.exact ? ` (${overPar(r.clicks - r.par)})` : ''}`}</td>
-      <td class="mono">${fmtTime(r.ms)}</td>
-      <td>${esc(new Date(r.at).toLocaleDateString())}</td>
-    </tr>`).join('');
+  $('#history tbody').innerHTML = rows.slice(0, 15).map(r => {
+    const tags = [[GAMES[gameOf(r.rules)].label, 'game'], ...r.rules.filter(k => EXTRA_RULES.includes(k) || k === 'noretrace').map(k => [RULES[k].label]),
+      ...r.daily ? [[`Daily ${shortDate(new Date(r.daily + 'T00:00'))}`, 'daily']] : []];   // local midnight of that day
+    const loss = lossOf(r), golf = r.won && !r.exact && r.par !== undefined ? golfScore(r.clicks, r.par) : null;
+    const result = r.won ? [`✓ ${r.clicks} click${r.clicks === 1 ? '' : 's'}`, 'won'] : loss ? [`✗ ${LOSSES[loss]}`, 'lost'] : ['Gave up', ''];
+    // At par it's just "Par 2"; otherwise the golf name and what it means, then par.
+    const detail = golf && golf.over === 0 && r.clicks > 1 ? `Par ${r.par}` : [golf && (golf.over ? `${golf.name} · ${golf.note}` : golf.name),
+      r.exact && !r.won && `${r.clicks} of exactly ${r.exact}`, r.par !== undefined && `par ${r.par}`].filter(Boolean).join(' · ');
+    const settings = settingsText({ ...r, rules: r.rules.filter(k => LEVEL_RULES.includes(k)) });
+    return `<tr>
+      <td class="h-game"><span class="tags">${tags.map(([t, c]) => `<span class="tag${c ? ' ' + c : ''}">${esc(t)}</span>`).join('')}</span></td>
+      <td class="h-route">${esc(r.goal === undefined ? routeText(r) : chain(r).join(' → '))}${settings ? `<div class="note">${esc(settings.replace(/, /g, ' · '))}</div>` : ''}</td>
+      <td class="h-result"><span><span class="res ${result[1]}">${esc(result[0])}</span>${best.get(pair(r)) === r ? '<span class="best-tag">Best</span>' : ''}</span>${detail ? `<div class="note">${esc(detail)}</div>` : ''}</td>
+      <td class="h-time mono">${fmtTime(r.ms)}</td>
+      <td class="h-when">${esc(whenText(r.at))}</td>
+    </tr>`;
+  }).join('');
 }
 
 // ---------------------------------------------------------------- Game
@@ -2079,7 +2109,6 @@ function showHint() {
 
 // Golf: a win's clicks against par, as its golf name and what that means, for anyone who doesn't play golf. Below par is
 // only possible where the live wiki has a link the snapshot hasn't.
-const overPar = over => over > 0 ? `+${over}` : over < 0 ? `−${-over}` : 'par';
 function golfScore(clicks, par) {
   const over = clicks - par, plain = over ? `${Math.abs(over)} ${over > 0 ? 'over' : 'under'} par` : 'even with par';
   if (clicks === 1 && par === 1) return { name: 'Hole in one!', note: 'par 1 in one click', over };

@@ -738,14 +738,16 @@ function setKinds(kinds) {
   updateSetupPar();
   updatePlay();
 }
-// Kinds from different topics, none holding the start.
-function rollKinds() {
+// The first kinds in an order that come from different topics, none holding the start. Rolled in a random order, and
+// the daily's in the day's ranking.
+function firstKinds(order, start) {
   const picked = [];
-  for (const k of Object.keys(KINDS).map(k => [Math.random(), k]).sort((a, b) => a[0] - b[0]).map(([, k]) => k)) {
-    if (picked.length < HUNT_SIZE && !picked.some(p => KINDS[p].topic === KINDS[k].topic) && !KIND_MEMBERS.get(k).has(setup.start?.title)) picked.push(k);
+  for (const k of order) {
+    if (picked.length < HUNT_SIZE && !picked.some(p => KINDS[p].topic === KINDS[k].topic) && !KIND_MEMBERS.get(k).has(start)) picked.push(k);
   }
   return picked;
 }
+const rollKinds = () => firstKinds(Object.keys(KINDS).map(k => [Math.random(), k]).sort((a, b) => a[0] - b[0]).map(([, k]) => k), setup.start?.title);
 
 // Par for the pair on the cards, under the difficulty, checkpoint and Content in play, beside Start. The first card
 // rendered loads the link graph, so it is ready by the time a game starts. setupParToken drops answers to older pairs.
@@ -970,16 +972,19 @@ function dailyDate(s) {
 const ranked = (date, salt, items) => items.map(t => [hash32(`${date}|${salt}|${t}`), t]).sort((a, b) => a[0] - b[0]).map(([, t]) => t);
 // Every daily is Normal plus one of these. No hubs makes it Hard. A Six clicks day's pair has par DAILY_SIX_CLICKS_PAR or
 // less, which leaves two clicks for a wrong turn. A Round trip day goes without No retracing.
-const DAILY_RULES = ['noback', 'blind', 'checkpoint', 'nohubs', 'limit', 'roundtrip'];
+const DAILY_RULES = ['noback', 'blind', 'checkpoint', 'nohubs', 'limit', 'roundtrip', 'exact', 'scavenger'];
 const DAILY_SIX_CLICKS_PAR = 4;
 // A Checkpoint day has one or two checkpoints. Three would use every topic and make a long game for a daily.
 const DAILY_CHECKPOINTS = [1, 2];
+// A Scavenger day hunts kinds or articles, ranked like the rest.
+const DAILY_HUNTS = ['kinds', 'articles'];
 const dailyRule = date => ranked(date, 'rule', DAILY_RULES)[0];
 
-// A daily can always be done: its target and checkpoints are only taken where the link graph has a route under its rules
-// (on a Six clicks day, a short enough one), so the daily needs the graph, and fails to load without it.
+// A daily can always be done: its target, checkpoints and finds are only taken where the link graph has a route under
+// its rules (on a Six clicks day, a short enough one; on an Exact clicks day, one of exactly its count), so the daily
+// needs the graph, and fails to load without it.
 async function dailyPair(date) {
-  const rule = dailyRule(date), rules = ['nonav', rule];
+  const rule = dailyRule(date), rules = ['nonav', rule], hunt = rule === 'scavenger' ? ranked(date, 'hunt', DAILY_HUNTS)[0] : null;
   // The first title in the day's ranking that may take the card: ok checks it, and again the title the wiki resolves
   // it to; fits checks its par, before it is looked up. At most 20 lookups.
   const first = async (salt, ok, fits = async () => true) => {
@@ -994,36 +999,46 @@ async function dailyPair(date) {
   };
   const par = async cards => (await parRoute({ ...cards, rules }))?.length - 1;   // NaN without a route
   const start = await first('start', () => true);
+  if (hunt === 'kinds') {
+    const kinds = firstKinds(ranked(date, 'kind', Object.keys(KINDS)), start.title);
+    if (!(await par({ start: start.title, kinds }) >= 1)) throw new Error('No daily pair found');
+    return { rule, hunt, start, vias: [], goal: null, kinds };
+  }
   // A target or checkpoint linked well enough, from a topic none of the cards before it has.
   const linked = (salt, cards, fits) =>
     first(salt, t => ARTICLES.get(t)?.body >= MIN_BACKLINKS && cards.every(c => groupOf(c.title) !== groupOf(t)), fits);
   const goal = await linked('target', [start], async t => {
     const p = await par({ start: start.title, goal: t });
-    return p >= 1 && (rule !== 'limit' || p <= DAILY_SIX_CLICKS_PAR);
+    return p >= 1 && (rule !== 'limit' || p <= DAILY_SIX_CLICKS_PAR) && (rule !== 'exact' || !!await exactRoute([start.title, t], rules, p + EXACT_EXTRA, []));
   });
-  // Each checkpoint goes after the ones before it, so the route has to go through all of them in order.
+  // Each checkpoint goes after the ones before it, so the route has to go through all of them in order. Scavenger's
+  // articles are the target and two more, in any order.
   const vias = [];
-  for (let i = 0; i < (rule === 'checkpoint' ? ranked(date, 'checkpoints', DAILY_CHECKPOINTS)[0] : 0); i++) {
+  const more = rule === 'checkpoint' ? ranked(date, 'checkpoints', DAILY_CHECKPOINTS)[0] : hunt ? HUNT_SIZE - 1 : 0;
+  for (let i = 0; i < more; i++) {
     const before = vias.map(v => v.title);
     vias.push(await linked(i ? 'via' + i : 'via', [start, goal, ...vias],
       async t => await par({ start: start.title, vias: [...before, t], goal: goal.title }) >= 1));
   }
-  return { rule, start, vias, goal };
+  return { rule, hunt, start, vias, goal, kinds: null };
 }
 
 async function loadDaily(date = today()) {
   const keys = ['start', ...VIA_KEYS, 'goal'], tokens = keys.map(w => ++setup.rolls[w]);
   setStatus('Loading the daily challenge…');
   await withBusy(async () => {
-    const { rule, start, vias, goal } = await dailyPair(date);
+    const { rule, hunt, start, vias, goal, kinds } = await dailyPair(date);
     if (keys.some((w, i) => tokens[i] !== setup.rolls[w])) return;
     Object.assign(setup, { start, goal, daily: date }, setVias(vias));
     setRules(['nonav', rule]);
+    if (hunt) $('#huntMode').value = hunt;
+    if (kinds) setKinds(kinds);
     setContent([]);   // the daily is its pair and rule only: no spin-off links
     syncVia();
     keys.forEach(renderCard);
     const done = savedGames().find(r => r.daily === date && r.won);
-    const what = rule === 'nohubs' ? 'on Hard' : vias.length > 1 ? `with ${vias.length} checkpoints` : 'with ' + RULES[rule].label;
+    const what = rule === 'nohubs' ? 'on Hard' : hunt ? `with Scavenger (${HUNT_SIZE} ${hunt})` : rule === 'checkpoint' && vias.length > 1 ? `with ${vias.length} checkpoints`
+      : 'with ' + RULES[rule].label;
     setStatus(`Daily challenge for ${date}, ${what}.` + (done ? ` You did it in ${done.clicks} clicks (${fmtTime(done.ms)}).` : ' Press Start when ready.'));
   });
 }
@@ -1719,11 +1734,11 @@ function distancesFrom(graph, title) {
 // be somewhere, and gives up after EXACT_BUDGET pages. On the 2026-08 snapshot it found one of par + 2 for every one of
 // 447 pairs tried in Normal, Relaxed and Hard, in a few milliseconds.
 const EXACT_BUDGET = 20000;
-async function exactRoute(titles, rules, n) {
+async function exactRoute(titles, rules, n, content = contentInPlay(titles)) {
   const [start, goal] = [titles[0], titles.at(-1)].map(t => PAGE_IDS.get(t));
   if (start === undefined || goal === undefined) return null;
   const graph = await linkGraph(!rules.includes('nonav'));
-  const dist = distancesTo(graph, goal, routeUsable({ keep: titles, rules, content: contentInPlay(titles) }));
+  const dist = distancesTo(graph, goal, routeUsable({ keep: titles, rules, content }));
   const out = u => new Set([...graph.links[u], ...(graph.carries?.[u] ?? []).flatMap(b => graph.boxes[b])]);
   const path = [start], on = new Set(path);
   let budget = EXACT_BUDGET;
@@ -2141,6 +2156,8 @@ $('#btnPeek').onclick = () => {
   setImg($('.peek img'), g.img);
   $('#pClose').onclick = closeModal;
 };
+// Whether a link or daily put every card in place: a start, and a target or Scavenger's kinds.
+const cardsLoaded = () => !!setup.start && !!(huntMode() === 'kinds' ? setup.kinds?.length : setup.goal);
 // Initial load: a #start=…&target=… hash plays that exact pair, #daily (or #daily=YYYY-MM-DD, a past day) that day's
 // pair and rule, otherwise roll a random one.
 (async function init() {
@@ -2178,13 +2195,13 @@ $('#btnPeek').onclick = () => {
       const r = rulesText(rules());
       setStatus(`Challenge loaded${r ? ' with ' + r : ''}. Press Start when ready.`);
     });
-    if (!setup.start || !(setup.goal || setup.kinds?.length)) {
+    if (!cardsLoaded()) {
       await reroll('all');
       if (missing && setup.start) setStatus('The challenge link’s article “' + missing + '” doesn’t exist, so a random pair was rolled instead.', true);
     }
   } else if (h.has('daily')) {
     await loadDaily(dailyDate(h.get('daily')));
-    if (!setup.start || !setup.goal) await reroll('all');
+    if (!cardsLoaded()) await reroll('all');
   } else {
     await reroll('all');
   }

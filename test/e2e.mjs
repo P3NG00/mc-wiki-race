@@ -489,7 +489,7 @@ check('daily pair loads', await until("!document.querySelector('#btnPlay').disab
   await ev("setup.start?.title + ' -> ' + setup.goal?.title"));
 check('the daily takes its start, checkpoints and target from different topics', await ev("new Set(cardKeys().map(w => groupOf(setup[w].title))).size === cardKeys().length"),
   await ev("cardKeys().map(w => setup[w].title + ' ' + groupOf(setup[w].title)).join(', ')"));
-check('a daily is Normal with one more rule, No hubs making it Hard', await ev("dailyRule('2026-01-10') === 'nohubs' && !DAILY_RULES.includes('nonav')"));
+check('a daily is Normal with one more rule, No hubs making it Hard', await ev("dailyRule('2026-01-12') === 'nohubs' && !DAILY_RULES.includes('nonav')"));
 // A daily can always be done: a route under its rules, and on a Six clicks day (2026-01-01) par 4 or less.
 check('a Six clicks daily has par 4 or less', await ev(`dailyPair('2026-01-01').then(async p => p.rule === 'limit' &&
   (await parRoute({ start: p.start.title, goal: p.goal.title, rules: ['nonav', 'limit'] })).length - 1 <= DAILY_SIX_CLICKS_PAR)`));

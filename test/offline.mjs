@@ -465,15 +465,25 @@ const dailies = JSON.parse(await ev(`(async () => {
   const out = [];
   for (let d = 1; d <= 31; d++) {
     const p = await dailyPair('2026-01-' + String(d).padStart(2, '0'));
-    const route = await parRoute({ start: p.start.title, vias: p.vias.map(v => v.title), goal: p.goal.title, rules: ['nonav', p.rule] });
-    out.push({ rule: p.rule, vias: p.vias.length, par: route ? route.length - 1 : null });
+    const rules = ['nonav', p.rule], route = await parRoute({ start: p.start.title, vias: p.vias.map(v => v.title), goal: p.goal?.title, kinds: p.kinds, rules });
+    const exact = p.rule === 'exact' && route && !!await exactRoute([p.start.title, p.goal.title], rules, route.length - 1 + EXACT_EXTRA, []);
+    out.push({ rule: p.rule, hunt: p.hunt, vias: p.vias.length, kinds: p.kinds?.length ?? 0, par: route ? route.length - 1 : null, exact });
   }
   return JSON.stringify(out);
 })()`));
-check('a month of dailies all have a route, Six clicks days par 4 or less, Checkpoint days one or two checkpoints, Round trip days there and back',
+check('a month of dailies all have a route: Six clicks days par 4 or less, Checkpoint days one or two checkpoints, Round trip days there and back, Exact clicks days one of exactly par + 2, Scavenger days three kinds or three articles',
   dailies.length === 31 && dailies.every(d => d.par >= (d.rule === 'roundtrip' ? 2 : 1) && (d.rule !== 'limit' || d.par <= 4)
-    && (d.rule === 'checkpoint' ? d.vias === 1 || d.vias === 2 : !d.vias)) && dailies.some(d => d.rule === 'roundtrip') &&
-  dailies.some(d => d.rule === 'limit'), dailies.map(d => `${d.rule}${d.vias > 1 ? '×' + d.vias : ''}:${d.par}`).join(' '));
+    && (d.rule === 'checkpoint' ? d.vias === 1 || d.vias === 2 : d.hunt === 'articles' ? d.vias === 2 : !d.vias) && (d.rule !== 'exact' || d.exact)
+    && (d.hunt === 'kinds' ? d.kinds === 3 : !d.kinds)) && ['roundtrip', 'limit', 'exact', 'scavenger'].every(r => dailies.some(d => d.rule === r)),
+  dailies.map(d => `${d.rule}${d.hunt ? '/' + d.hunt : d.vias > 1 ? '×' + d.vias : ''}:${d.par}`).join(' '));
+// Exact clicks and Scavenger days load with their rule, ready to start.
+for (const [date, rules, cards, what] of [['2026-01-24', 'nonav,exact', 'start,goal', 'with Exact clicks'], ['2026-01-08', 'nonav,scavenger', 'start', 'with Scavenger (3 kinds)'],
+  ['2026-01-10', 'nonav,scavenger', 'start,via0,via1,goal', 'with Scavenger (3 articles)']]) {
+  await open('#daily=' + date);
+  check(`the ${date} daily loads ${what}`, await until(ready, 30000) && await ev(`rules().join() === '${rules}' && cardKeys().join() === '${cards}'
+    && document.querySelector('#setupStatus').textContent.includes('${what}') && (!rules().includes('exact') || !!setup.exact) && (huntMode() !== 'kinds' || setup.kinds.length === 3)`),
+    await ev("document.querySelector('#setupStatus').textContent"));
+}
 await ev("document.querySelector('input[name=level][value=hard]').click()");
 check('another difficulty leaves the daily', await ev("setup.daily === null && document.querySelector('#setupStatus').textContent === LEFT_DAILY"));
 

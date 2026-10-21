@@ -1,2 +1,4 @@
 *.zim
 .venv/
+tools/wikidata/cache/
+__pycache__/

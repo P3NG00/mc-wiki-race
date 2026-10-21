@@ -1,0 +1,27 @@
+{
+  "comment": "Hand-picked inputs to build.py. Everything else in wiki-data.js comes from the ZIM.",
+  "pool_categories": [
+    "Blocks", "Items", "Hostile mobs", "Passive mobs", "Neutral mobs", "Boss mobs",
+    "Overworld biomes", "Nether biomes", "End biomes", "Generated structures",
+    "Enchantments", "Effects", "Food", "Tools", "Armor", "Redstone", "Plants", "Gameplay"
+  ],
+  "pool_comment": "Not Weapons: on the wiki that holds only weapons from Minecraft: The Manga, while the game's weapons are in Items.",
+  "pool_exclude_categories": [
+    "Book objects", "Fictional mods", "Joke features", "Minecraft Education", "Removed features", "Unused features"
+  ],
+  "pool_exclude_comment": "Pool articles in these are left out of the pool: book and comic objects, April Fools features, and things a player can't find in the current game. Chaos still rolls them.",
+  "disambiguation_categories": ["Disambiguation pages", "Version disambiguation pages"],
+  "hubs": [
+    "Minecraft", "Java Edition", "Bedrock Edition", "Edition", "Minecraft Education", "Java Edition version history",
+    "Bedrock Edition version history", "Commands", "Identifier", "Block", "Item", "Mob", "Biome", "Structure", "Overworld",
+    "The Nether", "The End", "Player", "Creative", "Crafting", "Smelting", "Breaking", "Drops", "Renewable resource", "Food",
+    "Tool", "Armor", "Weapon", "Ore", "Trading", "Enchantment", "Effect", "Advancement", "Achievement"
+  ],
+  "hubs_comment": "No hubs rule: links to these and their redirects are dead. Picked from the pages with the most incoming and outgoing links (report.py lists candidates), leaving out specific content (Diamond, Chest, Water…) that makes a fair target.",
+  "core_namespaces": [
+    "Media", "Special", "Talk", "User", "User talk", "Minecraft Wiki", "Minecraft Wiki talk", "Project", "Project talk",
+    "File", "File talk", "Image", "Image talk", "MediaWiki", "MediaWiki talk", "Template", "Template talk",
+    "Help", "Help talk", "Category", "Category talk", "Module", "Module talk", "Bucket", "Bucket talk", "Forum", "Forum talk"
+  ],
+  "namespaces_comment": "The ZIM holds articles and categories plus the wiki's own content namespaces (Tutorial, Dungeons…), and build.py adds those and their talk namespaces. Links into these other namespaces still appear on live pages, so they are listed by hand (from meta=siteinfo)."
+}

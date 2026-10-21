@@ -25,9 +25,16 @@ Quick syntax check of the inline script, which also fails on an HTML comment ope
 python3 -c "import re;h=open('index.html').read();s=re.findall(r'<script>\n(.*?)</script>\n</body>',h,re.S)[0];assert '<!--' not in s;open('/tmp/m.js','w').write(s)" && node --check /tmp/m.js
 ```
 
-## Offline copy of the wiki
+## Wiki data
 
-For reference only (the game never reads it): the English Kiwix ZIM of minecraft.wiki, linked from [Minecraft Wiki:Offline use](https://minecraft.wiki/w/Minecraft_Wiki:Offline_use) and rebuilt quarterly. It is downloaded by hand from `https://download.kiwix.org/zim/other/` into the repo root, where `.gitignore` keeps it out of git, and only its checksum is committed (`sha256sum -c minecraft.wiki_en_all_2026-08.zim.sha256`). Read it with the `libzim` package in an ignored venv: `python3 -m venv .venv && .venv/bin/pip install libzim`.
+`wiki-data.js` is generated from the English Kiwix ZIM of minecraft.wiki, which is linked from [Minecraft Wiki:Offline use](https://minecraft.wiki/w/Minecraft_Wiki:Offline_use) and rebuilt quarterly. Don't edit it by hand. The ZIM (1.9 GB) is downloaded by hand from `https://download.kiwix.org/zim/other/` into the repo root. `.gitignore` keeps it out of git and only its checksum is committed (`sha256sum -c minecraft.wiki_en_all_2026-08.zim.sha256`). The tools in `tools/wikidata/` are Python, run in an ignored venv (`python3 -m venv .venv && .venv/bin/pip install -r tools/wikidata/requirements.txt`), always with `.venv/bin/python -I`:
+- `extract.py <zim>` scans the ZIM (about a minute) into an ignored snapshot, `tools/wikidata/cache/<name>.jsonl.gz`. It holds every page's namespace (from mwoffliner's `ns-N` body class, since main-namespace titles can contain colons), visible categories and links. Links are split into those outside and inside `.navbox` tables (nested tables count as inside), taken from the parser output only, and resolved against the page's own path as a browser would, since a subpage links to `../Diamond`. Redirects include mwoffliner's forwarding pages for redirects to a section.
+- `build.py <snapshot>` writes `wiki-data.js` from the snapshot and `config.json`, which holds the hand-picked inputs: pool categories, the categories the pool leaves out (book objects, fictional mods, joke, removed, unused and Education features; Chaos still rolls them), the disambiguation categories, the hubs and the core namespaces the ZIM doesn't hold. Links are counted per linking article, through redirects. The same snapshot always gives the same bytes, one entry per line, so a new snapshot reads as a git diff.
+- `report.py <snapshot>` writes a Markdown report: pool sizes, what was left out, link-count quartiles, sampled shortest routes for each graph (with and without navboxes and hubs) and hub candidates.
+- `diff.py <old> <new>` compares two `wiki-data.js` files, such as `<(git show HEAD:wiki-data.js) wiki-data.js`: articles and pool members added and removed, link counts that moved, and hub and namespace changes.
+- `test.py` writes a small ZIM in mwoffliner's shape and checks the other tools against it, in a few seconds.
+
+To update: download the new ZIM, replace the `.sha256` file, run extract, build, diff and the test, play a few games, and commit `wiki-data.js` with the checksum.
 
 ## Architecture (all in `index.html`)
 

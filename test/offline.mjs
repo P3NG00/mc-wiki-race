@@ -257,6 +257,13 @@ check('picking Relay leaves Round trip and hides No retracing', await until(read
   && document.querySelector('#cardStart .tag').textContent === 'Start' && document.querySelector('#pairArrow').textContent === '➜'`));
 await ev("document.querySelector('input[name=game][value=roundtrip]').click()");
 check('picking Round trip leaves Relay', await until(ready) && await ev("rules().join() === 'roundtrip' && cardKeys().join() === 'start,goal'"));
+// With the cards off screen the strip links back up to them; with them in view it doesn't.
+const toCards = "!document.querySelector('#btnToCards').classList.contains('hidden')";
+await ev("document.querySelector('#games').scrollIntoView({ block: 'start' }); window.scrollBy(0, 400)");
+check('the strip links up to the cards while they are off screen', await until(toCards));
+await ev("document.querySelector('#btnToCards').click()");
+check('and the link scrolls them into view and hides', await until(`!(${toCards}) && document.querySelector('.pair').getBoundingClientRect().top >= 0`),
+  await ev("document.querySelector('.pair').getBoundingClientRect().top"));
 // A target with no way back that doesn't retrace (a dead end has no way back at all) says so as it is reached.
 await open(`#start=Diamond&target=${encodeURIComponent(deadEnd)}&rules=roundtrip,noretrace`);
 await until(ready);

@@ -132,6 +132,7 @@
     margin: 10px 0 28px; padding: 10px 16px; border-radius: var(--radius-lg); background: var(--accent-soft); }
   .game-help p { margin: 0; flex: 1 1 380px; }
   .game-opt { display: flex; gap: 8px; align-items: center; }
+  .game-help .to-cards { margin-left: auto; font-weight: 600; }
   .game-opt select { padding: 6px 10px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--panel); }
   .game-opt input { accent-color: var(--accent); margin: 0; }
   .extras { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin-bottom: 28px; }
@@ -482,6 +483,7 @@ const THEMES = [...new Set(['auto', 'light', 'dark', ...Array.from(document.quer
     <label class="game-opt" data-game="scavenger">Find <select id="huntMode"></select></label>
     <label class="game-opt" data-game="roundtrip"><input type="checkbox" class="rule" value="noretrace"> <span><b>No retracing</b> <span class="note">· the way there is dead on the way back</span></span></label>
     <span class="game-opt" data-game="exact" id="exactInfo"></span>
+    <button class="link to-cards hidden" id="btnToCards">↑ See your cards</button>
   </div>
 
   <h2 class="step">2 · Extra rules <span class="note">(any mix)</span></h2>
@@ -2360,6 +2362,10 @@ document.querySelectorAll('[data-custom]').forEach(inp => {
 $('#btnRerollAll').onclick = () => reroll('all');
 $('#settings').addEventListener('change', updateSettingsSum);
 $('#btnToSettings').onclick = () => $('#gameSettings').scrollIntoView({ behavior: 'smooth' });
+// Picking a game changes the cards above, so the strip under the tiles links back up to them while they are mostly off screen.
+// It doesn't scroll by itself, since the game's own options in the strip usually come next.
+new IntersectionObserver(([e]) => $('#btnToCards').classList.toggle('hidden', e.intersectionRatio >= .25), { threshold: [0, .25] }).observe($('.pair'));
+$('#btnToCards').onclick = () => $('.your-game').scrollIntoView({ behavior: 'smooth' });
 $('#btnSettings').onclick = () => {
   const open = !$('#settings').classList.toggle('hidden');
   $('#btnSettings').textContent = open ? 'Done' : 'Change';

@@ -63,6 +63,12 @@ test/run-e2e.sh [screenshot-dir]
 
 Plays a real game in headless Firefox against the live wiki. Needs `firefox`, Node 22 or newer, and network access.
 
+```sh
+test/run-e2e.sh --offline
+```
+
+Checks the game's own logic (rolls, the daily, Content, difficulty, which links are live) in about 20 seconds, with every request to the wiki answered by the test, so it works without network access or while the wiki is down.
+
 See `CLAUDE.md` for how the game works internally.
 
 ## License

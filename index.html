@@ -320,6 +320,8 @@ const THEMES = [...new Set(['auto', 'light', 'dark', ...Array.from(document.quer
     <label><input type="radio" name="mode" value="chaos"> Chaos</label>
   </div>
   <p class="mode-help" id="modeHelp"></p>
+  <div class="modes" role="radiogroup" aria-label="Difficulty" id="level"></div>
+  <p class="mode-help" id="levelHelp"></p>
   <div class="modes" role="group" aria-label="Target" id="target"></div>
   <div class="modes" role="group" aria-label="Rules" id="rules"></div>
   <div class="modes" role="group" aria-label="Content" id="content"></div>
@@ -590,8 +592,8 @@ const MODE_HELP = {
 };
 function updateModeHelp() { $('#modeHelp').textContent = MODE_HELP[mode()]; }
 
-// Optional rules, as checkboxes under the modes. The ones in play are stored with each result
-// (personal bests only compare games with the same rules) and carried in challenge links.
+// Rules, stored with each result (personal bests only compare games with the same rules) and carried in challenge links.
+// No hubs and No navboxes are set by the difficulty (LEVELS); the rest are optional checkboxes.
 const RULES = {
   noback: { label: 'No Back', help: 'The Back button is gone: every click is final.' },
   nohubs: { label: 'No hubs', help: 'Links to big overview pages (Block, Item, Mob, Crafting, Java Edition…) are dead.' },
@@ -600,6 +602,16 @@ const RULES = {
   checkpoint: { label: 'Checkpoint', help: 'A third article you have to visit on the way to the target.' },
   limit: { label: 'Six clicks', help: `Reach the target in ${CLICK_LIMIT} clicks or fewer, Back and the way through a checkpoint included.` },
 };
+// Difficulty, as the rules it turns on. Navboxes decide how hard a game is far more than the pool does: with them almost any
+// sensible click gets closer (see tools/wikidata/RESEARCH.md), so Normal, the default, plays without them.
+const LEVELS = {
+  relaxed: { label: 'Relaxed', rules: [], help: 'Relaxed: the link tables at the bottom of articles (navboxes) are there, so almost any sensible click gets you closer.' },
+  normal: { label: 'Normal', rules: ['nonav'], help: 'Normal: the link tables at the bottom of articles (navboxes) are hidden, so you find your way through the article itself.' },
+  hard: { label: 'Hard', rules: ['nonav', 'nohubs'], help: 'Hard: no navboxes, and links to big overview pages (Block, Item, Mob, Crafting, Java Edition…) are dead too.' },
+};
+const LEVEL_RULES = [...new Set(Object.values(LEVELS).flatMap(l => l.rules))];
+// The difficulty a set of rules makes. No hubs on its own, from a link made before difficulty, counts as Hard.
+const levelOf = keys => keys.includes('nohubs') ? 'hard' : keys.includes('nonav') ? 'normal' : 'relaxed';
 // Content families: articles the pool leaves out, which the Content checkboxes add back. Keys as in wiki-data.js.
 const FAMILIES = {
   joke: { label: 'April Fools', help: 'Joke blocks, items and mobs from April Fools updates.' },
@@ -619,9 +631,22 @@ function setContent(keys) {
   syncAllSpinoffs();
 }
 
-function rules() { return Object.keys(RULES).filter(k => $(`#rules input[value=${k}]`).checked); }
-function setRules(keys) { for (const k in RULES) $(`#rules input[value=${k}]`).checked = keys.includes(k); }
-const rulesText = keys => keys.map(k => RULES[k].label).join(', ');
+// The rules in play, in RULES order: the difficulty's and the ticked ones.
+function level() { return $('input[name=level]:checked').value; }
+function rules() {
+  return Object.keys(RULES).filter(k => LEVELS[level()].rules.includes(k) || $(`#rules input[value=${k}]`)?.checked);
+}
+function setRules(keys) {
+  $(`input[name=level][value=${levelOf(keys)}]`).checked = true;
+  for (const b of document.querySelectorAll('#rules input')) b.checked = keys.includes(b.value);
+  updateLevelHelp();
+}
+function updateLevelHelp() { $('#levelHelp').textContent = LEVELS[level()].help; }
+// Rules as words: the difficulty, unless it is Normal, then the ticked rules.
+function rulesText(keys) {
+  const l = levelOf(keys);
+  return [l !== 'normal' && LEVELS[l].label, ...keys.filter(k => !LEVEL_RULES.includes(k)).map(k => RULES[k].label)].filter(Boolean).join(', ');
+}
 // A result's rules plus its target's topic, when that wasn't Any, and its Content.
 const settingsText = r => [r.topic && r.topic !== 'any' && TOPICS[r.topic].label, r.content && 'Content: ' + r.content.map(contentLabel).join(', '),
   rulesText(r.rules)].filter(Boolean).join(', ');
@@ -779,7 +804,8 @@ function dailyDate(s) {
 // items ordered by the hash of the date, a salt and the item: the day's ranking.
 const ranked = (date, salt, items) => items.map(t => [hash32(`${date}|${salt}|${t}`), t]).sort((a, b) => a[0] - b[0]).map(([, t]) => t);
 // Six clicks is left out: it's the only rule you can lose by, and nothing checks that a daily pair can be done in six.
-const DAILY_RULES = ['noback', 'nohubs', 'nonav', 'blind', 'checkpoint'];
+// Every daily is Normal plus one of these. No hubs makes it Hard.
+const DAILY_RULES = ['noback', 'blind', 'checkpoint', 'nohubs'];
 const dailyRule = date => ranked(date, 'rule', DAILY_RULES)[0];
 
 async function dailyPair(date) {
@@ -807,12 +833,12 @@ async function loadDaily(date = today()) {
     const { rule, start, via, goal } = await dailyPair(date);
     if (keys.some((w, i) => tokens[i] !== setup.rolls[w])) return;
     Object.assign(setup, { start, via, goal, daily: date });
-    setRules([rule]);
+    setRules(['nonav', rule]);
     setContent([]);   // the daily is its pair and rule only: no spin-off links
     syncVia();
     keys.forEach(renderCard);
     const done = savedGames().find(r => r.daily === date && r.won);
-    setStatus(`Daily challenge for ${date}, with ${RULES[rule].label}.` + (done ? ` You did it in ${done.clicks} clicks (${fmtTime(done.ms)}).` : ' Press Start when ready.'));
+    setStatus(`Daily challenge for ${date}, ${rule === 'nohubs' ? 'on Hard' : 'with ' + RULES[rule].label}.` + (done ? ` You did it in ${done.clicks} clicks (${fmtTime(done.ms)}).` : ' Press Start when ready.'));
   });
 }
 
@@ -1393,8 +1419,10 @@ $('#modalBg').addEventListener('click', e => { if (e.target === $('#modalBg') &&
 document.addEventListener('keydown', e => { if (e.key === 'Escape' && modalDismissable) closeModal(); });
 
 // ---------------------------------------------------------------- Wiring
-$('#rules').innerHTML = '<span class="lbl">Rules</span>' + Object.entries(RULES).map(([k, r]) =>
+$('#rules').innerHTML = '<span class="lbl">Rules</span>' + Object.entries(RULES).filter(([k]) => !LEVEL_RULES.includes(k)).map(([k, r]) =>
   `<label title="${esc(r.help)}"><input type="checkbox" value="${k}"> ${esc(r.label)}</label>`).join('');
+$('#level').innerHTML = '<span class="lbl">Difficulty</span>' + Object.entries(LEVELS).map(([k, l]) =>
+  `<label title="${esc(l.help)}"><input type="radio" name="level" value="${k}"${k === 'normal' ? ' checked' : ''}> ${esc(l.label)}</label>`).join('');
 $('#target').innerHTML = '<span class="lbl">Target</span>' +
   `<select id="topic" aria-label="Target topic" title="Only targets from this topic. The start comes from another one.">
   ${Object.entries(TOPICS).map(([k, t]) => `<option value="${k}">${esc(t.label)}</option>`).join('')}</select>`;
@@ -1425,9 +1453,10 @@ for (const row of ['#content', '#spinoffs']) $(row).addEventListener('change', e
   syncAllSpinoffs();
   reroll('all');
 });
-$('#rules').addEventListener('change', () => {
+// A rule or the difficulty changing leaves a daily, but doesn't reroll.
+for (const row of ['#rules', '#level']) $(row).addEventListener('change', () => {
   if (leaveDaily()) setStatus(LEFT_DAILY);
-  syncVia(); renderCard('via'); renderCard('goal');
+  updateLevelHelp(); syncVia(); renderCard('via'); renderCard('goal');
 });
 // The path sidebar can collapse to a small box over the article. The choice is remembered.
 let pathCollapsed = false;
@@ -1508,10 +1537,14 @@ $('#btnPeek').onclick = () => {
 // pair and rule, otherwise roll a random one.
 (async function init() {
   updateModeHelp();
+  updateLevelHelp();
   syncContentToMode();   // a reload may bring the Pool radio button back on Chaos
   renderHistory();
   const h = new URLSearchParams(location.hash.slice(1));
-  if (h.has('rules')) setRules(h.get('rules').split(','));
+  // A challenge link carries its whole rules, difficulty included: one with none is Relaxed, as every game was before
+  // difficulty (navboxes on).
+  if (h.get('start') && h.get('target')) setRules((h.get('rules') || '').split(','));
+  else if (h.has('rules')) setRules(h.get('rules').split(','));
   if (h.get('start') && h.get('target')) {
     setStatus('Loading challenge…');
     let missing = null;

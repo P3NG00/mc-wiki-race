@@ -19,16 +19,18 @@ Open `index.html` in a browser. Opening it straight from disk (`file://`) works 
 - **Spin-offs** (Dungeons, Dungeons II, Legends, Earth, Story Mode, Movie) add the wiki's pages about other Minecraft games, in any mode, and make links to them work. **All** switches every spin-off on or off. Without them, links into those pages are dead.
 - **Target** topic (Blocks, Items, Mobs, Biomes & structures, Enchantments & effects) picks the target from that part of the wiki, in any pool. The start comes from another topic. Changing it rerolls the target, and a target you type yourself skips it.
 - **Reroll** any card, or type your own article.
-- **📅 Daily** loads today's pair, which is the same for everyone on the same date. Your rules still apply, and the result says it was the daily. `index.html#daily` opens it directly.
+- **📅 Daily** loads today's pair, which is the same for everyone on the same date. It always plays on Normal with one extra rule of the day (No Back, Blind target, Checkpoint, or Hard instead), and the result says it was the daily. `index.html#daily` opens it directly.
 - **Back** returns to the previous article and counts as a click. The clock pauses while an article loads.
+- **Difficulty** decides which links you can use:
+  - **Relaxed:** everything, including the big link tables at the bottom of articles (navboxes), so almost any sensible click gets you closer.
+  - **Normal** (the default): the navboxes are hidden, so you find your way through the article itself.
+  - **Hard:** no navboxes, and links to big overview pages like Block, Item, Mob, Crafting or Java Edition are dead too, unless that page is the target.
 - **Rules** are optional extras you can switch on:
   - **No Back:** the Back button is gone, so every click is final.
-  - **No hubs:** links to big overview pages like Block, Item, Mob, Crafting or Java Edition are dead, unless that page is the target.
   - **Blind target:** you only get the target's name, with no picture or description.
   - **Six clicks:** reach the target in 6 clicks or fewer, Back included, or the game is over.
-  - **No navboxes:** the big link tables at the bottom of articles are gone, so you have to use links in the article itself.
   - **Checkpoint:** a third card. You have to visit that article on the way, and reaching the target before it doesn't count.
-- **Copy challenge link** shares the exact pair you're looking at, plus any checkpoint and rules, as `index.html#start=<Title>&target=<Title>&via=<Title>&rules=checkpoint`.
+- **Copy challenge link** shares the exact pair you're looking at, plus any checkpoint, the difficulty and rules, as `index.html#start=<Title>&target=<Title>&via=<Title>&rules=nonav,checkpoint` (`nonav` is Normal, `nonav,nohubs` Hard, neither Relaxed).
 - **Theme** (top right of the setup screen): Auto follows your system's light or dark setting. Articles switch to the wiki's own dark theme to match.
 - Your last 50 games, your personal best for each pair and your theme are kept in the browser. Personal bests are kept separately for each combination of rules. Each result also notes the target topic it was rolled with and the Content that was on.
 

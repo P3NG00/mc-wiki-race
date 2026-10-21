@@ -272,7 +272,8 @@ await until("game.path.length === 1 && !game.loading");
 await ev("document.querySelector('#btnGiveUp').click()");
 await ev("document.querySelector('#gQuit').click()");
 const rolled = await ev("(([r]) => r.topic)(store.get('mwr.history', []))");
-check('result records the topic', rolled === 'mobs' && await ev("document.querySelector('#modal .note').textContent.endsWith('· Mobs')"),
+// That game came from a challenge link without rules, so it is Relaxed, which the note names too.
+check('result records the topic', rolled === 'mobs' && await ev("document.querySelector('#modal .note').textContent.endsWith('· Mobs, Relaxed')"),
   `${rolled} | ${await ev("document.querySelector('#modal .note').textContent")}`);
 await ev("document.querySelector('#mNew').click()");
 await until("!document.querySelector('#btnPlay').disabled", 60000);
@@ -303,7 +304,20 @@ check('identical start/target disables Play', await ev("setup.goal.title === set
 await send('browsingContext.navigate', { context: ctx, url: 'about:blank', wait: 'complete' });
 await send('browsingContext.navigate', { context: ctx, url: fileUrl + '#start=Icons.png&target=Diamond&rules=noback', wait: 'complete' });
 await until("!document.querySelector('#btnPlay').disabled");
-check('challenge link sets the rules', await ev("rules().join() === 'noback' && document.querySelector('#rules input[value=noback]').checked && document.querySelector('#setupStatus').textContent.includes('with No Back')"));
+check('challenge link sets the rules', await ev("rules().join() === 'noback' && level() === 'relaxed' && document.querySelector('#rules input[value=noback]').checked && document.querySelector('#setupStatus').textContent.includes('with Relaxed, No Back')"));
+// Difficulty sets No navboxes and No hubs: a link's rules give its difficulty (none is Relaxed, as every game was before
+// difficulty; No hubs alone, from an older link, is Hard), the Rules row has neither box, Normal is the page's default,
+// and the settings text names the difficulty unless it is Normal.
+check('difficulty from a challenge link\'s rules', await ev(`(() => {
+  const was = rules();
+  const got = [[], ['nonav'], ['nonav', 'nohubs'], ['nohubs'], ['noback', 'nonav']].map(r => (setRules(r), level() + ':' + rules().join())).join(' ');
+  setRules(was);
+  return got;
+})()`) === 'relaxed: normal:nonav hard:nohubs,nonav hard:nohubs,nonav normal:noback,nonav');
+check('the Rules row leaves the difficulty\'s rules to the Difficulty row, Normal by default',
+  await ev("!document.querySelector('#rules input[value=nonav]') && !document.querySelector('#rules input[value=nohubs]') && document.querySelector('input[name=level][value=normal]').defaultChecked"));
+check('settings text names the difficulty unless it is Normal',
+  await ev("[[], ['nonav'], ['nohubs', 'nonav', 'blind']].map(rulesText).join('|')") === 'Relaxed||Hard, Blind target');
 await ev("document.querySelector('#btnPlay').click()");
 await until("game.path.length === 1 && !game.loading");
 await sleep(1000);
@@ -368,7 +382,7 @@ await until("game.path.length === 1 && !game.loading");
 const onLinks = await dungeonsLinks();
 check('links into a spin-off that is on work', onLinks.length > 0 && onLinks.every(l => l), `${onLinks.length} links`);
 await ev("finish(false)");
-check('the result records the Content that was on', await ev("(([r]) => JSON.stringify(r.content) === '[\"Dungeons\"]' && settingsText(r) === 'Content: Dungeons')(savedGames())"),
+check('the result records the Content that was on', await ev("(([r]) => JSON.stringify(r.content) === '[\"Dungeons\"]' && settingsText(r) === 'Content: Dungeons, Relaxed')(savedGames())"),
   await ev("JSON.stringify(savedGames()[0].content)"));
 await send('browsingContext.navigate', { context: ctx, url: 'about:blank', wait: 'complete' });
 await send('browsingContext.navigate', { context: ctx, url: fileUrl + '#start=Dungeons:Creeper&target=Diamond', wait: 'complete' });
@@ -399,11 +413,15 @@ check('No hubs game loads', await until("game.path.length === 1 && !game.loading
 check('Blind target hides the HUD and path pictures and peek', await ev("document.querySelector('#hudImg').classList.contains('hidden') && document.querySelector('#pathArt').classList.contains('hidden') && document.querySelector('#btnPeek').classList.contains('hidden')"));
 check('hub redirects are known', await ev("HUB_TITLES.get('Blocks') === 'Block' && HUB_TITLES.get('Mining') === 'Breaking'"));
 f = await frameCtx();
-const hubLinks = JSON.parse(await ev(`JSON.stringify(Object.fromEntries(['Item', 'Java_Edition', 'Crafting', 'Pickaxe'].map(t =>
-  [t, [...document.querySelectorAll('a[href^="/w/' + t + '"]')].filter(a => a.getAttribute('href').split('#')[0] === '/w/' + t).map(a => a.classList.contains('mwr-live') ? 'live' : 'dead')])))`, f));
-const allAre = (t, s) => hubLinks[t].length > 0 && hubLinks[t].every(x => x === s);
-check('No hubs disables hub links', allAre('Item', 'dead') && allAre('Java_Edition', 'dead'), JSON.stringify(hubLinks));
-check('No hubs keeps the target and other links live', allAre('Crafting', 'live') && allAre('Pickaxe', 'live'));
+// No hubs on its own is Hard, so the navboxes are gone too; this looks at links in the article itself. Every link to a
+// hub, or a redirect to one, is dead except those to the target's (Crafting).
+const hubMap = JSON.parse(await ev('JSON.stringify(Object.fromEntries(HUB_TITLES))'));
+const textLinks = JSON.parse(await ev(`JSON.stringify([...document.querySelectorAll('a[href^="/w/"]')].filter(a => !a.closest('.navbox'))
+  .map(a => [decodeURIComponent(a.getAttribute('href').slice(3).split('#')[0]).replace(/_/g, ' '), a.classList.contains('mwr-live')]))`, f));
+const liveness = keep => textLinks.filter(([title]) => keep(title)).map(([, live]) => live);
+const toHubs = liveness(t => hubMap[t] && hubMap[t] !== 'Crafting'), toTarget = liveness(t => hubMap[t] === 'Crafting'), toPickaxe = liveness(t => t === 'Pickaxe');
+check('No hubs disables hub links', toHubs.length > 0 && toHubs.every(live => !live), `${toHubs.length} hub links, ${toHubs.filter(Boolean).length} live`);
+check('No hubs keeps the target and other links live', toTarget.length > 0 && toTarget.every(Boolean) && toPickaxe.length > 0 && toPickaxe.every(Boolean));
 
 // No navboxes: the navbox tables (and their Navigation heading) are hidden and their links dead; links in the text still work.
 await send('browsingContext.navigate', { context: ctx, url: 'about:blank', wait: 'complete' });
@@ -465,7 +483,8 @@ check('daily pair loads', await until("!document.querySelector('#btnPlay').disab
   await ev("setup.start?.title + ' -> ' + setup.goal?.title"));
 check('the daily takes its start, checkpoint and target from different topics', await ev("new Set([setup.start, setup.via, setup.goal].map(c => groupOf(c.title))).size === 3"),
   await ev("[setup.start, setup.via, setup.goal].map(c => c.title + ' ' + groupOf(c.title)).join(', ')"));
-check('daily sets its rule and checkpoint', await ev("rules().join() === 'checkpoint' && !!setup.via && !document.querySelector('#cardVia').classList.contains('hidden') && document.querySelector('#setupStatus').textContent.includes('with Checkpoint')"));
+check('a daily is Normal with one more rule, No hubs making it Hard', await ev("dailyRule('2026-01-04') === 'nohubs' && DAILY_RULES.every(r => r !== 'nonav' && r !== 'limit')"));
+check('daily sets its rule and checkpoint', await ev("rules().join() === 'nonav,checkpoint' && !!setup.via && !document.querySelector('#cardVia').classList.contains('hidden') && document.querySelector('#setupStatus').textContent.includes('with Checkpoint')"));
 const pairOf = p => `${p}.start.title + ' -> ' + ${p}.via?.title + ' -> ' + ${p}.goal.title`;
 const daily = await ev(pairOf('setup'));
 check('daily pair is deterministic', await ev(`dailyPair('2026-01-02').then(p => p.rule === 'checkpoint' && ${pairOf('p')})`) === daily &&
@@ -478,7 +497,7 @@ await ev("document.querySelector('#btnPlay').click()");
 await until("game.path.length === 1 && !game.loading");
 await ev("document.querySelector('#btnGiveUp').click()");
 await ev("document.querySelector('#gQuit').click()");
-check('daily result is recorded', await ev("(r => r.daily === '2026-01-02' && r.via === setup.via.title && r.rules.join() === 'checkpoint')(store.get('mwr.history', [])[0]) && document.querySelector('#modal').textContent.includes('Daily 2026-01-02')"));
+check('daily result is recorded', await ev("(r => r.daily === '2026-01-02' && r.via === setup.via.title && r.rules.join() === 'nonav,checkpoint')(store.get('mwr.history', [])[0]) && document.querySelector('#modal').textContent.includes('Daily 2026-01-02')"));
 await ev("document.querySelector('#mNew').click()");
 await until('setup.busy === 0', 60000);
 check('New game leaves the daily without the notice', await ev("setup.daily === null && document.querySelector('#setupStatus').textContent !== LEFT_DAILY"));
@@ -488,6 +507,11 @@ await until("setup.daily === '2026-01-02' && setup.busy === 0", 60000);
 await ev("document.querySelector('#rules input[value=limit]').click()");
 check('another rule leaves the daily', await ev("setup.daily === null && document.querySelector('#setupStatus').textContent === LEFT_DAILY"));
 await ev("document.querySelector('#rules input[value=limit]').click()");
+await ev("loadDaily('2026-01-02')");
+await until("setup.daily === '2026-01-02' && setup.busy === 0", 60000);
+await ev("document.querySelector('input[name=level][value=relaxed]').click()");
+check('another difficulty leaves the daily', await ev("setup.daily === null && document.querySelector('#setupStatus').textContent === LEFT_DAILY && level() === 'relaxed'"));
+await ev("document.querySelector('input[name=level][value=normal]').click()");
 await ev("loadDaily('2026-01-02')");
 await until("setup.daily === '2026-01-02' && setup.busy === 0", 60000);
 await ev("document.querySelector('#btnSwap').click()");

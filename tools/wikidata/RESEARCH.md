@@ -70,7 +70,7 @@ Taken in October 2026 from these findings:
 - **Pools:** Popular (the best-linked 30% of Everyday; "Famous" in the research), Everyday (the cleaned pool, the default), Deep cuts (the least-linked third of each topic) and Chaos. They replaced Classic, Balanced and Even, and Target difficulty (Easy/Any/Hard).
 - **Topics:** rolls draw a topic, then an article, and never take the start and target from the same topic.
 - **Pages left out:** the non-content pages leave the pool, plus three list pages no category marks (Block variant, Drinks, Removed blocks). Variants and Gameplay become the Content toggles Variants and Mechanics, off by default.
-- **Difficulty:** No navboxes and No hubs become a difficulty setting (Relaxed with navboxes, Normal without, Hard without navboxes or hubs), with Normal as the default. That's a separate step after the pools.
+- **Difficulty:** No navboxes and No hubs became a difficulty setting (Relaxed with navboxes, Normal without, Hard without navboxes or hubs), with Normal as the default. Every daily plays on Normal plus one rule, No hubs making it Hard.
 
 ## Open questions
 

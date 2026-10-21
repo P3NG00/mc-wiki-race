@@ -14,7 +14,7 @@ The setup screen puts playing first. Top to bottom:
 
 - **📅 Daily challenge** shows today's game. **Play the daily** loads today's pair, which is the same for everyone on the same date. It always plays on Normal with one extra rule of the day (No Back, Blind target, a relay, Six clicks, a round trip, Exact clicks, a scavenger hunt, or Hard instead), it can always be done (on a Six clicks day in 4 clicks or fewer), and the result says it was the daily. `index.html#daily` opens it directly.
 - **Your game** says what's set, and **Change game and settings** takes you down to the steps below the cards.
-- **The cards:** **Reroll** any of them, or type your own article. **Par** beside Start is the fewest clicks the game can be done in, with the same difficulty, checkpoints and spin-offs. It shows in the game's header too, and the result scores your win against it as golf does (Hole in one!, Par, Bogey, Double bogey…) and shows one route that takes that many. It goes by the wiki's offline copy, so the result names that copy's date.
+- **The cards:** **Reroll** any of them, or type your own article. **Par** beside Start is the fewest clicks the game can be done in, with the same difficulty, checkpoints and spin-offs. It shows in the game's header too, and the result scores your win against it as golf does, with what each name means (Par, even with par; Bogey, 1 over par; Birdie, 1 under…), and shows your path beside one route that takes that many. It goes by the wiki's offline copy, so the result names that copy's date.
 
 Under the cards are the steps for changing the game:
 

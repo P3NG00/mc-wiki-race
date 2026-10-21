@@ -205,9 +205,9 @@
   .hud .goal { display: flex; flex-direction: column; gap: 5px; min-width: 0; flex: 1; }
   .hud-top, .hud-tags { display: flex; flex-wrap: wrap; gap: 4px 6px; align-items: center; }
   .hud-top { gap: 4px 10px; }
-  .hud-tags .tag { font-size: 11px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; border-radius: var(--radius-pill);
+  .hud-tags .tag, .result-game .tag { font-size: 11px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; border-radius: var(--radius-pill);
     padding: 1px 8px; border: 1px solid var(--line); background: var(--bg); color: var(--muted); }
-  .hud-tags .tag.game { background: var(--ink); border-color: var(--ink); color: var(--panel); }
+  .hud-tags .tag.game, .result-game .tag.game { background: var(--ink); border-color: var(--ink); color: var(--panel); }
   .route-row { display: flex; gap: 8px; align-items: center; min-width: 0; }
   .route { position: relative; display: flex; gap: 6px; align-items: center; min-width: 0; overflow-x: auto; scrollbar-width: thin; padding: 2px; }
   .route .sep { flex: none; color: var(--muted); }
@@ -289,14 +289,34 @@
   .modal-bg { position: fixed; inset: 0; background: rgba(0,0,0,.45); display: grid; place-items: center; padding: 16px; z-index: 10; }
   .modal { background: var(--panel); color: var(--ink); border-radius: var(--radius-lg); padding: 22px; max-width: 520px; width: 100%; box-shadow: var(--shadow); max-height: 90vh; overflow-y: auto; }
   .modal h2 { margin: 0 0 6px; font-size: 22px; }
-  .modal .big { display: flex; gap: 24px; margin: 14px 0; }
-  .modal .big .stat { text-align: left; }
-  .modal .big .v { font-size: 30px; }
   .modal ol { padding-left: 22px; margin: 6px 0 16px; font-size: 14px; }
   .modal .actions { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
   .modal .peek { display: flex; gap: 14px; align-items: flex-start; }
   .modal .peek img { width: 96px; height: 96px; object-fit: contain; image-rendering: pixelated; flex: none; }
   .modal p { margin: 0 0 12px; }
+  /* The result: the outcome and its golf score, the game, four numbers, your path beside the shortest route, the buttons. */
+  .modal:has(.result) { max-width: 680px; }
+  .result { display: flex; flex-direction: column; gap: 12px; }
+  .result-head { display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: center; }
+  .result-head h2 { margin: 0; font-size: 26px; letter-spacing: -.01em; }
+  .result-head h2.lost { color: var(--target); }
+  .result .reason { margin: -6px 0 0; }
+  .score { font-size: 15px; font-weight: 700; border-radius: var(--radius-pill); padding: 3px 12px; background: var(--accent-soft); color: var(--accent); }
+  .score .note { font-weight: 400; color: inherit; opacity: .85; }
+  .score.over { background: var(--warm-soft); color: var(--warm); }
+  .result-game { display: flex; flex-wrap: wrap; gap: 4px 6px; align-items: center; }
+  .result-game .note { margin: 0; }
+  .tiles { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+  .tile { background: var(--bg); border-radius: var(--radius); padding: 8px 12px; }
+  .tile .v { font-size: 24px; font-weight: 700; line-height: 1.15; }
+  .tile .k { font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; }
+  .best { margin: 0; }
+  .best.new { background: var(--accent-soft); color: var(--accent); font-weight: 700; border-radius: var(--radius); padding: 8px 12px; }
+  .routes { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 4px 20px; }
+  .routes h3 { margin: 0; font-size: 12px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+  .routes ol { margin: 6px 0 4px; }
+  .routes .note { margin: 0; }
+  .result .actions { border-top: 1px solid var(--line); padding-top: 12px; }
   .note { color: var(--muted); font-size: 13px; }
 
   @media (max-width: 720px) {
@@ -348,7 +368,12 @@
     .main.collapsed .path { display: flex; }
     .toast { top: 10px; font-size: 13.5px; padding: 6px 14px; }
   }
-  @media (max-width: 480px) { .modal .peek { flex-direction: column; } }   /* the description gets the dialog's width */
+  @media (max-width: 480px) {
+    .modal .peek { flex-direction: column; }   /* the description gets the dialog's width */
+    .tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .result .actions button { flex: 1; }
+    .result .actions .primary { order: -1; flex-basis: 100%; }   /* New game first, the full width */
+  }   /* the description gets the dialog's width */
   /* Touch screens: bigger tap targets for the small controls, and 16 px inputs, as smaller text makes iOS zoom the
      page on focus. */
   @media (pointer: coarse) {
@@ -2052,28 +2077,29 @@ function showHint() {
   if (hint && game.active && !game.loading) showToast(HINTS[hint].text, hint === 'stranded' ? 6000 : 2000);
 }
 
-// Golf: a win's clicks against par. Below par is only possible where the live wiki has a link the snapshot hasn't.
+// Golf: a win's clicks against par, as its golf name and what that means, for anyone who doesn't play golf. Below par is
+// only possible where the live wiki has a link the snapshot hasn't.
 const overPar = over => over > 0 ? `+${over}` : over < 0 ? `−${-over}` : 'par';
 function golfScore(clicks, par) {
-  const over = clicks - par;
-  if (clicks === 1 && par === 1) return 'Hole in one!';
+  const over = clicks - par, plain = over ? `${Math.abs(over)} ${over > 0 ? 'over' : 'under'} par` : 'even with par';
+  if (clicks === 1 && par === 1) return { name: 'Hole in one!', note: 'par 1 in one click', over };
   const name = { [-3]: 'Albatross', [-2]: 'Eagle', [-1]: 'Birdie', 0: 'Par', 1: 'Bogey', 2: 'Double bogey', 3: 'Triple bogey' }[over];
-  if (!name) return `${Math.abs(over)} ${over > 0 ? 'over' : 'under'} par`;
-  return over ? `${name} (${overPar(over)})` : name;
+  return name ? { name, note: plain, over } : { name: plain, note: '', over };
 }
+const golfText = g => g.name + (g.note ? ` (${g.note})` : '');
 
-// Fills the result's par and score once the game's route is known (routeReady, from startGame), unless that result has
-// been closed by then. A record saved before par was known gets it now.
+// Fills the result's par, golf score and shortest route once the game's route is known (routeReady, from startGame),
+// unless that result has been closed by then. A record saved before par was known gets it now. Exact clicks keeps its
+// own route in that column (see finish) and gets no golf score.
 async function showPar(rec, routeReady) {
   const el = $('#par'), missing = chain(rec).find(t => !PAGE_IDS.has(t));
-  let text, par = null;
+  let text, par = null, route = null;
   try {
-    const route = missing ? null : await routeReady;
+    route = missing ? null : await routeReady;
     if (route) par = route.length - 1;
     text = missing ? `“${missing}” isn’t in the wiki as of ${WIKI_DATA.snapshot}, so the fewest clicks are unknown.`
       : !route ? `No route going by the wiki on ${WIKI_DATA.snapshot}, with these settings.`
-      : [rec.won && !rec.exact && golfScore(rec.clicks, par) + '.', `Par ${par}, going by the wiki on ${WIKI_DATA.snapshot}.`, `One way: ${route.join(' → ')}.`]
-        .filter(Boolean).join(' ');
+      : `Going by the wiki’s copy from ${WIKI_DATA.snapshot}.`;
   } catch (e) {
     text = `Couldn’t work out the fewest clicks: ${e.message}.`;
   }
@@ -2082,7 +2108,18 @@ async function showPar(rec, routeReady) {
     const saved = savedGames(), mine = saved.find(r => r.at === rec.at && r.start === rec.start);
     if (mine) { mine.par = par; store.set('mwr.history', saved); }
   }
-  if (el.isConnected) { el.textContent = text; $('#mPar').textContent = par ?? '–'; }
+  if (!el.isConnected) return;
+  el.textContent = text;
+  $('#mPar').textContent = par ?? '–';
+  if (!rec.exact) {
+    $('#mBestTitle').textContent = `${rec.finds || rec.kinds ? 'Shortest hunt' : 'Shortest route'}${route ? ` · par ${par}` : ''}`;
+    $('#mBest').innerHTML = (route ?? []).map(t => `<li>${esc(t)}</li>`).join('');
+  }
+  if (rec.won && !rec.exact && par !== null) {
+    const g = golfScore(rec.clicks, par);
+    $('#mScore').innerHTML = esc(g.name) + (g.note ? ` <span class="note">· ${esc(g.note)}</span>` : '');
+    $('#mScore').className = `score${g.over > 0 ? ' over' : ''}`;
+  }
 }
 
 // Ways to lose besides giving up, by the flag a record gets: Six clicks's and Exact clicks's limit used up, and Exact
@@ -2115,41 +2152,49 @@ function finish(won, lost = null) {
   store.set('mwr.history', hist.slice(0, 50));
 
   const route = routeText(rec);
-  const pathHtml = game.path.map(p => `<li><a href="${esc(wikiUrl(p.title))}" target="_blank" rel="noopener">${esc(p.title)}</a>${p.back ? ' <span class="note">(back)</span>' : ''}${p.via ? ` <span class="note">(${viaName(p.via).toLowerCase()})</span>` : ''}${p.found ? ` <span class="note">(found ${esc(p.found.join(', '))})</span>` : ''}</li>`).join('');
-  let bestNote = '';
+  // Your path, each page marked with what it was to the game: back, a checkpoint, a find, the target, Hot/cold's hint.
+  const last = game.path.length - 1, goalWord = lost === 'tooSoon' ? 'too soon' : game.roundTrip ? 'back home' : 'target';
+  const pathHtml = game.path.map((p, i) => `<li><a href="${esc(wikiUrl(p.title))}" target="_blank" rel="noopener">${esc(p.title)}</a>` +
+    [p.back && 'back', p.via && viaName(p.via).toLowerCase(), p.found && p.found.join(', '), i === last && (won || lost === 'tooSoon') && !game.hunt && goalWord,
+      p.hint && HINTS[p.hint].icon].filter(Boolean).map(w => ` <span class="note">${esc(w)}</span>`).join('') + '</li>').join('');
   const newBest = won && best && (rec.clicks < best.clicks || (rec.clicks === best.clicks && rec.ms < best.ms));
-  if (won && best) {
-    bestNote = newBest
-      ? '<p class="note">New personal best for this pair!</p>'
-      : `<p class="note">Your best for this pair: ${best.clicks} clicks in ${fmtTime(best.ms)}.</p>`;
-  }
-  // Exact clicks shows one route of its count, and a target reached too soon says what the count was.
-  const exactNote = !game.exact ? '' : `<p class="note">${lost === 'tooSoon' ? `You reached ${esc(target.title)} in ${rec.clicks}, but it had to be exactly ${game.limit}. ` : ''}` +
-    `One way in exactly ${game.limit}: ${esc(game.exact.join(' → '))}.</p>`;
+  const bestNote = !won || !best ? '' : newBest ? '<p class="best new">New personal best for this pair!</p>'
+    : `<p class="best note">Your best for this pair: ${best.clicks} clicks in ${fmtTime(best.ms)}.</p>`;
+  // The heading: the outcome, with a loss's reason under it. Exact clicks's column holds a route of its count.
+  const title = won ? (game.hunt ? '🎉 You found them all!' : '🎉 You made it!') : LOSSES[lost] ?? 'Game over';
+  const reason = lost === 'tooSoon' ? `You reached ${target.title} on click ${rec.clicks}, but it had to be exactly ${game.limit}.`
+    : lost === 'outOfClicks' ? `All ${game.limit} clicks used, ${game.hunt ? 'with something still to find' : 'and no target yet'}.` : '';
+  const tags = [GAMES[gameOf(rec.rules)].label, ...rec.rules.filter(k => EXTRA_RULES.includes(k) || k === 'noretrace').map(k => RULES[k].label)];
+  const otherSettings = settingsText({ ...rec, rules: rec.rules.filter(k => LEVEL_RULES.includes(k)) });   // what the labels don't say
   play(newBest ? 'best' : won ? 'win' : lost ? 'lose' : 'giveUp');
-  openModal(`
-    <h2>${won ? '🎉 You made it!' : LOSSES[lost] ?? 'Game over'}</h2>
-    <p class="note">${rec.daily ? `Daily ${rec.daily}: ` : ''}${esc(route)}${settingsNote ? ' · ' + esc(settingsNote) : ''}</p>
-    <div class="big">
-      <div class="stat"><div class="v mono">${won ? rec.clicks : '—'}</div><div class="k">Clicks</div></div>
-      <div class="stat"><div class="v mono" id="mPar">${rec.par ?? '…'}</div><div class="k">Par</div></div>
-      <div class="stat"><div class="v mono">${fmtTime(ms)}</div><div class="k">Time</div></div>
-      <div class="stat"><div class="v mono">${game.path.length}</div><div class="k">Pages seen</div></div>
+  openModal(`<div class="result">
+    <div class="result-head"><h2${won ? '' : ' class="lost"'}>${title}</h2><span class="score hidden" id="mScore"></span></div>
+    ${reason ? `<p class="reason">${esc(reason)}</p>` : ''}
+    <div class="result-game">${tags.map((t, i) => `<span class="tag${i ? '' : ' game'}">${esc(t)}</span>`).join('')}
+      <p class="note">${rec.daily ? `Daily ${rec.daily}: ` : ''}${esc(route)}${otherSettings ? ' · ' + esc(otherSettings) : ''}</p></div>
+    <div class="tiles">
+      <div class="tile"><div class="v mono">${won ? rec.clicks : game.exact ? `${rec.clicks} of ${game.limit}` : '—'}</div><div class="k">Clicks</div></div>
+      <div class="tile"><div class="v mono" id="mPar">${rec.par ?? '…'}</div><div class="k">Par</div></div>
+      <div class="tile"><div class="v mono">${fmtTime(ms)}</div><div class="k">Time</div></div>
+      <div class="tile"><div class="v mono">${rec.clicks ? fmtTime(ms / rec.clicks) : '–'}</div><div class="k">Per click</div></div>
     </div>
-    ${bestNote}${exactNote}
-    <p class="note" id="par">Working out par…</p>
-    <strong>Path</strong>
-    <ol>${pathHtml}</ol>
+    ${bestNote}
+    <div class="routes">
+      <div><h3>Your path · ${rec.clicks} click${rec.clicks === 1 ? '' : 's'}</h3><ol>${pathHtml}</ol></div>
+      <div><h3 id="mBestTitle">${game.exact ? `One way in exactly ${game.limit}` : 'Shortest route'}</h3>
+        <ol id="mBest">${game.exact ? game.exact.map(t => `<li>${esc(t)}</li>`).join('') : ''}</ol>
+        <p class="note" id="par">Working out par…</p></div>
+    </div>
     <div class="actions">
       <button id="mCopy">Copy result</button>
       <button id="mSame">Retry this pair</button>
       <button class="primary" id="mNew">New game</button>
-    </div>`, false);
+    </div></div>`, false);
   showPar(rec, game.parReady);
   $('#mCopy').onclick = async () => {
     const text = `MC Wiki Race${rec.daily ? ` daily ${rec.daily}` : ''}: ${route}${settingsNote ? ` (${settingsNote})` : ''}\n` +
       (won ? `${rec.clicks} clicks in ${fmtTime(ms)}` : `${LOSSES[lost] ?? 'Gave up'} after ${fmtTime(ms)}`) +
-      (rec.par === undefined ? '' : `, par ${rec.par}${won && !rec.exact ? ': ' + golfScore(rec.clicks, rec.par) : ''}`) + '\n' +
+      (rec.par === undefined ? '' : `, par ${rec.par}${won && !rec.exact ? ': ' + golfText(golfScore(rec.clicks, rec.par)) : ''}`) + '\n' +
       rec.path.join(' → ');
     try { await navigator.clipboard.writeText(text); $('#mCopy').textContent = 'Copied!'; }
     catch { $('#mCopy').textContent = 'Copy failed'; }

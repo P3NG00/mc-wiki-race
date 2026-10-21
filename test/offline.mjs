@@ -109,13 +109,15 @@ links = await linkStates();
 check('Hard: hubs, redirects to them and navboxes dead; the target hub and other links live',
   links.Block === 'dead' && links.Blocks === 'dead' && links.Creeper === 'dead' && links.Crafting === 'live' && links.Diamond_Pickaxe === 'live', JSON.stringify(links));
 await ev('finish(false)');
-check('the result shows par and a route', await until("/^Par \\d+, going by the wiki on .* One way: Diamond → .*Crafting\\.$/.test(document.querySelector('#par')?.textContent)"),
-  await ev("document.querySelector('#par')?.textContent"));
+const shortest = "[...document.querySelectorAll('#mBest li')].map(li => li.textContent).join(' → ')";
+check('the result shows par and a shortest route beside your path', await until(`/^Shortest route · par \\d+$/.test(document.querySelector('#mBestTitle').textContent)
+  && /^Diamond → .*Crafting$/.test(${shortest}) && document.querySelector('#par').textContent.startsWith('Going by the wiki’s copy from ')`),
+  await ev(shortest));
 check('the record keeps par, and the history shows it', await ev("Number.isInteger(savedGames()[0].par)") && await until(
   "toSetup(), document.querySelector('#history tbody tr td:nth-child(5)').textContent === 'par ' + savedGames()[0].par"),
   await ev("document.querySelector('#history tbody tr td:nth-child(5)').textContent"));
-check('golf names a win against par', await ev("[[1, 1], [2, 2], [3, 2], [4, 2], [5, 2], [9, 2], [1, 2], [1, 3]].map(([c, p]) => golfScore(c, p)).join('|')")
-  === 'Hole in one!|Par|Bogey (+1)|Double bogey (+2)|Triple bogey (+3)|7 over par|Birdie (−1)|Eagle (−2)');
+check('golf names a win against par, saying what each means', await ev("[[1, 1], [2, 2], [3, 2], [4, 2], [5, 2], [9, 2], [1, 2], [1, 3]].map(([c, p]) => golfText(golfScore(c, p))).join('|')")
+  === 'Hole in one! (par 1 in one click)|Par (even with par)|Bogey (1 over par)|Double bogey (2 over par)|Triple bogey (3 over par)|7 over par|Birdie (1 under par)|Eagle (2 under par)');
 await ev('closeModal(); toSetup()');
 check('difficulty from a link\'s rules, and its words', await ev(`(() => {
   const got = [[], ['nonav'], ['nonav', 'nohubs'], ['noback', 'nonav']].map(r => (setRules(r), level() + ':' + rulesText(rules()))).join(' ');
@@ -296,8 +298,9 @@ for (const [i, t] of exact.route.slice(1).entries()) {
   await until(`game.path.length === ${i + 2} && !game.loading || !game.active`);
 }
 check('on the count wins, with no golf score', await until('!game.active') && await ev(`(r => r.won && r.clicks === ${n} && r.exact === ${n})(store.get('mwr.history', [])[0])`) &&
-  await until("document.querySelector('#par').textContent.startsWith('Par ')") && await ev("!/bogey|Par\\./.test(document.querySelector('#par').textContent.split(', going')[0])"),
-  await ev("document.querySelector('#par')?.textContent"));
+  await until("document.querySelector('#par').textContent.startsWith('Going by')") && await ev(`document.querySelector('#mScore').classList.contains('hidden')
+  && document.querySelector('#mBestTitle').textContent === 'One way in exactly ${n}' && document.querySelectorAll('#mBest li').length === ${n + 1}`),
+  await ev("document.querySelector('#mBestTitle')?.textContent"));
 await ev("closeModal(); toSetup()");
 await open('#start=Diamond&target=Zombie&rules=exact');
 await until(ready);

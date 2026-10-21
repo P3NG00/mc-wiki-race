@@ -92,6 +92,8 @@ def render(data):
     j = lambda v: json.dumps(v, ensure_ascii=False)
     lines = [
         f'// minecraft.wiki as of {data["snapshot"]}, for MC Wiki Race: made by tools/wikidata/build.py from {data["file"]}.',
+        '// Its titles, categories and link counts come from minecraft.wiki (https://minecraft.wiki), licensed under CC BY-NC-SA 3.0',
+        '// (https://creativecommons.org/licenses/by-nc-sa/3.0/), not under the game\'s MIT license.',
         '// Don\'t edit it by hand; rebuild it from a newer ZIM (see CLAUDE.md, "Wiki data").',
     ]
     # One entry per line, and no trailing commas, so what follows the = is JSON (diff.py reads it back).

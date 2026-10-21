@@ -415,12 +415,15 @@ const THEMES = [...new Set(['auto', 'light', 'dark', ...Array.from(document.quer
 const WIKI = 'https://minecraft.wiki';
 const API = WIKI + '/api.php';
 
-// Game-content categories the Classic, Balanced and Even modes draw from (see randomPoolTitle).
+// Game-content categories the Classic, Balanced and Even modes draw from (see randomPoolTitle). Not Weapons: on the
+// wiki that holds only weapons from Minecraft: The Manga, while the game's weapons are in Items.
 const POOL_CATEGORIES = [
   'Blocks', 'Items', 'Hostile mobs', 'Passive mobs', 'Neutral mobs', 'Boss mobs',
   'Overworld biomes', 'Nether biomes', 'End biomes', 'Generated structures',
-  'Enchantments', 'Effects', 'Food', 'Tools', 'Weapons', 'Armor', 'Redstone', 'Plants', 'Gameplay',
+  'Enchantments', 'Effects', 'Food', 'Tools', 'Armor', 'Redstone', 'Plants', 'Gameplay',
 ];
+// Objects from the books and comics, filed in game categories too (Giant Pickaxe in Tools). Rolls skip them.
+const FICTION_CATEGORIES = ['Category:Fictional mods', 'Category:Book objects'];
 
 // Non-article namespaces on minecraft.wiki (from meta=siteinfo). Links into these are disabled.
 const NAMESPACES = [
@@ -442,7 +445,7 @@ const MIN_BACKLINKS = 5;   // a target or checkpoint must have at least this man
 const TOPICS = {
   any: { label: 'Any topic' },
   blocks: { label: 'Blocks', cats: ['Blocks', 'Redstone', 'Plants'] },
-  items: { label: 'Items', cats: ['Items', 'Food', 'Tools', 'Weapons', 'Armor'] },
+  items: { label: 'Items', cats: ['Items', 'Food', 'Tools', 'Armor'] },
   mobs: { label: 'Mobs', cats: ['Hostile mobs', 'Passive mobs', 'Neutral mobs', 'Boss mobs'] },
   world: { label: 'Biomes & structures', cats: ['Overworld biomes', 'Nether biomes', 'End biomes', 'Generated structures'] },
   magic: { label: 'Enchantments & effects', cats: ['Enchantments', 'Effects'] },
@@ -559,7 +562,11 @@ async function fetchHubTitles() {
 // with an infobox it is often the infobox caption ("Java Edition", "Adult"), and it keeps HTML entities such as &#91;.
 // TextExtracts returns at most 20 intros per request (exlimit).
 const EXTRACT_PARAMS = { exintro: '1', explaintext: '1', exlimit: 'max' };
-const INFO_PARAMS = { prop: 'pageprops|pageimages|extracts', ppprop: 'disambiguation', piprop: 'thumbnail', pithumbsize: '400', ...EXTRACT_PARAMS };
+// categories: only FICTION_CATEGORIES are asked for, so even Chaos's 50 pages fit in one reply at cllimit max.
+const INFO_PARAMS = {
+  prop: 'pageprops|pageimages|categories|extracts', ppprop: 'disambiguation', piprop: 'thumbnail', pithumbsize: '400',
+  clcategories: FICTION_CATEGORIES.join('|'), cllimit: 'max', ...EXTRACT_PARAMS,
+};
 const firstParagraph = text => (text || '').trim().split('\n')[0].trim();
 // limit: how many incoming links to count up to (bllimit).
 const backlinkParams = (title, limit) => ({ list: 'backlinks', bltitle: title, blnamespace: '0', bllimit: String(limit), blfilterredir: 'nonredirects' });
@@ -571,8 +578,11 @@ function toInfo(p) {
     desc: firstParagraph(p.extract),
     img: p.thumbnail?.source || '',
     disambig: !!p.pageprops && 'disambiguation' in p.pageprops,
+    fiction: !!p.categories?.length,
   };
 }
+// Rolls skip disambiguation pages and book and comic objects. A custom article may be either.
+const rollable = i => i && !i.disambig && !i.fiction;
 
 // Fills in desc for infos fetched without extracts, 20 titles per request.
 async function addDescs(infos) {
@@ -591,9 +601,9 @@ async function addDescs(infos) {
 const chaosQueue = [];
 let chaosRefill = null;
 function refillChaos() {
-  return chaosRefill ||= api({ action: 'query', generator: 'random', grnnamespace: '0', grnfilterredir: 'nonredirects', grnlimit: '50', ...INFO_PARAMS, prop: 'pageprops|pageimages' })
+  return chaosRefill ||= api({ action: 'query', generator: 'random', grnnamespace: '0', grnfilterredir: 'nonredirects', grnlimit: '50', ...INFO_PARAMS, prop: 'pageprops|pageimages|categories' })
     .then(async d => {
-      const infos = (d.query?.pages || []).map(toInfo).filter(p => p && !p.disambig && !CHAOS_REJECT.test(p.title));
+      const infos = (d.query?.pages || []).map(toInfo).filter(p => rollable(p) && !CHAOS_REJECT.test(p.title));
       await addDescs(infos);
       chaosQueue.push(...infos);
     })
@@ -628,7 +638,7 @@ async function backlinkCount(title, limit) {
   return d.query.backlinks.length;
 }
 
-// Resolves redirects/normalisation and returns { title, desc, img, disambig } or null if missing.
+// Resolves redirects/normalisation and returns { title, desc, img, disambig, fiction } or null if missing.
 // With backlinks (a limit), also counts incoming links up to that limit in the same request.
 async function pageInfo(title, { backlinks = 0 } = {}) {
   const d = await api({ action: 'query', titles: title, redirects: '1', ...INFO_PARAMS, ...(backlinks && backlinkParams(title, backlinks)) });
@@ -749,7 +759,7 @@ async function rollOne(which) {
     const infos = await Promise.all(Array.from({ length: batch }, () => candidate(limit, cats)));
     // Read the other cards now, not before the await: they may be rolling at the same time.
     const others = cardKeys().filter(w => w !== which).map(w => setup[w]?.title);
-    const ok = infos.filter(i => i && !i.disambig && !others.includes(i.title) && (!linked || i.backlinks >= MIN_BACKLINKS));
+    const ok = infos.filter(i => rollable(i) && !others.includes(i.title) && (!linked || i.backlinks >= MIN_BACKLINKS));
     // On a tie the first one wins, which is as random as any.
     if (ok.length) return Object.assign(ok.reduce((best, i) => d.better?.(i, best) ? i : best), picked);
   }
@@ -828,10 +838,10 @@ async function dailyPair(date) {
     for (const t of titles.slice(0, 20)) { const info = await ok(t); if (info) return info; }
     throw new Error('No daily pair found');
   };
-  const start = await first(ranked(date, 'start', pool), async t => { const i = await pageInfo(t); return i && !i.disambig && i; });
+  const start = await first(ranked(date, 'start', pool), async t => { const i = await pageInfo(t); return rollable(i) && i; });
   const linked = (salt, not) => first(ranked(date, salt, pool), async t => {
     const i = await pageInfo(t, { backlinks: MIN_BACKLINKS });
-    return i && !i.disambig && !not.includes(i.title) && i.backlinks >= MIN_BACKLINKS && i;
+    return rollable(i) && !not.includes(i.title) && i.backlinks >= MIN_BACKLINKS && i;
   });
   const goal = await linked('target', [start.title]);
   const via = rule === 'checkpoint' ? await linked('via', [start.title, goal.title]) : null;

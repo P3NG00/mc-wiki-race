@@ -31,6 +31,7 @@ Open `index.html` in a browser. Opening it straight from disk (`file://`) works 
   - **Blind target:** you only get the target's name, with no picture or description.
   - **Hot/cold:** after each click, a hint says whether you got closer to the target (🔥 warmer) or further away (❄️ colder), never how close.
   - **Six clicks:** reach the target in 6 clicks or fewer, Back included, or the game is over.
+  - **Exact clicks:** reach the target in exactly par + 2 clicks, never on the same page twice, so there's no Back. Getting there sooner loses, so you have to find a detour, and so does running out.
   - **Checkpoint:** one to three more cards, a relay. You have to visit them on the way, in order, and reaching the target before them doesn't count.
   - **Round trip:** reach the target, then find your way back to the start. Back can't take you the way you came. With **No retracing** ticked as well, every page from the way there is a dead link on the way back.
 - **Copy challenge link** shares the exact pair you're looking at, plus any checkpoints, the difficulty and rules, as `index.html#start=<Title>&target=<Title>&via=<Title>&rules=nonav,checkpoint` (`nonav` is Normal, `nonav,nohubs` Hard, neither Relaxed).

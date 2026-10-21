@@ -249,6 +249,59 @@ check('a target with no way back says so', await until("game.path.at(-1).hint ==
   await ev(`${toast} === '✓ Target reached, but there’s no way back to Diamond that doesn’t retrace your steps.'`), await ev(toast));
 await ev("finish(false); closeModal(); toSetup()");
 
+// Exact clicks: Start waits for a route of exactly par + 2 that is on no page twice; the header counts toward it, Back
+// and visited pages are gone, reaching the target sooner loses, on the count wins, and running out loses. It unticks the
+// rules it can't be played with, and they untick it.
+await open('#start=Diamond&target=Zombie&rules=exact');
+const exact = JSON.parse(await ev(`(async () => {
+  const par = (await cardsRoute(['Diamond', 'Zombie'], rules())).length - 1, g = await linkGraph(true), id = t => PAGE_IDS.get(t);
+  const step = (a, b) => g.links[id(a)].includes(id(b)) || g.carries[id(a)].some(x => g.boxes[x].includes(id(b)));
+  return JSON.stringify({ par, route: setup.exact, ok: !!setup.exact && setup.exact.length - 1 === par + 2 && new Set(setup.exact).size === setup.exact.length
+    && setup.exact[0] === 'Diamond' && setup.exact.at(-1) === 'Zombie' && setup.exact.every((t, i) => i === 0 || step(setup.exact[i - 1], t)) });
+})()`));
+check('Exact clicks: setup finds a route of exactly par + 2 on no page twice, and shows the count', await until(ready) && exact.ok &&
+  await ev(`document.querySelector('#setupPar').textContent === 'Par ${exact.par} · exactly ${exact.par + 2}'`), exact.route?.join(' → '));
+const n = exact.par + 2;
+await play();
+check('the header counts toward it and Back is gone', await ev(`document.querySelector('#hudClicks').textContent === '0/${n}' && document.querySelector('#btnBack').classList.contains('hidden')`));
+await ev("navigate('Crafting', null)");
+await until('game.path.length === 2 && !game.loading');
+rtLinks = await liveLinks();
+check('visited pages are dead links', rtLinks['/w/Crafting'] === false && rtLinks['/w/Diamond_Pickaxe'] === true, JSON.stringify(rtLinks));
+await ev("navigate('Zombie', null)");
+check('reaching the target sooner loses: Too soon', await until('!game.active') && await ev(`(r => r.tooSoon && !r.won && r.exact === ${n})(store.get('mwr.history', [])[0])
+  && document.querySelector('#modal h2').textContent === 'Too soon' && document.querySelector('#modal').textContent.includes('it had to be exactly ${n}')`));
+await ev("closeModal(); toSetup()");
+check('the history says too soon', await ev("document.querySelector('#history tbody tr').textContent.includes('too soon')"));
+await open('#start=Diamond&target=Zombie&rules=exact');
+await until(ready);
+await play();
+for (const [i, t] of exact.route.slice(1).entries()) {
+  await ev(`navigate(${JSON.stringify(t)}, null)`);
+  await until(`game.path.length === ${i + 2} && !game.loading || !game.active`);
+}
+check('on the count wins, with no golf score', await until('!game.active') && await ev(`(r => r.won && r.clicks === ${n} && r.exact === ${n})(store.get('mwr.history', [])[0])`) &&
+  await until("document.querySelector('#par').textContent.startsWith('Par ')") && await ev("!/bogey|Par\\./.test(document.querySelector('#par').textContent.split(', going')[0])"),
+  await ev("document.querySelector('#par')?.textContent"));
+await ev("closeModal(); toSetup()");
+await open('#start=Diamond&target=Zombie&rules=exact');
+await until(ready);
+await play();
+const wander = JSON.parse(await ev(`JSON.stringify(POOL_TITLES.filter(t => t !== 'Zombie' && t !== 'Diamond').slice(0, ${n}))`));
+for (const [i, t] of wander.entries()) {
+  await ev(`navigate(${JSON.stringify(t)}, null)`);
+  await until(`game.path.length === ${i + 2} && !game.loading || !game.active`);
+}
+check('running out loses: Out of clicks', await until('!game.active') && await ev("store.get('mwr.history', [])[0].outOfClicks === true && document.querySelector('#modal h2').textContent === 'Out of clicks'"));
+await ev("closeModal(); toSetup()");
+await ev("document.querySelector('#rules input[value=limit]').click()");
+check('Six clicks unticks Exact clicks', await ev("rules().join() === 'limit' && !document.querySelector('#rules input[value=exact]').checked"));
+await ev("document.querySelector('#rules input[value=checkpoint]').click()");
+await ev("document.querySelector('#rules input[value=exact]').click()");
+check('Exact clicks unticks Checkpoint and Six clicks', await until(ready) && await ev("rules().join() === 'exact' && cardKeys().join() === 'start,goal'"));
+check('a link with both plays Exact clicks only', await ev("(setRules(['checkpoint', 'roundtrip', 'noretrace', 'exact', 'limit']), rules().join()) === 'exact'"));
+await ev("setRules([])");
+
 // Rolls: each pool keeps to its tier, starts and targets come from different topics (Chaos aside), and targets are linked
 // well enough to be reached. planGroups and rollOne are called directly, with the pool's button set without a change event.
 check('a page without a hash rolls a pair on Normal', await open('') && await ev("level() === 'normal' && mode() === 'everyday'"));

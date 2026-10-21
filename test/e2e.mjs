@@ -617,8 +617,8 @@ const rand = () => {   // mulberry32
   t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
   return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
 };
-// The wiki may display a title with underscores or a lower-case first letter (DISPLAYTITLE).
-const titleKey = t => String(t).replace(/_/g, ' ').toLowerCase();
+// The heading shows the article's display title, which can differ from its title (Commands/msg is shown as /msg).
+const shownTitle = "(p => p && new DOMParser().parseFromString(p.displaytitle || p.title, 'text/html').body.textContent)(parseCache.get(game.path.at(-1).title))";
 // Done once the game has stopped loading and stays stopped: a second click can start a load just after the first ends.
 const settle = async () => {
   let ok;
@@ -660,13 +660,14 @@ for (let i = 0; i < 30 && problems.length === 0; i++) {
   if (!s.active) { wins++; lastNow = 0; await playPair(); continue; }
   const heading = await ev("document.querySelector('#firstHeading')?.textContent", await frameCtx());
   const bad = [!settled && 'stuck loading', s.overlay && 'overlay still shown', s.hud !== String(s.path.length - 1) && 'HUD clicks',
-    s.listed !== s.path.length && 'path list', s.stack.at(-1) !== s.path.at(-1) && 'Back stack', titleKey(heading) !== titleKey(s.path.at(-1)) && `heading "${heading}"`,
+    s.listed !== s.path.length && 'path list', s.stack.at(-1) !== s.path.at(-1) && 'Back stack', heading !== expected && `heading "${heading}"`,
     s.now < lastNow && 'clock went back', !s.running && 'clock stopped'].filter(Boolean);
   if (bad.length) problems.push(`step ${i + 1} (${action[1]}): ${bad.join(', ')} at ${s.path.at(-1)}`);
   lastNow = s.now;
 }
 check(`random play stays consistent (seed ${seed})`, problems.length === 0, `${steps.join(', ')}; ${wins} win(s)${problems.length ? '; ' + problems[0] : ''}`);
 await ev("localStorage.removeItem('mwr.theme'); localStorage.removeItem('mwr.pathCollapsed')");
+  const expected = await ev(shownTitle);
 
 check('no uncaught script errors', jsErrors.length === 0, jsErrors.slice(0, 5).join(' | '));
 

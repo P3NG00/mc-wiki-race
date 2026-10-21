@@ -342,7 +342,7 @@ const THEMES = [...new Set(['auto', 'light', 'dark', ...Array.from(document.quer
       </div>
       <img alt="" class="art hidden">
     </div>
-    <div class="arrow">➜</div>
+    <div class="arrow" id="pairArrow">➜</div>
     <div class="vias" id="vias"></div>
     <div class="card goal" id="cardGoal">
       <span class="tag">Target</span>
@@ -603,6 +603,8 @@ const RULES = {
   blind: { label: 'Blind target', help: 'You only get the target’s name: no picture or description.' },
   hotcold: { label: 'Hot/cold', help: 'After each click, a hint says whether you got closer to the target (warmer) or further away (colder).' },
   checkpoint: { label: 'Checkpoint', help: 'One to three more articles you have to visit, in order, on the way to the target.' },
+  roundtrip: { label: 'Round trip', help: 'Reach the target, then find your way back to the start. Back can’t take you the way you came.' },
+  noretrace: { label: 'No retracing', help: 'On the way back, every page from the way there is a dead link.' },
   limit: { label: 'Six clicks', help: `Reach the target in ${CLICK_LIMIT} clicks or fewer, Back and the way through a checkpoint included.` },
 };
 // Difficulty, as the rules it turns on. Navboxes decide how hard a game is far more than the pool does: with them almost any
@@ -639,10 +641,12 @@ function setContent(keys) {
   syncAllSpinoffs();
 }
 
-// The rules in play, in RULES order: the difficulty's and the ticked ones.
+// The rules in play, in RULES order: the difficulty's and the ticked ones. No retracing only goes with Round trip, and
+// Round trip takes the place of Checkpoint: its target is the one stop on the way.
 function level() { return $('input[name=level]:checked').value; }
 function rules() {
-  return Object.keys(RULES).filter(k => LEVELS[level()].rules.includes(k) || $(`#rules input[value=${k}]`)?.checked);
+  const on = k => LEVELS[level()].rules.includes(k) || !!$(`#rules input[value=${k}]`)?.checked;
+  return Object.keys(RULES).filter(k => on(k) && (k !== 'noretrace' || on('roundtrip')) && (k !== 'checkpoint' || !on('roundtrip')));
 }
 function setRules(keys) {
   $(`input[name=level][value=${levelOf(keys)}]`).checked = true;
@@ -659,8 +663,9 @@ function rulesText(keys) {
 const settingsText = r => [r.topic && r.topic !== 'any' && TOPICS[r.topic].label, r.content && 'Content: ' + r.content.map(contentLabel).join(', '),
   rulesText(r.rules)].filter(Boolean).join(', ');
 const sameRules = (a, b) => a.rules.join() === b.rules.join();
-// A record's articles in the order they are played: start, checkpoints, target. With the rules, it keys personal bests.
-const chain = r => [r.start, ...(r.vias ?? []), r.goal];
+// A record's articles in the order they are played: start, checkpoints, target, and the start again on a round trip.
+// With the rules, it keys personal bests.
+const chain = r => [r.start, ...(r.vias ?? []), r.goal, ...r.rules.includes('roundtrip') ? [r.start] : []];
 
 function renderCard(which) {
   const card = $({ start: '#cardStart', goal: '#cardGoal' }[which] ?? '#card-' + which);
@@ -681,12 +686,15 @@ async function updateSetupPar() {
   const token = ++setupParToken, titles = cardKeys().map(w => setup[w]?.title);
   let text = '';
   if (titles.every(Boolean)) {
-    const route = await parRoute({ start: titles[0], vias: titles.slice(1, -1), goal: titles.at(-1), rules: rules(), content: contentInPlay(titles) })
-      .catch(() => null);
+    const route = await cardsRoute(titles, rules()).catch(() => null);
     if (route) text = `Par ${route.length - 1}`;
   }
   if (token === setupParToken) $('#setupPar').textContent = text;
 }
+
+// A shortest route for the cards' titles, in cardKeys order, under rules.
+const cardsRoute = (titles, rules) =>
+  parRoute({ start: titles[0], vias: titles.slice(1, -1), goal: titles.at(-1), rules, content: contentInPlay(titles) });
 
 // Enables Start only for different articles on every card in use, with no lookup in flight.
 function updatePlay() {
@@ -697,11 +705,15 @@ function updatePlay() {
 }
 
 // Shows a card for each checkpoint in use, and the count while the Checkpoint rule is on, and rolls the checkpoints
-// that have no article yet. They are numbered when there is more than one.
+// that have no article yet. They are numbered when there is more than one. A round trip shows No retracing beside it,
+// and the start as where it ends too.
 function syncVia() {
-  const keys = viaKeys();
+  const keys = viaKeys(), roundTrip = rules().includes('roundtrip');
   $('.pair').dataset.vias = keys.length;
   $('#viaCount').classList.toggle('hidden', !rules().includes('checkpoint'));
+  $('#rules label[data-rule=noretrace]').classList.toggle('hidden', !roundTrip);
+  $('#pairArrow').textContent = roundTrip ? '⇄' : '➜';
+  $('#cardStart .tag').textContent = roundTrip ? 'Start and finish' : 'Start';
   VIA_KEYS.forEach((w, i) => {
     $('#slot-' + w).classList.toggle('hidden', !keys.includes(w));
     $(`#card-${w} .tag`).textContent = keys.length > 1 ? `Checkpoint ${i + 1}` : 'Checkpoint';
@@ -835,10 +847,9 @@ function dailyDate(s) {
 
 // items ordered by the hash of the date, a salt and the item: the day's ranking.
 const ranked = (date, salt, items) => items.map(t => [hash32(`${date}|${salt}|${t}`), t]).sort((a, b) => a[0] - b[0]).map(([, t]) => t);
-// Six clicks is left out: it's the only rule you can lose by, and nothing checks that a daily pair can be done in six.
 // Every daily is Normal plus one of these. No hubs makes it Hard. A Six clicks day's pair has par DAILY_SIX_CLICKS_PAR or
-// less, which leaves two clicks for a wrong turn.
-const DAILY_RULES = ['noback', 'blind', 'checkpoint', 'nohubs', 'limit'];
+// less, which leaves two clicks for a wrong turn. A Round trip day goes without No retracing.
+const DAILY_RULES = ['noback', 'blind', 'checkpoint', 'nohubs', 'limit', 'roundtrip'];
 const DAILY_SIX_CLICKS_PAR = 4;
 // A Checkpoint day has one or two checkpoints. Three would use every topic and make a long game for a daily.
 const DAILY_CHECKPOINTS = [1, 2];
@@ -931,6 +942,8 @@ const game = {
   daily: null,       // the date, if this is that day's daily pair
   vias: [],          // the checkpoints (Checkpoint rule), to be reached in order before the target counts
   viaNext: 0,        // how many of them have been reached
+  roundTrip: false,  // Round trip: plays as the target for its one checkpoint and the start for its target
+  retraced: null,    // No retracing, once the target is reached: the titles of the way there, now dead
   path: [],          // every article visited, in order (includes back-navigation)
   stack: [],         // navigation stack for the Back button
   elapsed: 0,        // ms of reading time; time spent loading articles is not counted
@@ -969,9 +982,9 @@ function markPathScroll() { const pl = $('.path-list'); pl.classList.toggle('scr
 
 // What the player is heading for: the next checkpoint until all are reached, then the target.
 const objective = () => game.vias[game.viaNext] ?? game.goal;
-// A checkpoint's name by its number (from 1), numbered when there is more than one.
-const viaName = n => 'Checkpoint' + (game.vias.length > 1 ? ` ${n}` : '');
-const objectiveLabel = () => objective() === game.goal ? 'Target' : viaName(game.viaNext + 1);
+// A checkpoint's name by its number (from 1), numbered when there is more than one. A round trip's is its target.
+const viaName = n => game.roundTrip ? 'Target' : 'Checkpoint' + (game.vias.length > 1 ? ` ${n}` : '');
+const objectiveLabel = () => objective() !== game.goal ? viaName(game.viaNext + 1) : game.roundTrip ? 'Back to' : 'Target';
 function renderObjective() {
   $('#hudLbl').textContent = objectiveLabel();
   $('#hudGoal').textContent = objective().title;
@@ -990,8 +1003,10 @@ function showToast(text, ms) {
   game.toastTimer = setTimeout(hideToast, ms);
 }
 function celebrateCheckpoint() {
-  const n = game.vias.length;
-  showToast(`✓ Checkpoint ${n > 1 ? `${game.viaNext} of ${n} ` : ''}reached! Now find ${objective().title}`, 3000);
+  const n = game.vias.length, stranded = game.path.at(-1).hint === 'stranded';
+  const home = game.goal.title;
+  showToast(game.roundTrip ? stranded ? `✓ Target reached, but there’s no way back to ${home} that doesn’t retrace your steps.` : `✓ Target reached! Now head back to ${home}`
+    : `✓ Checkpoint ${n > 1 ? `${game.viaNext} of ${n} ` : ''}reached! Now find ${objective().title}`, stranded ? 6000 : 3000);
   $('.hud .goal').classList.add('reached');
   play('checkpoint');
 }
@@ -1006,12 +1021,14 @@ function hideOverlay() { $('#overlay').classList.add('hidden'); }
 const guardLeaving = e => { e.preventDefault(); e.returnValue = true; };
 
 function startGame() {
-  const r = rules(), vias = viaKeys().map(w => setup[w]);
-  Object.assign(game, { active: true, start: setup.start, goal: setup.goal, vias, viaNext: 0, celebrate: false,
-    daily: setup.daily, rules: r, content: contentInPlay([setup.start, ...vias, setup.goal].map(c => c.title)), path: [], seen: new Map(),
+  const r = rules(), roundTrip = r.includes('roundtrip'), cards = cardKeys().map(w => setup[w]);
+  // A round trip plays as a checkpoint at the target, with the start as the goal.
+  const vias = roundTrip ? [setup.goal] : cards.slice(1, -1), goal = roundTrip ? setup.start : setup.goal;
+  Object.assign(game, { active: true, start: setup.start, goal, vias, viaNext: 0, roundTrip, retraced: new Set(), celebrate: false,
+    daily: setup.daily, rules: r, content: contentInPlay(cards.map(c => c.title)), path: [], seen: new Map(),
     stack: [], elapsed: 0, runningSince: 0, loading: false, par: null });
   // Par shows in the header once it is known: at once when the setup screen has loaded the link graph.
-  const parReady = game.parReady = parRoute({ start: game.start.title, vias: vias.map(v => v.title), goal: game.goal.title, rules: r, content: game.content });
+  const parReady = game.parReady = cardsRoute(cards.map(c => c.title), r);
   parReady.then(route => { if (game.parReady === parReady) { game.par = route ? route.length - 1 : null; renderHud(); } }, () => {});
   $('#btnBack').classList.toggle('hidden', game.rules.includes('noback'));
   $('#btnPeek').classList.toggle('hidden', game.rules.includes('blind'));
@@ -1071,6 +1088,7 @@ async function navigate(title, fragment, { back = false } = {}) {
   game.path.push({ title: page.title, back, ...(via && { via }) });
   game.seen.set(title, page.title).set(page.title, page.title);   // the link's title too, in case it was a redirect
   if (via) { game.celebrate = true; renderObjective(); }
+  if (via && game.roundTrip) turnBack(game.path.at(-1));
   // Hot/cold, on every arrival but the first and the objective's own (a target or later checkpoint passed early gets one):
   // the hint goes onto the path and shows over the article once both are ready (showHint, here and in frameReady),
   // unless the player has moved on by then.
@@ -1088,7 +1106,7 @@ async function navigate(title, fragment, { back = false } = {}) {
   // Nothing still ahead is marked: a target or checkpoint passed early still has to be reached again.
   const ahead = [...game.vias.slice(game.viaNext), game.goal].map(c => c.title);
   const seen = [...game.seen].filter(([, t]) => !ahead.includes(t)).map(([k]) => k);
-  const blocked = game.rules.includes('nohubs') ? [...HUB_TITLES.keys()].filter(t => !keep.includes(HUB_TITLES.get(t))) : [];
+  const blocked = [...game.retraced, ...game.rules.includes('nohubs') ? [...HUB_TITLES.keys()].filter(t => !keep.includes(HUB_TITLES.get(t))) : []];
   renderArticle(page, fragment, token, blocked, seen);
   setTimeout(() => frameReady(token), 15000);   // a stalled stylesheet must not leave Back and Give up disabled
   // Compare the post-redirect title, so following a redirect onto the target counts as arriving.
@@ -1475,19 +1493,44 @@ function shortestRoute(graph, from, to, usable) {
 // Relaxed, hubs are dead in Hard (the target's and the checkpoint's aside, as in play), and a spin-off's pages only count
 // when it is on. Null if there is none, or if a card's page isn't in the snapshot.
 async function parRoute({ start, vias = [], goal, rules, content = [] }) {
-  const graph = await linkGraph(!rules.includes('nonav')), usable = routeUsable({ keep: [...vias, goal], rules, content });
+  const graph = await linkGraph(!rules.includes('nonav')), usable = routeUsable({ keep: [start, ...vias, goal], rules, content });
+  if (rules.includes('roundtrip')) return roundTripRoute(graph, start, goal, usable, rules.includes('noretrace'));
   const stops = [start, ...vias, goal];
   const legs = stops.slice(1).map((b, i) => shortestRoute(graph, stops[i], b, usable));
   return legs.every(Boolean) ? legs.reduce((route, leg) => route.concat(leg.slice(1))) : null;
 }
-// Which pages a route may go through, by page number: as in play, hubs are dead in Hard but the ones kept (the target
-// and checkpoints), and a spin-off's pages only count when it is on.
-function routeUsable({ keep, rules, content = [] }) {
+// Which pages a route may go through, by page number: as in play, hubs are dead in Hard but the ones kept (the cards),
+// a spin-off's pages only count when it is on, and the titles to avoid (No retracing's) are dead.
+function routeUsable({ keep, avoid = new Set(), rules, content = [] }) {
   const hubs = new Set(rules.includes('nohubs') ? HUB_TITLES.values() : []);
   return v => {
     const title = WIKI_DATA.articles[v][0], spinoff = spinoffOf(title);
-    return !(hubs.has(title) && !keep.includes(title)) && (!spinoff || content.includes(spinoff));
+    return !(hubs.has(title) && !keep.includes(title)) && (!spinoff || content.includes(spinoff)) && !avoid.has(title);
   };
+}
+
+// A shortest round trip, there and back. With No retracing the way back may not go through a page of the way there.
+// The fewest clicks for that is a shortest loop through two given pages, which is NP-hard in general, so this tries the
+// shortest way there with the shortest way back around it and the other way about, then again with each page of the
+// first tries banned in turn, until it reaches the lower bound: the shortest way there plus the shortest way back. On the
+// 2026-08 snapshot it reached it in all of 600 Normal and Relaxed pairs tried, and in Hard in all but 2 of 295.
+const ROUND_TRIP_TRIES = 40;
+function roundTripRoute(graph, a, b, usable, noRetrace) {
+  const there = shortestRoute(graph, a, b, usable), back = shortestRoute(graph, b, a, usable);
+  if (!there || !back) return null;
+  const join = (t, k) => t.concat(k.slice(1));
+  if (!noRetrace) return join(there, back);
+  const avoiding = route => (ids => v => usable(v) && !ids.has(v))(new Set(route.slice(1, -1).map(t => PAGE_IDS.get(t))));
+  const lowest = there.length + back.length - 1;
+  let best = null;
+  for (const ban of [[], ...there.slice(1, -1), ...back.slice(1, -1)].slice(0, ROUND_TRIP_TRIES)) {
+    const without = [a, ban, b].flat();   // avoiding() leaves out the ends
+    const t = shortestRoute(graph, a, b, avoiding(without)), k = t && shortestRoute(graph, b, a, avoiding(t));
+    const k2 = shortestRoute(graph, b, a, avoiding(without)), t2 = k2 && shortestRoute(graph, a, b, avoiding(k2));
+    for (const route of [k && join(t, k), t2 && join(t2, k2)]) if (route && (!best || route.length < best.length)) best = route;
+    if (best?.length === lowest) break;
+  }
+  return best;
 }
 
 // Hot/cold: whether an arrival is closer to the objective than the page before it, going by the link graph under the
@@ -1498,19 +1541,36 @@ const HINTS = {
   colder: { icon: '❄️', text: '❄️ Colder' },
   same: { icon: '＝', text: 'Same distance' },
   unknown: { icon: '?', text: 'No hint: this page isn’t in the wiki’s offline copy' },
+  stranded: { icon: '⛔', text: 'There’s no way back that doesn’t retrace your steps' },   // see turnBack
 };
 async function hotColdHint(from, to) {
   if (!PAGE_IDS.has(from) || !PAGE_IDS.has(to)) return 'unknown';
   const aim = objective().title, keep = [...game.vias, game.goal].map(c => c.title);
-  const usable = routeUsable({ keep, rules: game.rules, content: game.content });
+  const usable = routeUsable({ keep, avoid: game.retraced, rules: game.rules, content: game.content });
   const graph = await linkGraph(!game.rules.includes('nonav'));
   const [before, after] = [from, to].map(t => shortestRoute(graph, t, aim, usable)?.length ?? Infinity);
   return after < before ? 'warmer' : after > before ? 'colder' : 'same';
 }
+// Reaching a round trip's target turns the game around: Back starts again from here, so it can't walk the way there
+// backwards, and with No retracing every page of the way there (and every link title that led to one) goes dead. If the
+// snapshot has no way back around them, the arrival gets the stranded hint: only giving up is left.
+function turnBack(entry) {
+  game.stack = [entry.title];
+  if (!game.rules.includes('noretrace')) return;
+  game.retraced = new Set([...game.seen].filter(([, t]) => t !== game.goal.title).map(([k]) => k));
+  linkGraph(!game.rules.includes('nonav')).then(graph => {
+    const usable = routeUsable({ keep: [game.goal.title], avoid: game.retraced, rules: game.rules, content: game.content });
+    if (PAGE_IDS.has(entry.title) && !shortestRoute(graph, entry.title, game.goal.title, usable)) {
+      entry.hint = 'stranded';
+      if (game.path.at(-1) === entry && game.active) { renderHud(); showHint(); }
+    }
+  }, () => {});
+}
+
 // Shows the latest arrival's hint over the article, once both the hint and the article are ready.
 function showHint() {
   const hint = game.path.at(-1)?.hint;
-  if (hint && game.active && !game.loading) showToast(HINTS[hint].text, 2000);
+  if (hint && game.active && !game.loading) showToast(HINTS[hint].text, hint === 'stranded' ? 6000 : 2000);
 }
 
 // Golf: a win's clicks against par. Below par is only possible where the live wiki has a link the snapshot hasn't.
@@ -1554,8 +1614,10 @@ function finish(won, outOfClicks = false) {
   clearInterval(game.timer);
   renderHud();
   const ms = now();
-  const rec = { start: game.start.title, goal: game.goal.title, ...(game.vias.length && { vias: game.vias.map(v => v.title) }), ...(game.daily && { daily: game.daily }),
-    ...(game.goal.topic && { topic: game.goal.topic }),
+  // A round trip is recorded by its cards: its target and no checkpoints.
+  const target = game.roundTrip ? game.vias[0] : game.goal, vias = game.roundTrip ? [] : game.vias;
+  const rec = { start: game.start.title, goal: target.title, ...(vias.length && { vias: vias.map(v => v.title) }), ...(game.daily && { daily: game.daily }),
+    ...(target.topic && { topic: target.topic }),
     ...(game.content.length && { content: game.content }), ...(game.par !== null && { par: game.par }), rules: game.rules, won, ...(outOfClicks && { outOfClicks }), clicks: clicks(), ms, at: Date.now(), path: game.path.map(p => p.title) };
   const settingsNote = settingsText(rec);
   const hist = savedGames();
@@ -1635,7 +1697,7 @@ document.addEventListener('keydown', e => { if (e.key === 'Escape' && modalDismi
 // ---------------------------------------------------------------- Wiring
 // The checkpoint count sits beside its checkbox, not in its label, where a click on it would toggle the box.
 $('#rules').innerHTML = '<span class="lbl">Rules</span>' + Object.entries(RULES).filter(([k]) => !LEVEL_RULES.includes(k)).map(([k, r]) =>
-  `<label title="${esc(r.help)}"><input type="checkbox" value="${k}"> ${esc(r.label)}</label>` + (k !== 'checkpoint' ? '' :
+  `<label title="${esc(r.help)}" data-rule="${k}"><input type="checkbox" value="${k}"> ${esc(r.label)}</label>` + (k !== 'checkpoint' ? '' :
   `<select id="viaCount" class="hidden" aria-label="How many checkpoints" title="How many checkpoints, visited in order">
   ${VIA_KEYS.map((w, i) => `<option>${i + 1}</option>`).join('')}</select>`)).join('');
 $('#vias').innerHTML = VIA_KEYS.map((w, i) => `
@@ -1683,8 +1745,10 @@ for (const row of ['#content', '#spinoffs']) $(row).addEventListener('change', e
   syncAllSpinoffs();
   reroll('all');
 });
-// A rule or the difficulty changing leaves a daily, but doesn't reroll.
-for (const row of ['#rules', '#level']) $(row).addEventListener('change', () => {
+// A rule or the difficulty changing leaves a daily, but doesn't reroll. Ticking Checkpoint or Round trip unticks the other.
+const EXCLUSIVE = { checkpoint: 'roundtrip', roundtrip: 'checkpoint' };
+for (const row of ['#rules', '#level']) $(row).addEventListener('change', e => {
+  if (e.target.checked && EXCLUSIVE[e.target.value]) $(`#rules input[value=${EXCLUSIVE[e.target.value]}]`).checked = false;
   if (leaveDaily()) setStatus(LEFT_DAILY);
   updateLevelHelp(); syncVia(); [...VIA_KEYS, 'goal'].forEach(renderCard);
 });

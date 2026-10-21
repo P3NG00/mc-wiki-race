@@ -198,6 +198,57 @@ check('back to one checkpoint, Reroll all drops the others', await until(ready) 
 await ev("document.querySelector('#rules input[value=checkpoint]').click()");
 check('the count hides with the rule', await ev("document.querySelector('#viaCount').classList.contains('hidden') && document.querySelector('.pair').dataset.vias === '0'"));
 
+// Round trip: the target, then back to the start. Reaching the target starts Back again from there, and with No
+// retracing every page of the way there goes dead. Checkpoint and Round trip untick each other.
+await open('#start=Diamond&target=Zombie&rules=roundtrip,noretrace');
+check('a round trip shows the start as the finish, ⇄ and No retracing', await until(ready) && await ev(`document.querySelector('#cardStart .tag').textContent === 'Start and finish'
+  && document.querySelector('#pairArrow').textContent === '⇄' && !document.querySelector('#rules label[data-rule=noretrace]').classList.contains('hidden')
+  && rules().join() === 'roundtrip,noretrace' && challengeLink().endsWith('&rules=roundtrip,noretrace')`));
+const rtPar = await ev("cardsRoute(['Diamond', 'Zombie'], rules()).then(r => r.length - 1)");
+check('setup par is the round trip\'s', await until(`document.querySelector('#setupPar').textContent === 'Par ${rtPar}'`), `par ${rtPar}`);
+await play();
+check('the HUD names the target first', await ev(hud) === 'Target Zombie', await ev(hud));
+await ev("navigate('Crafting', null)");
+await until('game.path.length === 2 && !game.loading');
+await ev("navigate('Zombie', null)");
+await until('game.path.length === 3 && !game.loading');
+check('reaching the target turns back: the banner, the HUD, Back starting again', await ev(`${toast} === '✓ Target reached! Now head back to Diamond'
+  && game.stack.join() === 'Zombie' && document.querySelector('#btnBack').disabled && game.path[2].via === 1`) && await ev(hud) === 'Back to Diamond', await ev(toast));
+const liveLinks = async () => JSON.parse(await ev(`JSON.stringify(Object.fromEntries([...document.querySelectorAll('a')].map(a => [a.getAttribute('href'), a.classList.contains('mwr-live')])))`, await frameCtx()));
+let rtLinks = await liveLinks();
+check('No retracing: the way there is dead, other links live', rtLinks['/w/Crafting'] === false && rtLinks['/w/Diamond_Pickaxe'] === true, JSON.stringify(rtLinks));
+await ev("navigate('Diamond Pickaxe', null)");
+await until('game.path.length === 4 && !game.loading');
+check('Back works again on the way back', await ev("!document.querySelector('#btnBack').disabled"));
+await ev("navigate('Diamond', null)");
+check('back at the start wins, recorded by its cards', await until('!game.active') && await ev(`(r => r.won && r.goal === 'Zombie' && !r.vias
+  && r.rules.join() === 'roundtrip,noretrace')(store.get('mwr.history', [])[0]) && document.querySelector('#modal').textContent.includes('Diamond → Zombie → Diamond')`));
+await ev("closeModal(); toSetup()");
+await open('#start=Diamond&target=Zombie&rules=roundtrip');
+await until(ready);
+await play();
+await ev("navigate('Crafting', null)");
+await until('game.path.length === 2 && !game.loading');
+await ev("navigate('Zombie', null)");
+await until('game.path.length === 3 && !game.loading');
+rtLinks = await liveLinks();
+check('without No retracing the way there stays live, and Back still starts again', rtLinks['/w/Crafting'] === true && await ev("game.stack.join() === 'Zombie'"));
+await ev("finish(false); closeModal(); toSetup()");
+await ev("document.querySelector('#rules input[value=checkpoint]').click()");
+check('Checkpoint unticks Round trip and hides No retracing', await until(ready) && await ev(`!document.querySelector('#rules input[value=roundtrip]').checked
+  && rules().join() === 'checkpoint' && document.querySelector('#rules label[data-rule=noretrace]').classList.contains('hidden')
+  && document.querySelector('#cardStart .tag').textContent === 'Start' && document.querySelector('#pairArrow').textContent === '➜'`));
+await ev("document.querySelector('#rules input[value=roundtrip]').click()");
+check('Round trip unticks Checkpoint', await until(ready) && await ev("rules().join() === 'roundtrip' && cardKeys().join() === 'start,goal'"));
+// A target with no way back that doesn't retrace (a dead end has no way back at all) says so as it is reached.
+await open(`#start=Diamond&target=${encodeURIComponent(deadEnd)}&rules=roundtrip,noretrace`);
+await until(ready);
+await play();
+await ev(`navigate(${JSON.stringify(deadEnd)}, null)`);
+check('a target with no way back says so', await until("game.path.at(-1).hint === 'stranded' && !game.loading") &&
+  await ev(`${toast} === '✓ Target reached, but there’s no way back to Diamond that doesn’t retrace your steps.'`), await ev(toast));
+await ev("finish(false); closeModal(); toSetup()");
+
 // Rolls: each pool keeps to its tier, starts and targets come from different topics (Chaos aside), and targets are linked
 // well enough to be reached. planGroups and rollOne are called directly, with the pool's button set without a change event.
 check('a page without a hash rolls a pair on Normal', await open('') && await ev("level() === 'normal' && mode() === 'everyday'"));
@@ -235,12 +286,15 @@ for (const m of ['popular', 'deep', 'chaos', 'everyday']) {
 
 // The daily: the same pair every time, its cards from different topics, Normal plus its rule.
 const pairOf = "JSON.stringify([...cardKeys().map(w => setup[w].title), rules()])";
-await open('#daily=2026-01-02');
+await open('#daily=2026-01-06');
 const daily = await ev(pairOf);
-await open('#daily=2026-01-02');
+await open('#daily=2026-01-06');
 check('the daily is the same on every load', await ev(pairOf) === daily, daily);
-check('the daily is Normal with Checkpoint on 2026-01-02, its cards from different topics',
+check('the daily is Normal with Checkpoint on 2026-01-06, its cards from different topics',
   await ev("rules().join() === 'nonav,checkpoint' && new Set(cardKeys().map(w => groupOf(setup[w].title))).size === cardKeys().length"), daily);
+await open('#daily=2026-01-02');
+check('a Round trip daily (2026-01-02) goes without No retracing', await until(ready) && await ev(`rules().join() === 'nonav,roundtrip'
+  && cardKeys().join() === 'start,goal' && document.querySelector('#setupStatus').textContent.includes('with Round trip')`), await ev(pairOf));
 // Every daily can be done: a route under its rules, and on a Six clicks day par 4 or less. A month of them.
 const dailies = JSON.parse(await ev(`(async () => {
   const out = [];
@@ -251,8 +305,9 @@ const dailies = JSON.parse(await ev(`(async () => {
   }
   return JSON.stringify(out);
 })()`));
-check('a month of dailies all have a route, Six clicks days par 4 or less, Checkpoint days one or two checkpoints', dailies.length === 31 &&
-  dailies.every(d => d.par >= 1 && (d.rule !== 'limit' || d.par <= 4) && (d.rule === 'checkpoint' ? d.vias === 1 || d.vias === 2 : !d.vias)) &&
+check('a month of dailies all have a route, Six clicks days par 4 or less, Checkpoint days one or two checkpoints, Round trip days there and back',
+  dailies.length === 31 && dailies.every(d => d.par >= (d.rule === 'roundtrip' ? 2 : 1) && (d.rule !== 'limit' || d.par <= 4)
+    && (d.rule === 'checkpoint' ? d.vias === 1 || d.vias === 2 : !d.vias)) && dailies.some(d => d.rule === 'roundtrip') &&
   dailies.some(d => d.rule === 'limit'), dailies.map(d => `${d.rule}${d.vias > 1 ? '×' + d.vias : ''}:${d.par}`).join(' '));
 await ev("document.querySelector('input[name=level][value=hard]').click()");
 check('another difficulty leaves the daily', await ev("setup.daily === null && document.querySelector('#setupStatus').textContent === LEFT_DAILY"));
@@ -309,14 +364,26 @@ const par = JSON.parse(await ev(`(async () => {
   }
   const off = await parRoute({ start: 'Minecraft Dungeons', goal: 'Dungeons:Creeper', rules: ['nonav'] });
   const on = await parRoute({ start: 'Minecraft Dungeons', goal: 'Dungeons:Creeper', rules: ['nonav'], content: ['Dungeons'] });
+  // Round trips: there and back, each way as short as it goes; with No retracing the way back keeps off the way there.
+  const roundTrips = [];
+  for (let i = 0; i < 20; i++) {
+    const start = pick(POOL_TITLES), goal = pick(POOL_TITLES);
+    if (start === goal) continue;
+    const [there, back, rt, rtn] = await Promise.all([[start, goal, []], [goal, start, []], [start, goal, ['roundtrip']], [start, goal, ['roundtrip', 'noretrace']]]
+      .map(([s, g, r]) => parRoute({ start: s, goal: g, rules: ['nonav', ...r] })));
+    const turn = rtn?.indexOf(goal), way = rtn?.slice(1, turn), home = rtn?.slice(turn + 1, -1);
+    if (!rt || rt.length !== there.length + back.length - 1 || rt[0] !== start || rt.at(-1) !== start || !follows({ links: relaxed.links }, rt)
+      || !rtn || rtn.length < rt.length || rtn.at(-1) !== start || !follows({ links: relaxed.links }, rtn) || home.some(t => way.includes(t))) roundTrips.push(start + ' -> ' + goal);
+  }
   const via = await parRoute({ start: 'Diamond', vias: ['Creeper'], goal: 'Bamboo', rules: ['nonav'] });
   const relay = await parRoute({ start: 'Diamond', vias: ['Creeper', 'Zombie'], goal: 'Bamboo', rules: ['nonav'] });
-  return JSON.stringify({ bad, spinoff: off === null && on?.at(-1) === 'Dungeons:Creeper', via: via?.includes('Creeper') && via.at(-1) === 'Bamboo',
+  return JSON.stringify({ bad, roundTrips, spinoff: off === null && on?.at(-1) === 'Dungeons:Creeper', via: via?.includes('Creeper') && via.at(-1) === 'Bamboo',
     relay: relay?.indexOf('Creeper') > 0 && relay.indexOf('Zombie') > relay.indexOf('Creeper') && relay.at(-1) === 'Bamboo' });
 })()`));
 check('par routes follow the graph, Relaxed ≤ Normal ≤ Hard, Hard without hubs', par.bad.length === 0, par.bad.slice(0, 3).join(', '));
 check('par reaches a spin-off page only with its spin-off on', par.spinoff);
 check('par goes through the checkpoint, and through two in order', par.via && par.relay);
+check('round trip par goes there and back, and with No retracing keeps off the way there', par.roundTrips.length === 0, par.roundTrips.join(', '));
 await open('#start=Brand%20New%20Mob&target=Diamond');
 await play();
 await ev('finish(false)');

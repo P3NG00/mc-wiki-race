@@ -481,11 +481,11 @@ await ev(`(a => { a.href = '/w/Iron_Ingot#<!--<script>x'; a.textContent = 'x'; d
 check('a fragment with <!--<script> still renders the article', await until("game.path.at(-1)?.title === 'Iron Ingot' && !game.loading", 10000) &&
   await ev("document.querySelectorAll('a.mwr-live').length > 50", await frameCtx()), await ev("game.path.at(-1)?.title + ' loading=' + game.loading"));
 
-// Daily: #daily=<date> loads that day's pair and rule, the same on every call, a different pair the next day. 2026-01-02's
+// Daily: #daily=<date> loads that day's pair and rule, the same on every call, a different pair the next day. 2026-01-06's
 // rule is Checkpoint, so it also fixes the checkpoint; 2026-01-05's is No Back, which picks none. The result records it.
 await send('browsingContext.navigate', { context: ctx, url: 'about:blank', wait: 'complete' });
-await send('browsingContext.navigate', { context: ctx, url: fileUrl + '#daily=2026-01-02&rules=limit', wait: 'complete' });
-check('daily pair loads', await until("!document.querySelector('#btnPlay').disabled && setup.daily === '2026-01-02'", 60000),
+await send('browsingContext.navigate', { context: ctx, url: fileUrl + '#daily=2026-01-06&rules=limit', wait: 'complete' });
+check('daily pair loads', await until("!document.querySelector('#btnPlay').disabled && setup.daily === '2026-01-06'", 60000),
   await ev("setup.start?.title + ' -> ' + setup.goal?.title"));
 check('the daily takes its start, checkpoints and target from different topics', await ev("new Set(cardKeys().map(w => groupOf(setup[w].title))).size === cardKeys().length"),
   await ev("cardKeys().map(w => setup[w].title + ' ' + groupOf(setup[w].title)).join(', ')"));
@@ -496,37 +496,37 @@ check('a Six clicks daily has par 4 or less', await ev(`dailyPair('2026-01-01').
 check('daily sets its rule and checkpoint', await ev(`rules().join() === 'nonav,checkpoint' && !!setup.via0 && ${viaCard} && document.querySelector('#setupStatus').textContent.includes('with Checkpoint')`));
 const pairOf = p => `[${p}.start, ...${p}.vias, ${p}.goal].map(c => c.title).join(' -> ')`;
 const daily = await ev("cardKeys().map(w => setup[w].title).join(' -> ')");
-check('daily pair is deterministic', await ev(`dailyPair('2026-01-02').then(p => p.rule === 'checkpoint' && ${pairOf('p')})`) === daily &&
+check('daily pair is deterministic', await ev(`dailyPair('2026-01-06').then(p => p.rule === 'checkpoint' && ${pairOf('p')})`) === daily &&
   await ev(`dailyPair('2026-01-05').then(p => p.rule === 'noback' && !p.vias.length && ${pairOf('p')} !== ${JSON.stringify(daily)})`), daily);
 // A #daily= date that is malformed, doesn't exist or hasn't come yet gives today's daily.
-const dates = await ev(`JSON.stringify(['2026-01-02', '2024-02-29', today(), '2026-02-31', '2025-02-29', '2026-13-01', '2999-01-01',
+const dates = await ev(`JSON.stringify(['2026-01-06', '2024-02-29', today(), '2026-02-31', '2025-02-29', '2026-13-01', '2999-01-01',
   (d => (d.setDate(d.getDate() + 1), d.toLocaleDateString('sv')))(new Date()), '2026-1-02', 'x', null].map(dailyDate))`);
-check('a daily link only gives a real day that has come', dates === JSON.stringify(['2026-01-02', '2024-02-29', ...Array(9).fill(await ev('today()'))]), dates);
+check('a daily link only gives a real day that has come', dates === JSON.stringify(['2026-01-06', '2024-02-29', ...Array(9).fill(await ev('today()'))]), dates);
 await ev("document.querySelector('#btnPlay').click()");
 await until("game.path.length === 1 && !game.loading");
 await ev("document.querySelector('#btnGiveUp').click()");
 await ev("document.querySelector('#gQuit').click()");
-check('daily result is recorded', await ev("(r => r.daily === '2026-01-02' && r.vias.join() === setup.via0.title && r.rules.join() === 'nonav,checkpoint')(store.get('mwr.history', [])[0]) && document.querySelector('#modal').textContent.includes('Daily 2026-01-02')"));
+check('daily result is recorded', await ev("(r => r.daily === '2026-01-06' && r.vias.join() === setup.via0.title && r.rules.join() === 'nonav,checkpoint')(store.get('mwr.history', [])[0]) && document.querySelector('#modal').textContent.includes('Daily 2026-01-06')"));
 await ev("document.querySelector('#mNew').click()");
 await until('setup.busy === 0', 60000);
 check('New game leaves the daily without the notice', await ev("setup.daily === null && document.querySelector('#setupStatus').textContent !== LEFT_DAILY"));
-check('history marks the daily', await ev("document.querySelector('#history tbody tr').textContent.includes('Daily 2026-01-02, Checkpoint')"));
-await ev("loadDaily('2026-01-02')");
-await until("setup.daily === '2026-01-02' && setup.busy === 0", 60000);
+check('history marks the daily', await ev("document.querySelector('#history tbody tr').textContent.includes('Daily 2026-01-06, Checkpoint')"));
+await ev("loadDaily('2026-01-06')");
+await until("setup.daily === '2026-01-06' && setup.busy === 0", 60000);
 await ev("document.querySelector('#rules input[value=limit]').click()");
 check('another rule leaves the daily', await ev("setup.daily === null && document.querySelector('#setupStatus').textContent === LEFT_DAILY"));
 await ev("document.querySelector('#rules input[value=limit]').click()");
-await ev("loadDaily('2026-01-02')");
-await until("setup.daily === '2026-01-02' && setup.busy === 0", 60000);
+await ev("loadDaily('2026-01-06')");
+await until("setup.daily === '2026-01-06' && setup.busy === 0", 60000);
 await ev("document.querySelector('input[name=level][value=relaxed]').click()");
 check('another difficulty leaves the daily', await ev("setup.daily === null && document.querySelector('#setupStatus').textContent === LEFT_DAILY && level() === 'relaxed'"));
 await ev("document.querySelector('input[name=level][value=normal]').click()");
-await ev("loadDaily('2026-01-02')");
-await until("setup.daily === '2026-01-02' && setup.busy === 0", 60000);
+await ev("loadDaily('2026-01-06')");
+await until("setup.daily === '2026-01-06' && setup.busy === 0", 60000);
 await ev("document.querySelector('#btnSwap').click()");
 check('swapping leaves the daily', await ev("setup.daily === null && document.querySelector('#setupStatus').textContent === LEFT_DAILY"));
-await ev("loadDaily('2026-01-02')");
-await until("setup.daily === '2026-01-02' && setup.busy === 0", 60000);
+await ev("loadDaily('2026-01-06')");
+await until("setup.daily === '2026-01-06' && setup.busy === 0", 60000);
 await ev("document.querySelector('[data-reroll=goal]').click()");
 await until("setup.busy === 0 && !!setup.goal", 60000);
 check('rerolling a card leaves the daily', await ev("setup.daily === null && document.querySelector('#setupStatus').textContent === LEFT_DAILY"));

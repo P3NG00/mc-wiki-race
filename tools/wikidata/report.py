@@ -1,4 +1,5 @@
-"""Writes a Markdown report on a snapshot: pool sizes, link counts, dead ends, pool designs compared, and hub candidates.
+"""Writes a Markdown report on a snapshot: pool sizes, link counts, dead ends, Scavenger kinds with every member, pool designs
+compared, and hub candidates.
 
     .venv/bin/python -I tools/wikidata/report.py tools/wikidata/cache/minecraft.wiki_en_all_2026-08.jsonl.gz [-o report.md]
 
@@ -165,6 +166,17 @@ def report(snap, config, pairs):
     for k in [*config['families'], *config['spinoffs']]:
         members = [r for r in data['articles'] if k in r[4]]
         w(f'| {k} | {len(members):,} | {sum(r[2] >= MIN_BACKLINKS for r in members):,} |')
+    w('')
+
+    w('## Scavenger kinds\n')
+    w('Every member of every kind, to read through before shipping a new snapshot: the game counts these as finds (and a '
+      'page the live wiki puts in the category, less the exclusions).\n')
+    w('| Category | Shown as | Topic | Members | Excluded |\n|---|---|---|--:|---|')
+    for cat, kind in data['kinds'].items():
+        w(f'| {cat} | {kind["label"]} | {kind["topic"]} | {len(kind["members"])} | {", ".join(kind["exclude"]) or "–"} |')
+    w('')
+    for cat, kind in data['kinds'].items():
+        w(f'- **{cat}:** ' + ', '.join(kind['members']))
     w('')
 
     w('## Links to pool articles\n')

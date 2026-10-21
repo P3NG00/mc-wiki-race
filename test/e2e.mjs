@@ -566,6 +566,19 @@ const viaModal = await ev("document.querySelector('#modal').textContent");
 check('checkpoint is recorded and kept out of other bests', await ev("store.get('mwr.history', [])[0].vias.join() === 'Pickaxe'") &&
   viaModal.includes('Diamond → Pickaxe → Diamond Pickaxe') && !/personal best|Your best/.test(viaModal));
 
+// Scavenger: the live wiki sends each article's categories with it, and a link from the start to a member of a kind finds it.
+await send('browsingContext.navigate', { context: ctx, url: 'about:blank', wait: 'complete' });
+await send('browsingContext.navigate', { context: ctx, url: fileUrl + '#start=Blaze%20Rod&kind=Nether%20mobs&kind=Enchantments&kind=Potions&rules=scavenger', wait: 'complete' });
+await until("!document.querySelector('#btnPlay').disabled", 60000);
+await ev("document.querySelector('#btnPlay').click()");
+await until("game.path.length === 1 && !game.loading", 60000);
+f = await frameCtx();
+await ev("[...document.querySelectorAll('a.mwr-live')].find(a => a.getAttribute('href') === '/w/Blaze').click()", f);
+check('Scavenger: the article comes with its live categories, and a member of a kind is a find', await until("game.path.length === 2 && !game.loading", 60000) &&
+  await ev("parseCache.get('Blaze')?.categories.some(c => c.category === 'Nether_mobs') && game.path[1].found?.join() === 'a mob found in the Nether'"),
+  await ev("JSON.stringify(game.path.at(-1))"));
+await ev("finish(false); closeModal()");
+
 // A theme stylesheet added by the host page shows up in the picker and, marked data-mwr-default, wins over a saved
 // theme that no longer exists. A preload script stands in for the host page injecting it into <head>.
 await ev("localStorage.setItem('mwr.theme', JSON.stringify('Gone'))");

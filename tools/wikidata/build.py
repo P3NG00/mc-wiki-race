@@ -12,6 +12,10 @@ The output defines WIKI_DATA, which index.html loads with a script tag (a JSON f
   articles                every article and every spin-off page: [title, linked from, linked from outside navboxes,
                           topic, families, tiers]
   hubs                    for the No hubs rule, every hub and every redirect to one, mapped to the hub
+  kinds                   for Scavenger, each of the config's kinds (a category): the name the game shows, its members'
+                          commonest topic, its members (pool articles in the category linked well enough to be a
+                          target, less the config's exclusions) and the exclusions, which the game also applies to a
+                          page's live categories
 A pool-mode roll may only pick content: a page that isn't a subpage, a disambiguation page, a version page (in a
 category ending in "versions") or in the config's not-content categories or titles. Content in a family's categories, or
 in a spin-off namespace, has that family. Other content in a topic's categories is in the pool, with that topic, and
@@ -29,12 +33,13 @@ page's count also has links from its own namespace, since those links are live w
 snapshot always gives the same bytes, one entry per line, so a new snapshot reads as a normal git diff (diff.py
 summarises it).
 """
-import argparse, json, os, sys
+import argparse, collections, json, os, sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))   # for common.py under python -I
 from common import CONFIG, HERE, MIN_BACKLINKS, Snapshot, load_config, spinoff_backlinks
 
 DEFAULT_OUT = os.path.join(HERE, '..', '..')
+MIN_KIND = 5   # a Scavenger kind needs this many members
 
 
 def namespaces(snap, config):
@@ -66,6 +71,26 @@ def tiers(rows, config, popular_share, deep_share):
         aims = [r for r in pool if r[3] == topic and r[2] >= MIN_BACKLINKS]
         deep += aims[:round(len(aims) * deep_share)]
     return {r[0] for r in popular}, {r[0] for r in deep}
+
+
+def kinds(snap, config, rows):
+    """Scavenger kinds, by category (see the docstring). Stops if an excluded title has left its category or a kind has
+    too few members, so a new snapshot gets the hand-picked list looked at again."""
+    aims = {r[0]: r[3] for r in rows if r[3] and r[2] >= MIN_BACKLINKS}
+    out, problems = {}, []
+    for cat, kind in config['kinds'].items():
+        in_cat = {t for t, p in snap.pages.items() if p['ns'] == 0 and cat in p['cats']}
+        members = sorted(t for t in aims if t in in_cat and t not in kind['exclude'])
+        gone = [t for t in kind['exclude'] if t not in in_cat]
+        if gone:
+            problems.append(f'{cat}: excluded, but no longer in it: {", ".join(gone)}')
+        if len(members) < MIN_KIND:
+            problems.append(f'{cat}: {len(members)} members')
+        topic = collections.Counter(aims[t] for t in members).most_common(1)[0][0] if members else ''
+        out[cat] = {'label': kind['label'], 'topic': topic, 'members': members, 'exclude': sorted(kind['exclude'])}
+    if problems:
+        sys.exit('Scavenger kinds to look at in config.json:\n  ' + '\n  '.join(problems))
+    return out
 
 
 def build(snap, config):
@@ -114,7 +139,7 @@ def build(snap, config):
     return {
         'snapshot': snap.meta['date'], 'file': snap.meta['file'], 'sha256': snap.meta['sha256'],
         'namespaces': ns_names, 'topics': list(config['topics']), 'families': list(families), 'spinoffs': spinoffs, 'articles': rows,
-        'hubs': dict(sorted(hubs.items())),
+        'hubs': dict(sorted(hubs.items())), 'kinds': kinds(snap, config, rows),
     }, sizes
 
 
@@ -165,6 +190,7 @@ def render(data):
     fields = [field(k, j(data[k])) for k in ('snapshot', 'file', 'sha256', 'namespaces', 'topics', 'families', 'spinoffs')]
     fields.append(field('articles', block(map(j, data['articles']), '[', ']')))
     fields.append(field('hubs', block((f'{j(k)}: {j(v)}' for k, v in data['hubs'].items()), '{', '}')))
+    fields.append(field('kinds', block((f'{j(k)}: {j(v)}' for k, v in data['kinds'].items()), '{', '}')))
     return js_file(data, 'minecraft.wiki', 'titles, categories and link counts', 'WIKI_DATA', fields)
 
 
@@ -189,7 +215,7 @@ def main():
     for name, text in zip(('wiki-data.js', 'wiki-links.js', 'wiki-navboxes.js'), (render(data), *render_graph(data, links, boxes, carries))):
         with open(os.path.join(args.out, name), 'w', encoding='utf-8', newline='\n') as f:
             f.write(text)
-    print(f'{os.path.normpath(args.out)}: {len(data["articles"])} pages, {len(data["hubs"])} hub titles, {sum(map(len, links)):,} links outside '
+    print(f'{os.path.normpath(args.out)}: {len(data["articles"])} pages, {len(data["hubs"])} hub titles, {len(data["kinds"])} kinds, {sum(map(len, links)):,} links outside '
           f'navboxes, {len(boxes)} navboxes ({sum(map(len, boxes)):,} links); content ' + ', '.join(f'{c} {n}' for c, n in sizes.items()), file=sys.stderr)
 
 

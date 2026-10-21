@@ -1,5 +1,5 @@
-"""Summarises what changed between two wiki-data.js files: pages, topic, tier and Content members added and removed, link counts
-that moved a lot, and hub and namespace changes. Compare with the committed one by reading it from git:
+"""Summarises what changed between two wiki-data.js files: pages, topic, tier, Content and Scavenger kind members added and
+removed, link counts that moved a lot, and hub and namespace changes. Compare with the committed one by reading it from git:
 
     .venv/bin/python -I tools/wikidata/diff.py <(git show HEAD:wiki-data.js) wiki-data.js
 """
@@ -32,6 +32,15 @@ def diff(old, new, moved=0.5, min_links=20):
         now = {t for t, r in b.items() if member(r, cat)}
         if was != now:
             w(f'{cat}: {len(was)} → {len(now)}')
+            if now - was:
+                w(f'  joined: {listing(now - was)}')
+            if was - now:
+                w(f'  left: {listing(was - now)}')
+    kinds = [d.get('kinds', {}) for d in (old, new)]   # none in a file from before Scavenger
+    for cat in dict.fromkeys([*kinds[0], *kinds[1]]):
+        was, now = (set(k.get(cat, {}).get('members', [])) for k in kinds)
+        if was != now:
+            w(f'Kind {cat}: {len(was)} → {len(now)}')
             if now - was:
                 w(f'  joined: {listing(now - was)}')
             if was - now:

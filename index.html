@@ -118,6 +118,9 @@
   .card.start .tag { color: var(--accent); }
   .card.goal .tag { color: var(--target); }
   .card.via .tag { color: var(--ink); }
+  .card.hunt .tag { color: var(--target); }
+  .card .kinds { margin: 0; padding-left: 20px; display: grid; gap: 8px; }
+  .card .kinds b { font-size: 17px; }
   .card .row { display: flex; gap: 12px; align-items: flex-start; }
   .card img { width: 72px; height: 72px; object-fit: contain; image-rendering: pixelated; flex: none; }
   .card img.art { width: 220px; height: 220px; right: -28px; bottom: -28px; }
@@ -353,6 +356,11 @@ const THEMES = [...new Set(['auto', 'light', 'dark', ...Array.from(document.quer
       </div>
       <img alt="" class="art hidden">
     </div>
+    <div class="card hunt hidden" id="cardHunt">
+      <span class="tag">Find one of each</span>
+      <ul class="kinds"></ul>
+      <div class="actions"><button data-reroll="kinds">🎲 Reroll</button></div>
+    </div>
   </div>
 
   <div class="setup-actions">
@@ -459,10 +467,16 @@ const TOPICS = {
 };
 const CLICK_LIMIT = 6;     // Six clicks rule: the game is lost once this many clicks haven't reached the target
 const EXACT_EXTRA = 2;     // Exact clicks rule: the target has to be reached in exactly par + this many clicks
+const HUNT_SIZE = 3;       // Scavenger rule: how many articles, or kinds, to find
 
 // No hubs rule: every title that leads to a hub (the hubs, picked in tools/wikidata/config.json, and their redirects),
 // mapped to the hub. Links to them are dead.
 const HUB_TITLES = new Map(Object.entries(WIKI_DATA.hubs));
+// Scavenger's kinds (wiki categories), from wiki-data.js: the name the game shows, topic, members and exclusions.
+const KINDS = WIKI_DATA.kinds;
+const KIND_MEMBERS = new Map(Object.entries(KINDS).map(([k, kind]) => [k, new Set(kind.members)]));
+// A kind's best-known members, to show what it means.
+const kindExamples = k => KINDS[k].members.toSorted((a, b) => ARTICLES.get(b).links - ARTICLES.get(a).links).slice(0, 3);
 const WIKI_STYLES = [
   'ext.Tabber|ext.embedVideo.styles|jquery.makeCollapsible.styles|jquery.tablesorter.styles|mediawiki.page.gallery.styles|skins.vector.styles.legacy',
   'ext.gadget.site-styles|ext.gadget.sound-styles',
@@ -487,8 +501,11 @@ const store = {
 // that isn't a record finish() would write is left out rather than allowed to stop the setup screen or a result.
 const isKey = (obj, k) => typeof k === 'string' && Object.hasOwn(obj, k);
 const optional = (v, ok) => v === undefined || ok(v);
-const isRecord = r => typeof r === 'object' && r !== null && typeof r.start === 'string' && typeof r.goal === 'string' &&
-  optional(r.vias, v => Array.isArray(v) && v.length && v.every(t => typeof t === 'string')) && optional(r.daily, v => typeof v === 'string') &&
+const isTitles = v => Array.isArray(v) && v.length > 0 && v.every(t => typeof t === 'string');
+// A target, or Scavenger's articles (finds) or kinds: exactly one of them.
+const isRecord = r => typeof r === 'object' && r !== null && typeof r.start === 'string' &&
+  [typeof r.goal === 'string', isTitles(r.finds), isTitles(r.kinds) && r.kinds.every(k => isKey(KINDS, k))].filter(Boolean).length === 1 &&
+  optional(r.vias, isTitles) && optional(r.daily, v => typeof v === 'string') &&
   optional(r.exact, Number.isInteger) &&
   optional(r.topic, v => isKey(TOPICS, v)) && optional(r.par, Number.isInteger) &&
   optional(r.content, v => Array.isArray(v) && v.every(k => CONTENT.has(k))) &&
@@ -576,12 +593,15 @@ async function pageInfo(title) {
 // rolls: per-card token, so superseded rolls are dropped. daily: the date, while the cards hold that day's pair.
 // via0…via2: the checkpoints, in order, as many as the Checkpoint rule's count while it is on.
 const VIA_KEYS = ['via0', 'via1', 'via2'];
-// exact: Exact clicks's route for the cards (updateSetupPar).
-const setup = { start: null, via0: null, via1: null, via2: null, goal: null, daily: null, busy: 0, exact: null,
+// exact: Exact clicks's route for the cards (updateSetupPar). kinds: Scavenger's kinds, by category.
+const setup = { start: null, via0: null, via1: null, via2: null, goal: null, daily: null, busy: 0, exact: null, kinds: null,
   rolls: { start: 0, via0: 0, via1: 0, via2: 0, goal: 0 } };
 const viaCount = () => +$('#viaCount').value;
-const viaKeys = () => rules().includes('checkpoint') ? VIA_KEYS.slice(0, viaCount()) : [];
-const cardKeys = () => ['start', ...viaKeys(), 'goal'];
+// Scavenger's mode while it is on: 'articles' (the checkpoint cards and the target card hold them) or 'kinds'.
+const huntMode = () => rules().includes('scavenger') ? $('#huntMode').value : null;
+const viaKeys = () => huntMode() === 'articles' ? VIA_KEYS.slice(0, HUNT_SIZE - 1) : rules().includes('checkpoint') ? VIA_KEYS.slice(0, viaCount()) : [];
+// The cards in use, in the order they are played. Scavenger's kinds are on a card of their own (setup.kinds).
+const cardKeys = () => huntMode() === 'kinds' ? ['start'] : ['start', ...viaKeys(), 'goal'];
 
 function mode() { return $('input[name=mode]:checked').value; }
 
@@ -608,6 +628,8 @@ const RULES = {
   checkpoint: { label: 'Checkpoint', help: 'One to three more articles you have to visit, in order, on the way to the target.' },
   roundtrip: { label: 'Round trip', help: 'Reach the target, then find your way back to the start. Back can’t take you the way you came.', over: ['checkpoint'] },
   noretrace: { label: 'No retracing', help: 'On the way back, every page from the way there is a dead link.', needs: 'roundtrip' },
+  scavenger: { label: 'Scavenger', help: `Instead of a target, find ${HUNT_SIZE} articles, or one of each of ${HUNT_SIZE} kinds, in any order.`,
+    over: ['checkpoint', 'roundtrip', 'exact'] },
   limit: { label: 'Six clicks', help: `Reach the target in ${CLICK_LIMIT} clicks or fewer, Back and the way through a checkpoint included.` },
   exact: { label: 'Exact clicks', help: `Reach the target in exactly par + ${EXACT_EXTRA} clicks, never on a page twice (so no Back). Getting there sooner loses, and so does running out.`,
     over: ['checkpoint', 'roundtrip', 'limit'] },
@@ -671,9 +693,15 @@ function rulesText(keys) {
 const settingsText = r => [r.topic && r.topic !== 'any' && TOPICS[r.topic].label, r.content && 'Content: ' + r.content.map(contentLabel).join(', '),
   rulesText(r.rules)].filter(Boolean).join(', ');
 const sameRules = (a, b) => a.rules.join() === b.rules.join();
-// A record's articles in the order they are played: start, checkpoints, target, and the start again on a round trip.
-// With the rules, it keys personal bests.
-const chain = r => [r.start, ...(r.vias ?? []), r.goal, ...r.rules.includes('roundtrip') ? [r.start] : []];
+// A record's articles in the order they are played: start, checkpoints, target, and the start again on a round trip;
+// for Scavenger the start and its articles, in any order (sorted).
+const chain = r => r.finds ? [r.start, ...r.finds.toSorted()] : r.kinds ? [r.start]
+  : [r.start, ...(r.vias ?? []), r.goal, ...r.rules.includes('roundtrip') ? [r.start] : []];
+// With the rules, this keys personal bests.
+const recordKey = r => [...chain(r), ...(r.kinds ?? []).toSorted()].join('|');
+// What a record was after: its target, or Scavenger's articles or kinds.
+const targetText = r => r.finds ? `${r.finds.join(', ')} (any order)` : r.kinds ? r.kinds.map(k => KINDS[k].label).join(', ') : r.goal;
+const routeText = r => r.goal === undefined ? `${r.start} → ${targetText(r)}` : chain(r).join(' → ');
 
 function renderCard(which) {
   const card = $({ start: '#cardStart', goal: '#cardGoal' }[which] ?? '#card-' + which);
@@ -683,8 +711,26 @@ function renderCard(which) {
   $('.desc', card).textContent = !info ? '' : blind ? 'Hidden: Blind target.' : info.desc || 'No description available.';
   setImg($('img.icon', card), blind ? '' : info?.img);
   setImg($('img.art', card), blind ? '' : info?.img);
+  // A start in one of Scavenger's kinds would be a find before the first click, so the kinds are rolled again.
+  if (which === 'start' && huntMode() === 'kinds' && setup.kinds?.some(k => KIND_MEMBERS.get(k).has(info?.title))) setKinds(rollKinds());
   updateSetupPar();   // first, so Start waits for an Exact clicks route
   updatePlay();
+}
+
+// Scavenger's kinds card: each kind's name and its best-known members.
+function setKinds(kinds) {
+  setup.kinds = kinds;
+  $('#cardHunt .kinds').innerHTML = kinds.map(k => `<li><b>${esc(KINDS[k].label)}</b><br><span class="note">e.g. ${esc(kindExamples(k).join(', '))}</span></li>`).join('');
+  updateSetupPar();
+  updatePlay();
+}
+// Kinds from different topics, none holding the start.
+function rollKinds() {
+  const picked = [];
+  for (const k of Object.keys(KINDS).map(k => [Math.random(), k]).sort((a, b) => a[0] - b[0]).map(([, k]) => k)) {
+    if (picked.length < HUNT_SIZE && !picked.some(p => KINDS[p].topic === KINDS[k].topic) && !KIND_MEMBERS.get(k).has(setup.start?.title)) picked.push(k);
+  }
+  return picked;
 }
 
 // Par for the pair on the cards, under the difficulty, checkpoint and Content in play, beside Start. The first card
@@ -692,11 +738,11 @@ function renderCard(which) {
 let setupParToken = 0;
 // With Exact clicks it also finds a route of exactly par + EXACT_EXTRA (setup.exact), which Start waits for.
 async function updateSetupPar() {
-  const token = ++setupParToken, titles = cardKeys().map(w => setup[w]?.title), r = rules();
+  const token = ++setupParToken, titles = cardKeys().map(w => setup[w]?.title), r = rules(), kinds = huntMode() === 'kinds' ? setup.kinds : null;
   setup.exact = null;
   let text = '';
-  if (titles.every(Boolean)) {
-    const route = await cardsRoute(titles, r).catch(() => null);
+  if (titles.every(Boolean) && (kinds?.length ?? true)) {
+    const route = await cardsRoute(titles, r, kinds).catch(() => null);
     if (route) text = `Par ${route.length - 1}`;
     if (r.includes('exact')) {
       const n = route && route.length - 1 + EXACT_EXTRA, exact = route && await exactRoute(titles, r, n).catch(() => null);
@@ -708,15 +754,15 @@ async function updateSetupPar() {
   if (token === setupParToken) { $('#setupPar').textContent = text; updatePlay(); }
 }
 
-// A shortest route for the cards' titles, in cardKeys order, under rules.
-const cardsRoute = (titles, rules) =>
-  parRoute({ start: titles[0], vias: titles.slice(1, -1), goal: titles.at(-1), rules, content: contentInPlay(titles) });
+// A shortest route for the cards' titles, in cardKeys order, and Scavenger's kinds if it has them, under rules.
+const cardsRoute = (titles, rules, kinds = null) =>
+  parRoute({ start: titles[0], vias: titles.slice(1, -1), goal: titles.at(-1), kinds, rules, content: contentInPlay(titles) });
 
 // Enables Start only for different articles on every card in use, with no lookup in flight.
 function updatePlay() {
   const cards = cardKeys().map(w => setup[w]);
   const full = cards.every(Boolean), same = full && new Set(cards.map(c => c.title)).size < cards.length;
-  $('#btnPlay').disabled = !full || same || setup.busy > 0 || (rules().includes('exact') && !setup.exact);
+  $('#btnPlay').disabled = !full || same || setup.busy > 0 || (rules().includes('exact') && !setup.exact) || (huntMode() === 'kinds' && !setup.kinds?.length);
   if (same && setup.busy === 0) setStatus('The same article is on two cards. Pick a different one.', true);
 }
 
@@ -724,16 +770,25 @@ function updatePlay() {
 // that have no article yet. They are numbered when there is more than one. A round trip shows No retracing beside it,
 // and the start as where it ends too.
 function syncVia() {
-  const keys = viaKeys(), roundTrip = rules().includes('roundtrip');
+  const keys = viaKeys(), roundTrip = rules().includes('roundtrip'), hunt = huntMode();
   $('.pair').dataset.vias = keys.length;
   $('#viaCount').classList.toggle('hidden', !rules().includes('checkpoint'));
+  $('#huntMode').classList.toggle('hidden', !hunt);
   $('#rules label[data-rule=noretrace]').classList.toggle('hidden', !roundTrip);
   $('#pairArrow').textContent = roundTrip ? '⇄' : '➜';
   $('#cardStart .tag').textContent = roundTrip ? 'Start and finish' : 'Start';
+  // Scavenger's articles are on the checkpoint cards and the target card, joined by + since they go in any order.
   VIA_KEYS.forEach((w, i) => {
     $('#slot-' + w).classList.toggle('hidden', !keys.includes(w));
-    $(`#card-${w} .tag`).textContent = keys.length > 1 ? `Checkpoint ${i + 1}` : 'Checkpoint';
+    $(`#card-${w} .tag`).textContent = hunt ? 'Find' : keys.length > 1 ? `Checkpoint ${i + 1}` : 'Checkpoint';
+    $(`#slot-${w} .arrow`).textContent = hunt ? '+' : '➜';
   });
+  $('#cardGoal .tag').textContent = hunt ? 'Find' : 'Target';
+  $('#cardGoal').classList.toggle('via', !!hunt);   // labelled like the other finds
+  $('#cardGoal').classList.toggle('hidden', hunt === 'kinds');
+  $('#cardHunt').classList.toggle('hidden', hunt !== 'kinds');
+  $('#btnSwap').classList.toggle('hidden', hunt === 'kinds');   // nothing to swap the start with
+  if (hunt === 'kinds' && !setup.kinds?.length) setKinds(rollKinds());
   const missing = keys.filter(w => !setup[w]);
   if (missing.length) reroll(missing);
   else updatePlay();
@@ -803,6 +858,11 @@ async function rollOne(which, group) {
 // which: a card, a list of them, or 'all' for every card in use. 'all' also drops checkpoints left over from a higher
 // count or from when the rule was on.
 async function reroll(which) {
+  if (which === 'kinds') {
+    setKinds(rollKinds());
+    setStatus(leaveDaily() ? LEFT_DAILY : '');
+    return;
+  }
   const targets = which === 'all' ? cardKeys() : [which].flat();
   if (which === 'all') for (const w of VIA_KEYS) if (!targets.includes(w)) setup[w] = null;
   const tokens = Object.fromEntries(targets.map(w => [w, ++setup.rolls[w]]));
@@ -819,6 +879,7 @@ async function reroll(which) {
     }));
     const failed = results.find(r => r.status === 'rejected');
     if (failed) throw failed.reason;
+    if (which === 'all' && huntMode() === 'kinds') setKinds(rollKinds());   // after the start, which they mustn't hold
     if (targets.every(current)) setStatus(left ? LEFT_DAILY : '');
   });
 }
@@ -929,12 +990,14 @@ function setVias(vias) {
   return Object.fromEntries(VIA_KEYS.map((w, i) => [w, vias[i] ?? null]));
 }
 
-// The checkpoints go in as one via= each, in order.
+// The checkpoints (or Scavenger's articles but the target card's) go in as one via= each, in order, and Scavenger's kinds
+// as one kind= each, in place of the target.
 function challengeLink() {
   const base = location.href.split('#')[0];
   const r = rules();
-  return `${base}#start=${encodeURIComponent(setup.start.title)}&target=${encodeURIComponent(setup.goal.title)}` +
-    viaKeys().map(w => '&via=' + encodeURIComponent(setup[w].title)).join('') + (r.length ? '&rules=' + r.join(',') : '');
+  return `${base}#start=${encodeURIComponent(setup.start.title)}` + (huntMode() === 'kinds' ? setup.kinds.map(k => '&kind=' + encodeURIComponent(k)).join('')
+    : `&target=${encodeURIComponent(setup.goal.title)}` + viaKeys().map(w => '&via=' + encodeURIComponent(setup[w].title)).join('')) +
+    (r.length ? '&rules=' + r.join(',') : '');
 }
 
 function renderHistory() {
@@ -942,7 +1005,7 @@ function renderHistory() {
   $('#history').classList.toggle('hidden', rows.length === 0);
   $('#history tbody').innerHTML = rows.slice(0, 15).map(r => `
     <tr class="${r.won ? '' : 'lost'}">
-      <td>${esc(r.start)}</td><td>${esc(r.goal)}${r.vias ? ` <span class="note">via ${esc(r.vias.join(', '))}</span>` : ''}</td><td>${esc([r.daily && `Daily ${r.daily}`, settingsText(r)].filter(Boolean).join(', '))}</td>
+      <td>${esc(r.start)}</td><td>${esc(targetText(r))}${r.vias ? ` <span class="note">via ${esc(r.vias.join(', '))}</span>` : ''}</td><td>${esc([r.daily && `Daily ${r.daily}`, settingsText(r)].filter(Boolean).join(', '))}</td>
       <td class="mono">${r.won ? `${r.clicks}<span class="unit"> click${r.clicks === 1 ? '' : 's'}</span>` : LOSSES[lossOf(r)]?.toLowerCase() ?? 'gave up'}</td>
       <td class="mono">${r.par === undefined ? '–' : `<span class="unit">par </span>${r.par}${r.won && !r.exact ? ` (${overPar(r.clicks - r.par)})` : ''}`}</td>
       <td class="mono">${fmtTime(r.ms)}</td>
@@ -963,6 +1026,8 @@ const game = {
                      // with Exact clicks every page visited
   limit: 0,          // the clicks the game is lost after: Six clicks's, or Exact clicks's count
   exact: null,       // Exact clicks: a route of exactly that many clicks, shown with the result
+  hunt: null,        // Scavenger: what to find, each { info } (an article) or { kind }, with its label and, once
+                     // found, found (the title it was found on). game.goal is then null.
   path: [],          // every article visited, in order (includes back-navigation)
   stack: [],         // navigation stack for the Back button
   elapsed: 0,        // ms of reading time; time spent loading articles is not counted
@@ -991,7 +1056,7 @@ function renderHud() {
   $('#btnBack').disabled = game.stack.length < 2 || game.loading || !game.active;
   $('#btnGiveUp').disabled = game.loading || !game.active;
   $('#pathList').innerHTML = game.path.map((p, i) =>
-    `<li class="${i === game.path.length - 1 ? 'cur' : ''} ${p.back ? 'back' : ''} ${p.via ? 'via' : ''}">${esc(p.title)}${p.back ? ' (back)' : ''}${p.via ? ' ✓ ' + viaName(p.via).toLowerCase() : ''}${p.hint ? ` <span title="${esc(HINTS[p.hint].text)}">${HINTS[p.hint].icon}</span>` : ''}</li>`).join('');
+    `<li class="${i === game.path.length - 1 ? 'cur' : ''} ${p.back ? 'back' : ''} ${p.via || p.found ? 'via' : ''}">${esc(p.title)}${p.back ? ' (back)' : ''}${p.via ? ' ✓ ' + viaName(p.via).toLowerCase() : ''}${p.found ? ' ✓ ' + esc(p.found.join(', ')) : ''}${p.hint ? ` <span title="${esc(HINTS[p.hint].text)}">${HINTS[p.hint].icon}</span>` : ''}</li>`).join('');
   scrollPathToEnd();
 }
 // Keeps the newest entry in view: at the bottom of the sidebar, or at the end of the one-line path on phones, whose
@@ -1000,14 +1065,23 @@ function scrollPathToEnd() { const pl = $('.path-list'); pl.scrollTop = pl.scrol
 function markPathScroll() { const pl = $('.path-list'); pl.classList.toggle('scrolled', pl.scrollLeft > 0); }
 
 // What the player is heading for: the next checkpoint until all are reached, then the target.
+// Scavenger has none: see huntLeft.
 const objective = () => game.vias[game.viaNext] ?? game.goal;
 // A checkpoint's name by its number (from 1), numbered when there is more than one. A round trip's is its target.
 const viaName = n => game.roundTrip ? 'Target' : 'Checkpoint' + (game.vias.length > 1 ? ` ${n}` : '');
-const objectiveLabel = () => objective() !== game.goal ? viaName(game.viaNext + 1) : game.roundTrip ? 'Back to' : 'Target';
+const objectiveLabel = () => game.hunt ? 'Find' : objective() !== game.goal ? viaName(game.viaNext + 1) : game.roundTrip ? 'Back to' : 'Target';
+// Scavenger: what is still to find.
+const huntLeft = () => game.hunt.filter(h => !h.found);
+// The articles still to reach, which aren't marked as visited: the checkpoints left and the target, or Scavenger's.
+const ahead = () => game.hunt ? huntLeft().filter(h => h.info).map(h => h.info) : [...game.vias.slice(game.viaNext), game.goal];
+// Every article the game is after, which stay live under No hubs.
+const cardTitles = () => [game.goal, ...game.vias, ...(game.hunt ?? []).map(h => h.info)].filter(Boolean).map(c => c.title);
+// The HUD shows what is still to find; its picture, the one article left.
 function renderObjective() {
+  const left = game.hunt && huntLeft(), next = left ? left.length === 1 && left[0].info : objective();
   $('#hudLbl').textContent = objectiveLabel();
-  $('#hudGoal').textContent = objective().title;
-  const img = game.rules.includes('blind') ? '' : objective().img;
+  $('#hudGoal').textContent = left ? left.map(h => h.label).join(', ') : objective().title;
+  const img = game.rules.includes('blind') ? '' : next?.img;
   setImg($('#hudImg'), img);
   setImg($('#pathArt'), img);
 }
@@ -1021,8 +1095,16 @@ function showToast(text, ms) {
   $('#toast').classList.remove('hidden');
   game.toastTimer = setTimeout(hideToast, ms);
 }
+// Scavenger's finds get one too: "✓ Found a Nether mob: Blaze (2 of 3)".
 function celebrateCheckpoint() {
-  const n = game.vias.length, stranded = game.path.at(-1).hint === 'stranded';
+  const n = game.vias.length, entry = game.path.at(-1), stranded = entry.hint === 'stranded';
+  if (game.hunt) {
+    const got = game.hunt.length - huntLeft().length;
+    showToast(`✓ Found ${game.hunt[0].kind ? `${entry.found.join(' and ')}: ${entry.title}` : entry.title} (${got} of ${game.hunt.length})`, 3000);
+    $('.hud .goal').classList.add('reached');
+    play('checkpoint');
+    return;
+  }
   const home = game.goal.title;
   showToast(game.roundTrip ? stranded ? `✓ Target reached, but there’s no way back to ${home} that doesn’t retrace your steps.` : `✓ Target reached! Now head back to ${home}`
     : `✓ Checkpoint ${n > 1 ? `${game.viaNext} of ${n} ` : ''}reached! Now find ${objective().title}`, stranded ? 6000 : 3000);
@@ -1040,15 +1122,17 @@ function hideOverlay() { $('#overlay').classList.add('hidden'); }
 const guardLeaving = e => { e.preventDefault(); e.returnValue = true; };
 
 function startGame() {
-  const r = rules(), roundTrip = r.includes('roundtrip'), cards = cardKeys().map(w => setup[w]);
+  const r = rules(), roundTrip = r.includes('roundtrip'), cards = cardKeys().map(w => setup[w]), mode = huntMode();
+  const kinds = mode === 'kinds' ? setup.kinds : null;
+  const hunt = kinds ? kinds.map(k => ({ kind: k, label: KINDS[k].label })) : mode ? cards.slice(1).map(info => ({ info, label: info.title })) : null;
   // A round trip plays as a checkpoint at the target, with the start as the goal.
-  const vias = roundTrip ? [setup.goal] : cards.slice(1, -1), goal = roundTrip ? setup.start : setup.goal;
+  const vias = roundTrip ? [setup.goal] : hunt ? [] : cards.slice(1, -1), goal = hunt ? null : roundTrip ? setup.start : setup.goal;
   const exact = r.includes('exact') ? setup.exact : null, limit = exact ? exact.length - 1 : r.includes('limit') ? CLICK_LIMIT : 0;
-  Object.assign(game, { active: true, start: setup.start, goal, vias, viaNext: 0, roundTrip, dead: new Set(), exact, limit, celebrate: false,
+  Object.assign(game, { active: true, start: setup.start, goal, vias, viaNext: 0, roundTrip, hunt, dead: new Set(), exact, limit, celebrate: false,
     daily: setup.daily, rules: r, content: contentInPlay(cards.map(c => c.title)), path: [], seen: new Map(),
     stack: [], elapsed: 0, runningSince: 0, loading: false, par: null });
   // Par shows in the header once it is known: at once when the setup screen has loaded the link graph.
-  const parReady = game.parReady = cardsRoute(cards.map(c => c.title), r);
+  const parReady = game.parReady = cardsRoute(cards.map(c => c.title), r, kinds);
   parReady.then(route => { if (game.parReady === parReady) { game.par = route ? route.length - 1 : null; renderHud(); } }, () => {});
   $('#btnBack').classList.toggle('hidden', !canGoBack());
   $('#btnPeek').classList.toggle('hidden', game.rules.includes('blind'));
@@ -1088,7 +1172,7 @@ async function navigate(title, fragment, { back = false } = {}) {
     // A reply without an article has to fail here, where Retry is offered: past this point the game would stay
     // loading, with Give up disabled.
     page = await (parseCache.get(title) ||
-      api({ action: 'parse', page: title, prop: 'text|displaytitle', redirects: '1', disableeditsection: '1', disablelimitreport: '1' })
+      api({ action: 'parse', page: title, prop: 'text|displaytitle|categories', redirects: '1', disableeditsection: '1', disablelimitreport: '1' })
         .then(d => d.parse || Promise.reject(new Error('The wiki sent no article'))));
   } catch (e) {
     if (token !== game.navToken) return;
@@ -1105,7 +1189,10 @@ async function navigate(title, fragment, { back = false } = {}) {
   cacheParse([title, page.title], page);
   if (back) game.stack.pop(); else game.stack.push(page.title);
   const via = page.title === game.vias[game.viaNext]?.title ? ++game.viaNext : 0;   // the checkpoint's number, from 1
-  game.path.push({ title: page.title, back, ...(via && { via }) });
+  const finds = game.hunt && game.path.length ? huntFinds(page) : [];   // the start never counts
+  game.path.push({ title: page.title, back, ...(via && { via }), ...(finds.length && { found: finds.map(h => h.label) }) });
+  for (const h of finds) h.found = page.title;
+  if (finds.length) { game.celebrate = true; renderObjective(); }
   game.seen.set(title, page.title).set(page.title, page.title);   // the link's title too, in case it was a redirect
   // With Exact clicks every page visited is dead, by every title that led to it, before Hot/cold looks; only the target
   // can still be arrived at, too soon.
@@ -1115,7 +1202,7 @@ async function navigate(title, fragment, { back = false } = {}) {
   // Hot/cold, on every arrival but the first and the objective's own (a target or later checkpoint passed early gets one):
   // the hint goes onto the path and shows over the article once both are ready (showHint, here and in frameReady),
   // unless the player has moved on by then.
-  if (game.rules.includes('hotcold') && game.path.length > 1 && !via && page.title !== objective().title) {
+  if (game.rules.includes('hotcold') && game.path.length > 1 && !via && (game.hunt ? !finds.length : page.title !== objective().title)) {
     const entry = game.path.at(-1);
     hotColdHint(game.path.at(-2).title, entry.title).then(hint => {
       entry.hint = hint;
@@ -1125,15 +1212,16 @@ async function navigate(title, fragment, { back = false } = {}) {
   $('#credit').innerHTML = `<a href="${esc(wikiUrl(page.title))}" target="_blank" rel="noopener">View on minecraft.wiki</a> · ` +
     `<a href="${LICENSE_URL}" target="_blank" rel="noopener">CC BY-NC-SA 3.0</a>`;
   // The target and checkpoints stay reachable even if they are hubs.
-  const keep = [game.goal, ...game.vias].map(c => c.title);
+  const keep = cardTitles();
   // Nothing still ahead is marked: a target or checkpoint passed early still has to be reached again.
-  const ahead = [...game.vias.slice(game.viaNext), game.goal].map(c => c.title);
-  const seen = [...game.seen].filter(([, t]) => !ahead.includes(t)).map(([k]) => k);
+  const left = ahead().map(c => c.title);
+  const seen = [...game.seen].filter(([, t]) => !left.includes(t)).map(([k]) => k);
   const blocked = [...game.dead, ...game.rules.includes('nohubs') ? [...HUB_TITLES.keys()].filter(t => !keep.includes(HUB_TITLES.get(t))) : []];
   renderArticle(page, fragment, token, blocked, seen);
   setTimeout(() => frameReady(token), 15000);   // a stalled stylesheet must not leave Back and Give up disabled
   // Compare the post-redirect title, so following a redirect onto the target counts as arriving.
-  const arrived = page.title === game.goal.title && objective() === game.goal, won = arrived && (!game.exact || clicks() === game.limit);
+  const arrived = game.hunt ? !huntLeft().length : page.title === game.goal.title && objective() === game.goal;
+  const won = arrived && (!game.exact || clicks() === game.limit);
   const lost = arrived && !won ? 'tooSoon' : !won && game.limit && clicks() >= game.limit ? 'outOfClicks' : null;
   if (won || lost) { game.loading = false; hideOverlay(); finish(won, lost); return; }
   renderHud();
@@ -1494,15 +1582,15 @@ async function linkGraph(navboxes) {
   return { links: links.decoded, ...boxes.decoded };
 }
 
-// One route with the fewest clicks from one page to another, as titles, or null if there is none. usable(page): whether
-// the route may go through a page.
+// One route with the fewest clicks from one page to another (or to the nearest of a list), as titles, or null if there
+// is none. usable(page): whether the route may go through a page.
 function shortestRoute(graph, from, to, usable) {
-  const start = PAGE_IDS.get(from), goal = PAGE_IDS.get(to);
-  if (start === undefined || goal === undefined) return null;
+  const start = PAGE_IDS.get(from), goals = new Set([to].flat().map(t => PAGE_IDS.get(t)).filter(v => v !== undefined));
+  if (start === undefined || !goals.size) return null;
   const prev = new Map([[start, -1]]), opened = new Set(), queue = [start];
   for (let i = 0; i < queue.length; i++) {
     const u = queue[i];
-    if (u === goal) {
+    if (goals.has(u)) {
       const route = [];
       for (let v = u; v !== -1; v = prev.get(v)) route.unshift(WIKI_DATA.articles[v][0]);
       return route;
@@ -1518,8 +1606,10 @@ function shortestRoute(graph, from, to, usable) {
 // A shortest route for a game, through its checkpoint if it has one, going by the snapshot: navbox links count only in
 // Relaxed, hubs are dead in Hard (the target's and the checkpoint's aside, as in play), and a spin-off's pages only count
 // when it is on. Null if there is none, or if a card's page isn't in the snapshot.
-async function parRoute({ start, vias = [], goal, rules, content = [] }) {
+async function parRoute({ start, vias = [], goal, kinds = null, rules, content = [] }) {
   const graph = await linkGraph(!rules.includes('nonav')), usable = routeUsable({ keep: [start, ...vias, goal], rules, content });
+  if (kinds) return kindsRoute(graph, start, kinds, usable);
+  if (rules.includes('scavenger')) return huntRoute(graph, start, [...vias, goal], usable);
   if (rules.includes('roundtrip')) return roundTripRoute(graph, start, goal, usable, rules.includes('noretrace'));
   const stops = [start, ...vias, goal];
   const legs = stops.slice(1).map((b, i) => shortestRoute(graph, stops[i], b, usable));
@@ -1592,6 +1682,47 @@ async function exactRoute(titles, rules, n) {
   return go(start, n) ? path.map(v => WIKI_DATA.articles[v][0]) : null;
 }
 
+// Scavenger's articles: the shortest of the routes through them in each order, each leg a shortest route. Revisits are
+// allowed, so that is the fewest clicks: whatever order a route first reaches them in, each leg is at least as long.
+const orders = items => items.length < 2 ? [items] : items.flatMap((x, i) => orders(items.toSpliced(i, 1)).map(rest => [x, ...rest]));
+function huntRoute(graph, start, finds, usable) {
+  const legs = new Map();   // each leg once, null (no route) included
+  const leg = (a, b) => { const k = a + '|' + b; if (!legs.has(k)) legs.set(k, shortestRoute(graph, a, b, usable)); return legs.get(k); };
+  let best = null;
+  for (const order of orders(finds)) {
+    const stops = [start, ...order], route = stops.slice(1).map((b, i) => leg(stops[i], b));
+    if (route.every(Boolean)) {
+      const joined = route.reduce((r, l) => r.concat(l.slice(1)));
+      if (!best || joined.length < best.length) best = joined;
+    }
+  }
+  return best;
+}
+// Scavenger's kinds: a shortest route through a page of each, found exactly by a breadth-first search over (page, the
+// kinds found so far). A page of several kinds finds them all, and the start finds none.
+function kindsRoute(graph, start, kinds, usable) {
+  const from = PAGE_IDS.get(start), bits = kinds.length, all = (1 << bits) - 1;
+  if (from === undefined) return null;
+  const finds = new Uint8Array(graph.links.length);
+  kinds.forEach((k, i) => { for (const t of KINDS[k].members) if (PAGE_IDS.has(t)) finds[PAGE_IDS.get(t)] |= 1 << i; });
+  // A state is page << bits | found; prev holds the state before it (-1 for the start, -2 for one not reached yet).
+  const prev = new Int32Array(graph.links.length << bits).fill(-2), queue = [from << bits], opened = new Set();
+  prev[queue[0]] = -1;
+  for (let i = 0; i < queue.length; i++) {
+    const s = queue[i], found = s & all;
+    if (found === all) {
+      const route = [];
+      for (let t = s; t !== -1; t = prev[t]) route.unshift(WIKI_DATA.articles[t >> bits][0]);
+      return route;
+    }
+    const reach = v => { const t = v << bits | found | finds[v]; if (prev[t] === -2 && usable(v)) { prev[t] = s; queue.push(t); } };
+    graph.links[s >> bits].forEach(reach);
+    // A navbox is opened once for each set of kinds found, the first, nearest time.
+    for (const b of graph.carries?.[s >> bits] ?? []) if (!opened.has(b << bits | found)) { opened.add(b << bits | found); graph.boxes[b].forEach(reach); }
+  }
+  return null;
+}
+
 // A shortest round trip, there and back. With No retracing the way back may not go through a page of the way there.
 // The fewest clicks for that is a shortest loop through two given pages, which is NP-hard in general, so this tries the
 // shortest way there with the shortest way back around it and the other way about, then again with each page of the
@@ -1628,8 +1759,9 @@ const HINTS = {
 };
 async function hotColdHint(from, to) {
   if (!PAGE_IDS.has(from) || !PAGE_IDS.has(to)) return 'unknown';
-  const aim = objective().title, keep = [...game.vias, game.goal].map(c => c.title);
-  const usable = routeUsable({ keep, avoid: game.dead, rules: game.rules, content: game.content });
+  // Scavenger aims at the nearest of what is still to find.
+  const aim = game.hunt ? huntLeft().flatMap(h => h.info ? [h.info.title] : KINDS[h.kind].members) : objective().title;
+  const usable = routeUsable({ keep: cardTitles(), avoid: game.dead, rules: game.rules, content: game.content });
   const graph = await linkGraph(!game.rules.includes('nonav'));
   const [before, after] = [from, to].map(t => shortestRoute(graph, t, aim, usable)?.length ?? Infinity);
   return after < before ? 'warmer' : after > before ? 'colder' : 'same';
@@ -1648,6 +1780,14 @@ function turnBack(entry) {
       if (game.path.at(-1) === entry && game.active) { renderHud(); showHint(); }
     }
   }, () => {});
+}
+
+// Scavenger: what an arrival finds of what is left. A kind counts a page among its members (the snapshot's) or one the
+// live wiki puts in its category (page.categories, from the parse), less its exclusions.
+function huntFinds(page) {
+  const live = new Set((page.categories ?? []).map(c => c.category.replace(/_/g, ' ')));
+  return huntLeft().filter(h => h.info ? h.info.title === page.title
+    : KIND_MEMBERS.get(h.kind).has(page.title) || (live.has(h.kind) && !KINDS[h.kind].exclude.includes(page.title)));
 }
 
 // Shows the latest arrival's hint over the article, once both the hint and the article are ready.
@@ -1704,19 +1844,21 @@ function finish(won, lost = null) {
   renderHud();
   const ms = now();
   // A round trip is recorded by its cards: its target and no checkpoints.
+  // Scavenger is recorded by its articles (finds) or kinds.
   const target = game.roundTrip ? game.vias[0] : game.goal, vias = game.roundTrip ? [] : game.vias;
-  const rec = { start: game.start.title, goal: target.title, ...(vias.length && { vias: vias.map(v => v.title) }), ...(game.daily && { daily: game.daily }),
-    ...(target.topic && { topic: target.topic }),
+  const hunt = game.hunt && (game.hunt[0].kind ? { kinds: game.hunt.map(h => h.kind) } : { finds: game.hunt.map(h => h.info.title) });
+  const rec = { start: game.start.title, ...(target && { goal: target.title }), ...hunt, ...(vias.length && { vias: vias.map(v => v.title) }), ...(game.daily && { daily: game.daily }),
+    ...(target?.topic && { topic: target.topic }),
     ...(game.content.length && { content: game.content }), ...(game.par !== null && { par: game.par }), ...(game.exact && { exact: game.limit }), rules: game.rules, won, ...(lost && { [lost]: true }), clicks: clicks(), ms, at: Date.now(), path: game.path.map(p => p.title) };
   const settingsNote = settingsText(rec);
   const hist = savedGames();
-  const best = hist.filter(r => r.won && chain(r).join('|') === chain(rec).join('|') && sameRules(r, rec))
+  const best = hist.filter(r => r.won && recordKey(r) === recordKey(rec) && sameRules(r, rec))
     .sort((a, b) => a.clicks - b.clicks || a.ms - b.ms)[0];
   hist.unshift(rec);
   store.set('mwr.history', hist.slice(0, 50));
 
-  const route = chain(rec).join(' → ');
-  const pathHtml = game.path.map(p => `<li><a href="${esc(wikiUrl(p.title))}" target="_blank" rel="noopener">${esc(p.title)}</a>${p.back ? ' <span class="note">(back)</span>' : ''}${p.via ? ` <span class="note">(${viaName(p.via).toLowerCase()})</span>` : ''}</li>`).join('');
+  const route = routeText(rec);
+  const pathHtml = game.path.map(p => `<li><a href="${esc(wikiUrl(p.title))}" target="_blank" rel="noopener">${esc(p.title)}</a>${p.back ? ' <span class="note">(back)</span>' : ''}${p.via ? ` <span class="note">(${viaName(p.via).toLowerCase()})</span>` : ''}${p.found ? ` <span class="note">(found ${esc(p.found.join(', '))})</span>` : ''}</li>`).join('');
   let bestNote = '';
   const newBest = won && best && (rec.clicks < best.clicks || (rec.clicks === best.clicks && rec.ms < best.ms));
   if (won && best) {
@@ -1791,7 +1933,9 @@ document.addEventListener('keydown', e => { if (e.key === 'Escape' && modalDismi
 $('#rules').innerHTML = '<span class="lbl">Rules</span>' + Object.entries(RULES).filter(([k]) => !LEVEL_RULES.includes(k)).map(([k, r]) =>
   `<label title="${esc(r.help)}" data-rule="${k}"><input type="checkbox" value="${k}"> ${esc(r.label)}</label>` + (k !== 'checkpoint' ? '' :
   `<select id="viaCount" class="hidden" aria-label="How many checkpoints" title="How many checkpoints, visited in order">
-  ${VIA_KEYS.map((w, i) => `<option>${i + 1}</option>`).join('')}</select>`)).join('');
+  ${VIA_KEYS.map((w, i) => `<option>${i + 1}</option>`).join('')}</select>`) + (k !== 'scavenger' ? '' :
+  `<select id="huntMode" class="hidden" aria-label="What to find" title="Articles to find, or kinds to find one of each">
+  <option value="kinds">${HUNT_SIZE} kinds</option><option value="articles">${HUNT_SIZE} articles</option></select>`)).join('');
 $('#vias').innerHTML = VIA_KEYS.map((w, i) => `
     <div class="via-slot hidden" id="slot-${w}">
       <div class="card via" id="card-${w}">
@@ -1895,7 +2039,7 @@ $('#btnSwap').onclick = () => {
 $('#btnDaily').onclick = () => loadDaily();
 $('#btnPlay').onclick = startGame;
 $('#btnCopy').onclick = async () => {
-  if (cardKeys().some(w => !setup[w])) return;
+  if (cardKeys().some(w => !setup[w]) || (huntMode() === 'kinds' && !setup.kinds?.length)) return;
   try { await navigator.clipboard.writeText(challengeLink()); setStatus('Challenge link copied.'); }
   catch { setStatus(challengeLink()); }
 };
@@ -1916,6 +2060,14 @@ $('#btnClearHistory').onclick = () => {
   $('#hClear').onclick = () => { store.set('mwr.history', []); renderHistory(); closeModal(); };
 };
 $('#btnPeek').onclick = () => {
+  if (game.hunt) {
+    openModal(`<h2>Find</h2><ul>${huntLeft().map(h => `<li><b>${esc(h.label)}</b>: ${esc(h.info ? h.info.desc || 'No description available.'
+      : 'e.g. ' + kindExamples(h.kind).join(', '))}</li>`).join('')}</ul>
+      <p class="note">The clock keeps running while you peek.</p>
+      <div class="actions"><button class="primary" id="pClose">Back to the hunt</button></div>`);
+    $('#pClose').onclick = closeModal;
+    return;
+  }
   const g = objective();
   openModal(`<h2>${objectiveLabel()}: ${esc(g.title)}</h2>
     <div class="peek"><img alt="" class="hidden"><p>${esc(g.desc || 'No description available.')}</p></div>
@@ -1934,25 +2086,36 @@ $('#btnPeek').onclick = () => {
   const h = new URLSearchParams(location.hash.slice(1));
   // A challenge link carries its whole rules, difficulty included: one with none is Relaxed, as every game was before
   // difficulty (navboxes on).
-  if (h.get('start') && h.get('target')) setRules((h.get('rules') || '').split(','));
+  // Scavenger's kinds go in as kind= in place of the target.
+  const kinds = h.getAll('kind').filter(k => isKey(KINDS, k)).slice(0, HUNT_SIZE), challenge = h.get('start') && (h.get('target') || kinds.length);
+  if (challenge) setRules((h.get('rules') || '').split(','));
   else if (h.has('rules')) setRules(h.get('rules').split(','));
-  if (h.get('start') && h.get('target')) {
+  if (challenge) {
     setStatus('Loading challenge…');
     let missing = null;
     await withBusy(async () => {
-      const titles = [h.get('start'), ...h.getAll('via').filter(Boolean).slice(0, VIA_KEYS.length), h.get('target')];
+      const titles = kinds.length ? [h.get('start')] : [h.get('start'), ...h.getAll('via').filter(Boolean).slice(0, VIA_KEYS.length), h.get('target')];
       const infos = await Promise.all(titles.map(pageInfo));
       missing = titles.find((t, i) => !infos[i]);
       if (missing) return;
-      Object.assign(setup, { start: infos[0], goal: infos.at(-1) }, setVias(infos.slice(1, -1)));
-      if (infos.length > 2) setRules([...rules(), 'checkpoint']);
+      if (kinds.length) {
+        setup.start = infos[0];
+        setRules([...rules(), 'scavenger']);
+        $('#huntMode').value = 'kinds';
+        setKinds(kinds);
+      } else {
+        Object.assign(setup, { start: infos[0], goal: infos.at(-1) }, setVias(infos.slice(1, -1)));
+        if (infos.length > 2) setRules([...rules(), rules().includes('scavenger') ? 'scavenger' : 'checkpoint']);
+        if (rules().includes('scavenger')) $('#huntMode').value = 'articles';
+      }
+      syncVia();
       cardKeys().forEach(renderCard);
       const r = rulesText(rules());
       setStatus(`Challenge loaded${r ? ' with ' + r : ''}. Press Start when ready.`);
     });
-    if (!setup.start || !setup.goal) {
+    if (!setup.start || !(setup.goal || setup.kinds?.length)) {
       await reroll('all');
-      if (missing && setup.start && setup.goal) setStatus('The challenge link’s article “' + missing + '” doesn’t exist, so a random pair was rolled instead.', true);
+      if (missing && setup.start) setStatus('The challenge link’s article “' + missing + '” doesn’t exist, so a random pair was rolled instead.', true);
     }
   } else if (h.has('daily')) {
     await loadDaily(dailyDate(h.get('daily')));

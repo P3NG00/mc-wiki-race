@@ -28,6 +28,9 @@ function check(name, ok, extra = '') {
 const ARTICLE = title => `<div class="mw-parser-output"><p>${title}: <a href="/w/Diamond_Pickaxe">pickaxe</a> <a href="/w/Block">Block</a>
   <a href="/w/Blocks">Blocks</a> <a href="/w/Crafting">Crafting</a> <a href="/w/Tutorial:Mining">tutorial</a> <a href="/w/Dungeons:Creeper">dungeons</a></p>
   <table class="navbox"><tr><td><a href="/w/Creeper">Creeper</a></td></tr></table></div>`;
+// The live categories a parse reply gives, as the API writes them: Brand New Mob is only in the live wiki's Nether mobs,
+// and Chicken is in it too but excluded from the kind.
+const LIVE_CATEGORIES = { 'Brand New Mob': ['Nether_mobs', 'Verify'], Chicken: ['Nether_mobs', 'Passive_mobs'] };
 const reply = (request, body, type = 'application/json') => send('network.provideResponse', { request, statusCode: 200, body: { type: 'string', value: body },
   headers: [['Access-Control-Allow-Origin', '*'], ['Content-Type', type]].map(([name, value]) => ({ name, value: { type: 'string', value } })) });
 function answer(request, url) {
@@ -36,7 +39,11 @@ function answer(request, url) {
   if (u.pathname !== '/api.php') return send('network.failRequest', { request });   // images
   const kind = [p.get('action'), ...['list', 'generator', 'prop'].filter(k => p.has(k)).map(k => `${k}=${p.get(k)}`)].join(' ');
   requests.set(kind, (requests.get(kind) || 0) + 1);
-  if (p.get('action') === 'parse') return reply(request, JSON.stringify({ parse: { title: p.get('page'), displaytitle: p.get('page'), text: ARTICLE(p.get('page')) } }));
+  if (p.get('action') === 'parse') {
+    const t = p.get('page');
+    return reply(request, JSON.stringify({ parse: { title: t, displaytitle: t, text: ARTICLE(t),
+      categories: (LIVE_CATEGORIES[t] ?? []).map(category => ({ sortkey: '', category })) } }));
+  }
   if (p.get('action') === 'query' && p.has('titles')) {
     return reply(request, JSON.stringify({ query: { pages: p.get('titles').split('|').map(t => ({ title: t, ns: nsOf(t), pageprops: {}, extract: `About ${t}.` })) } }));
   }
@@ -302,6 +309,81 @@ check('Exact clicks unticks Checkpoint and Six clicks', await until(ready) && aw
 check('a link with both plays Exact clicks only', await ev("(setRules(['checkpoint', 'roundtrip', 'noretrace', 'exact', 'limit']), rules().join()) === 'exact'"));
 await ev("setRules([])");
 
+// Scavenger, kinds: a link's kinds go on the hunt card, par is a route through a member of each, and a find ticks its
+// kind: a snapshot member, or a page the live wiki puts in the category less the kind's exclusions (Chicken). Finding
+// one of each wins, and the record keeps the kinds.
+await open('#start=Diamond&kind=Nether%20mobs&kind=Enchantments&kind=Potions&rules=scavenger');
+check('Scavenger: a kinds link puts its kinds on the hunt card in place of the target', await until(ready) && await ev(`huntMode() === 'kinds'
+  && setup.kinds.join() === 'Nether mobs,Enchantments,Potions' && !document.querySelector('#cardHunt').classList.contains('hidden')
+  && document.querySelector('#cardGoal').classList.contains('hidden') && document.querySelector('#cardHunt .kinds').textContent.includes('a mob found in the Nether')
+  && challengeLink().endsWith('#start=Diamond&kind=Nether%20mobs&kind=Enchantments&kind=Potions&rules=scavenger')`));
+const kindsPar = JSON.parse(await ev(`cardsRoute(['Diamond'], rules(), setup.kinds).then(r => JSON.stringify({ route: r,
+  each: setup.kinds.every(k => r.slice(1).some(t => KIND_MEMBERS.get(k).has(t))) }))`));
+check('its par is a route through a member of each kind', kindsPar.each && await until(`document.querySelector('#setupPar').textContent === 'Par ${kindsPar.route.length - 1}'`),
+  kindsPar.route.join(' → '));
+await play();
+check('the HUD lists the kinds to find', await ev(hud) === 'Find a mob found in the Nether, an enchantment, a potion', await ev(hud));
+await ev("navigate('Chicken', null)");
+await until('game.path.length === 2 && !game.loading');
+check('an excluded page in the live category isn\'t a find', await ev('!game.path[1].found && game.hunt.every(h => !h.found)'));
+await ev("navigate('Brand New Mob', null)");
+await until('game.path.length === 3 && !game.loading');
+check('a page only the live wiki puts in the category is a find', await ev(`game.path[2].found?.join() === 'a mob found in the Nether'
+  && ${toast} === '✓ Found a mob found in the Nether: Brand New Mob (1 of 3)'`) && await ev(hud) === 'Find an enchantment, a potion', await ev(toast));
+await ev("navigate('Sharpness', null)");
+await until('game.path.length === 4 && !game.loading');
+await ev("navigate('Potion of Swiftness', null)");
+check('one of each wins, recorded by its kinds', await until('!game.active') && await ev(`(r => r.won && r.kinds.join() === 'Nether mobs,Enchantments,Potions' && r.goal === undefined
+  && isRecord(r))(store.get('mwr.history', [])[0]) && document.querySelector('#modal').textContent.includes('Diamond → a mob found in the Nether, an enchantment, a potion')`));
+await ev("closeModal(); toSetup()");
+check('the history names the kinds', await ev("document.querySelector('#history tbody tr').textContent.includes('a mob found in the Nether, an enchantment, a potion')"));
+await open('#start=Diamond&kind=Hostile%20mobs&kind=Flying%20mobs&kind=Potions&rules=scavenger');
+await until(ready);
+await play();
+await ev("navigate('Blaze', null)");
+check('a page of two kinds finds both', await until("game.path.length === 2 && !game.loading") &&
+  await ev(`game.path[1].found.join() === 'a hostile mob,a flying mob' && ${toast} === '✓ Found a hostile mob and a flying mob: Blaze (2 of 3)'`), await ev(toast));
+await ev("finish(false); closeModal(); toSetup()");
+const rolled = JSON.parse(await ev(`(() => {
+  setup.start = { title: 'Blaze' };
+  const rolls = Array.from({ length: 40 }, rollKinds);
+  return JSON.stringify(rolls.filter(ks => ks.length !== 3 || new Set(ks.map(k => KINDS[k].topic)).size !== 3 || ks.some(k => KIND_MEMBERS.get(k).has('Blaze'))));
+})()`));
+check('rolled kinds are three from three topics, none holding the start', rolled.length === 0, JSON.stringify(rolled.slice(0, 2)));
+await open('#start=Diamond&kind=Hostile%20mobs&kind=Enchantments&kind=Potions&rules=scavenger');
+await until(ready);
+await ev("setCustom('start', 'Blaze')");
+check('a start in one of the kinds rolls them again', await until("setup.start?.title === 'Blaze' && setup.busy === 0") &&
+  await ev("setup.kinds.length === 3 && !setup.kinds.some(k => KIND_MEMBERS.get(k).has('Blaze'))"), await ev('setup.kinds.join()'));
+
+// Scavenger, articles: three Find cards joined by +, par the best order, any order wins, Hot/cold aims at the nearest.
+await open('#start=Diamond&target=Bamboo&via=Ghast&via=Sharpness&rules=scavenger,hotcold');
+check('Scavenger: an articles link shows three Find cards joined by +', await until(ready) && await ev(`huntMode() === 'articles' && cardKeys().join() === 'start,via0,via1,goal'
+  && ['#card-via0', '#card-via1', '#cardGoal'].every(c => document.querySelector(c + ' .tag').textContent === 'Find')
+  && document.querySelector('#slot-via0 .arrow').textContent === '+' && challengeLink().endsWith('&target=Bamboo&via=Ghast&via=Sharpness&rules=hotcold,scavenger')`),
+  await ev('challengeLink()'));
+const best = JSON.parse(await ev(`Promise.all(orders(['Ghast', 'Sharpness', 'Bamboo']).map(o => parRoute({ start: 'Diamond', vias: o.slice(0, -1), goal: o.at(-1), rules: ['nonav'] })))
+  .then(rs => JSON.stringify([Math.min(...rs.map(r => r.length - 1)), document.querySelector('#setupPar').textContent]))`));
+check('its par is the best of the orders', await until(`document.querySelector('#setupPar').textContent === 'Par ${best[0]}'`), best.join(' / '));
+await play();
+await ev("navigate('Crafting', null)");
+check('Hot/cold aims at the nearest find', await until("game.path.length === 2 && !game.loading && !!game.path[1].hint"));
+for (const [i, t] of ['Sharpness', 'Bamboo', 'Ghast'].entries()) {
+  await ev(`navigate(${JSON.stringify(t)}, null)`);
+  await until(`game.path.length === ${i + 3} && !game.loading || !game.active`);
+  if (i === 0) check('a find in any order', await ev(`${toast} === '✓ Found Sharpness (1 of 3)' && game.path[2].found.join() === 'Sharpness'`), await ev(toast));
+}
+check('all three in any order wins, recorded by its articles', await until('!game.active') && await ev(`(r => r.won && r.finds.join() === 'Ghast,Sharpness,Bamboo'
+  && r.goal === undefined)(store.get('mwr.history', [])[0]) && document.querySelector('#modal').textContent.includes('Diamond → Ghast, Sharpness, Bamboo (any order)')`));
+await ev("closeModal(); toSetup()");
+await ev("(s => { s.value = 'kinds'; s.dispatchEvent(new Event('change', { bubbles: true })); })(document.querySelector('#huntMode'))");
+check('switching to kinds rolls them onto the hunt card', await until(ready) && await ev(`setup.kinds?.length === 3 && cardKeys().join() === 'start'
+  && !document.querySelector('#cardHunt').classList.contains('hidden') && document.querySelector('#slot-via0').classList.contains('hidden')`));
+await ev("document.querySelector('#rules input[value=checkpoint]').click()");
+check('Checkpoint unticks Scavenger, giving the target back', await until(ready) && await ev(`!rules().includes('scavenger') && document.querySelector('#huntMode').classList.contains('hidden')
+  && !document.querySelector('#cardGoal').classList.contains('hidden') && document.querySelector('#cardGoal .tag').textContent === 'Target'`));
+await ev("setRules([])");
+
 // Rolls: each pool keeps to its tier, starts and targets come from different topics (Chaos aside), and targets are linked
 // well enough to be reached. planGroups and rollOne are called directly, with the pool's button set without a change event.
 check('a page without a hash rolls a pair on Normal', await open('') && await ev("level() === 'normal' && mode() === 'everyday'"));
@@ -444,7 +526,7 @@ check('par names a card\'s page that isn\'t in the snapshot', await until("docum
   await ev("document.querySelector('#par')?.textContent"));
 await ev('closeModal(); toSetup()');
 
-check('only page info and articles are asked for', [...requests.keys()].every(k => k === 'query prop=pageprops|pageimages|extracts' || k === 'parse prop=text|displaytitle'),
+check('only page info and articles are asked for', [...requests.keys()].every(k => k === 'query prop=pageprops|pageimages|extracts' || k === 'parse prop=text|displaytitle|categories'),
   JSON.stringify(Object.fromEntries(requests)));
 check('no uncaught errors', jsErrors.length === 0, jsErrors.slice(0, 3).join(' | '));
 console.log(failures ? `${failures} check(s) failed` : 'All checks passed');

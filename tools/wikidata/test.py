@@ -9,6 +9,7 @@ from libzim.writer import Creator, Hint, Item, StringProvider
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))   # for the tools under python -I
 from common import Snapshot, load_config, read_data
 from extract import extract
+import build as build_module
 from build import build, graph, render, render_graph
 from diff import diff
 from report import report
@@ -107,7 +108,9 @@ def write_zim(path):
 
 # Every Deep cuts share of the one item linked well enough to be a target (Diamond), as a third would round to nothing.
 CONFIG = {**load_config(), 'topics': {'items': ['Items', 'Tools'], 'mobs': ['Hostile mobs']}, 'hubs': ['Block', 'Breaking'],
-          'core_namespaces': ['Special', 'File', 'Category'], 'spinoffs': ['Dungeons'], 'deep_cuts_share': 1}
+          'core_namespaces': ['Special', 'File', 'Category'], 'spinoffs': ['Dungeons'], 'deep_cuts_share': 1,
+          'kinds': {'Items': {'label': 'an item', 'exclude': ['Iron Ingot']}}}
+build_module.MIN_KIND = 1   # the fixture's only item linked well enough to be a target is Diamond
 
 with tempfile.TemporaryDirectory() as tmp:
     zim = os.path.join(tmp, 'test.zim')
@@ -175,9 +178,25 @@ with tempfile.TemporaryDirectory() as tmp:
           data['hubs'] == {'Block': 'Block', 'Blocks': 'Block', 'Breaking': 'Breaking', 'Breaking/Mining': 'Breaking', 'Mining': 'Breaking'},
           data['hubs'])
 
+    # Items: Diamond is in it and linked well enough; Iron Ingot is excluded; Charcoal isn't linked well enough.
+    check('Scavenger kinds: pool members linked well enough, less the exclusions',
+          data['kinds'] == {'Items': {'label': 'an item', 'topic': 'items', 'members': ['Diamond'], 'exclude': ['Iron Ingot']}}, data['kinds'])
+    stops = lambda kinds: build(snap, {**CONFIG, 'kinds': kinds})
+    try:
+        stops({'Items': {'label': 'an item', 'exclude': ['Creeper']}})
+        check('a kind whose excluded title left its category stops the build', False)
+    except SystemExit as e:
+        check('a kind whose excluded title left its category stops the build', 'Creeper' in str(e), e)
+    try:
+        stops({'Hostile mobs': {'label': 'a hostile mob', 'exclude': []}})
+        check('a kind with too few members stops the build', False)
+    except SystemExit as e:
+        check('a kind with too few members stops the build', 'Hostile mobs: 0 members' in str(e), e)
+
     text = report(snap, CONFIG, 20)
-    check('the report runs, with its topics, pool definitions and designs',
-          all(h in text for h in ('## Topics', '## Pool definitions', '## Pool designs', '| Everyday, any pair |', 'Dead ends')), text[:400])
+    check('the report runs, with its topics, kinds, pool definitions and designs',
+          all(h in text for h in ('## Topics', '## Scavenger kinds', '- **Items:** Diamond', '## Pool definitions', '## Pool designs',
+                                  '| Everyday, any pair |', 'Dead ends')), text[:400])
 
     out = os.path.join(tmp, 'wiki-data.js')
     with open(out, 'w', encoding='utf-8') as f:
@@ -202,10 +221,11 @@ with tempfile.TemporaryDirectory() as tmp:
     newer['articles'] = [r for r in newer['articles'] if r[0] != 'Creeper'] + [['Copper Golem', 40, 30, 'mobs', [], []]]
     newer['articles'][[r[0] for r in newer['articles']].index('Diamond')][2] = 30
     newer['hubs'].pop('Mining')
+    newer['kinds']['Items']['members'] = ['Charcoal']
     report = diff(data, newer, min_links=5)
-    check('diff lists added and removed articles, category moves, link changes and hubs',
+    check('diff lists added and removed articles, category and kind moves, link changes and hubs',
           all(s in report for s in ('2026-08-21', '2026-11-21', 'added (1): Copper Golem', 'removed (1): Creeper',
-                                    'mobs: 1 → 1', 'Diamond: 8 → 30', 'Hubs: +none; −Mining')), report)
+                                    'mobs: 1 → 1', 'Kind Items: 1 → 1\n  joined: Charcoal\n  left: Diamond', 'Diamond: 8 → 30', 'Hubs: +none; −Mining')), report)
 
 # The game labels every topic and family the data names; a key without a label stops the page from loading.
 game = open(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..', 'index.html'), encoding='utf-8').read()

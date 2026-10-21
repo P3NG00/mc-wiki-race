@@ -34,6 +34,7 @@ Open `index.html` in a browser. Opening it straight from disk (`file://`) works 
   - **Exact clicks:** reach the target in exactly par + 2 clicks, never on the same page twice, so there's no Back. Getting there sooner loses, so you have to find a detour, and so does running out.
   - **Checkpoint:** one to three more cards, a relay. You have to visit them on the way, in order, and reaching the target before them doesn't count.
   - **Round trip:** reach the target, then find your way back to the start. Back can't take you the way you came. With **No retracing** ticked as well, every page from the way there is a dead link on the way back.
+  - **Scavenger:** instead of a target, find three things in any order: **3 kinds** (one of each, like a mob found in the Nether, an enchantment and a potion) or **3 articles**. A kind is a wiki category, hand-picked, with surprising members left out; the result says what each find was.
 - **Copy challenge link** shares the exact pair you're looking at, plus any checkpoints, the difficulty and rules, as `index.html#start=<Title>&target=<Title>&via=<Title>&rules=nonav,checkpoint` (`nonav` is Normal, `nonav,nohubs` Hard, neither Relaxed).
 - **Theme** (top right of the setup screen): Auto follows your system's light or dark setting. Articles switch to the wiki's own dark theme to match.
 - Your last 50 games, your personal best for each pair and your theme are kept in the browser. Personal bests are kept separately for each combination of rules. Each result also notes the target topic it was rolled with and the Content that was on.
@@ -71,7 +72,7 @@ Plays a real game in headless Firefox against the live wiki. Needs `firefox`, No
 test/run-e2e.sh --offline
 ```
 
-Checks the game's own logic (rolls, the daily, Content, difficulty, which links are live) in about 20 seconds, with every request to the wiki answered by the test, so it works without network access or while the wiki is down.
+Checks the game's own logic (rolls, the daily, Content, difficulty, which links are live, every rule) in about 20 seconds, with every request to the wiki answered by the test, so it works without network access or while the wiki is down.
 
 See `CLAUDE.md` for how the game works internally.
 

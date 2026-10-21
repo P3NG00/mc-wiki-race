@@ -104,7 +104,10 @@
   .modes select { padding: 6px 12px; border: 1px solid var(--line); border-radius: var(--radius-pill); background: var(--panel); }
   .mode-help { color: var(--muted); font-size: 13px; margin: -6px 0 18px 54px; }
   .pair { display: grid; grid-template-columns: 1fr auto 1fr; gap: 12px; align-items: stretch; }
-  .pair.has-via { grid-template-columns: 1fr auto 1fr auto 1fr; }
+  .pair[data-vias="1"] { grid-template-columns: repeat(2, minmax(0, 1fr) auto) minmax(0, 1fr); }
+  .pair[data-vias="2"] { grid-template-columns: repeat(3, minmax(0, 1fr) auto) minmax(0, 1fr); }
+  .pair[data-vias="3"] { grid-template-columns: repeat(4, minmax(0, 1fr) auto) minmax(0, 1fr); }
+  .vias, .via-slot { display: contents; }
   .arrow { align-self: center; font-size: 22px; color: var(--muted); }
   .card {
     background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius-lg); padding: 14px;
@@ -228,7 +231,7 @@
   .note { color: var(--muted); font-size: 13px; }
 
   @media (max-width: 720px) {
-    .pair, .pair.has-via { grid-template-columns: 1fr; }
+    .pair, .pair[data-vias] { grid-template-columns: 1fr; }
     .arrow { justify-self: center; transform: rotate(90deg); }
     .mode-help { margin-left: 0; }
     .setup-actions .primary { flex-basis: 100%; padding: 10px 14px; }
@@ -340,16 +343,7 @@ const THEMES = [...new Set(['auto', 'light', 'dark', ...Array.from(document.quer
       <img alt="" class="art hidden">
     </div>
     <div class="arrow">➜</div>
-    <div class="card via via-part hidden" id="cardVia">
-      <span class="tag">Checkpoint</span>
-      <div class="row"><img alt="" class="icon hidden"><div><p class="title">…</p><p class="desc"></p></div></div>
-      <div class="actions">
-        <button data-reroll="via">🎲 Reroll</button>
-        <input type="text" placeholder="or type an article…" data-custom="via" aria-label="Custom checkpoint article">
-      </div>
-      <img alt="" class="art hidden">
-    </div>
-    <div class="arrow via-part hidden">➜</div>
+    <div class="vias" id="vias"></div>
     <div class="card goal" id="cardGoal">
       <span class="tag">Target</span>
       <div class="row"><img alt="" class="icon hidden"><div><p class="title">…</p><p class="desc"></p></div></div>
@@ -493,7 +487,7 @@ const store = {
 const isKey = (obj, k) => typeof k === 'string' && Object.hasOwn(obj, k);
 const optional = (v, ok) => v === undefined || ok(v);
 const isRecord = r => typeof r === 'object' && r !== null && typeof r.start === 'string' && typeof r.goal === 'string' &&
-  optional(r.via, v => typeof v === 'string') && optional(r.daily, v => typeof v === 'string') &&
+  optional(r.vias, v => Array.isArray(v) && v.length && v.every(t => typeof t === 'string')) && optional(r.daily, v => typeof v === 'string') &&
   optional(r.topic, v => isKey(TOPICS, v)) && optional(r.par, Number.isInteger) &&
   optional(r.content, v => Array.isArray(v) && v.every(k => CONTENT.has(k))) &&
   Array.isArray(r.rules) && r.rules.every(k => isKey(RULES, k)) && typeof r.won === 'boolean' &&
@@ -578,9 +572,13 @@ async function pageInfo(title) {
 
 // ---------------------------------------------------------------- Setup screen
 // rolls: per-card token, so superseded rolls are dropped. daily: the date, while the cards hold that day's pair.
-// via: the checkpoint, used while the Checkpoint rule is on.
-const setup = { start: null, via: null, goal: null, daily: null, busy: 0, rolls: { start: 0, via: 0, goal: 0 } };
-const cardKeys = () => rules().includes('checkpoint') ? ['start', 'via', 'goal'] : ['start', 'goal'];
+// via0…via2: the checkpoints, in order, as many as the Checkpoint rule's count while it is on.
+const VIA_KEYS = ['via0', 'via1', 'via2'];
+const setup = { start: null, via0: null, via1: null, via2: null, goal: null, daily: null, busy: 0,
+  rolls: { start: 0, via0: 0, via1: 0, via2: 0, goal: 0 } };
+const viaCount = () => +$('#viaCount').value;
+const viaKeys = () => rules().includes('checkpoint') ? VIA_KEYS.slice(0, viaCount()) : [];
+const cardKeys = () => ['start', ...viaKeys(), 'goal'];
 
 function mode() { return $('input[name=mode]:checked').value; }
 
@@ -604,7 +602,7 @@ const RULES = {
   nonav: { label: 'No navboxes', help: 'The link tables at the bottom of articles are gone: only links in the article itself count.' },
   blind: { label: 'Blind target', help: 'You only get the target’s name: no picture or description.' },
   hotcold: { label: 'Hot/cold', help: 'After each click, a hint says whether you got closer to the target (warmer) or further away (colder).' },
-  checkpoint: { label: 'Checkpoint', help: 'A third article you have to visit on the way to the target.' },
+  checkpoint: { label: 'Checkpoint', help: 'One to three more articles you have to visit, in order, on the way to the target.' },
   limit: { label: 'Six clicks', help: `Reach the target in ${CLICK_LIMIT} clicks or fewer, Back and the way through a checkpoint included.` },
 };
 // Difficulty, as the rules it turns on. Navboxes decide how hard a game is far more than the pool does: with them almost any
@@ -661,9 +659,11 @@ function rulesText(keys) {
 const settingsText = r => [r.topic && r.topic !== 'any' && TOPICS[r.topic].label, r.content && 'Content: ' + r.content.map(contentLabel).join(', '),
   rulesText(r.rules)].filter(Boolean).join(', ');
 const sameRules = (a, b) => a.rules.join() === b.rules.join();
+// A record's articles in the order they are played: start, checkpoints, target. With the rules, it keys personal bests.
+const chain = r => [r.start, ...(r.vias ?? []), r.goal];
 
 function renderCard(which) {
-  const card = $({ start: '#cardStart', via: '#cardVia', goal: '#cardGoal' }[which]);
+  const card = $({ start: '#cardStart', goal: '#cardGoal' }[which] ?? '#card-' + which);
   const info = setup[which];
   const blind = which !== 'start' && rules().includes('blind');
   $('.title', card).textContent = info ? info.title : '…';
@@ -678,11 +678,11 @@ function renderCard(which) {
 // rendered loads the link graph, so it is ready by the time a game starts. setupParToken drops answers to older pairs.
 let setupParToken = 0;
 async function updateSetupPar() {
-  const token = ++setupParToken, keys = cardKeys();
-  const [start, via, goal] = ['start', 'via', 'goal'].map(w => keys.includes(w) ? setup[w]?.title : undefined);
+  const token = ++setupParToken, titles = cardKeys().map(w => setup[w]?.title);
   let text = '';
-  if (start && goal && (via || !keys.includes('via'))) {
-    const route = await parRoute({ start, via, goal, rules: rules(), content: contentInPlay([start, via, goal]) }).catch(() => null);
+  if (titles.every(Boolean)) {
+    const route = await parRoute({ start: titles[0], vias: titles.slice(1, -1), goal: titles.at(-1), rules: rules(), content: contentInPlay(titles) })
+      .catch(() => null);
     if (route) text = `Par ${route.length - 1}`;
   }
   if (token === setupParToken) $('#setupPar').textContent = text;
@@ -696,12 +696,18 @@ function updatePlay() {
   if (same && setup.busy === 0) setStatus('The same article is on two cards. Pick a different one.', true);
 }
 
-// Shows the checkpoint card while the Checkpoint rule is on, and rolls a checkpoint if there is none yet.
+// Shows a card for each checkpoint in use, and the count while the Checkpoint rule is on, and rolls the checkpoints
+// that have no article yet. They are numbered when there is more than one.
 function syncVia() {
-  const on = rules().includes('checkpoint');
-  $('.pair').classList.toggle('has-via', on);
-  document.querySelectorAll('.via-part').forEach(el => el.classList.toggle('hidden', !on));
-  if (on && !setup.via) reroll('via');
+  const keys = viaKeys();
+  $('.pair').dataset.vias = keys.length;
+  $('#viaCount').classList.toggle('hidden', !rules().includes('checkpoint'));
+  VIA_KEYS.forEach((w, i) => {
+    $('#slot-' + w).classList.toggle('hidden', !keys.includes(w));
+    $(`#card-${w} .tag`).textContent = keys.length > 1 ? `Checkpoint ${i + 1}` : 'Checkpoint';
+  });
+  const missing = keys.filter(w => !setup[w]);
+  if (missing.length) reroll(missing);
   else updatePlay();
 }
 
@@ -735,7 +741,7 @@ function planGroups(cards) {
   if (mode() === 'chaos') return Object.fromEntries(cards.map(w => [w, w === 'goal' && POOL.has(topic) ? topic : null]));
   const taken = cardKeys().filter(w => !cards.includes(w)).map(w => groupOf(setup[w]?.title)).filter(Boolean);
   const plan = {};
-  for (const w of ['goal', 'via', 'start'].filter(w => cards.includes(w))) {
+  for (const w of ['goal', ...VIA_KEYS, 'start'].filter(w => cards.includes(w))) {
     const groups = [...rollGroups(mode(), w !== 'start').keys()], free = groups.filter(g => !taken.includes(g));
     plan[w] = w === 'goal' && groups.includes(topic) ? topic : pick(free.length ? free : groups);
     taken.push(plan[w]);
@@ -766,10 +772,11 @@ async function rollOne(which, group) {
   throw new Error('Gave up finding a good article');
 }
 
-// which: a card, or 'all' for every card in use. 'all' also drops a checkpoint left over from when the rule was on.
+// which: a card, a list of them, or 'all' for every card in use. 'all' also drops checkpoints left over from a higher
+// count or from when the rule was on.
 async function reroll(which) {
-  const targets = which === 'all' ? cardKeys() : [which];
-  if (which === 'all' && !targets.includes('via')) setup.via = null;
+  const targets = which === 'all' ? cardKeys() : [which].flat();
+  if (which === 'all') for (const w of VIA_KEYS) if (!targets.includes(w)) setup[w] = null;
   const tokens = Object.fromEntries(targets.map(w => [w, ++setup.rolls[w]]));
   const current = w => tokens[w] === setup.rolls[w];
   const left = leaveDaily();
@@ -833,9 +840,11 @@ const ranked = (date, salt, items) => items.map(t => [hash32(`${date}|${salt}|${
 // less, which leaves two clicks for a wrong turn.
 const DAILY_RULES = ['noback', 'blind', 'checkpoint', 'nohubs', 'limit'];
 const DAILY_SIX_CLICKS_PAR = 4;
+// A Checkpoint day has one or two checkpoints. Three would use every topic and make a long game for a daily.
+const DAILY_CHECKPOINTS = [1, 2];
 const dailyRule = date => ranked(date, 'rule', DAILY_RULES)[0];
 
-// A daily can always be done: its target and checkpoint are only taken where the link graph has a route under its rules
+// A daily can always be done: its target and checkpoints are only taken where the link graph has a route under its rules
 // (on a Six clicks day, a short enough one), so the daily needs the graph, and fails to load without it.
 async function dailyPair(date) {
   const rule = dailyRule(date), rules = ['nonav', rule];
@@ -860,32 +869,45 @@ async function dailyPair(date) {
     const p = await par({ start: start.title, goal: t });
     return p >= 1 && (rule !== 'limit' || p <= DAILY_SIX_CLICKS_PAR);
   });
-  const via = rule !== 'checkpoint' ? null
-    : await linked('via', [start, goal], async t => await par({ start: start.title, via: t, goal: goal.title }) >= 1);
-  return { rule, start, via, goal };
+  // Each checkpoint goes after the ones before it, so the route has to go through all of them in order.
+  const vias = [];
+  for (let i = 0; i < (rule === 'checkpoint' ? ranked(date, 'checkpoints', DAILY_CHECKPOINTS)[0] : 0); i++) {
+    const before = vias.map(v => v.title);
+    vias.push(await linked(i ? 'via' + i : 'via', [start, goal, ...vias],
+      async t => await par({ start: start.title, vias: [...before, t], goal: goal.title }) >= 1));
+  }
+  return { rule, start, vias, goal };
 }
 
 async function loadDaily(date = today()) {
-  const keys = ['start', 'via', 'goal'], tokens = keys.map(w => ++setup.rolls[w]);
+  const keys = ['start', ...VIA_KEYS, 'goal'], tokens = keys.map(w => ++setup.rolls[w]);
   setStatus('Loading the daily challenge…');
   await withBusy(async () => {
-    const { rule, start, via, goal } = await dailyPair(date);
+    const { rule, start, vias, goal } = await dailyPair(date);
     if (keys.some((w, i) => tokens[i] !== setup.rolls[w])) return;
-    Object.assign(setup, { start, via, goal, daily: date });
+    Object.assign(setup, { start, goal, daily: date }, setVias(vias));
     setRules(['nonav', rule]);
     setContent([]);   // the daily is its pair and rule only: no spin-off links
     syncVia();
     keys.forEach(renderCard);
     const done = savedGames().find(r => r.daily === date && r.won);
-    setStatus(`Daily challenge for ${date}, ${rule === 'nohubs' ? 'on Hard' : 'with ' + RULES[rule].label}.` + (done ? ` You did it in ${done.clicks} clicks (${fmtTime(done.ms)}).` : ' Press Start when ready.'));
+    const what = rule === 'nohubs' ? 'on Hard' : vias.length > 1 ? `with ${vias.length} checkpoints` : 'with ' + RULES[rule].label;
+    setStatus(`Daily challenge for ${date}, ${what}.` + (done ? ` You did it in ${done.clicks} clicks (${fmtTime(done.ms)}).` : ' Press Start when ready.'));
   });
 }
 
+// A checkpoint list for setup's cards: the count set to its length, and every checkpoint card it leaves empty.
+function setVias(vias) {
+  if (vias.length) $('#viaCount').value = vias.length;
+  return Object.fromEntries(VIA_KEYS.map((w, i) => [w, vias[i] ?? null]));
+}
+
+// The checkpoints go in as one via= each, in order.
 function challengeLink() {
   const base = location.href.split('#')[0];
   const r = rules();
   return `${base}#start=${encodeURIComponent(setup.start.title)}&target=${encodeURIComponent(setup.goal.title)}` +
-    (r.includes('checkpoint') ? '&via=' + encodeURIComponent(setup.via.title) : '') + (r.length ? '&rules=' + r.join(',') : '');
+    viaKeys().map(w => '&via=' + encodeURIComponent(setup[w].title)).join('') + (r.length ? '&rules=' + r.join(',') : '');
 }
 
 function renderHistory() {
@@ -893,7 +915,7 @@ function renderHistory() {
   $('#history').classList.toggle('hidden', rows.length === 0);
   $('#history tbody').innerHTML = rows.slice(0, 15).map(r => `
     <tr class="${r.won ? '' : 'lost'}">
-      <td>${esc(r.start)}</td><td>${esc(r.goal)}${r.via ? ` <span class="note">via ${esc(r.via)}</span>` : ''}</td><td>${esc([r.daily && `Daily ${r.daily}`, settingsText(r)].filter(Boolean).join(', '))}</td>
+      <td>${esc(r.start)}</td><td>${esc(r.goal)}${r.vias ? ` <span class="note">via ${esc(r.vias.join(', '))}</span>` : ''}</td><td>${esc([r.daily && `Daily ${r.daily}`, settingsText(r)].filter(Boolean).join(', '))}</td>
       <td class="mono">${r.won ? `${r.clicks}<span class="unit"> click${r.clicks === 1 ? '' : 's'}</span>` : r.outOfClicks ? 'out of clicks' : 'gave up'}</td>
       <td class="mono">${r.par === undefined ? '–' : `<span class="unit">par </span>${r.par}${r.won ? ` (${overPar(r.clicks - r.par)})` : ''}`}</td>
       <td class="mono">${fmtTime(r.ms)}</td>
@@ -907,8 +929,8 @@ const game = {
   start: null, goal: null,
   rules: [],         // rule keys in play, read from the checkboxes at start
   daily: null,       // the date, if this is that day's daily pair
-  via: null,         // the checkpoint (Checkpoint rule), which has to be reached before the target counts
-  viaReached: false,
+  vias: [],          // the checkpoints (Checkpoint rule), to be reached in order before the target counts
+  viaNext: 0,        // how many of them have been reached
   path: [],          // every article visited, in order (includes back-navigation)
   stack: [],         // navigation stack for the Back button
   elapsed: 0,        // ms of reading time; time spent loading articles is not counted
@@ -937,7 +959,7 @@ function renderHud() {
   $('#btnBack').disabled = game.stack.length < 2 || game.loading || !game.active;
   $('#btnGiveUp').disabled = game.loading || !game.active;
   $('#pathList').innerHTML = game.path.map((p, i) =>
-    `<li class="${i === game.path.length - 1 ? 'cur' : ''} ${p.back ? 'back' : ''} ${p.via ? 'via' : ''}">${esc(p.title)}${p.back ? ' (back)' : ''}${p.via ? ' ✓ checkpoint' : ''}${p.hint ? ` <span title="${esc(HINTS[p.hint].text)}">${HINTS[p.hint].icon}</span>` : ''}</li>`).join('');
+    `<li class="${i === game.path.length - 1 ? 'cur' : ''} ${p.back ? 'back' : ''} ${p.via ? 'via' : ''}">${esc(p.title)}${p.back ? ' (back)' : ''}${p.via ? ' ✓ ' + viaName(p.via).toLowerCase() : ''}${p.hint ? ` <span title="${esc(HINTS[p.hint].text)}">${HINTS[p.hint].icon}</span>` : ''}</li>`).join('');
   scrollPathToEnd();
 }
 // Keeps the newest entry in view: at the bottom of the sidebar, or at the end of the one-line path on phones, whose
@@ -945,10 +967,13 @@ function renderHud() {
 function scrollPathToEnd() { const pl = $('.path-list'); pl.scrollTop = pl.scrollHeight; pl.scrollLeft = pl.scrollWidth; markPathScroll(); }
 function markPathScroll() { const pl = $('.path-list'); pl.classList.toggle('scrolled', pl.scrollLeft > 0); }
 
-// What the player is heading for: the checkpoint until it is reached, then the target.
-const objective = () => game.via && !game.viaReached ? game.via : game.goal;
+// What the player is heading for: the next checkpoint until all are reached, then the target.
+const objective = () => game.vias[game.viaNext] ?? game.goal;
+// A checkpoint's name by its number (from 1), numbered when there is more than one.
+const viaName = n => 'Checkpoint' + (game.vias.length > 1 ? ` ${n}` : '');
+const objectiveLabel = () => objective() === game.goal ? 'Target' : viaName(game.viaNext + 1);
 function renderObjective() {
-  $('#hudLbl').textContent = objective() === game.goal ? 'Target' : 'Checkpoint';
+  $('#hudLbl').textContent = objectiveLabel();
   $('#hudGoal').textContent = objective().title;
   const img = game.rules.includes('blind') ? '' : objective().img;
   setImg($('#hudImg'), img);
@@ -965,7 +990,8 @@ function showToast(text, ms) {
   game.toastTimer = setTimeout(hideToast, ms);
 }
 function celebrateCheckpoint() {
-  showToast(`✓ Checkpoint reached! Now find ${game.goal.title}`, 3000);
+  const n = game.vias.length;
+  showToast(`✓ Checkpoint ${n > 1 ? `${game.viaNext} of ${n} ` : ''}reached! Now find ${objective().title}`, 3000);
   $('.hud .goal').classList.add('reached');
   play('checkpoint');
 }
@@ -980,13 +1006,12 @@ function hideOverlay() { $('#overlay').classList.add('hidden'); }
 const guardLeaving = e => { e.preventDefault(); e.returnValue = true; };
 
 function startGame() {
-  const r = rules();
-  const via = r.includes('checkpoint') ? setup.via : null;
-  Object.assign(game, { active: true, start: setup.start, goal: setup.goal, via, viaReached: false, celebrate: false,
-    daily: setup.daily, rules: r, content: contentInPlay([setup.start.title, setup.goal.title, via?.title]), path: [], seen: new Map(),
+  const r = rules(), vias = viaKeys().map(w => setup[w]);
+  Object.assign(game, { active: true, start: setup.start, goal: setup.goal, vias, viaNext: 0, celebrate: false,
+    daily: setup.daily, rules: r, content: contentInPlay([setup.start, ...vias, setup.goal].map(c => c.title)), path: [], seen: new Map(),
     stack: [], elapsed: 0, runningSince: 0, loading: false, par: null });
   // Par shows in the header once it is known: at once when the setup screen has loaded the link graph.
-  const parReady = game.parReady = parRoute({ start: game.start.title, via: via?.title, goal: game.goal.title, rules: r, content: game.content });
+  const parReady = game.parReady = parRoute({ start: game.start.title, vias: vias.map(v => v.title), goal: game.goal.title, rules: r, content: game.content });
   parReady.then(route => { if (game.parReady === parReady) { game.par = route ? route.length - 1 : null; renderHud(); } }, () => {});
   $('#btnBack').classList.toggle('hidden', game.rules.includes('noback'));
   $('#btnPeek').classList.toggle('hidden', game.rules.includes('blind'));
@@ -1042,11 +1067,11 @@ async function navigate(title, fragment, { back = false } = {}) {
   if (token !== game.navToken || !game.active) return;
   cacheParse([title, page.title], page);
   if (back) game.stack.pop(); else game.stack.push(page.title);
-  const via = !game.viaReached && page.title === game.via?.title;
+  const via = page.title === game.vias[game.viaNext]?.title ? ++game.viaNext : 0;   // the checkpoint's number, from 1
   game.path.push({ title: page.title, back, ...(via && { via }) });
   game.seen.set(title, page.title).set(page.title, page.title);   // the link's title too, in case it was a redirect
-  if (via) { game.viaReached = game.celebrate = true; renderObjective(); }
-  // Hot/cold, on every arrival but the first and the objective's own (a target passed before the checkpoint gets one):
+  if (via) { game.celebrate = true; renderObjective(); }
+  // Hot/cold, on every arrival but the first and the objective's own (a target or later checkpoint passed early gets one):
   // the hint goes onto the path and shows over the article once both are ready (showHint, here and in frameReady),
   // unless the player has moved on by then.
   if (game.rules.includes('hotcold') && game.path.length > 1 && !via && page.title !== objective().title) {
@@ -1058,15 +1083,16 @@ async function navigate(title, fragment, { back = false } = {}) {
   }
   $('#credit').innerHTML = `<a href="${esc(wikiUrl(page.title))}" target="_blank" rel="noopener">View on minecraft.wiki</a> · ` +
     `<a href="${LICENSE_URL}" target="_blank" rel="noopener">CC BY-NC-SA 3.0</a>`;
-  // The target and checkpoint stay reachable even if they are hubs.
-  const keep = [game.goal.title, game.via?.title];
-  // The objective is never marked: a target passed before the checkpoint still has to be reached again.
-  const seen = [...game.seen].filter(([, t]) => t !== objective().title).map(([k]) => k);
+  // The target and checkpoints stay reachable even if they are hubs.
+  const keep = [game.goal, ...game.vias].map(c => c.title);
+  // Nothing still ahead is marked: a target or checkpoint passed early still has to be reached again.
+  const ahead = [...game.vias.slice(game.viaNext), game.goal].map(c => c.title);
+  const seen = [...game.seen].filter(([, t]) => !ahead.includes(t)).map(([k]) => k);
   const blocked = game.rules.includes('nohubs') ? [...HUB_TITLES.keys()].filter(t => !keep.includes(HUB_TITLES.get(t))) : [];
   renderArticle(page, fragment, token, blocked, seen);
   setTimeout(() => frameReady(token), 15000);   // a stalled stylesheet must not leave Back and Give up disabled
   // Compare the post-redirect title, so following a redirect onto the target counts as arriving.
-  const won = page.title === game.goal.title && (!game.via || game.viaReached);
+  const won = page.title === game.goal.title && objective() === game.goal;
   if (won || (game.rules.includes('limit') && clicks() >= CLICK_LIMIT)) { game.loading = false; hideOverlay(); finish(won, !won); return; }
   renderHud();
 }
@@ -1448,18 +1474,19 @@ function shortestRoute(graph, from, to, usable) {
 // A shortest route for a game, through its checkpoint if it has one, going by the snapshot: navbox links count only in
 // Relaxed, hubs are dead in Hard (the target's and the checkpoint's aside, as in play), and a spin-off's pages only count
 // when it is on. Null if there is none, or if a card's page isn't in the snapshot.
-async function parRoute({ start, via, goal, rules, content = [] }) {
-  const graph = await linkGraph(!rules.includes('nonav')), usable = routeUsable({ goal, via, rules, content });
-  const legs = (via ? [[start, via], [via, goal]] : [[start, goal]]).map(([a, b]) => shortestRoute(graph, a, b, usable));
+async function parRoute({ start, vias = [], goal, rules, content = [] }) {
+  const graph = await linkGraph(!rules.includes('nonav')), usable = routeUsable({ keep: [...vias, goal], rules, content });
+  const stops = [start, ...vias, goal];
+  const legs = stops.slice(1).map((b, i) => shortestRoute(graph, stops[i], b, usable));
   return legs.every(Boolean) ? legs.reduce((route, leg) => route.concat(leg.slice(1))) : null;
 }
-// Which pages a route may go through, by page number: as in play, hubs are dead in Hard but the target and the
-// checkpoint, and a spin-off's pages only count when it is on.
-function routeUsable({ goal, via, rules, content = [] }) {
+// Which pages a route may go through, by page number: as in play, hubs are dead in Hard but the ones kept (the target
+// and checkpoints), and a spin-off's pages only count when it is on.
+function routeUsable({ keep, rules, content = [] }) {
   const hubs = new Set(rules.includes('nohubs') ? HUB_TITLES.values() : []);
   return v => {
     const title = WIKI_DATA.articles[v][0], spinoff = spinoffOf(title);
-    return !(hubs.has(title) && title !== goal && title !== via) && (!spinoff || content.includes(spinoff));
+    return !(hubs.has(title) && !keep.includes(title)) && (!spinoff || content.includes(spinoff));
   };
 }
 
@@ -1474,7 +1501,8 @@ const HINTS = {
 };
 async function hotColdHint(from, to) {
   if (!PAGE_IDS.has(from) || !PAGE_IDS.has(to)) return 'unknown';
-  const aim = objective().title, usable = routeUsable({ goal: game.goal.title, via: game.via?.title, rules: game.rules, content: game.content });
+  const aim = objective().title, keep = [...game.vias, game.goal].map(c => c.title);
+  const usable = routeUsable({ keep, rules: game.rules, content: game.content });
   const graph = await linkGraph(!game.rules.includes('nonav'));
   const [before, after] = [from, to].map(t => shortestRoute(graph, t, aim, usable)?.length ?? Infinity);
   return after < before ? 'warmer' : after > before ? 'colder' : 'same';
@@ -1498,7 +1526,7 @@ function golfScore(clicks, par) {
 // Fills the result's par and score once the game's route is known (routeReady, from startGame), unless that result has
 // been closed by then. A record saved before par was known gets it now.
 async function showPar(rec, routeReady) {
-  const el = $('#par'), missing = [rec.start, rec.via, rec.goal].find(t => t && !PAGE_IDS.has(t));
+  const el = $('#par'), missing = chain(rec).find(t => !PAGE_IDS.has(t));
   let text, par = null;
   try {
     const route = missing ? null : await routeReady;
@@ -1526,18 +1554,18 @@ function finish(won, outOfClicks = false) {
   clearInterval(game.timer);
   renderHud();
   const ms = now();
-  const rec = { start: game.start.title, goal: game.goal.title, ...(game.via && { via: game.via.title }), ...(game.daily && { daily: game.daily }),
+  const rec = { start: game.start.title, goal: game.goal.title, ...(game.vias.length && { vias: game.vias.map(v => v.title) }), ...(game.daily && { daily: game.daily }),
     ...(game.goal.topic && { topic: game.goal.topic }),
     ...(game.content.length && { content: game.content }), ...(game.par !== null && { par: game.par }), rules: game.rules, won, ...(outOfClicks && { outOfClicks }), clicks: clicks(), ms, at: Date.now(), path: game.path.map(p => p.title) };
   const settingsNote = settingsText(rec);
   const hist = savedGames();
-  const best = hist.filter(r => r.won && r.start === rec.start && r.goal === rec.goal && r.via === rec.via && sameRules(r, rec))
+  const best = hist.filter(r => r.won && chain(r).join('|') === chain(rec).join('|') && sameRules(r, rec))
     .sort((a, b) => a.clicks - b.clicks || a.ms - b.ms)[0];
   hist.unshift(rec);
   store.set('mwr.history', hist.slice(0, 50));
 
-  const route = [rec.start, rec.via, rec.goal].filter(Boolean).join(' → ');
-  const pathHtml = game.path.map(p => `<li><a href="${esc(wikiUrl(p.title))}" target="_blank" rel="noopener">${esc(p.title)}</a>${p.back ? ' <span class="note">(back)</span>' : ''}${p.via ? ' <span class="note">(checkpoint)</span>' : ''}</li>`).join('');
+  const route = chain(rec).join(' → ');
+  const pathHtml = game.path.map(p => `<li><a href="${esc(wikiUrl(p.title))}" target="_blank" rel="noopener">${esc(p.title)}</a>${p.back ? ' <span class="note">(back)</span>' : ''}${p.via ? ` <span class="note">(${viaName(p.via).toLowerCase()})</span>` : ''}</li>`).join('');
   let bestNote = '';
   const newBest = won && best && (rec.clicks < best.clicks || (rec.clicks === best.clicks && rec.ms < best.ms));
   if (won && best) {
@@ -1605,8 +1633,24 @@ $('#modalBg').addEventListener('click', e => { if (e.target === $('#modalBg') &&
 document.addEventListener('keydown', e => { if (e.key === 'Escape' && modalDismissable) closeModal(); });
 
 // ---------------------------------------------------------------- Wiring
+// The checkpoint count sits beside its checkbox, not in its label, where a click on it would toggle the box.
 $('#rules').innerHTML = '<span class="lbl">Rules</span>' + Object.entries(RULES).filter(([k]) => !LEVEL_RULES.includes(k)).map(([k, r]) =>
-  `<label title="${esc(r.help)}"><input type="checkbox" value="${k}"> ${esc(r.label)}</label>`).join('');
+  `<label title="${esc(r.help)}"><input type="checkbox" value="${k}"> ${esc(r.label)}</label>` + (k !== 'checkpoint' ? '' :
+  `<select id="viaCount" class="hidden" aria-label="How many checkpoints" title="How many checkpoints, visited in order">
+  ${VIA_KEYS.map((w, i) => `<option>${i + 1}</option>`).join('')}</select>`)).join('');
+$('#vias').innerHTML = VIA_KEYS.map((w, i) => `
+    <div class="via-slot hidden" id="slot-${w}">
+      <div class="card via" id="card-${w}">
+        <span class="tag">Checkpoint</span>
+        <div class="row"><img alt="" class="icon hidden"><div><p class="title">…</p><p class="desc"></p></div></div>
+        <div class="actions">
+          <button data-reroll="${w}">🎲 Reroll</button>
+          <input type="text" placeholder="or type an article…" data-custom="${w}" aria-label="Custom checkpoint ${i + 1} article">
+        </div>
+        <img alt="" class="art hidden">
+      </div>
+      <div class="arrow">➜</div>
+    </div>`).join('');
 $('#level').innerHTML = '<span class="lbl">Difficulty</span>' + Object.entries(LEVELS).map(([k, l]) =>
   `<label title="${esc(l.help)}"><input type="radio" name="level" value="${k}"${k === 'normal' ? ' checked' : ''}> ${esc(l.label)}</label>`).join('');
 $('#target').innerHTML = '<span class="lbl">Target</span>' +
@@ -1642,7 +1686,7 @@ for (const row of ['#content', '#spinoffs']) $(row).addEventListener('change', e
 // A rule or the difficulty changing leaves a daily, but doesn't reroll.
 for (const row of ['#rules', '#level']) $(row).addEventListener('change', () => {
   if (leaveDaily()) setStatus(LEFT_DAILY);
-  updateLevelHelp(); syncVia(); renderCard('via'); renderCard('goal');
+  updateLevelHelp(); syncVia(); [...VIA_KEYS, 'goal'].forEach(renderCard);
 });
 // The path sidebar can collapse to a small box over the article. The choice is remembered.
 let pathCollapsed = false;
@@ -1682,10 +1726,12 @@ document.querySelectorAll('[data-custom]').forEach(inp => {
   inp.addEventListener('keydown', e => { if (e.key === 'Enter') { setCustom(inp.dataset.custom, inp.value); inp.value = ''; } });
 });
 $('#btnRerollAll').onclick = () => reroll('all');
+// Swap plays the whole chain backwards, checkpoints included.
 $('#btnSwap').onclick = () => {
-  [setup.start, setup.goal] = [setup.goal, setup.start];
+  const keys = cardKeys(), cards = keys.map(w => setup[w]).reverse();
+  keys.forEach((w, i) => { setup[w] = cards[i]; });
   if (leaveDaily()) setStatus(LEFT_DAILY);
-  renderCard('start'); renderCard('goal');
+  keys.forEach(renderCard);
 };
 $('#btnDaily').onclick = () => loadDaily();
 $('#btnPlay').onclick = startGame;
@@ -1712,7 +1758,7 @@ $('#btnClearHistory').onclick = () => {
 };
 $('#btnPeek').onclick = () => {
   const g = objective();
-  openModal(`<h2>${g === game.goal ? 'Target' : 'Checkpoint'}: ${esc(g.title)}</h2>
+  openModal(`<h2>${objectiveLabel()}: ${esc(g.title)}</h2>
     <div class="peek"><img alt="" class="hidden"><p>${esc(g.desc || 'No description available.')}</p></div>
     <p class="note">The clock keeps running while you peek.</p>
     <div class="actions"><button class="primary" id="pClose">Back to the hunt</button></div>`);
@@ -1735,12 +1781,13 @@ $('#btnPeek').onclick = () => {
     setStatus('Loading challenge…');
     let missing = null;
     await withBusy(async () => {
-      const [s, v, g] = await Promise.all(['start', 'via', 'target'].map(k => h.get(k) && pageInfo(h.get(k))));
-      missing = ['start', 'via', 'target'].map(k => h.get(k)).find((t, i) => t && ![s, v, g][i]);
+      const titles = [h.get('start'), ...h.getAll('via').filter(Boolean).slice(0, VIA_KEYS.length), h.get('target')];
+      const infos = await Promise.all(titles.map(pageInfo));
+      missing = titles.find((t, i) => !infos[i]);
       if (missing) return;
-      Object.assign(setup, { start: s, via: v || null, goal: g });
-      if (v) setRules([...rules(), 'checkpoint']);
-      ['start', 'via', 'goal'].forEach(renderCard);
+      Object.assign(setup, { start: infos[0], goal: infos.at(-1) }, setVias(infos.slice(1, -1)));
+      if (infos.length > 2) setRules([...rules(), 'checkpoint']);
+      cardKeys().forEach(renderCard);
       const r = rulesText(rules());
       setStatus(`Challenge loaded${r ? ' with ' + r : ''}. Press Start when ready.`);
     });

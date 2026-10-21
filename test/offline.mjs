@@ -154,6 +154,50 @@ await sleep(300);
 check('no hints without the rule', await ev('game.path.every(p => !p.hint)'));
 await ev("finish(false); closeModal(); toSetup()");
 
+// Relay: two checkpoints from a challenge link, reached in order. One reached early doesn't count, the banner and the HUD
+// name the next one, the record keeps both, and par goes through both.
+const setCount = n => ev(`(s => { s.value = ${n}; s.dispatchEvent(new Event('change', { bubbles: true })); })(document.querySelector('#viaCount'))`);
+const hud = "document.querySelector('#hudLbl').textContent + ' ' + document.querySelector('#hudGoal').textContent";
+const toast = "document.querySelector('#toast').textContent";
+await open('#start=Diamond&via=Creeper&via=Zombie&target=Crafting');
+check('a link with two checkpoints shows two numbered cards in order', await until(ready) && await ev(`viaCount() === 2 && document.querySelector('.pair').dataset.vias === '2'
+  && ['via0', 'via1'].map(w => setup[w].title + ' ' + document.querySelector('#card-' + w + ' .tag').textContent).join() === 'Creeper Checkpoint 1,Zombie Checkpoint 2'
+  && document.querySelector('#slot-via2').classList.contains('hidden') && challengeLink().includes('&via=Creeper&via=Zombie&')`));
+await play();
+check('the HUD names the first checkpoint', await ev(hud) === 'Checkpoint 1 Creeper', await ev(hud));
+await ev("navigate('Zombie', null)");
+await until('game.path.length === 2 && !game.loading');
+check('the second checkpoint reached first doesn\'t count', await ev('game.viaNext === 0 && !game.path[1].via') && await ev(hud) === 'Checkpoint 1 Creeper');
+await ev("navigate('Creeper', null)");
+await until('game.path.length === 3 && !game.loading');
+check('reaching the first checkpoint names the second', await ev(`game.path[2].via === 1 && ${toast} === '✓ Checkpoint 1 of 2 reached! Now find Zombie'`) &&
+  await ev(hud) === 'Checkpoint 2 Zombie', await ev(toast));
+await ev("navigate('Crafting', null)");
+await until('game.path.length === 4 && !game.loading');
+check('the target before the last checkpoint doesn\'t win', await ev('game.active'));
+await ev("navigate('Zombie', null)");
+await until('game.path.length === 5 && !game.loading');
+check('reaching the last checkpoint names the target', await ev(`game.path[4].via === 2 && ${toast} === '✓ Checkpoint 2 of 2 reached! Now find Crafting'`) &&
+  await ev(hud) === 'Target Crafting', await ev(toast));
+const relayPar = await ev("parRoute({ start: 'Diamond', vias: ['Creeper', 'Zombie'], goal: 'Crafting', rules: [] }).then(r => r.length - 1)");
+await ev("navigate('Crafting', null)");
+check('the relay is won and recorded with both checkpoints, par over the whole chain', await until('!game.active') &&
+  await ev(`(r => r.won && r.vias.join() === 'Creeper,Zombie' && r.par === ${relayPar})(store.get('mwr.history', [])[0])`), `par ${relayPar}`);
+await ev("closeModal(); toSetup()");
+// Swap reverses the whole chain. A third checkpoint rolls a third card; back to one, Reroll all drops the other two.
+await ev("document.querySelector('#btnSwap').click()");
+check('Swap plays the chain backwards', await ev("cardKeys().map(w => setup[w].title).join() === 'Crafting,Zombie,Creeper,Diamond'"),
+  await ev("cardKeys().map(w => setup[w]?.title).join()"));
+await setCount(3);
+check('a third checkpoint rolls a third card', await until(ready) && await ev(`!!setup.via2 && document.querySelector('.pair').dataset.vias === '3' &&
+  document.querySelector('#card-via2 .tag').textContent === 'Checkpoint 3'`), await ev('setup.via2?.title'));
+await setCount(1);
+await ev("reroll('all')");
+check('back to one checkpoint, Reroll all drops the others', await until(ready) &&
+  await ev("cardKeys().join() === 'start,via0,goal' && !setup.via1 && !setup.via2 && document.querySelector('#card-via0 .tag').textContent === 'Checkpoint'"));
+await ev("document.querySelector('#rules input[value=checkpoint]').click()");
+check('the count hides with the rule', await ev("document.querySelector('#viaCount').classList.contains('hidden') && document.querySelector('.pair').dataset.vias === '0'"));
+
 // Rolls: each pool keeps to its tier, starts and targets come from different topics (Chaos aside), and targets are linked
 // well enough to be reached. planGroups and rollOne are called directly, with the pool's button set without a change event.
 check('a page without a hash rolls a pair on Normal', await open('') && await ev("level() === 'normal' && mode() === 'everyday'"));
@@ -190,26 +234,26 @@ for (const m of ['popular', 'deep', 'chaos', 'everyday']) {
 }
 
 // The daily: the same pair every time, its cards from different topics, Normal plus its rule.
-const pairOf = "JSON.stringify([setup.start.title, setup.via?.title, setup.goal.title, rules()])";
+const pairOf = "JSON.stringify([...cardKeys().map(w => setup[w].title), rules()])";
 await open('#daily=2026-01-02');
 const daily = await ev(pairOf);
 await open('#daily=2026-01-02');
 check('the daily is the same on every load', await ev(pairOf) === daily, daily);
-check('the daily is Normal with Checkpoint on 2026-01-02, its three cards from three topics',
-  await ev("rules().join() === 'nonav,checkpoint' && new Set([setup.start, setup.via, setup.goal].map(c => groupOf(c.title))).size === 3"), daily);
+check('the daily is Normal with Checkpoint on 2026-01-02, its cards from different topics',
+  await ev("rules().join() === 'nonav,checkpoint' && new Set(cardKeys().map(w => groupOf(setup[w].title))).size === cardKeys().length"), daily);
 // Every daily can be done: a route under its rules, and on a Six clicks day par 4 or less. A month of them.
 const dailies = JSON.parse(await ev(`(async () => {
   const out = [];
   for (let d = 1; d <= 31; d++) {
     const p = await dailyPair('2026-01-' + String(d).padStart(2, '0'));
-    const route = await parRoute({ start: p.start.title, via: p.via?.title, goal: p.goal.title, rules: ['nonav', p.rule] });
-    out.push({ rule: p.rule, par: route ? route.length - 1 : null });
+    const route = await parRoute({ start: p.start.title, vias: p.vias.map(v => v.title), goal: p.goal.title, rules: ['nonav', p.rule] });
+    out.push({ rule: p.rule, vias: p.vias.length, par: route ? route.length - 1 : null });
   }
   return JSON.stringify(out);
 })()`));
-check('a month of dailies all have a route, Six clicks days par 4 or less', dailies.length === 31 &&
-  dailies.every(d => d.par >= 1 && (d.rule !== 'limit' || d.par <= 4)) && dailies.some(d => d.rule === 'limit'),
-  dailies.map(d => `${d.rule}:${d.par}`).join(' '));
+check('a month of dailies all have a route, Six clicks days par 4 or less, Checkpoint days one or two checkpoints', dailies.length === 31 &&
+  dailies.every(d => d.par >= 1 && (d.rule !== 'limit' || d.par <= 4) && (d.rule === 'checkpoint' ? d.vias === 1 || d.vias === 2 : !d.vias)) &&
+  dailies.some(d => d.rule === 'limit'), dailies.map(d => `${d.rule}${d.vias > 1 ? '×' + d.vias : ''}:${d.par}`).join(' '));
 await ev("document.querySelector('input[name=level][value=hard]').click()");
 check('another difficulty leaves the daily', await ev("setup.daily === null && document.querySelector('#setupStatus').textContent === LEFT_DAILY"));
 
@@ -265,12 +309,14 @@ const par = JSON.parse(await ev(`(async () => {
   }
   const off = await parRoute({ start: 'Minecraft Dungeons', goal: 'Dungeons:Creeper', rules: ['nonav'] });
   const on = await parRoute({ start: 'Minecraft Dungeons', goal: 'Dungeons:Creeper', rules: ['nonav'], content: ['Dungeons'] });
-  const via = await parRoute({ start: 'Diamond', via: 'Creeper', goal: 'Bamboo', rules: ['nonav'] });
-  return JSON.stringify({ bad, spinoff: off === null && on?.at(-1) === 'Dungeons:Creeper', via: via?.includes('Creeper') && via.at(-1) === 'Bamboo' });
+  const via = await parRoute({ start: 'Diamond', vias: ['Creeper'], goal: 'Bamboo', rules: ['nonav'] });
+  const relay = await parRoute({ start: 'Diamond', vias: ['Creeper', 'Zombie'], goal: 'Bamboo', rules: ['nonav'] });
+  return JSON.stringify({ bad, spinoff: off === null && on?.at(-1) === 'Dungeons:Creeper', via: via?.includes('Creeper') && via.at(-1) === 'Bamboo',
+    relay: relay?.indexOf('Creeper') > 0 && relay.indexOf('Zombie') > relay.indexOf('Creeper') && relay.at(-1) === 'Bamboo' });
 })()`));
 check('par routes follow the graph, Relaxed ≤ Normal ≤ Hard, Hard without hubs', par.bad.length === 0, par.bad.slice(0, 3).join(', '));
 check('par reaches a spin-off page only with its spin-off on', par.spinoff);
-check('par goes through the checkpoint', par.via);
+check('par goes through the checkpoint, and through two in order', par.via && par.relay);
 await open('#start=Brand%20New%20Mob&target=Diamond');
 await play();
 await ev('finish(false)');

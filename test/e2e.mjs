@@ -288,10 +288,10 @@ await sleep(500);
 await until("!document.querySelector('#btnPlay').disabled", 60000);
 
 // Ticking Checkpoint shows the checkpoint card with a third, different article; unticking hides it.
-const viaCard = "!document.querySelector('#cardVia').classList.contains('hidden')";
+const viaCard = "!document.querySelector('#slot-via0').classList.contains('hidden')";
 await ev("document.querySelector('#rules input[value=checkpoint]').click()");
 check('Checkpoint adds a distinct checkpoint', await until(`${viaCard} && !document.querySelector('#btnPlay').disabled`, 60000) &&
-  await ev("new Set([setup.start.title, setup.via.title, setup.goal.title]).size === 3"), await ev("setup.via?.title"));
+  await ev("new Set([setup.start.title, setup.via0.title, setup.goal.title]).size === 3"), await ev("setup.via0?.title"));
 await ev("document.querySelector('#rules input[value=checkpoint]').click()");
 check('unticking Checkpoint hides it', await ev(`!(${viaCard}) && !document.querySelector('#btnPlay').disabled`));
 
@@ -487,17 +487,17 @@ await send('browsingContext.navigate', { context: ctx, url: 'about:blank', wait:
 await send('browsingContext.navigate', { context: ctx, url: fileUrl + '#daily=2026-01-02&rules=limit', wait: 'complete' });
 check('daily pair loads', await until("!document.querySelector('#btnPlay').disabled && setup.daily === '2026-01-02'", 60000),
   await ev("setup.start?.title + ' -> ' + setup.goal?.title"));
-check('the daily takes its start, checkpoint and target from different topics', await ev("new Set([setup.start, setup.via, setup.goal].map(c => groupOf(c.title))).size === 3"),
-  await ev("[setup.start, setup.via, setup.goal].map(c => c.title + ' ' + groupOf(c.title)).join(', ')"));
+check('the daily takes its start, checkpoints and target from different topics', await ev("new Set(cardKeys().map(w => groupOf(setup[w].title))).size === cardKeys().length"),
+  await ev("cardKeys().map(w => setup[w].title + ' ' + groupOf(setup[w].title)).join(', ')"));
 check('a daily is Normal with one more rule, No hubs making it Hard', await ev("dailyRule('2026-01-10') === 'nohubs' && !DAILY_RULES.includes('nonav')"));
 // A daily can always be done: a route under its rules, and on a Six clicks day (2026-01-01) par 4 or less.
 check('a Six clicks daily has par 4 or less', await ev(`dailyPair('2026-01-01').then(async p => p.rule === 'limit' &&
   (await parRoute({ start: p.start.title, goal: p.goal.title, rules: ['nonav', 'limit'] })).length - 1 <= DAILY_SIX_CLICKS_PAR)`));
-check('daily sets its rule and checkpoint', await ev("rules().join() === 'nonav,checkpoint' && !!setup.via && !document.querySelector('#cardVia').classList.contains('hidden') && document.querySelector('#setupStatus').textContent.includes('with Checkpoint')"));
-const pairOf = p => `${p}.start.title + ' -> ' + ${p}.via?.title + ' -> ' + ${p}.goal.title`;
-const daily = await ev(pairOf('setup'));
+check('daily sets its rule and checkpoint', await ev(`rules().join() === 'nonav,checkpoint' && !!setup.via0 && ${viaCard} && document.querySelector('#setupStatus').textContent.includes('with Checkpoint')`));
+const pairOf = p => `[${p}.start, ...${p}.vias, ${p}.goal].map(c => c.title).join(' -> ')`;
+const daily = await ev("cardKeys().map(w => setup[w].title).join(' -> ')");
 check('daily pair is deterministic', await ev(`dailyPair('2026-01-02').then(p => p.rule === 'checkpoint' && ${pairOf('p')})`) === daily &&
-  await ev(`dailyPair('2026-01-05').then(p => p.rule === 'noback' && !p.via && ${pairOf('p')} !== ${JSON.stringify(daily)})`), daily);
+  await ev(`dailyPair('2026-01-05').then(p => p.rule === 'noback' && !p.vias.length && ${pairOf('p')} !== ${JSON.stringify(daily)})`), daily);
 // A #daily= date that is malformed, doesn't exist or hasn't come yet gives today's daily.
 const dates = await ev(`JSON.stringify(['2026-01-02', '2024-02-29', today(), '2026-02-31', '2025-02-29', '2026-13-01', '2999-01-01',
   (d => (d.setDate(d.getDate() + 1), d.toLocaleDateString('sv')))(new Date()), '2026-1-02', 'x', null].map(dailyDate))`);
@@ -506,7 +506,7 @@ await ev("document.querySelector('#btnPlay').click()");
 await until("game.path.length === 1 && !game.loading");
 await ev("document.querySelector('#btnGiveUp').click()");
 await ev("document.querySelector('#gQuit').click()");
-check('daily result is recorded', await ev("(r => r.daily === '2026-01-02' && r.via === setup.via.title && r.rules.join() === 'nonav,checkpoint')(store.get('mwr.history', [])[0]) && document.querySelector('#modal').textContent.includes('Daily 2026-01-02')"));
+check('daily result is recorded', await ev("(r => r.daily === '2026-01-02' && r.vias.join() === setup.via0.title && r.rules.join() === 'nonav,checkpoint')(store.get('mwr.history', [])[0]) && document.querySelector('#modal').textContent.includes('Daily 2026-01-02')"));
 await ev("document.querySelector('#mNew').click()");
 await until('setup.busy === 0', 60000);
 check('New game leaves the daily without the notice', await ev("setup.daily === null && document.querySelector('#setupStatus').textContent !== LEFT_DAILY"));
@@ -536,15 +536,15 @@ check('rerolling a card leaves the daily', await ev("setup.daily === null && doc
 await send('browsingContext.navigate', { context: ctx, url: 'about:blank', wait: 'complete' });
 await send('browsingContext.navigate', { context: ctx, url: fileUrl + '#start=Diamond&via=Pickaxe&target=Diamond%20Pickaxe&rules=checkpoint', wait: 'complete' });
 await until("!document.querySelector('#btnPlay').disabled");
-check('challenge link sets the checkpoint', await ev(`setup.via?.title === 'Pickaxe' && rules().includes('checkpoint') && ${viaCard} && challengeLink().includes('&via=Pickaxe&')`),
+check('challenge link sets the checkpoint', await ev(`setup.via0?.title === 'Pickaxe' && rules().includes('checkpoint') && ${viaCard} && challengeLink().includes('&via=Pickaxe&')`),
   await ev('challengeLink()'));
-await ev(`(h => { h.unshift({ start: 'Diamond', goal: 'Diamond Pickaxe', via: 'Zombie', rules: ['checkpoint'], won: true, clicks: 1, ms: 1000, at: Date.now(), path: [] });
+await ev(`(h => { h.unshift({ start: 'Diamond', goal: 'Diamond Pickaxe', vias: ['Zombie'], rules: ['checkpoint'], won: true, clicks: 1, ms: 1000, at: Date.now(), path: [] });
   store.set('mwr.history', h); })(store.get('mwr.history', []))`);
 await ev("document.querySelector('#btnPlay').click()");
 await until("game.path.length === 1 && !game.loading");
 const hudLbl = "document.querySelector('#hudLbl').textContent + ' ' + document.querySelector('#hudGoal').textContent";
 check('HUD shows the checkpoint first', await ev(hudLbl) === 'Checkpoint Pickaxe', await ev(hudLbl));
-check('the path picture is the checkpoint', await ev("document.querySelector('#pathArt').src === game.via.img && !!game.via.img"));
+check('the path picture is the checkpoint', await ev("document.querySelector('#pathArt').src === game.vias[0].img && !!game.vias[0].img"));
 f = await frameCtx();
 await ev("[...document.querySelectorAll('a.mwr-live')].find(a => /Diamond_Pickaxe/i.test(a.getAttribute('href'))).click()", f);
 await until("game.path.length === 2 && !game.loading");
@@ -552,7 +552,7 @@ check('target before the checkpoint does not win', await ev("game.active") === t
 f = await frameCtx();
 await ev("[...document.querySelectorAll('a.mwr-live')].find(a => a.getAttribute('href') === '/w/Pickaxe').click()", f);
 await until("game.path.length === 3 && !game.loading");
-check('reaching the checkpoint switches to the target', await ev(hudLbl) === 'Target Diamond Pickaxe' && await ev('game.path[2].via === true') &&
+check('reaching the checkpoint switches to the target', await ev(hudLbl) === 'Target Diamond Pickaxe' && await ev('game.path[2].via === 1') &&
   await ev("document.querySelector('#pathArt').src === game.goal.img && !!game.goal.img"), await ev(hudLbl));
 check('reaching the checkpoint is celebrated', await ev("!document.querySelector('#toast').classList.contains('hidden') && document.querySelector('#toast').textContent.includes('Diamond Pickaxe') && document.querySelector('.hud .goal').classList.contains('reached') && document.querySelector('#pathList li.via')?.textContent.includes('Pickaxe')"));
 f = await frameCtx();
@@ -563,7 +563,7 @@ f = await frameCtx();
 await ev("[...document.querySelectorAll('a.mwr-live')].find(a => /Diamond_Pickaxe/i.test(a.getAttribute('href'))).click()", f);
 check('checkpoint game wins', await until("!game.active && !document.querySelector('#modalBg').classList.contains('hidden')"), `clicks=${await ev('clicks()')}`);
 const viaModal = await ev("document.querySelector('#modal').textContent");
-check('checkpoint is recorded and kept out of other bests', await ev("store.get('mwr.history', [])[0].via === 'Pickaxe'") &&
+check('checkpoint is recorded and kept out of other bests', await ev("store.get('mwr.history', [])[0].vias.join() === 'Pickaxe'") &&
   viaModal.includes('Diamond → Pickaxe → Diamond Pickaxe') && !/personal best|Your best/.test(viaModal));
 
 // A theme stylesheet added by the host page shows up in the picker and, marked data-mwr-default, wins over a saved
@@ -597,8 +597,9 @@ check('Clear history empties it', await ev(`${histLen} === 0 && document.querySe
 const tricky = ['Gravelly Mountains+', 'How did we get here? (block)', 'Village & Pillage', 'Oxygène',
   'Java Edition guides/Caves & Cliffs: Part I', '100% A=B; c+d', 'Steve\'s "quote"'];
 const trip = JSON.parse(await ev(`(() => {
-  const saved = { start: setup.start, via: setup.via, goal: setup.goal }, savedRules = rules();
-  const linkFor = (start, via, goal, r) => (Object.assign(setup, { start: { title: start }, via: { title: via }, goal: { title: goal } }), setRules(r), challengeLink());
+  const saved = { ...setup }, savedRules = rules(), savedCount = viaCount();
+  const linkFor = (start, via, goal, r) =>
+    (Object.assign(setup, { start: { title: start }, goal: { title: goal } }, setVias([{ title: via }])), setRules(r), challengeLink());
   const bad = ${JSON.stringify(tricky)}.filter(t => {
     const h = new URLSearchParams(new URL(linkFor(t, t + ' via', t + ' goal', ['noback', 'checkpoint'])).hash.slice(1));
     return h.get('start') !== t || h.get('via') !== t + ' via' || h.get('target') !== t + ' goal' || h.get('rules') !== rules().join();
@@ -606,12 +607,13 @@ const trip = JSON.parse(await ev(`(() => {
   const link = linkFor(...${JSON.stringify(tricky.slice(0, 3))}, ['checkpoint']);
   Object.assign(setup, saved);
   setRules(savedRules);
+  document.querySelector('#viaCount').value = savedCount;
   return JSON.stringify({ bad, link });
 })()`));
 check('challenge links keep awkward titles intact', trip.bad.length === 0, JSON.stringify(trip.bad));
 await send('browsingContext.navigate', { context: ctx, url: 'about:blank', wait: 'complete' });
 await send('browsingContext.navigate', { context: ctx, url: trip.link, wait: 'complete' });
-const loaded = "[setup.start?.title, setup.via?.title, setup.goal?.title].join(' | ')";
+const loaded = "[setup.start?.title, setup.via0?.title, setup.goal?.title].join(' | ')";
 check('a challenge link with awkward titles loads them unchanged', await until("!document.querySelector('#btnPlay').disabled") &&
   await ev(loaded) === tricky.slice(0, 3).join(' | '), await ev(loaded));
 await ev("document.querySelector('#btnPlay').click()");

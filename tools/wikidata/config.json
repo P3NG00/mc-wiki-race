@@ -6,10 +6,15 @@
     "Enchantments", "Effects", "Food", "Tools", "Armor", "Redstone", "Plants", "Gameplay"
   ],
   "pool_comment": "Not Weapons: on the wiki that holds only weapons from Minecraft: The Manga, while the game's weapons are in Items.",
-  "pool_exclude_categories": [
-    "Book objects", "Fictional mods", "Joke features", "Minecraft Education", "Removed features", "Unused features"
-  ],
-  "pool_exclude_comment": "Pool articles in these are left out of the pool: book and comic objects, April Fools features, and things a player can't find in the current game. Chaos still rolls them.",
+  "families": {
+    "joke": ["Joke features"],
+    "removed": ["Removed features", "Unused features"],
+    "education": ["Minecraft Education blocks", "Minecraft Education items", "Minecraft Education entities", "Minecraft Education mobs"],
+    "fiction": ["Book objects", "Fictional mods"]
+  },
+  "families_comment": "Content the player can add to the pool with the Content checkboxes (keys as in index.html's FAMILIES), by category. Articles in them are left out of the pool otherwise. Education is its four exact categories: the broad Minecraft Education category also holds Brewing, Charcoal and Dye.",
+  "spinoffs": ["Dungeons", "Dungeons II", "Legends", "Earth", "Story Mode", "Movie"],
+  "spinoffs_comment": "Namespaces of other games, each a Spin-offs checkbox: its pages can be rolled and links into it go live.",
   "disambiguation_categories": ["Disambiguation pages", "Version disambiguation pages"],
   "hubs": [
     "Minecraft", "Java Edition", "Bedrock Edition", "Edition", "Minecraft Education", "Java Edition version history",

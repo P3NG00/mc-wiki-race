@@ -64,6 +64,23 @@ class Snapshot:
         return full, outside
 
 
+def spinoff_backlinks(snap, namespaces):
+    """For every page in these namespaces, how many pages link to it at all and how many outside navboxes. Only links
+    from articles and from pages in its own namespace count: the pages a player can be on when that spin-off is on."""
+    ns_of = {t: p['ns'] for t, p in snap.pages.items() if p['ns'] in namespaces}
+    full, outside = dict.fromkeys(ns_of, 0), dict.fromkeys(ns_of, 0)
+    for src, p in snap.pages.items():
+        if p['ns'] != 0 and p['ns'] not in namespaces:
+            continue
+        body = {r for r in map(snap.resolve, p['body']) if r in ns_of} - {src}
+        nav = {r for r in map(snap.resolve, p['nav']) if r in ns_of} - {src} - body
+        for r in body | nav:
+            if p['ns'] in (0, ns_of[r]):
+                full[r] += 1
+                outside[r] += r in body
+    return full, outside
+
+
 def read_data(path):
     """The WIKI_DATA object from a wiki-data.js written by build.py."""
     with open(path, encoding='utf-8') as f:

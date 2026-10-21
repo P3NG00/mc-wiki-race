@@ -15,6 +15,8 @@ Open `index.html` in a browser. Opening it straight from disk (`file://`) works 
   - **Balanced:** the same content, with bigger categories picked more often.
   - **Even:** the same content, with every article equally likely.
   - **Chaos:** any article on the wiki.
+- **Content** adds more to Classic, Balanced and Even: **April Fools** jokes, **Removed & unused** features, **Education** blocks, items and mobs, and **Books & comics** objects. Chaos has them all already.
+- **Spin-offs** (Dungeons, Dungeons II, Legends, Earth, Story Mode, Movie) add the wiki's pages about other Minecraft games, in any mode, and make links to them work. **All** switches every spin-off on or off. Without them, links into those pages are dead.
 - **Target** difficulty goes by how many articles link to the target. **Any** takes any target linked from at least 5 articles, **Easy** the best-linked of 5 random targets and **Hard** the least-linked of 5. A **topic** (Blocks, Items, Mobs, Biomes & structures, Enchantments & effects) picks the target from that part of the wiki, in any mode. The start still comes from the mode, because two articles from the same topic are usually one click apart. Changing difficulty or topic rerolls only the target, and a target you type yourself skips both.
 - **Reroll** any card, or type your own article.
 - **📅 Daily** loads today's pair, which is the same for everyone on the same date. Your rules still apply, and the result says it was the daily. `index.html#daily` opens it directly.
@@ -28,7 +30,7 @@ Open `index.html` in a browser. Opening it straight from disk (`file://`) works 
   - **Checkpoint:** a third card. You have to visit that article on the way, and reaching the target before it doesn't count.
 - **Copy challenge link** shares the exact pair you're looking at, plus any checkpoint and rules, as `index.html#start=<Title>&target=<Title>&via=<Title>&rules=checkpoint`.
 - **Theme** (top right of the setup screen): Auto follows your system's light or dark setting. Articles switch to the wiki's own dark theme to match.
-- Your last 50 games, your personal best for each pair and your theme are kept in the browser. Personal bests are kept separately for each combination of rules. Each result also notes the target difficulty and topic it was rolled with, so you can see whether Hard really plays harder.
+- Your last 50 games, your personal best for each pair and your theme are kept in the browser. Personal bests are kept separately for each combination of rules. Each result also notes the target difficulty and topic it was rolled with and the Content that was on, so you can see whether Hard really plays harder.
 
 ## Hosting
 

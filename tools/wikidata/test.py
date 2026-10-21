@@ -44,7 +44,7 @@ PAGES = {
                    '<a href="Diamond">itself</a>, <a href="Village_%26_Pillage">encoded</a>, <a href="Village_&amp;_Pillage">escaped</a></p>'
                    '<map><area href="Breaking" shape="rect"></map>' + NAVBOX, ['Items'], ['Pages with sound tables']),
     'Diamond Pickaxe': (0, '<a href="Diamond">diamond</a> <a href="Block">block</a>', ['Items', 'Tools']),
-    'Creeper': (0, '<a href="Diamond">diamond</a>', ['Hostile mobs', 'Entities']),
+    'Creeper': (0, '<a href="Diamond">diamond</a> <a href="Dungeons%3ACreeper">in Dungeons</a>', ['Hostile mobs', 'Entities']),
     'Iron Ingot': (0, '<a href="Diamond">diamond</a>', ['Items']),
     'Block': (0, '<a href="Diamond">diamond</a>', []),
     'Breaking': (0, '<a href="Block">block</a>', []),
@@ -55,6 +55,15 @@ PAGES = {
     'Diamond Pickaxe/Render': (0, '<a href="../Diamond">diamond</a> <a href="Old">sibling</a>', ['Items']),
     'Diamond Pickaxe/Old': (0, '', ['Items']),
     'Tutorial:Mining': (10010, '<a href="Diamond">diamond</a> <a href="Creeper">creeper</a>', []),
+    # One page in each Content family, and a page only in the broad Education category, which stays in the pool.
+    'Rose': (0, '', ['Items', 'Removed features']),
+    'Frostgate': (0, '', ['Items', 'Fictional mods']),
+    'Balloon': (0, '', ['Items', 'Minecraft Education', 'Minecraft Education items']),
+    'Charcoal': (0, '', ['Items', 'Minecraft Education']),
+    # A spin-off: its pages link to articles (which don't count) and to each other (which do), and a version page.
+    'Dungeons:Creeper': (10000, '<a href="Diamond">diamond</a> <a href="Dungeons%3AArch_Illager">arch illager</a>', ['Minecraft Dungeons entities']),
+    'Dungeons:Arch Illager': (10000, '', ['Minecraft Dungeons entities']),
+    'Dungeons:1.0.5.0': (10000, '<a href="Dungeons%3ACreeper">creeper</a>', ['Minecraft Dungeons versions']),
     'Category:Items': (14, '<a href="Diamond">diamond</a>', []),
 }
 REDIRECTS = {'Blocks': 'Block', 'Iron ingot': 'Iron Ingot'}
@@ -90,7 +99,7 @@ def write_zim(path):
 
 
 CONFIG = {**load_config(), 'pool_categories': ['Items', 'Tools', 'Hostile mobs'], 'hubs': ['Block', 'Breaking'],
-          'core_namespaces': ['Special', 'File', 'Category']}
+          'core_namespaces': ['Special', 'File', 'Category'], 'spinoffs': ['Dungeons']}
 
 with tempfile.TemporaryDirectory() as tmp:
     zim = os.path.join(tmp, 'test.zim')
@@ -107,7 +116,8 @@ with tempfile.TemporaryDirectory() as tmp:
           d['body'] == ['Breaking', 'Diamond', 'Diamond Pickaxe', 'Iron ingot', 'Tutorial:Mining', 'Village & Pillage'], d['body'])
     check('links in navboxes, nested tables included', d['nav'] == ['Block', 'Creeper', 'Diamond Pickaxe'], d['nav'])
     check('visible categories only', d['cats'] == ['Items'], d['cats'])
-    check('namespaces from body classes, not from colons in titles', snap.namespaces == {14: 'Category', 10010: 'Tutorial'}, snap.namespaces)
+    check('namespaces from body classes, not from colons in titles', snap.namespaces == {14: 'Category', 10000: 'Dungeons', 10010: 'Tutorial'},
+          snap.namespaces)
     check('a section redirect page is a redirect', snap.redirects.get('Mining') == 'Breaking' and 'Mining' not in snap.pages)
     check('links and section redirects on a subpage are relative to it',
           snap.pages['Diamond Pickaxe/Render']['body'] == ['Diamond', 'Diamond Pickaxe/Old'] and snap.redirects.get('Breaking/Mining') == 'Breaking',
@@ -120,20 +130,31 @@ with tempfile.TemporaryDirectory() as tmp:
 
     data, sizes = build(snap, CONFIG)
     rows = {r[0]: r for r in data['articles']}
-    check('every article is listed, and no page from another namespace', sorted(rows) == sorted(t for t, (ns, *_) in PAGES.items() if ns == 0), sorted(rows))
-    check('the pool leaves out subpages, disambiguation pages and excluded categories',
-          all(rows[t][3] == [] for t in ('Diamond Pickaxe/Render', 'Diamond (disambiguation)', 'Ankle Monitor')), sorted(rows))
+    check('every article and spin-off page is listed, and nothing else', sorted(rows) == sorted(t for t, (ns, *_) in PAGES.items() if ns in (0, 10000)),
+          sorted(rows))
+    check('the pool leaves out subpages, disambiguation pages and Content families',
+          all(rows[t][3] == [] for t in ('Diamond Pickaxe/Render', 'Diamond (disambiguation)', 'Ankle Monitor', 'Rose', 'Frostgate', 'Balloon')), sorted(rows))
+    check('Content families by category, Education by its exact categories only',
+          [rows[t][4] for t in ('Ankle Monitor', 'Rose', 'Balloon', 'Frostgate', 'Diamond Pickaxe/Render')] == [['joke'], ['removed'], ['education'], ['fiction'], []]
+          and rows['Charcoal'][3:] == [['Items'], []], [rows[t][3:] for t in ('Ankle Monitor', 'Rose', 'Balloon', 'Frostgate', 'Charcoal')])
+    check('spin-off pages are content of their spin-off, except version pages',
+          [rows[t][4] for t in ('Dungeons:Creeper', 'Dungeons:Arch Illager', 'Dungeons:1.0.5.0')] == [['Dungeons'], ['Dungeons'], []]
+          and data['spinoffs'] == {'Dungeons': 10000} and data['families'] == list(CONFIG['families']))
+    check('a spin-off page counts links from articles and its own namespace',
+          rows['Dungeons:Creeper'][1:3] == [2, 2] and rows['Dungeons:Arch Illager'][1:3] == [1, 1], (rows['Dungeons:Creeper'], rows['Dungeons:Arch Illager']))
     check('an article with a colon in its title is still an article', 'Minecraft: Story Mode' in rows)
     # Diamond: linked from Diamond Pickaxe, Creeper, Iron Ingot, Block and Minecraft: Story Mode, plus the subpage,
-    # disambiguation page and joke article, which are articles even if rolls skip them. Not from Tutorial:Mining.
+    # disambiguation page and joke article, which are articles even if rolls skip them. Not from Tutorial:Mining or
+    # Dungeons:Creeper, which are in other namespaces.
     check('links counted per article, through redirects', rows['Diamond'][1:3] == [8, 8], rows['Diamond'])
     check('navbox-only links counted apart', rows['Creeper'][1:3] == [1, 0] and rows['Diamond Pickaxe'][1:3] == [1, 1],
           (rows['Creeper'], rows['Diamond Pickaxe']))
     check('a link through a redirect counts', rows['Iron Ingot'][1:3] == [1, 1], rows['Iron Ingot'])
     check('pool categories per article, in config order', rows['Diamond Pickaxe'][3] == ['Items', 'Tools'] and rows['Block'][3] == [])
-    check('pool sizes', sizes == {'Items': 3, 'Tools': 1, 'Hostile mobs': 1}, sizes)
+    check('sizes', sizes == {'Items': 4, 'Tools': 1, 'Hostile mobs': 1, 'joke': 1, 'removed': 1, 'education': 1, 'fiction': 1, 'Dungeons': 2}, sizes)
     check('namespaces: core, then the ZIM\'s with their talk namespaces',
-          data['namespaces'] == ['Special', 'File', 'Category', 'Category talk', 'Tutorial', 'Tutorial talk'], data['namespaces'])
+          data['namespaces'] == ['Special', 'File', 'Category', 'Category talk', 'Dungeons', 'Dungeons talk', 'Tutorial', 'Tutorial talk'],
+          data['namespaces'])
     check('hubs and redirects to them, sections included',
           data['hubs'] == {'Block': 'Block', 'Blocks': 'Block', 'Breaking': 'Breaking', 'Breaking/Mining': 'Breaking', 'Mining': 'Breaking'},
           data['hubs'])
@@ -145,7 +166,7 @@ with tempfile.TemporaryDirectory() as tmp:
 
     newer = copy.deepcopy(data)
     newer['snapshot'] = '2026-11-21'
-    newer['articles'] = [r for r in newer['articles'] if r[0] != 'Creeper'] + [['Copper Golem', 40, 30, ['Hostile mobs']]]
+    newer['articles'] = [r for r in newer['articles'] if r[0] != 'Creeper'] + [['Copper Golem', 40, 30, ['Hostile mobs'], []]]
     newer['articles'][[r[0] for r in newer['articles']].index('Diamond')][2] = 30
     newer['hubs'].pop('Mining')
     report = diff(data, newer, min_links=5)

@@ -98,6 +98,7 @@
     border-radius: var(--radius-pill); background: var(--panel); cursor: pointer;
   }
   .modes label:has(input:checked) { border-color: var(--accent); background: var(--accent-soft); }
+  .modes label:has(input:disabled) { opacity: .6; cursor: default; }
   .modes input { accent-color: var(--accent); margin: 0; }
   .modes .lbl { align-self: center; min-width: 46px; color: var(--muted); font-size: 13.5px; }
   .modes select { padding: 6px 12px; border: 1px solid var(--line); border-radius: var(--radius-pill); background: var(--panel); }
@@ -321,6 +322,8 @@ const THEMES = [...new Set(['auto', 'light', 'dark', ...Array.from(document.quer
   <p class="mode-help" id="modeHelp"></p>
   <div class="modes" role="group" aria-label="Target" id="difficulty"></div>
   <div class="modes" role="group" aria-label="Rules" id="rules"></div>
+  <div class="modes" role="group" aria-label="Content" id="content"></div>
+  <div class="modes" role="group" aria-label="Spin-offs" id="spinoffs"></div>
 
   <div class="pair">
     <div class="card start" id="cardStart">
@@ -421,23 +424,29 @@ const WIKI = 'https://minecraft.wiki';
 const API = WIKI + '/api.php';
 
 // What the game knows about the wiki before asking it, from wiki-data.js, which tools/wikidata builds from the Kiwix ZIM
-// of minecraft.wiki (see CLAUDE.md). ARTICLES holds every article, with how many articles link to it (links), how many
-// of those from outside navboxes (body) and its pool categories. Subpages, disambiguation pages, book objects and joke,
-// removed, unused and Education features have none, so only Chaos rolls them.
-const ARTICLES = new Map(WIKI_DATA.articles.map(([title, links, body, cats]) => [title, { links, body, cats }]));
+// of minecraft.wiki (see CLAUDE.md). ARTICLES holds every article and every spin-off page, with how many pages link to it
+// (links), how many of those from outside navboxes (body), its pool categories (cats) and its Content (fams: a family such
+// as joke, or its spin-off). Subpages, disambiguation and version pages have neither, so only Chaos rolls them.
+const ARTICLES = new Map(WIKI_DATA.articles.map(([title, links, body, cats, fams]) => [title, { links, body, cats, fams }]));
 // Game-content categories the Classic, Balanced and Even modes draw from (see randomTitle), each with its articles.
 const POOL_CATEGORIES = WIKI_DATA.categories;
 const POOL = new Map(POOL_CATEGORIES.map(c => [c, []]));
 for (const [title, { cats }] of ARTICLES) for (const c of cats) POOL.get(c).push(title);
 const POOL_TITLES = [...ARTICLES.keys()].filter(t => ARTICLES.get(t).cats.length);
 
-// Non-article namespaces on minecraft.wiki. Links into these are disabled.
+// Non-article namespaces on minecraft.wiki. Links into these are disabled, except a spin-off's in a game that has it on.
 const NAMESPACES = WIKI_DATA.namespaces;
+// Spin-off games' namespaces, name to number. Their pages are in ARTICLES too, titled "Dungeons:…".
+const SPINOFFS = WIKI_DATA.spinoffs;
+const spinoffOf = title => Object.keys(SPINOFFS).find(n => title.startsWith(n + ':'));
+// What the Content and Spin-offs checkboxes add to a pool-mode roll, by key: the families, then the spin-offs.
+const CONTENT = new Map([...WIKI_DATA.families, ...Object.keys(SPINOFFS)].map(k => [k, []]));
+for (const [title, { fams }] of ARTICLES) for (const f of fams) CONTENT.get(f).push(title);
 
 const MIN_BACKLINKS = 5;   // a target or checkpoint must be linked from at least this many articles, outside navboxes
-// Chaos mode draws from every article, and its targets and checkpoints from the half linked well enough to be reached.
-const CHAOS_TITLES = [...ARTICLES.keys()];
-const CHAOS_TARGETS = CHAOS_TITLES.filter(t => ARTICLES.get(t).body >= MIN_BACKLINKS);
+// Chaos mode draws from every article, and from every page of each spin-off that is on.
+const CHAOS_TITLES = [], SPINOFF_PAGES = new Map(Object.keys(SPINOFFS).map(n => [n, []]));
+for (const t of ARTICLES.keys()) (SPINOFF_PAGES.get(spinoffOf(t)) ?? CHAOS_TITLES).push(t);
 // Target difficulty. Easy and Hard roll DIFFICULTY_SAMPLES targets and keep the best- or least-linked one, so they adapt to
 // the pool: fixed counts don't work, since navboxes link most items and mobs from 500+ articles but no biome gets there.
 // Target topics: a topic draws the target uniformly from its categories, whatever the mode (Classic would roll Wither
@@ -488,6 +497,7 @@ const optional = (v, ok) => v === undefined || ok(v);
 const isRecord = r => typeof r === 'object' && r !== null && typeof r.start === 'string' && typeof r.goal === 'string' &&
   optional(r.via, v => typeof v === 'string') && optional(r.daily, v => typeof v === 'string') &&
   optional(r.difficulty, v => isKey(DIFFICULTY, v)) && optional(r.topic, v => isKey(TOPICS, v)) &&
+  optional(r.content, v => Array.isArray(v) && v.every(k => CONTENT.has(k))) &&
   Array.isArray(r.rules) && r.rules.every(k => isKey(RULES, k)) && typeof r.won === 'boolean' &&
   [r.clicks, r.ms, r.at].every(Number.isFinite);
 const savedGames = () => { const h = store.get('mwr.history', []); return Array.isArray(h) ? h.filter(isRecord) : []; };
@@ -526,7 +536,7 @@ const INFO_PARAMS = {
 const firstParagraph = text => (text || '').trim().split('\n')[0].trim();
 
 function toInfo(p) {
-  if (!p || p.missing || p.invalid || p.ns !== 0) return null;
+  if (!p || p.missing || p.invalid || (p.ns !== 0 && !Object.values(SPINOFFS).includes(p.ns))) return null;
   return {
     title: p.title,
     desc: firstParagraph(p.extract),
@@ -541,13 +551,29 @@ function pickWeighted(arr, weight) {
   return arr[arr.length - 1];
 }
 
-// classic: uniform category, then uniform member. balanced: categories weighted by the square root of their size.
-// even: every article in the pool equally likely. chaos: any article. linked: for a target or checkpoint.
+// The title lists a roll draws from: the pool's categories plus the Content that is on, each as one more list (Chaos:
+// every article plus the pages of each spin-off that is on). Even gets one list without duplicates. linked: for a
+// target or checkpoint, so only titles linked well enough to be reached. Kept per mode, Content and linked.
+const rollListsCache = new Map();
+function rollLists(mode, linked) {
+  const picked = content(), key = [mode, linked, ...picked].join('|');
+  if (!rollListsCache.has(key)) {
+    let lists = mode === 'chaos'
+      ? [CHAOS_TITLES, ...picked.filter(k => k in SPINOFFS).map(k => SPINOFF_PAGES.get(k))]
+      : [...POOL.values(), ...picked.map(k => CONTENT.get(k))];
+    if (mode === 'even') lists = [[...new Set(lists.flat())]];
+    if (linked) lists = lists.map(l => l.filter(t => ARTICLES.get(t).body >= MIN_BACKLINKS));
+    rollListsCache.set(key, lists.filter(l => l.length));
+  }
+  return rollListsCache.get(key);
+}
+
+// classic: uniform list, then uniform member. balanced: lists weighted by the square root of their size. even and chaos:
+// every title equally likely (their lists don't overlap).
 function randomTitle(mode, linked) {
-  if (mode === 'chaos') return pick(linked ? CHAOS_TARGETS : CHAOS_TITLES);
-  if (mode === 'classic') return pick(POOL.get(pick(POOL_CATEGORIES)));
-  if (mode === 'even') return pick(POOL_TITLES);
-  return pick(pickWeighted([...POOL.values()], l => Math.sqrt(l.length)));
+  const lists = rollLists(mode, linked);
+  if (mode === 'classic') return pick(pick(lists));
+  return pick(pickWeighted(lists, l => mode === 'balanced' ? Math.sqrt(l.length) : l.length));
 }
 
 // Resolves redirects/normalisation and returns { title, desc, img, disambig } or null if missing.
@@ -586,12 +612,30 @@ const RULES = {
   checkpoint: { label: 'Checkpoint', help: 'A third article you have to visit on the way to the target.' },
   limit: { label: 'Six clicks', help: `Reach the target in ${CLICK_LIMIT} clicks or fewer, Back and the way through a checkpoint included.` },
 };
+// Content families: articles the pool leaves out, which the Content checkboxes add back. Keys as in wiki-data.js.
+const FAMILIES = {
+  joke: { label: 'April Fools', help: 'Joke blocks, items and mobs from April Fools updates.' },
+  removed: { label: 'Removed & unused', help: 'Things taken out of the game, or in its files but never used.' },
+  education: { label: 'Education', help: 'Blocks, items and mobs from Minecraft Education.' },
+  fiction: { label: 'Books & comics', help: 'Objects from the novels and comics.' },
+};
+const contentLabel = k => FAMILIES[k]?.label ?? k;
+// The Content that is on, in CONTENT order. In Chaos the families are in anyway, so their boxes are disabled and left out.
+function content() {
+  return [...document.querySelectorAll('#content input, #spinoffs input[value]')].filter(b => b.checked && !b.disabled).map(b => b.value);
+}
+function setContent(keys) {
+  for (const b of document.querySelectorAll('#content input:enabled, #spinoffs input[value]')) b.checked = keys.includes(b.value);
+  syncAllSpinoffs();
+}
+
 function rules() { return Object.keys(RULES).filter(k => $(`#rules input[value=${k}]`).checked); }
 function setRules(keys) { for (const k in RULES) $(`#rules input[value=${k}]`).checked = keys.includes(k); }
 const rulesText = keys => keys.map(k => RULES[k].label).join(', ');
 // A result's rules plus how its target was rolled, when that wasn't Any.
 const settingsText = r => [r.difficulty && r.difficulty !== 'any' && `${DIFFICULTY[r.difficulty].label} target`,
-  r.topic && r.topic !== 'any' && TOPICS[r.topic].label, rulesText(r.rules)].filter(Boolean).join(', ');
+  r.topic && r.topic !== 'any' && TOPICS[r.topic].label, r.content && 'Content: ' + r.content.map(contentLabel).join(', '),
+  rulesText(r.rules)].filter(Boolean).join(', ');
 const sameRules = (a, b) => a.rules.join() === b.rules.join();
 
 function renderCard(which) {
@@ -761,6 +805,7 @@ async function loadDaily(date = today()) {
     if (keys.some((w, i) => tokens[i] !== setup.rolls[w])) return;
     Object.assign(setup, { start, via, goal, daily: date });
     setRules([rule]);
+    setContent([]);   // the daily is its pair and rule only: no spin-off links
     syncVia();
     keys.forEach(renderCard);
     const done = savedGames().find(r => r.daily === date && r.won);
@@ -859,8 +904,12 @@ const guardLeaving = e => { e.preventDefault(); e.returnValue = true; };
 
 function startGame() {
   const r = rules();
-  Object.assign(game, { active: true, start: setup.start, goal: setup.goal, via: r.includes('checkpoint') ? setup.via : null, viaReached: false, celebrate: false,
-    daily: setup.daily, rules: r, path: [], seen: new Map(), stack: [], elapsed: 0, runningSince: 0, loading: false });
+  const via = r.includes('checkpoint') ? setup.via : null;
+  // The Content in play: what is on, plus the spin-off of any card's page, whose links have to work to reach it.
+  const on = new Set([...content(), ...[setup.start, setup.goal, via].map(c => c && spinoffOf(c.title)).filter(Boolean)]);
+  Object.assign(game, { active: true, start: setup.start, goal: setup.goal, via, viaReached: false, celebrate: false,
+    daily: setup.daily, rules: r, content: [...CONTENT.keys()].filter(k => on.has(k)), path: [], seen: new Map(), stack: [],
+    elapsed: 0, runningSince: 0, loading: false });
   $('#btnBack').classList.toggle('hidden', game.rules.includes('noback'));
   $('#btnPeek').classList.toggle('hidden', game.rules.includes('blind'));
   renderObjective();
@@ -1061,7 +1110,7 @@ function renderArticle(page, fragment, token, blocked = [], seen = []) {
   // scripts would run. Not even this comment may spell that sequence out.
   const js = v => JSON.stringify(v).replace(/</g, '\\u003c');
   const frameScript = `
-    const NS = new Set(${js(NAMESPACES.map(n => n.toLowerCase()))});
+    const NS = new Set(${js(NAMESPACES.filter(n => !game.content.includes(n)).map(n => n.toLowerCase()))});
     const FRAG = ${js(fragment || '')};
     const WGL = ${js(WGL_THEME_CLASSES)};
     const BLOCKED = new Set(${js(blocked)});
@@ -1267,7 +1316,8 @@ function finish(won, outOfClicks = false) {
   renderHud();
   const ms = now();
   const rec = { start: game.start.title, goal: game.goal.title, ...(game.via && { via: game.via.title }), ...(game.daily && { daily: game.daily }),
-    ...(game.goal.difficulty && { difficulty: game.goal.difficulty, topic: game.goal.topic }), rules: game.rules, won, ...(outOfClicks && { outOfClicks }), clicks: clicks(), ms, at: Date.now(), path: game.path.map(p => p.title) };
+    ...(game.goal.difficulty && { difficulty: game.goal.difficulty, topic: game.goal.topic }),
+    ...(game.content.length && { content: game.content }), rules: game.rules, won, ...(outOfClicks && { outOfClicks }), clicks: clicks(), ms, at: Date.now(), path: game.path.map(p => p.title) };
   const settingsNote = settingsText(rec);
   const hist = savedGames();
   const best = hist.filter(r => r.won && r.start === rec.start && r.goal === rec.goal && r.via === rec.via && sameRules(r, rec))
@@ -1347,6 +1397,31 @@ $('#difficulty').innerHTML = '<span class="lbl">Target</span>' + Object.entries(
 $('#difficulty').insertAdjacentHTML('beforeend', `<select id="topic" aria-label="Target topic" title="Only targets from this topic. The start still comes from the mode.">
   ${Object.entries(TOPICS).map(([k, t]) => `<option value="${k}">${esc(t.label)}</option>`).join('')}</select>`);
 $('#difficulty').addEventListener('change', () => reroll('goal'));
+$('#content').innerHTML = '<span class="lbl">Content</span>' + WIKI_DATA.families.map(k =>
+  `<label title="${esc(FAMILIES[k].help)}"><input type="checkbox" value="${k}"> ${esc(FAMILIES[k].label)}</label>`).join('');
+$('#spinoffs').innerHTML = '<span class="lbl">Spin-offs</span><label title="Every spin-off"><input type="checkbox" id="spinAll"> All</label>' +
+  Object.keys(SPINOFFS).map(n => `<label title="${esc(`${n} pages can be rolled, and links to them work.`)}"><input type="checkbox" value="${esc(n)}"> ${esc(n)}</label>`).join('');
+const spinoffBoxes = () => [...document.querySelectorAll('#spinoffs input[value]')];
+// All is ticked when every spin-off is, and shows a dash when only some are.
+function syncAllSpinoffs() {
+  const n = spinoffBoxes().filter(b => b.checked).length;
+  $('#spinAll').checked = n === spinoffBoxes().length;
+  $('#spinAll').indeterminate = n > 0 && n < spinoffBoxes().length;
+}
+// In Chaos every Minecraft article is in already, so the Content boxes show ticked and can't be changed until it's left.
+function syncContentToMode() {
+  const chaos = mode() === 'chaos';
+  for (const b of document.querySelectorAll('#content input')) {
+    if (chaos && !b.disabled) { b.dataset.was = b.checked; b.checked = true; }
+    if (!chaos && b.disabled) b.checked = b.dataset.was === 'true';
+    b.disabled = chaos;
+  }
+}
+for (const row of ['#content', '#spinoffs']) $(row).addEventListener('change', e => {
+  if (e.target.id === 'spinAll') for (const b of spinoffBoxes()) b.checked = e.target.checked;
+  syncAllSpinoffs();
+  reroll('all');
+});
 $('#rules').addEventListener('change', () => {
   if (leaveDaily()) setStatus(LEFT_DAILY);
   syncVia(); renderCard('via'); renderCard('goal');
@@ -1383,7 +1458,7 @@ $('#themeSelect').innerHTML = THEMES.map(t => `<option value="${esc(t)}">${esc(T
 $('#themeSelect').value = document.documentElement.dataset.theme || 'auto';
 $('#themeSelect').onchange = e => setTheme(e.target.value);
 matchMedia('(prefers-color-scheme: dark)').addEventListener('change', syncFrameTheme);
-document.querySelectorAll('input[name=mode]').forEach(r => r.addEventListener('change', () => { updateModeHelp(); reroll('all'); }));
+document.querySelectorAll('input[name=mode]').forEach(r => r.addEventListener('change', () => { updateModeHelp(); syncContentToMode(); reroll('all'); }));
 document.querySelectorAll('[data-reroll]').forEach(b => b.addEventListener('click', () => reroll(b.dataset.reroll)));
 document.querySelectorAll('[data-custom]').forEach(inp => {
   inp.addEventListener('keydown', e => { if (e.key === 'Enter') { setCustom(inp.dataset.custom, inp.value); inp.value = ''; } });
@@ -1430,6 +1505,7 @@ $('#btnPeek').onclick = () => {
 // pair and rule, otherwise roll a random one.
 (async function init() {
   updateModeHelp();
+  syncContentToMode();   // a reload may bring the Pool radio button back on Chaos
   renderHistory();
   const h = new URLSearchParams(location.hash.slice(1));
   if (h.has('rules')) setRules(h.get('rules').split(','));

@@ -51,7 +51,7 @@ def report(snap, config, pairs):
     full_in, outside_in = snap.backlinks()
     rows = {r[0]: r for r in data['articles']}
     pool = sorted(index[t] for t, r in rows.items() if r[3])
-    wide = sorted(index[t] for t, r in rows.items() if r[2] >= MIN_BACKLINKS)
+    wide = sorted(index[t] for t, r in rows.items() if t in index and r[2] >= MIN_BACKLINKS)
     hubs = {index[h] for h in config['hubs']}
     out = []
     w = out.append
@@ -70,16 +70,22 @@ def report(snap, config, pairs):
     w(f'| Articles no article links to | {sum(1 for c in full_in if not c):,} |\n')
 
     w('## Pool categories\n')
-    excluded = set(config['pool_exclude_categories'])
     w('| Category | In pool | Left out | Under 5 links outside navboxes |\n|---|--:|--:|--:|')
     for c in config['pool_categories']:
         members = [t for t in snap.articles if c in snap.pages[t]['cats'] and '/' not in t]
         dropped = sum(1 for t in members if c not in rows[t][3])
         weak = sum(1 for t in members if c in rows[t][3] and rows[t][2] < MIN_BACKLINKS)
         w(f'| {c} | {sizes[c]} | {dropped} | {weak} |')
-    left = Counter(c for t in snap.articles if '/' not in t and set(snap.pages[t]['cats']) & set(config['pool_categories'])
-                   for c in snap.pages[t]['cats'] if c in excluded)
-    w('\nLeft out by category: ' + ', '.join(f'{c} {n}' for c, n in sorted(left.items())) + '.\n')
+    left = Counter(f for t in snap.articles if set(snap.pages[t]['cats']) & set(config['pool_categories']) for f in rows[t][4])
+    w('\nMoved to a Content family: ' + ', '.join(f'{k} {n}' for k, n in sorted(left.items())) + '.\n')
+
+    w('## Content families and spin-offs\n')
+    w('What a ticked Content or Spin-offs checkbox adds to a pool-mode roll. A spin-off\'s pages all count in Chaos.\n')
+    w('| Content | Pages | Possible targets |\n|---|--:|--:|')
+    for k in [*config['families'], *config['spinoffs']]:
+        members = [r for r in data['articles'] if k in r[4]]
+        w(f'| {k} | {len(members):,} | {sum(r[2] >= MIN_BACKLINKS for r in members):,} |')
+    w('')
 
     w('## Links to pool articles\n')
     w('| | Quartiles |\n|---|---|')

@@ -328,6 +328,59 @@ check('blueprint layers can be chosen', allShown && aboveHidden && await ev('gam
 // A calculator only says it is loading without the wiki's script, so it is hidden.
 check('calculator placeholders are hidden', await ev("(c => c.length > 0 && c.every(e => !e.offsetHeight))([...document.querySelectorAll('.mcw-calc')])", f));
 
+// Content: the Content and Spin-offs rows. Rolls draw from what is on, and links into a spin-off work only in a game that
+// has it on, by its checkbox or because a card's page is in it. The boxes are set without a change event where a reroll
+// would replace the pair.
+await send('browsingContext.navigate', { context: ctx, url: 'about:blank', wait: 'complete' });
+await send('browsingContext.navigate', { context: ctx, url: fileUrl + '#start=Minecraft%20Dungeons&target=Diamond', wait: 'complete' });
+await until("!document.querySelector('#btnPlay').disabled");
+check('Even rolls Dungeons pages only with Dungeons on', await ev(`(() => {
+  const sample = () => Array.from({ length: 300 }, () => randomTitle('even', false));
+  const off = sample().every(t => !spinoffOf(t));
+  setContent(['Dungeons']);
+  const on = sample().some(t => t.startsWith('Dungeons:'));
+  setContent([]);
+  return off && on;
+})()`));
+await ev("document.querySelector('input[value=chaos]').click()");
+check('Chaos shows the Content families ticked and fixed', await ev("[...document.querySelectorAll('#content input')].every(b => b.checked && b.disabled) && content().length === 0"));
+await ev("document.querySelector('input[value=classic]').click()");
+check('leaving Chaos gives the Content boxes back as they were', await ev("[...document.querySelectorAll('#content input')].every(b => !b.checked && !b.disabled)"));
+await until("!document.querySelector('#btnPlay').disabled", 30000);
+await ev("document.querySelector('#spinoffs input[value=Legends]').click()");
+check('All shows a dash when only some spin-offs are on', await ev("(a => a.indeterminate && !a.checked)(document.querySelector('#spinAll'))"));
+await ev("document.querySelector('#spinAll').click()");
+check('All turns every spin-off on', await ev("spinoffBoxes().every(b => b.checked) && !document.querySelector('#spinAll').indeterminate"));
+await ev("document.querySelector('#spinAll').click()");
+await until("!document.querySelector('#btnPlay').disabled && setup.busy === 0", 30000);
+await send('browsingContext.navigate', { context: ctx, url: 'about:blank', wait: 'complete' });
+await send('browsingContext.navigate', { context: ctx, url: fileUrl + '#start=Minecraft%20Dungeons&target=Diamond', wait: 'complete' });
+await until("!document.querySelector('#btnPlay').disabled");
+const dungeonsLinks = async () => JSON.parse(await ev("JSON.stringify([...document.querySelectorAll('a[href^=\"/w/Dungeons:\"]')].map(a => a.classList.contains('mwr-live')))", await frameCtx()));
+await ev("document.querySelector('#btnPlay').click()");
+await until("game.path.length === 1 && !game.loading");
+const offLinks = await dungeonsLinks();
+check('links into a spin-off that is off are dead', offLinks.length > 0 && offLinks.every(l => !l), `${offLinks.length} links`);
+await ev("finish(false)");
+await ev("closeModal(); toSetup(); document.querySelector('#spinoffs input[value=Dungeons]').checked = true");
+await ev("document.querySelector('#btnPlay').click()");
+await until("game.path.length === 1 && !game.loading");
+const onLinks = await dungeonsLinks();
+check('links into a spin-off that is on work', onLinks.length > 0 && onLinks.every(l => l), `${onLinks.length} links`);
+await ev("finish(false)");
+check('the result records the Content that was on', await ev("(([r]) => JSON.stringify(r.content) === '[\"Dungeons\"]' && settingsText(r) === 'Content: Dungeons')(savedGames())"),
+  await ev("JSON.stringify(savedGames()[0].content)"));
+await send('browsingContext.navigate', { context: ctx, url: 'about:blank', wait: 'complete' });
+await send('browsingContext.navigate', { context: ctx, url: fileUrl + '#start=Dungeons:Creeper&target=Diamond', wait: 'complete' });
+check('a challenge link can start on a spin-off page', await until("!document.querySelector('#btnPlay').disabled && setup.start?.title === 'Dungeons:Creeper'"),
+  await ev("setup.start?.title"));
+await ev("document.querySelector('#btnPlay').click()");
+await until("game.path.length === 1 && !game.loading");
+check('a card in a spin-off turns its links on without the checkbox', await ev("JSON.stringify(game.content) === '[\"Dungeons\"]'") &&
+  (await dungeonsLinks()).every(l => l), await ev("JSON.stringify(game.content)"));
+await ev("finish(false); closeModal(); toSetup()");
+check('history entries with unknown Content are left out', await ev(`(r => isRecord(r) && !isRecord({ ...r, content: ['Nope'] }))(savedGames()[0])`));
+
 // No hubs: links to hubs and their redirects are dead, except a hub that is the target.
 // Blind target: no target picture or description on the card or in the HUD, and no peek.
 await ev("store.set('mwr.pathCollapsed', true)");   // stands in for collapsing it before the reload

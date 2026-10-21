@@ -1,4 +1,4 @@
-"""Summarises what changed between two wiki-data.js files: articles and pool members added and removed, link counts
+"""Summarises what changed between two wiki-data.js files: pages, pool and Content members added and removed, link counts
 that moved a lot, and hub and namespace changes. Compare with the committed one by reading it from git:
 
     .venv/bin/python -I tools/wikidata/diff.py <(git show HEAD:wiki-data.js) wiki-data.js
@@ -20,14 +20,15 @@ def diff(old, new, moved=0.5, min_links=20):
     w = out.append
     w(f'{old["snapshot"]} ({old["file"]}) → {new["snapshot"]} ({new["file"]})')
     a, b = {r[0]: r for r in old['articles']}, {r[0]: r for r in new['articles']}
-    w(f'Articles: {len(a):,} → {len(b):,}')
+    w(f'Pages: {len(a):,} → {len(b):,}')
     if b.keys() - a.keys():
         w(f'  added ({len(b.keys() - a.keys())}): {listing(b.keys() - a.keys())}')
     if a.keys() - b.keys():
         w(f'  removed ({len(a.keys() - b.keys())}): {listing(a.keys() - b.keys())}')
-    for cat in dict.fromkeys(old['categories'] + new['categories']):
-        was = {t for t, r in a.items() if cat in r[3]}
-        now = {t for t, r in b.items() if cat in r[3]}
+    keys = lambda d: [*d['categories'], *d['families'], *d['spinoffs']]
+    for cat in dict.fromkeys(keys(old) + keys(new)):
+        was = {t for t, r in a.items() if cat in r[3] or cat in r[4]}
+        now = {t for t, r in b.items() if cat in r[3] or cat in r[4]}
         if was != now:
             w(f'{cat}: {len(was)} → {len(now)}')
             if now - was:

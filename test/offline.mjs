@@ -158,6 +158,19 @@ await open('#daily=2026-01-02');
 check('the daily is the same on every load', await ev(pairOf) === daily, daily);
 check('the daily is Normal with Checkpoint on 2026-01-02, its three cards from three topics',
   await ev("rules().join() === 'nonav,checkpoint' && new Set([setup.start, setup.via, setup.goal].map(c => groupOf(c.title))).size === 3"), daily);
+// Every daily can be done: a route under its rules, and on a Six clicks day par 4 or less. A month of them.
+const dailies = JSON.parse(await ev(`(async () => {
+  const out = [];
+  for (let d = 1; d <= 31; d++) {
+    const p = await dailyPair('2026-01-' + String(d).padStart(2, '0'));
+    const route = await parRoute({ start: p.start.title, via: p.via?.title, goal: p.goal.title, rules: ['nonav', p.rule] });
+    out.push({ rule: p.rule, par: route ? route.length - 1 : null });
+  }
+  return JSON.stringify(out);
+})()`));
+check('a month of dailies all have a route, Six clicks days par 4 or less', dailies.length === 31 &&
+  dailies.every(d => d.par >= 1 && (d.rule !== 'limit' || d.par <= 4)) && dailies.some(d => d.rule === 'limit'),
+  dailies.map(d => `${d.rule}:${d.par}`).join(' '));
 await ev("document.querySelector('input[name=level][value=hard]').click()");
 check('another difficulty leaves the daily', await ev("setup.daily === null && document.querySelector('#setupStatus').textContent === LEFT_DAILY"));
 

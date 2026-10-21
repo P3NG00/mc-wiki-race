@@ -828,25 +828,39 @@ function dailyDate(s) {
 // items ordered by the hash of the date, a salt and the item: the day's ranking.
 const ranked = (date, salt, items) => items.map(t => [hash32(`${date}|${salt}|${t}`), t]).sort((a, b) => a[0] - b[0]).map(([, t]) => t);
 // Six clicks is left out: it's the only rule you can lose by, and nothing checks that a daily pair can be done in six.
-// Every daily is Normal plus one of these. No hubs makes it Hard.
-const DAILY_RULES = ['noback', 'blind', 'checkpoint', 'nohubs'];
+// Every daily is Normal plus one of these. No hubs makes it Hard. A Six clicks day's pair has par DAILY_SIX_CLICKS_PAR or
+// less, which leaves two clicks for a wrong turn.
+const DAILY_RULES = ['noback', 'blind', 'checkpoint', 'nohubs', 'limit'];
+const DAILY_SIX_CLICKS_PAR = 4;
 const dailyRule = date => ranked(date, 'rule', DAILY_RULES)[0];
 
+// A daily can always be done: its target and checkpoint are only taken where the link graph has a route under its rules
+// (on a Six clicks day, a short enough one), so the daily needs the graph, and fails to load without it.
 async function dailyPair(date) {
-  const rule = dailyRule(date);
-  // ok: whether a title may take the card, checked on the pool and again on the title the wiki resolves it to.
-  const first = async (salt, ok) => {
-    for (const t of ranked(date, salt, POOL_TITLES.filter(ok)).slice(0, 20)) {
+  const rule = dailyRule(date), rules = ['nonav', rule];
+  // The first title in the day's ranking that may take the card: ok checks it, and again the title the wiki resolves
+  // it to; fits checks its par, before it is looked up. At most 20 lookups.
+  const first = async (salt, ok, fits = async () => true) => {
+    let lookups = 0;
+    for (const t of ranked(date, salt, POOL_TITLES.filter(ok))) {
+      if (!await fits(t)) continue;
+      if (++lookups > 20) break;
       const info = await pageInfo(t);
       if (info && ok(info.title)) return info;
     }
     throw new Error('No daily pair found');
   };
+  const par = async cards => (await parRoute({ ...cards, rules }))?.length - 1;   // NaN without a route
   const start = await first('start', () => true);
   // A target or checkpoint linked well enough, from a topic none of the cards before it has.
-  const linked = (salt, cards) => first(salt, t => ARTICLES.get(t)?.body >= MIN_BACKLINKS && cards.every(c => groupOf(c.title) !== groupOf(t)));
-  const goal = await linked('target', [start]);
-  const via = rule === 'checkpoint' ? await linked('via', [start, goal]) : null;
+  const linked = (salt, cards, fits) =>
+    first(salt, t => ARTICLES.get(t)?.body >= MIN_BACKLINKS && cards.every(c => groupOf(c.title) !== groupOf(t)), fits);
+  const goal = await linked('target', [start], async t => {
+    const p = await par({ start: start.title, goal: t });
+    return p >= 1 && (rule !== 'limit' || p <= DAILY_SIX_CLICKS_PAR);
+  });
+  const via = rule !== 'checkpoint' ? null
+    : await linked('via', [start, goal], async t => await par({ start: start.title, via: t, goal: goal.title }) >= 1);
   return { rule, start, via, goal };
 }
 

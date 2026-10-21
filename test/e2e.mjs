@@ -482,19 +482,22 @@ check('a fragment with <!--<script> still renders the article', await until("gam
   await ev("document.querySelectorAll('a.mwr-live').length > 50", await frameCtx()), await ev("game.path.at(-1)?.title + ' loading=' + game.loading"));
 
 // Daily: #daily=<date> loads that day's pair and rule, the same on every call, a different pair the next day. 2026-01-02's
-// rule is Checkpoint, so it also fixes the checkpoint; 2026-01-01's is No Back, which picks none. The result records it.
+// rule is Checkpoint, so it also fixes the checkpoint; 2026-01-05's is No Back, which picks none. The result records it.
 await send('browsingContext.navigate', { context: ctx, url: 'about:blank', wait: 'complete' });
 await send('browsingContext.navigate', { context: ctx, url: fileUrl + '#daily=2026-01-02&rules=limit', wait: 'complete' });
 check('daily pair loads', await until("!document.querySelector('#btnPlay').disabled && setup.daily === '2026-01-02'", 60000),
   await ev("setup.start?.title + ' -> ' + setup.goal?.title"));
 check('the daily takes its start, checkpoint and target from different topics', await ev("new Set([setup.start, setup.via, setup.goal].map(c => groupOf(c.title))).size === 3"),
   await ev("[setup.start, setup.via, setup.goal].map(c => c.title + ' ' + groupOf(c.title)).join(', ')"));
-check('a daily is Normal with one more rule, No hubs making it Hard', await ev("dailyRule('2026-01-04') === 'nohubs' && DAILY_RULES.every(r => r !== 'nonav' && r !== 'limit')"));
+check('a daily is Normal with one more rule, No hubs making it Hard', await ev("dailyRule('2026-01-10') === 'nohubs' && !DAILY_RULES.includes('nonav')"));
+// A daily can always be done: a route under its rules, and on a Six clicks day (2026-01-01) par 4 or less.
+check('a Six clicks daily has par 4 or less', await ev(`dailyPair('2026-01-01').then(async p => p.rule === 'limit' &&
+  (await parRoute({ start: p.start.title, goal: p.goal.title, rules: ['nonav', 'limit'] })).length - 1 <= DAILY_SIX_CLICKS_PAR)`));
 check('daily sets its rule and checkpoint', await ev("rules().join() === 'nonav,checkpoint' && !!setup.via && !document.querySelector('#cardVia').classList.contains('hidden') && document.querySelector('#setupStatus').textContent.includes('with Checkpoint')"));
 const pairOf = p => `${p}.start.title + ' -> ' + ${p}.via?.title + ' -> ' + ${p}.goal.title`;
 const daily = await ev(pairOf('setup'));
 check('daily pair is deterministic', await ev(`dailyPair('2026-01-02').then(p => p.rule === 'checkpoint' && ${pairOf('p')})`) === daily &&
-  await ev(`dailyPair('2026-01-01').then(p => p.rule === 'noback' && !p.via && ${pairOf('p')} !== ${JSON.stringify(daily)})`), daily);
+  await ev(`dailyPair('2026-01-05').then(p => p.rule === 'noback' && !p.via && ${pairOf('p')} !== ${JSON.stringify(daily)})`), daily);
 // A #daily= date that is malformed, doesn't exist or hasn't come yet gives today's daily.
 const dates = await ev(`JSON.stringify(['2026-01-02', '2024-02-29', today(), '2026-02-31', '2025-02-29', '2026-13-01', '2999-01-01',
   (d => (d.setDate(d.getDate() + 1), d.toLocaleDateString('sv')))(new Date()), '2026-1-02', 'x', null].map(dailyDate))`);

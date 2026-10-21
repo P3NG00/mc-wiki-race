@@ -318,6 +318,8 @@ const layersBefore = await ev(layers, f);
 await ev("document.querySelector('.layered-blueprint label.layered-blueprint-tab:nth-of-type(2)').click()", f);
 const aboveHidden = await until(`/^vvh+$/.test(${layers})`, 3000, f);
 check('blueprint layers can be chosen', allShown && aboveHidden && await ev('game.path.length === 1'), `${layersBefore} -> ${await ev(layers, f)}`);
+// A calculator only says it is loading without the wiki's script, so it is hidden.
+check('calculator placeholders are hidden', await ev("(c => c.length > 0 && c.every(e => !e.offsetHeight))([...document.querySelectorAll('.mcw-calc')])", f));
 
 // No hubs: links to hubs and their redirects are dead, except a hub that is the target.
 // Blind target: no target picture or description on the card or in the HUD, and no peek.

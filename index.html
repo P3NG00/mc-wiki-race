@@ -1218,6 +1218,8 @@ ${WIKI_STYLES.map(h => `<link rel="stylesheet" href="${esc(h)}">`).join('\n')}
   #content { margin: 0 !important; border: 0 !important; padding: 20px 28px 60px !important; max-width: 1200px; background: transparent !important; }
   @media (max-width: 600px) { #content { padding: 14px 14px 60px !important; } }
   .mw-editsection, iframe, .embedvideo, .mw-ext-embedvideo, audio, video { display: none !important; }
+  /* The wiki's calculators are built by its script, which the frame doesn't load. Without it they only say they are loading. */
+  .mcw-calc { display: none !important; }
   a.mwr-dead { color: inherit !important; text-decoration: none !important; cursor: not-allowed; opacity: .6; }
   a.mwr-dead img { opacity: 1; }
   /* A live text link gets a tint of its own colour on hover, so it stands out from the dead ones around it. On a link

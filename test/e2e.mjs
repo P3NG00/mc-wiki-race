@@ -135,6 +135,14 @@ const stillItem = await ev(shownItem, f);
 check('crafting slots hold still under the pointer', !!heldItem && stillItem === heldItem, `${heldItem} -> ${stillItem}`);
 await moveTo('viewport');
 await send('input.releaseActions', { context: ctx });
+// The infobox's tabs (Wooden, Golden, Stone…) show one picture at a time, and clicking a tab switches to it.
+const tabState = `JSON.stringify((t => ({ tabs: [...t.querySelectorAll('.tabbernav li')].map(li => (li.classList.contains('tabberactive') ? '*' : '') + li.textContent),
+  shown: [...t.querySelectorAll(':scope > .tabbertab')].filter(p => p.offsetHeight).map(p => p.dataset.title) }))(document.querySelector('.infobox .tabber')))`;
+const tabsBefore = JSON.parse(await ev(tabState, f));
+await ev("document.querySelectorAll('.infobox .tabbernav a')[1].click()", f);
+const tabsAfter = JSON.parse(await ev(tabState, f));
+check('infobox tabs show one panel and switch', tabsBefore.tabs.length > 2 && tabsBefore.tabs[0] === '*' + tabsBefore.shown[0] && tabsBefore.shown.length === 1 &&
+  tabsAfter.tabs[1] === '*' + tabsAfter.shown[0] && tabsAfter.shown.length === 1 && await ev('game.path.length === 2 && !game.loading'), JSON.stringify([tabsBefore, tabsAfter]));
 
 // Back reuses the cached article instead of calling the API again.
 await ev("window.apiCalls = 0; { const orig = api; window.api = Object.assign(p => (apiCalls++, orig(p)), { orig }); }");
@@ -659,6 +667,7 @@ for (let i = 0; i < 30 && problems.length === 0; i++) {
   const s = JSON.parse(await ev(state));
   if (!s.active) { wins++; lastNow = 0; await playPair(); continue; }
   const heading = await ev("document.querySelector('#firstHeading')?.textContent", await frameCtx());
+  const expected = await ev(shownTitle);
   const bad = [!settled && 'stuck loading', s.overlay && 'overlay still shown', s.hud !== String(s.path.length - 1) && 'HUD clicks',
     s.listed !== s.path.length && 'path list', s.stack.at(-1) !== s.path.at(-1) && 'Back stack', heading !== expected && `heading "${heading}"`,
     s.now < lastNow && 'clock went back', !s.running && 'clock stopped'].filter(Boolean);
@@ -667,7 +676,6 @@ for (let i = 0; i < 30 && problems.length === 0; i++) {
 }
 check(`random play stays consistent (seed ${seed})`, problems.length === 0, `${steps.join(', ')}; ${wins} win(s)${problems.length ? '; ' + problems[0] : ''}`);
 await ev("localStorage.removeItem('mwr.theme'); localStorage.removeItem('mwr.pathCollapsed')");
-  const expected = await ev(shownTitle);
 
 check('no uncaught script errors', jsErrors.length === 0, jsErrors.slice(0, 5).join(' | '));
 

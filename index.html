@@ -465,7 +465,7 @@ const HUBS = [
   'Tool', 'Armor', 'Weapon', 'Ore', 'Trading', 'Enchantment', 'Effect', 'Advancement', 'Achievement',
 ];
 const WIKI_STYLES = [
-  'ext.embedVideo.styles|jquery.makeCollapsible.styles|jquery.tablesorter.styles|mediawiki.page.gallery.styles|skins.vector.styles.legacy',
+  'ext.Tabber|ext.embedVideo.styles|jquery.makeCollapsible.styles|jquery.tablesorter.styles|mediawiki.page.gallery.styles|skins.vector.styles.legacy',
   'ext.gadget.site-styles|ext.gadget.sound-styles',
   'site.styles',
   // The wiki's dark theme. Apart from a few rules that change nothing visible here, it is scoped to
@@ -1160,6 +1160,30 @@ function renderArticle(page, fragment, token, blocked = [], seen = []) {
         if (next?.classList.contains('animated-subframe')) advance(next);
       }
     }, 2000);
+    // The wiki's Tabber script, which builds a row of tabs for each .tabber from its panels' data-title and shows one
+    // panel at a time (an item's variants in its infobox, for one). Without it every panel shows, one under another.
+    // After the animator, which measures frames inside hidden panels as 0 px. It starts on the panel holding the
+    // linked section, as the wiki starts on the one the address names.
+    const fragEl = FRAG ? document.getElementById(FRAG) || document.getElementById(FRAG.replace(/ /g, '_')) : null;
+    for (const tabber of document.querySelectorAll('#mw-content-text .tabber')) {
+      const panels = [...tabber.children].filter(c => c.classList.contains('tabbertab'));
+      const nav = document.createElement('ul');
+      nav.className = 'tabbernav';
+      const tabs = panels.map(p => {
+        const li = document.createElement('li'), a = document.createElement('a');
+        a.href = '#';
+        a.textContent = p.dataset.title;
+        a.setAttribute('alt', p.dataset.title);   // the wiki's CSS reserves the width of the bold active label from it
+        li.append(a);
+        nav.append(li, document.createElement('wbr'));
+        return li;
+      });
+      const show = i => panels.forEach((p, j) => { p.style.display = i === j ? '' : 'none'; tabs[j].classList.toggle('tabberactive', i === j); });
+      tabs.forEach((li, i) => li.firstChild.addEventListener('click', () => show(i)));   // the click handler above prevents the jump
+      tabber.prepend(nav);
+      tabber.classList.add('tabberlive');
+      show(Math.max(0, panels.findIndex(p => p.contains(fragEl))));
+    }
     scrollToId(FRAG);
   `;
 

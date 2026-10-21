@@ -2,7 +2,9 @@
 
     .venv/bin/python -I tools/wikidata/report.py tools/wikidata/cache/minecraft.wiki_en_all_2026-08.jsonl.gz [-o report.md]
 
-The pool designs come from the config's research section (see RESEARCH.md for what they found). Each is measured on
+The pool designs compared are the pools as built (Everyday, Popular, Deep cuts), the other Popular and Deep cuts shares
+in the config's research section, and the Variants family on its own and added to Everyday (see RESEARCH.md for what the
+first comparison found). Each is measured on
 --pairs random pairs (200 by default, about 3 minutes in all) with a seed taken from its name, so a report is repeatable,
 in three graphs: all links, without navboxes (the No navboxes rule), and without navboxes or the config's hubs (both
 rules). Per design:
@@ -16,10 +18,8 @@ import argparse, os, random, statistics, sys
 from collections import Counter, deque
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))   # for common.py and build.py under python -I
-from common import Snapshot, load_config
-from build import build
-
-MIN_BACKLINKS = 5   # as in index.html: a target needs this many linking articles outside navboxes
+from common import MIN_BACKLINKS, Snapshot, load_config
+from build import build, tiers, topic_of as topic_from
 
 
 def reach(adj, start, skip=frozenset()):
@@ -47,31 +47,19 @@ def quartiles(values):
     return ' / '.join(f'{q:g}' for q in statistics.quantiles(values, n=4)) if len(values) > 1 else '–'
 
 
-def research_pools(snap, config, rows):
-    """The pools to compare, by name, plus each article's topic, the non-content pages left out and the variants."""
-    research = config['research']
-    links = lambda t: rows[t][2]
-    cats = lambda t: set(snap.pages[t]['cats'])
-    topic_of = {}
-    for topic, topic_cats in research['topics'].items():
-        for t in snap.articles:
-            if set(rows[t][3]) & set(topic_cats):
-                topic_of.setdefault(t, topic)
-    today = sorted(topic_of)
-    clean = [t for t in today if not cats(t) & set(research['not_content_categories'])]
-    variants = [t for t in clean if cats(t) & set(research['variant_categories'])]
-    everyday = [t for t in clean if not cats(t) & set(research['variant_categories'])]
-    best_linked = lambda ts, share: sorted(ts, key=links)[len(ts) - round(len(ts) * share):]
-    least_linked = lambda ts, share: sorted(ts, key=links)[:round(len(ts) * share)]
-
-    pools = {'Pool today': today, 'Cleaned, with variants': clean, 'Everyday (cleaned, no variants)': everyday}
-    for share in research['famous_shares']:
-        pools[f'Famous {share:.0%}'] = best_linked(everyday, share)
+def research_pools(config, data, topic_of):
+    """The pools to compare, by name. topic_of: every article's topic by its categories, so variants (in no topic in the
+    data, being a family) count in their topic too."""
+    research, rows = config['research'], data['articles']
+    everyday = [r[0] for r in rows if r[3]]
+    variants = [r[0] for r in rows if 'variants' in r[4] and topic_of.get(r[0])]
+    pools = {'Everyday': everyday, 'Everyday with variants': everyday + variants}
+    for share in research['popular_shares']:
+        pools[f'Popular {share:.0%}'] = sorted(tiers(rows, config, share, 0)[0])
     for share in research['deep_cuts_shares']:
-        pools[f'Deep cuts {share:.0%} per topic'] = [t for topic in research['topics'] for t in least_linked(
-            [t for t in everyday if topic_of[t] == topic and links(t) >= MIN_BACKLINKS], share)]
+        pools[f'Deep cuts {share:.0%} per topic'] = sorted(tiers(rows, config, 0, share)[1])
     pools['Variants only'] = variants
-    return pools, topic_of, sorted(set(today) - set(clean)), variants
+    return pools
 
 
 def designs(pools, topic_of, rows, chaos):
@@ -147,7 +135,7 @@ def report(snap, config, pairs):
     w(f'| Articles (main namespace) | {len(snap.articles):,} |')
     w(f'| Other pages | ' + ', '.join(f'{snap.namespaces.get(k, k)} {v:,}' for k, v in sorted(ns.items()) if k) + ' |')
     w(f'| Redirects | {len(snap.redirects):,} |')
-    w(f'| In pool categories | {len(pool):,} |')
+    w(f'| In the pool (a topic) | {len(pool):,} |')
     w(f'| Possible targets (linked from {MIN_BACKLINKS}+ articles outside navboxes) | {len(wide):,} |')
     w(f'| Article links | {sum(map(len, full_adj)):,} ({sum(map(len, body)):,} outside navboxes) |')
     w(f'| Articles no article links to | {sum(1 for c in full_in if not c):,} |')
@@ -155,15 +143,21 @@ def report(snap, config, pairs):
       f'{len(snap.articles) - len(to_core):,} |')
     w(f'| Articles no route from {snap.articles[core]} reaches (can never be reached) | {len(snap.articles) - len(from_core):,} |\n')
 
-    w('## Pool categories\n')
-    w('| Category | In pool | Left out | Under 5 links outside navboxes |\n|---|--:|--:|--:|')
-    for c in config['pool_categories']:
-        members = [t for t in snap.articles if c in snap.pages[t]['cats'] and '/' not in t]
-        dropped = sum(1 for t in members if c not in rows[t][3])
-        weak = sum(1 for t in members if c in rows[t][3] and rows[t][2] < MIN_BACKLINKS)
-        w(f'| {c} | {sizes[c]} | {dropped} | {weak} |')
-    left = Counter(f for t in snap.articles if set(snap.pages[t]['cats']) & set(config['pool_categories']) for f in rows[t][4])
-    w('\nMoved to a Content family: ' + ', '.join(f'{k} {n}' for k, n in sorted(left.items())) + '.\n')
+    topic_of = {t: topic_from(set(snap.pages[t]['cats']), config) for t in snap.articles}   # by category, families too
+    marked = [t for t in snap.articles if topic_of[t] and (t in config['not_content_titles']
+                                                           or set(snap.pages[t]['cats']) & set(config['not_content_categories']))]
+    w('## Topics\n')
+    w('| Topic | In pool | Popular | Deep cuts | Moved to a family | Not content | Under 5 links outside navboxes |')
+    w('|---|--:|--:|--:|--:|--:|--:|')
+    for k in config['topics']:
+        members = [t for t in snap.articles if topic_of[t] == k and '/' not in t]
+        pooled = [t for t in members if rows[t][3] == k]
+        w(f'| {k} | {sizes[k]} | {sum("popular" in rows[t][5] for t in pooled)} | {sum("deep" in rows[t][5] for t in pooled)} | '
+          f'{sum(1 for t in members if rows[t][4])} | {sum(1 for t in members if t in marked)} | '
+          f'{sum(1 for t in pooled if rows[t][2] < MIN_BACKLINKS)} |')
+    left = Counter(f for t in snap.articles if topic_of[t] for f in rows[t][4])
+    w('\nMoved to a Content family: ' + ', '.join(f'{k} {n}' for k, n in sorted(left.items())) + '.')
+    w(f'Not game content ({len(marked)}): ' + (', '.join(marked) or 'none') + '.\n')
 
     w('## Content families and spin-offs\n')
     w('What a ticked Content or Spin-offs checkbox adds to a pool-mode roll. A spin-off\'s pages all count in Chaos.\n')
@@ -179,25 +173,24 @@ def report(snap, config, pairs):
     w(f'| Outside navboxes | {quartiles([outside_in[i] for i in pool])} |\n')
 
     research = config['research']
-    pools, topic_of, not_content, variants = research_pools(snap, config, rows)
+    pools = research_pools(config, data, topic_of)
     links = lambda t: rows[t][2]
     w('## Pool definitions\n')
-    w(f'Topics and categories from the config\'s research section. Left out as not game content ({len(not_content)}): '
-      + (', '.join(not_content) or 'none') + '.')
-    w(f'Variants ({len(variants)}): ' + ', '.join(f'{c} {sum(c in snap.pages[t]["cats"] for t in variants)}' for c in research['variant_categories']) + '.\n')
-    w('| Pool | Articles | Links outside navboxes (median, range) | ' + ' | '.join(research['topics']) + ' |')
-    w('|---|--:|---|' + '--:|' * len(research['topics']))
+    w('Variants by category: ' + ', '.join(f'{c} {sum(c in snap.pages[t]["cats"] for t in pools["Variants only"])}'
+                                         for c in config['families']['variants']) + '.\n')
+    w('| Pool | Articles | Links outside navboxes (median, range) | ' + ' | '.join(config['topics']) + ' |')
+    w('|---|--:|---|' + '--:|' * len(config['topics']))
     for name, p in pools.items():
         tc = Counter(topic_of[t] for t in p)
         span = f'{statistics.median(map(links, p)):.0f} ({min(map(links, p))}–{max(map(links, p))})' if p else '–'
-        w(f'| {name} | {len(p):,} | {span} | ' + ' | '.join(str(tc[k]) for k in research['topics']) + ' |')
+        w(f'| {name} | {len(p):,} | {span} | ' + ' | '.join(str(tc[k]) for k in config['topics']) + ' |')
     w('')
     for name, p in pools.items():
         if not p:
             continue
         edge = sorted(p, key=links)
         line = f'- **{name}:** least linked ' + ', '.join(f'{t} ({links(t)})' for t in edge[:5])
-        if name.startswith('Famous'):
+        if name.startswith('Popular'):
             line += '; best linked ' + ', '.join(f'{t} ({links(t)})' for t in edge[-3:])
         w(line + '; random ' + ', '.join(random.Random(name).sample(p, min(8, len(p)))) + '.')
     w('')

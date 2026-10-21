@@ -3,6 +3,7 @@ import gzip, json, os
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 CONFIG = os.path.join(HERE, 'config.json')
+MIN_BACKLINKS = 5   # as in index.html: a target needs this many linking articles outside navboxes
 
 
 def load_config(path=CONFIG):

@@ -1,35 +1,36 @@
 {
   "comment": "Hand-picked inputs to build.py. Everything else in wiki-data.js comes from the ZIM.",
-  "pool_categories": [
-    "Blocks", "Items", "Hostile mobs", "Passive mobs", "Neutral mobs", "Boss mobs",
-    "Overworld biomes", "Nether biomes", "End biomes", "Generated structures",
-    "Enchantments", "Effects", "Food", "Tools", "Armor", "Redstone", "Plants", "Gameplay"
-  ],
-  "pool_comment": "Not Weapons: on the wiki that holds only weapons from Minecraft: The Manga, while the game's weapons are in Items.",
+  "topics": {
+    "blocks": ["Blocks", "Redstone", "Plants"],
+    "items": ["Items", "Food", "Tools", "Armor"],
+    "mobs": ["Hostile mobs", "Passive mobs", "Neutral mobs", "Boss mobs"],
+    "world": ["Overworld biomes", "Nether biomes", "End biomes", "Generated structures"],
+    "magic": ["Enchantments", "Effects"]
+  },
+  "topics_comment": "The pool: game content by topic (keys as in index.html's TOPICS), an article going to the first topic whose categories it is in. Rolls draw a topic, then an article, and never take the start and target from the same topic. Not Weapons: on the wiki that holds only weapons from Minecraft: The Manga, while the game's weapons are in Items. Not Gameplay, which is the mechanics family.",
+  "not_content_categories": ["Minecraft 4k", "China Edition", "Set index pages", "Pages using MCRS diagrams"],
+  "not_content_titles": ["Block variant", "Drinks", "Removed blocks"],
+  "not_content_comment": "Pages in game categories that aren't game content: other editions, list and set index pages. Only Chaos rolls them. The titles are list pages no category marks.",
+  "popular_share": 0.3,
+  "deep_cuts_share": 0.33,
+  "shares_comment": "Popular is this share of the pool, best linked from outside navboxes. Deep cuts is this share of each topic, least linked among the articles linked well enough to be a target. See RESEARCH.md.",
   "families": {
     "joke": ["Joke features"],
     "removed": ["Removed features", "Unused features"],
     "education": ["Minecraft Education blocks", "Minecraft Education items", "Minecraft Education entities", "Minecraft Education mobs"],
-    "fiction": ["Book objects", "Fictional mods"]
+    "fiction": ["Book objects", "Fictional mods"],
+    "variants": ["Slabs", "Stairs", "Walls", "Pottery sherds", "Music discs", "Dyes", "Smithing templates", "Banner patterns"],
+    "mechanics": ["Gameplay"]
   },
-  "families_comment": "Content the player can add to the pool with the Content checkboxes (keys as in index.html's FAMILIES), by category. Articles in them are left out of the pool otherwise. Education is its four exact categories: the broad Minecraft Education category also holds Brewing, Charcoal and Dye.",
+  "families_comment": "Content the player can add with the Content checkboxes (keys as in index.html's FAMILIES), by category. Articles in them are left out of the pool otherwise. Education is its four exact categories: the broad Minecraft Education category also holds Brewing, Charcoal and Dye.",
   "spinoffs": ["Dungeons", "Dungeons II", "Legends", "Earth", "Story Mode", "Movie"],
   "spinoffs_comment": "Namespaces of other games, each a Spin-offs checkbox: its pages can be rolled and links into it go live.",
   "research": {
-    "topics": {
-      "blocks": ["Blocks", "Redstone", "Plants"],
-      "items": ["Items", "Food", "Tools", "Armor"],
-      "mobs": ["Hostile mobs", "Passive mobs", "Neutral mobs", "Boss mobs"],
-      "world": ["Overworld biomes", "Nether biomes", "End biomes", "Generated structures"],
-      "magic": ["Enchantments", "Effects"]
-    },
-    "not_content_categories": ["Minecraft 4k", "China Edition", "Set index pages", "Pages using MCRS diagrams"],
-    "variant_categories": ["Slabs", "Stairs", "Walls", "Pottery sherds", "Music discs", "Dyes", "Smithing templates", "Banner patterns"],
-    "famous_shares": [0.2, 0.25, 0.3],
+    "popular_shares": [0.2, 0.25, 0.3],
     "deep_cuts_shares": [0.33, 0.5],
     "sweet_spot_first_clicks": [2, 15]
   },
-  "research_comment": "Pool designs report.py compares (see RESEARCH.md): topics as in index.html's TOPICS, pages that aren't game content, variant groups, and the share of game content that Famous (best linked) and Deep cuts (least linked, per topic) take. Only report.py reads this; the game doesn't use it yet.",
+  "research_comment": "Only report.py reads this: the Popular and Deep cuts shares its Pool designs section compares, besides the ones in use, and the sweet spot's range of good first clicks. See RESEARCH.md.",
   "disambiguation_categories": ["Disambiguation pages", "Version disambiguation pages"],
   "hubs": [
     "Minecraft", "Java Edition", "Bedrock Edition", "Edition", "Minecraft Education", "Java Edition version history",

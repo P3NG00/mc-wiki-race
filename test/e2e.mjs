@@ -214,9 +214,9 @@ check('running out of clicks ends the game', await until("!game.active && docume
 check('result records running out of clicks', await ev("(([r]) => r.outOfClicks === true && !r.won && r.clicks === 6)(store.get('mwr.history', []))"));
 await ev("document.querySelector('#rules input[value=limit]').click()");
 
-// Random rolls in both modes.
+// Random rolls in every pool.
 await ev("document.querySelector('#mNew').click()");
-check('Classic roll', await until("!document.querySelector('#btnPlay').disabled", 60000), await ev("setup.start.title + ' -> ' + setup.goal.title"));
+check('Everyday roll', await until("!document.querySelector('#btnPlay').disabled", 60000), await ev("setup.start.title + ' -> ' + setup.goal.title"));
 // Rolls take their titles and link counts from wiki-data.js, so the only requests they make are for page info. The fetch
 // wrapper records them, and counts how many are in flight at once.
 await ev(`window.inFlight = 0; window.maxInFlight = 0; window.requests = []; window.fetch = Object.assign(async (...a) => {
@@ -224,7 +224,7 @@ await ev(`window.inFlight = 0; window.maxInFlight = 0; window.requests = []; win
   maxInFlight = Math.max(maxInFlight, ++inFlight);
   try { return await fetch.orig(...a); } finally { inFlight--; }
 }, { orig: fetch.bind(window) })`);
-for (const m of ['balanced', 'even', 'chaos']) {
+for (const m of ['popular', 'deep', 'chaos']) {
   await ev(`document.querySelector('input[value=${m}]').click()`);
   await sleep(500);
   check(`${m} roll`, await until("!document.querySelector('#btnPlay').disabled", 60000), await ev("setup.start.title + ' -> ' + setup.goal.title"));
@@ -241,38 +241,38 @@ check('description is the first paragraph', zpDesc.startsWith('Zombified piglins
 check('fictional, joke and removed things are left out of the pool', await ev("['Frostgate', 'Ankle Monitor', 'Steppe dirt'].every(t => ARTICLES.has(t) && !POOL_TITLES.includes(t)) && POOL_TITLES.includes('Diamond')"));
 check('at most API_CONCURRENCY requests at once', await ev('maxInFlight === API_CONCURRENCY'), `max=${await ev('maxInFlight')}`);
 
-// Difficulty rerolls only the target. Easy and Hard keep the best- or least-linked of five candidates, Any takes the first.
-// candidate() is stubbed to offer five pool articles in turn, so this tests the selection rather than the link counts.
-await ev("document.querySelector('input[name=diff][value=hard]').click()");
-await sleep(500);
-check('Hard roll (Chaos)', await until("!document.querySelector('#btnPlay').disabled", 60000) && await ev('ARTICLES.get(setup.goal.title)?.body >= MIN_BACKLINKS'),
+check('a Chaos target is linked well enough to be reached', await ev('ARTICLES.get(setup.goal.title)?.body >= MIN_BACKLINKS'),
   await ev("setup.goal.title + ' ' + JSON.stringify(ARTICLES.get(setup.goal.title))"));
+// The pool modes draw a topic, then an article, and never take the start and target from the same topic (the navbox would
+// put them one click apart). Popular and Deep cuts keep to their tier. planGroups and candidate are called directly with
+// the mode's button set without a change event, so this makes no requests and leaves the cards alone.
+check('each pool keeps to its tier, with the start and target from different topics', await ev(`(() => {
+  const ok = [];
+  for (const m of ['popular', 'everyday', 'deep']) {
+    document.querySelector('input[value=' + m + ']').checked = true;
+    const tier = { popular: 'popular', deep: 'deep' }[m];
+    for (let i = 0; i < 50; i++) {
+      const plan = planGroups(['start', 'goal']), s = candidate(plan.start, false), g = candidate(plan.goal, true);
+      ok.push(groupOf(s) !== groupOf(g) && ARTICLES.get(g).body >= MIN_BACKLINKS && (!tier || [s, g].every(t => ARTICLES.get(t).tiers.includes(tier))));
+    }
+  }
+  document.querySelector('input[value=chaos]').checked = true;
+  return ok.every(Boolean);
+})()`));
 const startBefore = await ev('setup.start.title');
-// Five pool articles linked from enough articles, none the start, with different counts.
-await ev(`window.candidate = Object.assign(() => candidate.titles[candidate.n++ % 5], { orig: candidate, n: 0,
-  titles: POOL_TITLES.filter(t => ARTICLES.get(t).body >= MIN_BACKLINKS && t !== setup.start.title).filter((t, i, a) => a.findIndex(u => ARTICLES.get(u).links === ARTICLES.get(t).links) === i).slice(0, 5) })`);
-const byLinks = "[...candidate.titles].sort((a, b) => ARTICLES.get(a).links - ARTICLES.get(b).links)";
-for (const [diff, want] of [['easy', `${byLinks}.at(-1)`], ['hard', `${byLinks}[0]`], ['any', 'candidate.titles[0]']]) {
-  await ev(`candidate.n = 0; document.querySelector('input[name=diff][value=${diff}]').click()`);
-  await sleep(300);
-  await until("!document.querySelector('#btnPlay').disabled", 15000);
-  const got = await ev("setup.goal.title + ' ' + setup.goal.difficulty");
-  check(`${diff} target selection`, got === await ev(`${want} + ' ${diff}'`) && await ev('setup.start.title') === startBefore, `${got} from ${await ev('candidate.titles.join(", ")')}`);
-}
-await ev('window.candidate = candidate.orig');
 
-// A topic rerolls only the target, from the topic's categories, even in Chaos.
+// A topic rerolls only the target (in Chaos, whatever the start's topic), from that topic.
 await ev("(s => { s.value = 'mobs'; s.dispatchEvent(new Event('change', { bubbles: true })); })(document.querySelector('#topic'))");
 await sleep(500);
 check('Mobs topic target', await until("!document.querySelector('#btnPlay').disabled", 60000) && await ev('setup.start.title') === startBefore &&
-  await ev("TOPICS.mobs.cats.some(c => POOL.get(c).includes(setup.goal.title))"), await ev("setup.goal.title"));
-// The result keeps how its target was rolled, and shows the topic.
+  await ev("ARTICLES.get(setup.goal.title)?.topic === 'mobs'"), await ev("setup.goal.title"));
+// The result keeps the target's topic, and shows it.
 await ev("document.querySelector('#btnPlay').click()");
 await until("game.path.length === 1 && !game.loading");
 await ev("document.querySelector('#btnGiveUp').click()");
 await ev("document.querySelector('#gQuit').click()");
-const rolled = await ev("(([r]) => r.difficulty + ' ' + r.topic)(store.get('mwr.history', []))");
-check('result records difficulty and topic', rolled === 'any mobs' && await ev("document.querySelector('#modal .note').textContent.endsWith('· Mobs')"),
+const rolled = await ev("(([r]) => r.topic)(store.get('mwr.history', []))");
+check('result records the topic', rolled === 'mobs' && await ev("document.querySelector('#modal .note').textContent.endsWith('· Mobs')"),
   `${rolled} | ${await ev("document.querySelector('#modal .note').textContent")}`);
 await ev("document.querySelector('#mNew').click()");
 await until("!document.querySelector('#btnPlay').disabled", 60000);
@@ -334,8 +334,8 @@ check('calculator placeholders are hidden', await ev("(c => c.length > 0 && c.ev
 await send('browsingContext.navigate', { context: ctx, url: 'about:blank', wait: 'complete' });
 await send('browsingContext.navigate', { context: ctx, url: fileUrl + '#start=Minecraft%20Dungeons&target=Diamond', wait: 'complete' });
 await until("!document.querySelector('#btnPlay').disabled");
-check('Even rolls Dungeons pages only with Dungeons on', await ev(`(() => {
-  const sample = () => Array.from({ length: 300 }, () => randomTitle('even', false));
+check('Everyday rolls Dungeons pages only with Dungeons on', await ev(`(() => {
+  const sample = () => Array.from({ length: 300 }, () => candidate(planGroups(['start']).start, false));
   const off = sample().every(t => !spinoffOf(t));
   setContent(['Dungeons']);
   const on = sample().some(t => t.startsWith('Dungeons:'));
@@ -344,7 +344,7 @@ check('Even rolls Dungeons pages only with Dungeons on', await ev(`(() => {
 })()`));
 await ev("document.querySelector('input[value=chaos]').click()");
 check('Chaos shows the Content families ticked and fixed', await ev("[...document.querySelectorAll('#content input')].every(b => b.checked && b.disabled) && content().length === 0"));
-await ev("document.querySelector('input[value=classic]').click()");
+await ev("document.querySelector('input[value=everyday]').click()");
 check('leaving Chaos gives the Content boxes back as they were', await ev("[...document.querySelectorAll('#content input')].every(b => !b.checked && !b.disabled)"));
 await until("!document.querySelector('#btnPlay').disabled", 30000);
 await ev("document.querySelector('#spinoffs input[value=Legends]').click()");
@@ -463,6 +463,8 @@ await send('browsingContext.navigate', { context: ctx, url: 'about:blank', wait:
 await send('browsingContext.navigate', { context: ctx, url: fileUrl + '#daily=2026-01-02&rules=limit', wait: 'complete' });
 check('daily pair loads', await until("!document.querySelector('#btnPlay').disabled && setup.daily === '2026-01-02'", 60000),
   await ev("setup.start?.title + ' -> ' + setup.goal?.title"));
+check('the daily takes its start, checkpoint and target from different topics', await ev("new Set([setup.start, setup.via, setup.goal].map(c => groupOf(c.title))).size === 3"),
+  await ev("[setup.start, setup.via, setup.goal].map(c => c.title + ' ' + groupOf(c.title)).join(', ')"));
 check('daily sets its rule and checkpoint', await ev("rules().join() === 'checkpoint' && !!setup.via && !document.querySelector('#cardVia').classList.contains('hidden') && document.querySelector('#setupStatus').textContent.includes('with Checkpoint')"));
 const pairOf = p => `${p}.start.title + ' -> ' + ${p}.via?.title + ' -> ' + ${p}.goal.title`;
 const daily = await ev(pairOf('setup'));

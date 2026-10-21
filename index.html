@@ -314,13 +314,13 @@ const THEMES = [...new Set(['auto', 'light', 'dark', ...Array.from(document.quer
 
   <div class="modes" role="radiogroup" aria-label="Article pool">
     <span class="lbl">Pool</span>
-    <label><input type="radio" name="mode" value="classic" checked> Classic</label>
-    <label><input type="radio" name="mode" value="balanced"> Balanced</label>
-    <label><input type="radio" name="mode" value="even"> Even</label>
+    <label><input type="radio" name="mode" value="popular"> Popular</label>
+    <label><input type="radio" name="mode" value="everyday" checked> Everyday</label>
+    <label><input type="radio" name="mode" value="deep"> Deep cuts</label>
     <label><input type="radio" name="mode" value="chaos"> Chaos</label>
   </div>
   <p class="mode-help" id="modeHelp"></p>
-  <div class="modes" role="group" aria-label="Target" id="difficulty"></div>
+  <div class="modes" role="group" aria-label="Target" id="target"></div>
   <div class="modes" role="group" aria-label="Rules" id="rules"></div>
   <div class="modes" role="group" aria-label="Content" id="content"></div>
   <div class="modes" role="group" aria-label="Spin-offs" id="spinoffs"></div>
@@ -425,14 +425,14 @@ const API = WIKI + '/api.php';
 
 // What the game knows about the wiki before asking it, from wiki-data.js, which tools/wikidata builds from the Kiwix ZIM
 // of minecraft.wiki (see CLAUDE.md). ARTICLES holds every article and every spin-off page, with how many pages link to it
-// (links), how many of those from outside navboxes (body), its pool categories (cats) and its Content (fams: a family such
-// as joke, or its spin-off). Subpages, disambiguation and version pages have neither, so only Chaos rolls them.
-const ARTICLES = new Map(WIKI_DATA.articles.map(([title, links, body, cats, fams]) => [title, { links, body, cats, fams }]));
-// Game-content categories the Classic, Balanced and Even modes draw from (see randomTitle), each with its articles.
-const POOL_CATEGORIES = WIKI_DATA.categories;
-const POOL = new Map(POOL_CATEGORIES.map(c => [c, []]));
-for (const [title, { cats }] of ARTICLES) for (const c of cats) POOL.get(c).push(title);
-const POOL_TITLES = [...ARTICLES.keys()].filter(t => ARTICLES.get(t).cats.length);
+// (links), how many of those from outside navboxes (body), its topic if it is in the pool, its Content (fams: a family
+// such as joke, or its spin-off) and its tiers (popular, deep). Subpages, disambiguation, version and other non-content
+// pages have neither topic nor Content, so only Chaos rolls them.
+const ARTICLES = new Map(WIKI_DATA.articles.map(([title, links, body, topic, fams, tiers]) => [title, { links, body, topic, fams, tiers }]));
+// The pool: game content by topic (TOPICS has their labels), which the Popular, Everyday and Deep cuts pools draw from.
+const POOL = new Map(WIKI_DATA.topics.map(k => [k, []]));
+for (const [title, { topic }] of ARTICLES) if (topic) POOL.get(topic).push(title);
+const POOL_TITLES = [...POOL.values()].flat();
 
 // Non-article namespaces on minecraft.wiki. Links into these are disabled, except a spin-off's in a game that has it on.
 const NAMESPACES = WIKI_DATA.namespaces;
@@ -447,23 +447,15 @@ const MIN_BACKLINKS = 5;   // a target or checkpoint must be linked from at leas
 // Chaos mode draws from every article, and from every page of each spin-off that is on.
 const CHAOS_TITLES = [], SPINOFF_PAGES = new Map(Object.keys(SPINOFFS).map(n => [n, []]));
 for (const t of ARTICLES.keys()) (SPINOFF_PAGES.get(spinoffOf(t)) ?? CHAOS_TITLES).push(t);
-// Target difficulty. Easy and Hard roll DIFFICULTY_SAMPLES targets and keep the best- or least-linked one, so they adapt to
-// the pool: fixed counts don't work, since navboxes link most items and mobs from 500+ articles but no biome gets there.
-// Target topics: a topic draws the target uniformly from its categories, whatever the mode (Classic would roll Wither
-// 12.5% of the time in Mobs). The start still comes from the mode: same-topic pairs are mostly one click, via the navbox.
+// Topics, keys as in wiki-data.js. A target topic pins the target's topic in the pool modes, Chaos too, and the start
+// still comes from another one: same-topic pairs are mostly one click, through the navbox.
 const TOPICS = {
   any: { label: 'Any topic' },
-  blocks: { label: 'Blocks', cats: ['Blocks', 'Redstone', 'Plants'] },
-  items: { label: 'Items', cats: ['Items', 'Food', 'Tools', 'Armor'] },
-  mobs: { label: 'Mobs', cats: ['Hostile mobs', 'Passive mobs', 'Neutral mobs', 'Boss mobs'] },
-  world: { label: 'Biomes & structures', cats: ['Overworld biomes', 'Nether biomes', 'End biomes', 'Generated structures'] },
-  magic: { label: 'Enchantments & effects', cats: ['Enchantments', 'Effects'] },
-};
-const DIFFICULTY_SAMPLES = 5;
-const DIFFICULTY = {
-  any: { label: 'Any', help: 'Any target linked from at least 5 articles, not counting navboxes.' },
-  easy: { label: 'Easy', better: (a, b) => ARTICLES.get(a).links > ARTICLES.get(b).links, help: `The best-linked of ${DIFFICULTY_SAMPLES} random targets.` },
-  hard: { label: 'Hard', better: (a, b) => ARTICLES.get(a).links < ARTICLES.get(b).links, help: `The least-linked of ${DIFFICULTY_SAMPLES} random targets.` },
+  blocks: { label: 'Blocks' },
+  items: { label: 'Items' },
+  mobs: { label: 'Mobs' },
+  world: { label: 'Biomes & structures' },
+  magic: { label: 'Enchantments & effects' },
 };
 const CLICK_LIMIT = 6;     // Six clicks rule: the game is lost once this many clicks haven't reached the target
 
@@ -496,7 +488,7 @@ const isKey = (obj, k) => typeof k === 'string' && Object.hasOwn(obj, k);
 const optional = (v, ok) => v === undefined || ok(v);
 const isRecord = r => typeof r === 'object' && r !== null && typeof r.start === 'string' && typeof r.goal === 'string' &&
   optional(r.via, v => typeof v === 'string') && optional(r.daily, v => typeof v === 'string') &&
-  optional(r.difficulty, v => isKey(DIFFICULTY, v)) && optional(r.topic, v => isKey(TOPICS, v)) &&
+  optional(r.topic, v => isKey(TOPICS, v)) &&
   optional(r.content, v => Array.isArray(v) && v.every(k => CONTENT.has(k))) &&
   Array.isArray(r.rules) && r.rules.every(k => isKey(RULES, k)) && typeof r.won === 'boolean' &&
   [r.clicks, r.ms, r.at].every(Number.isFinite);
@@ -551,30 +543,26 @@ function pickWeighted(arr, weight) {
   return arr[arr.length - 1];
 }
 
-// The title lists a roll draws from: the pool's categories plus the Content that is on, each as one more list (Chaos:
-// every article plus the pages of each spin-off that is on). Even gets one list without duplicates. linked: for a
-// target or checkpoint, so only titles linked well enough to be reached. Kept per mode, Content and linked.
-const rollListsCache = new Map();
-function rollLists(mode, linked) {
+// The groups a roll draws from, by key: the pool's topics (in Popular and Deep cuts only their articles of that tier),
+// then each Content key that is on, as one more group. Chaos has every article as one group ('') and each spin-off that
+// is on as another. linked: for a target or checkpoint, so only titles linked well enough to be reached. Kept per mode,
+// Content and linked.
+const rollGroupsCache = new Map();
+function rollGroups(mode, linked) {
   const picked = content(), key = [mode, linked, ...picked].join('|');
-  if (!rollListsCache.has(key)) {
-    let lists = mode === 'chaos'
-      ? [CHAOS_TITLES, ...picked.filter(k => k in SPINOFFS).map(k => SPINOFF_PAGES.get(k))]
-      : [...POOL.values(), ...picked.map(k => CONTENT.get(k))];
-    if (mode === 'even') lists = [[...new Set(lists.flat())]];
-    if (linked) lists = lists.map(l => l.filter(t => ARTICLES.get(t).body >= MIN_BACKLINKS));
-    rollListsCache.set(key, lists.filter(l => l.length));
+  if (!rollGroupsCache.has(key)) {
+    const tier = mode === 'popular' || mode === 'deep' ? mode : null;   // the pool's value is its tier's name
+    const groups = mode === 'chaos'
+      ? [['', CHAOS_TITLES], ...picked.filter(k => k in SPINOFFS).map(k => [k, SPINOFF_PAGES.get(k)])]
+      : [...[...POOL].map(([k, ts]) => [k, tier ? ts.filter(t => ARTICLES.get(t).tiers.includes(tier)) : ts]),
+        ...picked.map(k => [k, CONTENT.get(k)])];
+    rollGroupsCache.set(key, new Map(groups.map(([k, ts]) => [k, linked ? ts.filter(t => ARTICLES.get(t).body >= MIN_BACKLINKS) : ts])
+      .filter(([, ts]) => ts.length)));
   }
-  return rollListsCache.get(key);
+  return rollGroupsCache.get(key);
 }
-
-// classic: uniform list, then uniform member. balanced: lists weighted by the square root of their size. even and chaos:
-// every title equally likely (their lists don't overlap).
-function randomTitle(mode, linked) {
-  const lists = rollLists(mode, linked);
-  if (mode === 'classic') return pick(pick(lists));
-  return pick(pickWeighted(lists, l => mode === 'balanced' ? Math.sqrt(l.length) : l.length));
-}
+// A page's group: its topic, else its Content. Chaos-only pages have none.
+const groupOf = title => (a => a?.topic || a?.fams[0] || '')(ARTICLES.get(title));
 
 // Resolves redirects/normalisation and returns { title, desc, img, disambig } or null if missing.
 async function pageInfo(title) {
@@ -595,9 +583,9 @@ function setImg(img, src) {
 }
 
 const MODE_HELP = {
-  classic: 'Classic: game content (blocks, items, mobs, biomes, structures, enchantments, effects and more). Each category is equally likely, so small ones like bosses come up often.',
-  balanced: 'Balanced: the same game content, with bigger categories picked more often (by the square root of their size). Bosses and rare biomes still show up, just less.',
-  even: 'Even: the same game content, with every article equally likely. Mostly blocks and items.',
+  popular: 'Popular: the best-known game content, the 30% of it most linked across the wiki. A good place to start.',
+  everyday: 'Everyday: all the game content: blocks, items, mobs, biomes, structures, enchantments and effects. Each topic is equally likely, and the start and target always come from different ones.',
+  deep: 'Deep cuts: the least-known third of each topic. Think Camel Husk or Curse of Binding rather than Creeper.',
   chaos: 'Chaos: any article on the wiki, version pages, history subpages and April Fools jokes included. Expect obscure starting points.',
 };
 function updateModeHelp() { $('#modeHelp').textContent = MODE_HELP[mode()]; }
@@ -618,6 +606,8 @@ const FAMILIES = {
   removed: { label: 'Removed & unused', help: 'Things taken out of the game, or in its files but never used.' },
   education: { label: 'Education', help: 'Blocks, items and mobs from Minecraft Education.' },
   fiction: { label: 'Books & comics', help: 'Objects from the novels and comics.' },
+  variants: { label: 'Variants', help: 'Stairs, slabs, walls, dyes, pottery sherds, banner patterns, music discs and smithing templates.' },
+  mechanics: { label: 'Mechanics', help: 'How the game works: breeding, brewing, game rules, achievements and more.' },
 };
 const contentLabel = k => FAMILIES[k]?.label ?? k;
 // The Content that is on, in CONTENT order. In Chaos the families are in anyway, so their boxes are disabled and left out.
@@ -632,9 +622,8 @@ function setContent(keys) {
 function rules() { return Object.keys(RULES).filter(k => $(`#rules input[value=${k}]`).checked); }
 function setRules(keys) { for (const k in RULES) $(`#rules input[value=${k}]`).checked = keys.includes(k); }
 const rulesText = keys => keys.map(k => RULES[k].label).join(', ');
-// A result's rules plus how its target was rolled, when that wasn't Any.
-const settingsText = r => [r.difficulty && r.difficulty !== 'any' && `${DIFFICULTY[r.difficulty].label} target`,
-  r.topic && r.topic !== 'any' && TOPICS[r.topic].label, r.content && 'Content: ' + r.content.map(contentLabel).join(', '),
+// A result's rules plus its target's topic, when that wasn't Any, and its Content.
+const settingsText = r => [r.topic && r.topic !== 'any' && TOPICS[r.topic].label, r.content && 'Content: ' + r.content.map(contentLabel).join(', '),
   rulesText(r.rules)].filter(Boolean).join(', ');
 const sameRules = (a, b) => a.rules.join() === b.rules.join();
 
@@ -688,29 +677,41 @@ async function withBusy(fn) {
   finally { setup.busy--; updatePlay(); }
 }
 
-// A title for a card to try. cats: the target's topic, if any, which it is drawn from whatever the mode.
-function candidate(cats, linked) {
-  return cats ? pick([...new Set(cats.flatMap(c => POOL.get(c)))]) : randomTitle(mode(), linked);
+// A group for each card to roll, different from every other card's, so the start and target never share a topic: its
+// navbox would put them one click apart. The target takes the chosen topic, so it goes first; the rest are drawn
+// uniformly. In Chaos the cards draw from all of it (null) and may share, but a target topic still holds.
+function planGroups(cards) {
+  const topic = $('#topic').value;
+  if (mode() === 'chaos') return Object.fromEntries(cards.map(w => [w, w === 'goal' && POOL.has(topic) ? topic : null]));
+  const taken = cardKeys().filter(w => !cards.includes(w)).map(w => groupOf(setup[w]?.title)).filter(Boolean);
+  const plan = {};
+  for (const w of ['goal', 'via', 'start'].filter(w => cards.includes(w))) {
+    const groups = [...rollGroups(mode(), w !== 'start').keys()], free = groups.filter(g => !taken.includes(g));
+    plan[w] = w === 'goal' && groups.includes(topic) ? topic : pick(free.length ? free : groups);
+    taken.push(plan[w]);
+  }
+  return plan;
 }
 
-// A checkpoint needs incoming links like a target, but difficulty and topic only apply to the target.
-async function rollOne(which) {
-  const linked = which !== 'start', goal = which === 'goal';
-  // How a target was picked goes onto it, and from there into the result (see finish).
-  const picked = goal && { difficulty: $('input[name=diff]:checked').value, topic: $('#topic').value };
-  const d = goal ? DIFFICULTY[picked.difficulty] : DIFFICULTY.any;
-  const batch = d.better ? DIFFICULTY_SAMPLES : 1;
-  const cats = goal && TOPICS[picked.topic].cats;
+// A title for a card to try, from its group (null: Chaos, every title equally likely). A target topic in Chaos draws
+// from that topic of the whole pool.
+function candidate(group, linked) {
+  const groups = rollGroups(mode(), linked);
+  if (group === null) return pick(pickWeighted([...groups.values()], l => l.length));
+  return pick(groups.get(group) ?? rollGroups('everyday', linked).get(group));
+}
+
+// A checkpoint needs incoming links like a target, but the topic only applies to the target.
+async function rollOne(which, group) {
+  const linked = which !== 'start';
   const others = () => cardKeys().filter(w => w !== which).map(w => setup[w]?.title);
   for (let attempt = 0; attempt < 12; attempt++) {
-    // Easy and Hard compare the candidates' link counts from wiki-data.js and fetch only the one they keep.
-    const ok = Array.from({ length: batch }, () => candidate(cats, linked))
-      .filter(t => !others().includes(t) && (!linked || ARTICLES.get(t).body >= MIN_BACKLINKS));
-    if (!ok.length) continue;
-    // On a tie the first one wins, which is as random as any.
-    const info = await pageInfo(ok.reduce((best, t) => d.better?.(t, best) ? t : best));
-    // Check the other cards again after the await: they may be rolling at the same time.
-    if (info && !others().includes(info.title)) return Object.assign(info, picked);
+    const title = candidate(group, linked);
+    if (others().includes(title)) continue;
+    const info = await pageInfo(title);
+    // Check the other cards again after the await: they may be rolling at the same time. The target's topic goes into
+    // the result (see finish).
+    if (info && !others().includes(info.title)) return Object.assign(info, which === 'goal' && { topic: $('#topic').value });
   }
   throw new Error('Gave up finding a good article');
 }
@@ -722,12 +723,13 @@ async function reroll(which) {
   const tokens = Object.fromEntries(targets.map(w => [w, ++setup.rolls[w]]));
   const current = w => tokens[w] === setup.rolls[w];
   const left = leaveDaily();
+  const plan = planGroups(targets);
   setStatus('Picking…');
   await withBusy(async () => {
     for (const w of targets) { setup[w] = null; renderCard(w); }
     // allSettled, so one card failing doesn't end the busy state while the other is still rolling.
     const results = await Promise.allSettled(targets.map(async w => {
-      const info = await rollOne(w);
+      const info = await rollOne(w, plan[w]);
       if (current(w)) { setup[w] = info; renderCard(w); }
     }));
     const failed = results.find(r => r.status === 'rejected');
@@ -791,9 +793,10 @@ async function dailyPair(date) {
     throw new Error('No daily pair found');
   };
   const start = await first('start', () => true);
-  const linked = (salt, not) => first(salt, t => !not.includes(t) && ARTICLES.get(t)?.body >= MIN_BACKLINKS);
-  const goal = await linked('target', [start.title]);
-  const via = rule === 'checkpoint' ? await linked('via', [start.title, goal.title]) : null;
+  // A target or checkpoint linked well enough, from a topic none of the cards before it has.
+  const linked = (salt, cards) => first(salt, t => ARTICLES.get(t)?.body >= MIN_BACKLINKS && cards.every(c => groupOf(c.title) !== groupOf(t)));
+  const goal = await linked('target', [start]);
+  const via = rule === 'checkpoint' ? await linked('via', [start, goal]) : null;
   return { rule, start, via, goal };
 }
 
@@ -1316,7 +1319,7 @@ function finish(won, outOfClicks = false) {
   renderHud();
   const ms = now();
   const rec = { start: game.start.title, goal: game.goal.title, ...(game.via && { via: game.via.title }), ...(game.daily && { daily: game.daily }),
-    ...(game.goal.difficulty && { difficulty: game.goal.difficulty, topic: game.goal.topic }),
+    ...(game.goal.topic && { topic: game.goal.topic }),
     ...(game.content.length && { content: game.content }), rules: game.rules, won, ...(outOfClicks && { outOfClicks }), clicks: clicks(), ms, at: Date.now(), path: game.path.map(p => p.title) };
   const settingsNote = settingsText(rec);
   const hist = savedGames();
@@ -1392,11 +1395,11 @@ document.addEventListener('keydown', e => { if (e.key === 'Escape' && modalDismi
 // ---------------------------------------------------------------- Wiring
 $('#rules').innerHTML = '<span class="lbl">Rules</span>' + Object.entries(RULES).map(([k, r]) =>
   `<label title="${esc(r.help)}"><input type="checkbox" value="${k}"> ${esc(r.label)}</label>`).join('');
-$('#difficulty').innerHTML = '<span class="lbl">Target</span>' + Object.entries(DIFFICULTY).map(([k, d]) =>
-  `<label title="${esc(d.help)}"><input type="radio" name="diff" value="${k}"${k === 'any' ? ' checked' : ''}> ${esc(d.label)}</label>`).join('');
-$('#difficulty').insertAdjacentHTML('beforeend', `<select id="topic" aria-label="Target topic" title="Only targets from this topic. The start still comes from the mode.">
-  ${Object.entries(TOPICS).map(([k, t]) => `<option value="${k}">${esc(t.label)}</option>`).join('')}</select>`);
-$('#difficulty').addEventListener('change', () => reroll('goal'));
+$('#target').innerHTML = '<span class="lbl">Target</span>' +
+  `<select id="topic" aria-label="Target topic" title="Only targets from this topic. The start comes from another one.">
+  ${Object.entries(TOPICS).map(([k, t]) => `<option value="${k}">${esc(t.label)}</option>`).join('')}</select>`;
+// A new topic rerolls the target, and in the pool modes the start too if it is from that topic.
+$('#target').addEventListener('change', () => reroll(mode() !== 'chaos' && groupOf(setup.start?.title) === $('#topic').value ? 'all' : 'goal'));
 $('#content').innerHTML = '<span class="lbl">Content</span>' + WIKI_DATA.families.map(k =>
   `<label title="${esc(FAMILIES[k].help)}"><input type="checkbox" value="${k}"> ${esc(FAMILIES[k].label)}</label>`).join('');
 $('#spinoffs').innerHTML = '<span class="lbl">Spin-offs</span><label title="Every spin-off"><input type="checkbox" id="spinAll"> All</label>' +

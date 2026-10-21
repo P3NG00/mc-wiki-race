@@ -1,4 +1,4 @@
-"""Summarises what changed between two wiki-data.js files: pages, pool and Content members added and removed, link counts
+"""Summarises what changed between two wiki-data.js files: pages, topic, tier and Content members added and removed, link counts
 that moved a lot, and hub and namespace changes. Compare with the committed one by reading it from git:
 
     .venv/bin/python -I tools/wikidata/diff.py <(git show HEAD:wiki-data.js) wiki-data.js
@@ -25,10 +25,11 @@ def diff(old, new, moved=0.5, min_links=20):
         w(f'  added ({len(b.keys() - a.keys())}): {listing(b.keys() - a.keys())}')
     if a.keys() - b.keys():
         w(f'  removed ({len(a.keys() - b.keys())}): {listing(a.keys() - b.keys())}')
-    keys = lambda d: [*d['categories'], *d['families'], *d['spinoffs']]
+    keys = lambda d: [*d['topics'], 'popular', 'deep', *d['families'], *d['spinoffs']]
+    member = lambda r, k: k == r[3] or k in r[4] or k in r[5]
     for cat in dict.fromkeys(keys(old) + keys(new)):
-        was = {t for t, r in a.items() if cat in r[3] or cat in r[4]}
-        now = {t for t, r in b.items() if cat in r[3] or cat in r[4]}
+        was = {t for t, r in a.items() if member(r, cat)}
+        now = {t for t, r in b.items() if member(r, cat)}
         if was != now:
             w(f'{cat}: {len(was)} → {len(now)}')
             if now - was:

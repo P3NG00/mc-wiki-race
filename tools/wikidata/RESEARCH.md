@@ -1,6 +1,6 @@
 # Pool research
 
-Findings from testing pool designs on the link graph of the 2026-08-21 snapshot (`minecraft.wiki_en_all_2026-08.zim`), done in October 2026 before deciding the release pools. Everything was measured offline on the snapshot. The numbers come from `report.py` (its Dead ends, Pool definitions and Pool designs sections, set up in `config.json`'s `research` section) with 200 random pairs per design. The same snapshot reproduces them exactly, and a new snapshot can be checked against them. Two findings come from earlier exploratory runs that the report doesn't repeat; they are marked.
+Findings from testing pool designs on the link graph of the 2026-08-21 snapshot (`minecraft.wiki_en_all_2026-08.zim`), done in October 2026 before deciding the release pools. Everything was measured offline on the snapshot. The numbers come from `report.py` as of commit 02ebb25 (its Dead ends, Pool definitions and Pool designs sections) with 200 random pairs per design, which that version reproduces exactly. The report has since moved on to the pools as built (Everyday, Popular, Deep cuts, under those names), so a new snapshot's report reads alongside these findings rather than matching them line for line. Two findings come from earlier exploratory runs that the report doesn't repeat; they are marked.
 
 ## How pairs were measured
 
@@ -64,9 +64,14 @@ Different-topic pairs unless noted. "1" and "3+" are shares of pairs by fewest c
 | Variants only | 4% / 25 / 45% | 0% / 1% / 3 / 96% | 60% / 29% | 53/54 |
 | Chaos (every article, any pair) | 4% / 6 / 54% | 2% / 73% / 3 / 64% | 69% / 55% | 4/21 |
 
+## Decisions
+
+Taken in October 2026 from these findings:
+- **Pools:** Popular (the best-linked 30% of Everyday; "Famous" in the research), Everyday (the cleaned pool, the default), Deep cuts (the least-linked third of each topic) and Chaos. They replaced Classic, Balanced and Even, and Target difficulty (Easy/Any/Hard).
+- **Topics:** rolls draw a topic, then an article, and never take the start and target from the same topic.
+- **Pages left out:** the non-content pages leave the pool, plus three list pages no category marks (Block variant, Drinks, Removed blocks). Variants and Gameplay become the Content toggles Variants and Mechanics, off by default.
+- **Difficulty:** No navboxes and No hubs become a difficulty setting (Relaxed with navboxes, Normal without, Hard without navboxes or hubs), with Normal as the default. That's a separate step after the pools.
+
 ## Open questions
 
-- Should No navboxes be the default, given finding 1, or should it become a difficulty setting (navboxes on, off, off with no hubs)?
-- Famous at 25% or 30%? Deep cuts at 33% or 50%?
-- Variants as a Content toggle, off by default?
 - How fast the live wiki drifts from the snapshot, measured with a few API requests.

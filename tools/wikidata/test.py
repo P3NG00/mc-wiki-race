@@ -3,7 +3,7 @@ in a few seconds without the real ZIM:
 
     .venv/bin/python -I tools/wikidata/test.py
 """
-import copy, filecmp, os, sys, tempfile
+import copy, filecmp, os, re, sys, tempfile
 from libzim.writer import Creator, Hint, Item, StringProvider
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))   # for the tools under python -I
@@ -61,6 +61,9 @@ PAGES = {
     'Frostgate': (0, '', ['Items', 'Fictional mods']),
     'Balloon': (0, '', ['Items', 'Minecraft Education', 'Minecraft Education items']),
     'Charcoal': (0, '', ['Items', 'Minecraft Education']),
+    'Oak Slab': (0, '', ['Items', 'Slabs']),
+    'Breeding': (0, '', ['Gameplay']),
+    'Dirt (Minecraft 4k)': (0, '', ['Items', 'Minecraft 4k']),
     # A spin-off: its pages link to articles (which don't count) and to each other (which do), and a version page.
     'Dungeons:Creeper': (10000, '<a href="Diamond">diamond</a> <a href="Dungeons%3AArch_Illager">arch illager</a>', ['Minecraft Dungeons entities']),
     'Dungeons:Arch Illager': (10000, '', ['Minecraft Dungeons entities']),
@@ -99,8 +102,9 @@ def write_zim(path):
             c.add_redirection(title.replace(' ', '_'), title, to.replace(' ', '_'), {Hint.FRONT_ARTICLE: True})
 
 
-CONFIG = {**load_config(), 'pool_categories': ['Items', 'Tools', 'Hostile mobs'], 'hubs': ['Block', 'Breaking'],
-          'core_namespaces': ['Special', 'File', 'Category'], 'spinoffs': ['Dungeons']}
+# Every Deep cuts share of the one item linked well enough to be a target (Diamond), as a third would round to nothing.
+CONFIG = {**load_config(), 'topics': {'items': ['Items', 'Tools'], 'mobs': ['Hostile mobs']}, 'hubs': ['Block', 'Breaking'],
+          'core_namespaces': ['Special', 'File', 'Category'], 'spinoffs': ['Dungeons'], 'deep_cuts_share': 1}
 
 with tempfile.TemporaryDirectory() as tmp:
     zim = os.path.join(tmp, 'test.zim')
@@ -133,11 +137,13 @@ with tempfile.TemporaryDirectory() as tmp:
     rows = {r[0]: r for r in data['articles']}
     check('every article and spin-off page is listed, and nothing else', sorted(rows) == sorted(t for t, (ns, *_) in PAGES.items() if ns in (0, 10000)),
           sorted(rows))
-    check('the pool leaves out subpages, disambiguation pages and Content families',
-          all(rows[t][3] == [] for t in ('Diamond Pickaxe/Render', 'Diamond (disambiguation)', 'Ankle Monitor', 'Rose', 'Frostgate', 'Balloon')), sorted(rows))
+    check('the pool leaves out subpages, disambiguation pages, non-content pages and Content families',
+          all(rows[t][3] == '' for t in ('Diamond Pickaxe/Render', 'Diamond (disambiguation)', 'Dirt (Minecraft 4k)', 'Ankle Monitor', 'Rose',
+                                         'Frostgate', 'Balloon', 'Oak Slab', 'Breeding')), sorted(rows))
     check('Content families by category, Education by its exact categories only',
-          [rows[t][4] for t in ('Ankle Monitor', 'Rose', 'Balloon', 'Frostgate', 'Diamond Pickaxe/Render')] == [['joke'], ['removed'], ['education'], ['fiction'], []]
-          and rows['Charcoal'][3:] == [['Items'], []], [rows[t][3:] for t in ('Ankle Monitor', 'Rose', 'Balloon', 'Frostgate', 'Charcoal')])
+          [rows[t][4] for t in ('Ankle Monitor', 'Rose', 'Balloon', 'Frostgate', 'Oak Slab', 'Breeding', 'Dirt (Minecraft 4k)', 'Diamond Pickaxe/Render')]
+          == [['joke'], ['removed'], ['education'], ['fiction'], ['variants'], ['mechanics'], [], []] and rows['Charcoal'][3:5] == ['items', []],
+          [rows[t][3:] for t in ('Ankle Monitor', 'Rose', 'Balloon', 'Frostgate', 'Oak Slab', 'Breeding', 'Charcoal')])
     check('spin-off pages are content of their spin-off, except version pages',
           [rows[t][4] for t in ('Dungeons:Creeper', 'Dungeons:Arch Illager', 'Dungeons:1.0.5.0')] == [['Dungeons'], ['Dungeons'], []]
           and data['spinoffs'] == {'Dungeons': 10000} and data['families'] == list(CONFIG['families']))
@@ -151,8 +157,13 @@ with tempfile.TemporaryDirectory() as tmp:
     check('navbox-only links counted apart', rows['Creeper'][1:3] == [1, 0] and rows['Diamond Pickaxe'][1:3] == [1, 1],
           (rows['Creeper'], rows['Diamond Pickaxe']))
     check('a link through a redirect counts', rows['Iron Ingot'][1:3] == [1, 1], rows['Iron Ingot'])
-    check('pool categories per article, in config order', rows['Diamond Pickaxe'][3] == ['Items', 'Tools'] and rows['Block'][3] == [])
-    check('sizes', sizes == {'Items': 4, 'Tools': 1, 'Hostile mobs': 1, 'joke': 1, 'removed': 1, 'education': 1, 'fiction': 1, 'Dungeons': 2}, sizes)
+    check('a topic per pool article, the first in config order', [rows[t][3] for t in ('Diamond Pickaxe', 'Creeper', 'Block')] == ['items', 'mobs', ''])
+    # Popular is the best-linked 30% of the five in the pool (rounded to 2: Diamond, then Iron Ingot before Diamond Pickaxe
+    # on a tie, by title); Deep cuts, at a share of 1 here, every item linked well enough to be a target.
+    check('tiers: Popular and Deep cuts', {t: r[5] for t, r in rows.items() if r[5]} == {'Diamond': ['popular', 'deep'], 'Iron Ingot': ['popular']},
+          {t: r[5] for t, r in rows.items() if r[5]})
+    check('sizes', sizes == {'items': 4, 'mobs': 1, 'popular': 2, 'deep': 1, 'joke': 1, 'removed': 1, 'education': 1, 'fiction': 1,
+                             'variants': 1, 'mechanics': 1, 'Dungeons': 2}, sizes)
     check('namespaces: core, then the ZIM\'s with their talk namespaces',
           data['namespaces'] == ['Special', 'File', 'Category', 'Category talk', 'Dungeons', 'Dungeons talk', 'Tutorial', 'Tutorial talk'],
           data['namespaces'])
@@ -160,10 +171,9 @@ with tempfile.TemporaryDirectory() as tmp:
           data['hubs'] == {'Block': 'Block', 'Blocks': 'Block', 'Breaking': 'Breaking', 'Breaking/Mining': 'Breaking', 'Mining': 'Breaking'},
           data['hubs'])
 
-    research = {**CONFIG['research'], 'topics': {'items': ['Items', 'Tools'], 'mobs': ['Hostile mobs']}}
-    text = report(snap, {**CONFIG, 'research': research}, 20)
-    check('the report runs, with its pool definitions and designs',
-          all(h in text for h in ('## Pool definitions', '## Pool designs', '| Pool today, any pair |', 'Dead ends')), text[:400])
+    text = report(snap, CONFIG, 20)
+    check('the report runs, with its topics, pool definitions and designs',
+          all(h in text for h in ('## Topics', '## Pool definitions', '## Pool designs', '| Everyday, any pair |', 'Dead ends')), text[:400])
 
     out = os.path.join(tmp, 'wiki-data.js')
     with open(out, 'w', encoding='utf-8') as f:
@@ -172,13 +182,20 @@ with tempfile.TemporaryDirectory() as tmp:
 
     newer = copy.deepcopy(data)
     newer['snapshot'] = '2026-11-21'
-    newer['articles'] = [r for r in newer['articles'] if r[0] != 'Creeper'] + [['Copper Golem', 40, 30, ['Hostile mobs'], []]]
+    newer['articles'] = [r for r in newer['articles'] if r[0] != 'Creeper'] + [['Copper Golem', 40, 30, 'mobs', [], []]]
     newer['articles'][[r[0] for r in newer['articles']].index('Diamond')][2] = 30
     newer['hubs'].pop('Mining')
     report = diff(data, newer, min_links=5)
     check('diff lists added and removed articles, category moves, link changes and hubs',
           all(s in report for s in ('2026-08-21', '2026-11-21', 'added (1): Copper Golem', 'removed (1): Creeper',
-                                    'Hostile mobs: 1 → 1', 'Diamond: 8 → 30', 'Hubs: +none; −Mining')), report)
+                                    'mobs: 1 → 1', 'Diamond: 8 → 30', 'Hubs: +none; −Mining')), report)
+
+# The game labels every topic and family the data names; a key without a label stops the page from loading.
+game = open(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..', 'index.html'), encoding='utf-8').read()
+labels = lambda name: set(re.findall(r'^  (\w+): \{ label:', game[game.index(f'const {name} = {{'):].split('\n};')[0], re.M))
+real = load_config()
+check('index.html labels every topic and family in config.json',
+      set(real['topics']) <= labels('TOPICS') and set(real['families']) <= labels('FAMILIES'), (labels('TOPICS'), labels('FAMILIES')))
 
 print('all passed' if not failures else f'{failures} failed')
 sys.exit(1 if failures else 0)

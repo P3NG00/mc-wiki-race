@@ -413,35 +413,31 @@ const THEMES = [...new Set(['auto', 'light', 'dark', ...Array.from(document.quer
 
 <div class="modal-bg hidden" id="modalBg"><div class="modal" id="modal" role="dialog" aria-modal="true"></div></div>
 
+<script src="wiki-data.js"></script>
 <script>
 'use strict';
 
 const WIKI = 'https://minecraft.wiki';
 const API = WIKI + '/api.php';
 
-// Game-content categories the Classic, Balanced and Even modes draw from (see randomPoolTitle). Not Weapons: on the
-// wiki that holds only weapons from Minecraft: The Manga, while the game's weapons are in Items.
-const POOL_CATEGORIES = [
-  'Blocks', 'Items', 'Hostile mobs', 'Passive mobs', 'Neutral mobs', 'Boss mobs',
-  'Overworld biomes', 'Nether biomes', 'End biomes', 'Generated structures',
-  'Enchantments', 'Effects', 'Food', 'Tools', 'Armor', 'Redstone', 'Plants', 'Gameplay',
-];
-// Objects from the books and comics, filed in game categories too (Giant Pickaxe in Tools). Rolls skip them.
-const FICTION_CATEGORIES = ['Category:Fictional mods', 'Category:Book objects'];
+// What the game knows about the wiki before asking it, from wiki-data.js, which tools/wikidata builds from the Kiwix ZIM
+// of minecraft.wiki (see CLAUDE.md). ARTICLES holds every article, with how many articles link to it (links), how many
+// of those from outside navboxes (body) and its pool categories. Subpages, disambiguation pages, book objects and joke,
+// removed, unused and Education features have none, so only Chaos rolls them.
+const ARTICLES = new Map(WIKI_DATA.articles.map(([title, links, body, cats]) => [title, { links, body, cats }]));
+// Game-content categories the Classic, Balanced and Even modes draw from (see randomTitle), each with its articles.
+const POOL_CATEGORIES = WIKI_DATA.categories;
+const POOL = new Map(POOL_CATEGORIES.map(c => [c, []]));
+for (const [title, { cats }] of ARTICLES) for (const c of cats) POOL.get(c).push(title);
+const POOL_TITLES = [...ARTICLES.keys()].filter(t => ARTICLES.get(t).cats.length);
 
-// Non-article namespaces on minecraft.wiki (from meta=siteinfo). Links into these are disabled.
-const NAMESPACES = [
-  'Media', 'Special', 'Talk', 'User', 'User talk', 'Minecraft Wiki', 'Minecraft Wiki talk', 'Project', 'Project talk',
-  'File', 'File talk', 'Image', 'Image talk', 'MediaWiki', 'MediaWiki talk', 'Template', 'Template talk',
-  'Help', 'Help talk', 'Category', 'Category talk', 'Module', 'Module talk', 'Bucket', 'Bucket talk',
-  'Dungeons', 'Dungeons talk', 'Earth', 'Earth talk', 'Story Mode', 'Story Mode talk', 'Legends', 'Legends talk',
-  'Forum', 'Forum talk', 'Tutorial', 'Tutorial talk', 'Movie', 'Movie talk', 'Dungeons II', 'Dungeons II talk',
-];
+// Non-article namespaces on minecraft.wiki. Links into these are disabled.
+const NAMESPACES = WIKI_DATA.namespaces;
 
-// Chaos mode: generator=random returns lots of version/changelog/history pages; skip those.
-const CHAOS_REJECT = /\/|\(disambiguation\)$|^(Java|Bedrock|Pocket|Education|Legacy Console|PlayStation \d|Xbox( 360| One)?|Nintendo|Wii U|New Nintendo 3DS|Pi|Minecraft Launcher|Launcher|Realms|China) Edition|^(Launcher|Minecraft Launcher|Bedrock Dedicated Server|Server) \d|^\d+w\d+[a-z]$|\b\d+\.\d+(\.\d+)?\b/i;
-
-const MIN_BACKLINKS = 5;   // a target or checkpoint must have at least this many incoming article links
+const MIN_BACKLINKS = 5;   // a target or checkpoint must be linked from at least this many articles, outside navboxes
+// Chaos mode draws from every article, and its targets and checkpoints from the half linked well enough to be reached.
+const CHAOS_TITLES = [...ARTICLES.keys()];
+const CHAOS_TARGETS = CHAOS_TITLES.filter(t => ARTICLES.get(t).body >= MIN_BACKLINKS);
 // Target difficulty. Easy and Hard roll DIFFICULTY_SAMPLES targets and keep the best- or least-linked one, so they adapt to
 // the pool: fixed counts don't work, since navboxes link most items and mobs from 500+ articles but no biome gets there.
 // Target topics: a topic draws the target uniformly from its categories, whatever the mode (Classic would roll Wither
@@ -456,21 +452,15 @@ const TOPICS = {
 };
 const DIFFICULTY_SAMPLES = 5;
 const DIFFICULTY = {
-  any: { label: 'Any', help: 'Any target linked from at least 5 articles.' },
-  easy: { label: 'Easy', better: (a, b) => a.backlinks > b.backlinks, help: `The best-linked of ${DIFFICULTY_SAMPLES} random targets.` },
-  hard: { label: 'Hard', better: (a, b) => a.backlinks < b.backlinks, help: `The least-linked of ${DIFFICULTY_SAMPLES} random targets.` },
+  any: { label: 'Any', help: 'Any target linked from at least 5 articles, not counting navboxes.' },
+  easy: { label: 'Easy', better: (a, b) => ARTICLES.get(a).links > ARTICLES.get(b).links, help: `The best-linked of ${DIFFICULTY_SAMPLES} random targets.` },
+  hard: { label: 'Hard', better: (a, b) => ARTICLES.get(a).links < ARTICLES.get(b).links, help: `The least-linked of ${DIFFICULTY_SAMPLES} random targets.` },
 };
 const CLICK_LIMIT = 6;     // Six clicks rule: the game is lost once this many clicks haven't reached the target
 
-// No hubs rule: links to these pages (and to redirects to them) are dead. Picked from pages with the most incoming
-// and outgoing article links, leaving out specific content (Diamond, Chest, Water…) that makes a fair target.
-// At most 50, so their redirects come from a single titles= query.
-const HUBS = [
-  'Minecraft', 'Java Edition', 'Bedrock Edition', 'Edition', 'Minecraft Education', 'Java Edition version history',
-  'Bedrock Edition version history', 'Commands', 'Identifier', 'Block', 'Item', 'Mob', 'Biome', 'Structure', 'Overworld',
-  'The Nether', 'The End', 'Player', 'Creative', 'Crafting', 'Smelting', 'Breaking', 'Drops', 'Renewable resource', 'Food',
-  'Tool', 'Armor', 'Weapon', 'Ore', 'Trading', 'Enchantment', 'Effect', 'Advancement', 'Achievement',
-];
+// No hubs rule: every title that leads to a hub (the hubs, picked in tools/wikidata/config.json, and their redirects),
+// mapped to the hub. Links to them are dead.
+const HUB_TITLES = new Map(Object.entries(WIKI_DATA.hubs));
 const WIKI_STYLES = [
   'ext.Tabber|ext.embedVideo.styles|jquery.makeCollapsible.styles|jquery.tablesorter.styles|mediawiki.page.gallery.styles|skins.vector.styles.legacy',
   'ext.gadget.site-styles|ext.gadget.sound-styles',
@@ -526,54 +516,14 @@ async function api(params) {
   }
 }
 
-// Caches the promise, so concurrent rolls share one fetch; a failed fetch is evicted.
-const categoryCache = new Map();
-function categoryMembers(cat) {
-  if (!categoryCache.has(cat)) categoryCache.set(cat, fetchCategory(cat).catch(e => { categoryCache.delete(cat); throw e; }));
-  return categoryCache.get(cat);
-}
-
-async function fetchCategory(cat) {
-  const titles = [];
-  let cont = {};
-  do {
-    const d = await api({ action: 'query', list: 'categorymembers', cmtitle: 'Category:' + cat, cmtype: 'page', cmnamespace: '0', cmlimit: '500', ...cont });
-    for (const m of d.query.categorymembers) titles.push(m.title);
-    cont = d.continue || null;
-  } while (cont);
-  return titles.filter(t => !t.includes('/') && !/\(disambiguation\)$/.test(t));
-}
-
-// Every title that leads to a hub, mapped to the hub: the hubs themselves plus all their redirects (about 600).
-// Fetched once per session, the first time a No hubs game loads an article.
-let hubTitlesPromise = null;
-function hubTitles() {
-  return hubTitlesPromise ||= fetchHubTitles().catch(e => { hubTitlesPromise = null; throw e; });
-}
-
-async function fetchHubTitles() {
-  const map = new Map(HUBS.map(t => [t, t]));
-  let cont = {};
-  do {
-    const d = await api({ action: 'query', titles: HUBS.join('|'), prop: 'redirects', rdnamespace: '0', rdlimit: 'max', ...cont });
-    for (const p of d.query.pages) for (const r of p.redirects || []) map.set(r.title, p.title);
-    cont = d.continue || null;
-  } while (cont);
-  return map;
-}
-
 // The description is the first paragraph of the plain-text intro. pageprops' description is unusable here: on pages
 // with an infobox it is often the infobox caption ("Java Edition", "Adult"), and it keeps HTML entities such as &#91;.
 // TextExtracts returns at most 20 intros per request (exlimit).
 const EXTRACT_PARAMS = { exintro: '1', explaintext: '1', exlimit: 'max' };
-// categories: only FICTION_CATEGORIES are asked for, so even Chaos's 50 pages fit in one reply at cllimit max.
 const INFO_PARAMS = {
-  prop: 'pageprops|pageimages|categories|extracts', ppprop: 'disambiguation', piprop: 'thumbnail', pithumbsize: '400',
-  clcategories: FICTION_CATEGORIES.join('|'), cllimit: 'max', ...EXTRACT_PARAMS,
+  prop: 'pageprops|pageimages|extracts', ppprop: 'disambiguation', piprop: 'thumbnail', pithumbsize: '400', ...EXTRACT_PARAMS,
 };
 const firstParagraph = text => (text || '').trim().split('\n')[0].trim();
-// limit: how many incoming links to count up to (bllimit).
-const backlinkParams = (title, limit) => ({ list: 'backlinks', bltitle: title, blnamespace: '0', bllimit: String(limit), blfilterredir: 'nonredirects' });
 
 function toInfo(p) {
   if (!p || p.missing || p.invalid || p.ns !== 0) return null;
@@ -582,44 +532,7 @@ function toInfo(p) {
     desc: firstParagraph(p.extract),
     img: p.thumbnail?.source || '',
     disambig: !!p.pageprops && 'disambiguation' in p.pageprops,
-    fiction: !!p.categories?.length,
   };
-}
-// Rolls skip disambiguation pages and book and comic objects. A custom article may be either.
-const rollable = i => i && !i.disambig && !i.fiction;
-
-// Fills in desc for infos fetched without extracts, 20 titles per request.
-async function addDescs(infos) {
-  const chunks = [];
-  for (let i = 0; i < infos.length; i += 20) chunks.push(infos.slice(i, i + 20));
-  await Promise.all(chunks.map(async chunk => {
-    const d = await api({ action: 'query', titles: chunk.map(i => i.title).join('|'), prop: 'extracts', ...EXTRACT_PARAMS });
-    const byTitle = new Map((d.query?.pages || []).map(p => [p.title, p.extract]));
-    for (const info of chunk) info.desc = firstParagraph(byTitle.get(info.title));
-  }));
-}
-
-// One request returns 50 random articles with their info. Those that pass the filters are queued and drawn uniformly
-// without replacement, so the next rolls (and rejected targets) don't need a new request. Concurrent refills share one.
-// Extracts are fetched afterwards for the survivors only, since one request can't carry 50 of them.
-const chaosQueue = [];
-let chaosRefill = null;
-function refillChaos() {
-  return chaosRefill ||= api({ action: 'query', generator: 'random', grnnamespace: '0', grnfilterredir: 'nonredirects', grnlimit: '50', ...INFO_PARAMS, prop: 'pageprops|pageimages|categories' })
-    .then(async d => {
-      const infos = (d.query?.pages || []).map(toInfo).filter(p => rollable(p) && !CHAOS_REJECT.test(p.title));
-      await addDescs(infos);
-      chaosQueue.push(...infos);
-    })
-    .finally(() => { chaosRefill = null; });
-}
-
-async function randomChaosInfo() {
-  for (let i = 0; !chaosQueue.length; i++) {
-    if (i === 6) throw new Error('Could not find a suitable random article');
-    await refillChaos();
-  }
-  return chaosQueue.splice(Math.floor(Math.random() * chaosQueue.length), 1)[0];
 }
 
 function pickWeighted(arr, weight) {
@@ -629,27 +542,18 @@ function pickWeighted(arr, weight) {
 }
 
 // classic: uniform category, then uniform member. balanced: categories weighted by the square root of their size.
-// even: every article in the pool equally likely. The last two need every category, fetched once per session.
-async function randomPoolTitle(mode) {
-  if (mode === 'classic') return pick(await categoryMembers(pick(POOL_CATEGORIES)));
-  const lists = await Promise.all(POOL_CATEGORIES.map(categoryMembers));
-  if (mode === 'even') return pick([...new Set(lists.flat())]);
-  return pick(pickWeighted(lists, l => Math.sqrt(l.length)));
+// even: every article in the pool equally likely. chaos: any article. linked: for a target or checkpoint.
+function randomTitle(mode, linked) {
+  if (mode === 'chaos') return pick(linked ? CHAOS_TARGETS : CHAOS_TITLES);
+  if (mode === 'classic') return pick(POOL.get(pick(POOL_CATEGORIES)));
+  if (mode === 'even') return pick(POOL_TITLES);
+  return pick(pickWeighted([...POOL.values()], l => Math.sqrt(l.length)));
 }
 
-async function backlinkCount(title, limit) {
-  const d = await api({ action: 'query', ...backlinkParams(title, limit) });
-  return d.query.backlinks.length;
-}
-
-// Resolves redirects/normalisation and returns { title, desc, img, disambig, fiction } or null if missing.
-// With backlinks (a limit), also counts incoming links up to that limit in the same request.
-async function pageInfo(title, { backlinks = 0 } = {}) {
-  const d = await api({ action: 'query', titles: title, redirects: '1', ...INFO_PARAMS, ...(backlinks && backlinkParams(title, backlinks)) });
-  const info = toInfo(d.query.pages?.[0]);   // pages is absent for interwiki titles such as de:Diamant
-  // bltitle is the title as given; if it redirected, count links to the real article instead.
-  if (info && backlinks) info.backlinks = info.title === title ? d.query.backlinks.length : await backlinkCount(info.title, backlinks);
-  return info;
+// Resolves redirects/normalisation and returns { title, desc, img, disambig } or null if missing.
+async function pageInfo(title) {
+  const d = await api({ action: 'query', titles: title, redirects: '1', ...INFO_PARAMS });
+  return toInfo(d.query.pages?.[0]);   // pages is absent for interwiki titles such as de:Diamant
 }
 
 // ---------------------------------------------------------------- Setup screen
@@ -668,7 +572,7 @@ const MODE_HELP = {
   classic: 'Classic: game content (blocks, items, mobs, biomes, structures, enchantments, effects and more). Each category is equally likely, so small ones like bosses come up often.',
   balanced: 'Balanced: the same game content, with bigger categories picked more often (by the square root of their size). Bosses and rare biomes still show up, just less.',
   even: 'Even: the same game content, with every article equally likely. Mostly blocks and items.',
-  chaos: 'Chaos: any article on the wiki (version and history pages filtered out). Expect obscure starting points.',
+  chaos: 'Chaos: any article on the wiki, version pages, history subpages and April Fools jokes included. Expect obscure starting points.',
 };
 function updateModeHelp() { $('#modeHelp').textContent = MODE_HELP[mode()]; }
 
@@ -740,13 +644,9 @@ async function withBusy(fn) {
   finally { setup.busy--; updatePlay(); }
 }
 
-// limit: for a target, how many incoming links to count up to (0 for a start). cats: the target's topic, if any.
-async function candidate(limit, cats) {
-  if (cats) return pageInfo(pick([...new Set((await Promise.all(cats.map(categoryMembers))).flat())]), { backlinks: limit });
-  if (mode() !== 'chaos') return pageInfo(await randomPoolTitle(mode()), { backlinks: limit });
-  const info = await randomChaosInfo();
-  if (limit) info.backlinks = await backlinkCount(info.title, limit);
-  return info;
+// A title for a card to try. cats: the target's topic, if any, which it is drawn from whatever the mode.
+function candidate(cats, linked) {
+  return cats ? pick([...new Set(cats.flatMap(c => POOL.get(c)))]) : randomTitle(mode(), linked);
 }
 
 // A checkpoint needs incoming links like a target, but difficulty and topic only apply to the target.
@@ -755,17 +655,18 @@ async function rollOne(which) {
   // How a target was picked goes onto it, and from there into the result (see finish).
   const picked = goal && { difficulty: $('input[name=diff]:checked').value, topic: $('#topic').value };
   const d = goal ? DIFFICULTY[picked.difficulty] : DIFFICULTY.any;
-  // Easy and Hard compare counts, so those count up to the API's cap of 500.
-  const limit = !linked ? 0 : d.better ? 500 : MIN_BACKLINKS;
   const batch = d.better ? DIFFICULTY_SAMPLES : 1;
   const cats = goal && TOPICS[picked.topic].cats;
+  const others = () => cardKeys().filter(w => w !== which).map(w => setup[w]?.title);
   for (let attempt = 0; attempt < 12; attempt++) {
-    const infos = await Promise.all(Array.from({ length: batch }, () => candidate(limit, cats)));
-    // Read the other cards now, not before the await: they may be rolling at the same time.
-    const others = cardKeys().filter(w => w !== which).map(w => setup[w]?.title);
-    const ok = infos.filter(i => rollable(i) && !others.includes(i.title) && (!linked || i.backlinks >= MIN_BACKLINKS));
+    // Easy and Hard compare the candidates' link counts from wiki-data.js and fetch only the one they keep.
+    const ok = Array.from({ length: batch }, () => candidate(cats, linked))
+      .filter(t => !others().includes(t) && (!linked || ARTICLES.get(t).body >= MIN_BACKLINKS));
+    if (!ok.length) continue;
     // On a tie the first one wins, which is as random as any.
-    if (ok.length) return Object.assign(ok.reduce((best, i) => d.better?.(i, best) ? i : best), picked);
+    const info = await pageInfo(ok.reduce((best, t) => d.better?.(t, best) ? t : best));
+    // Check the other cards again after the await: they may be rolling at the same time.
+    if (info && !others().includes(info.title)) return Object.assign(info, picked);
   }
   throw new Error('Gave up finding a good article');
 }
@@ -837,16 +738,16 @@ const dailyRule = date => ranked(date, 'rule', DAILY_RULES)[0];
 
 async function dailyPair(date) {
   const rule = dailyRule(date);
-  const pool = [...new Set((await Promise.all(POOL_CATEGORIES.map(categoryMembers))).flat())];
-  const first = async (titles, ok) => {
-    for (const t of titles.slice(0, 20)) { const info = await ok(t); if (info) return info; }
+  // ok: whether a title may take the card, checked on the pool and again on the title the wiki resolves it to.
+  const first = async (salt, ok) => {
+    for (const t of ranked(date, salt, POOL_TITLES.filter(ok)).slice(0, 20)) {
+      const info = await pageInfo(t);
+      if (info && ok(info.title)) return info;
+    }
     throw new Error('No daily pair found');
   };
-  const start = await first(ranked(date, 'start', pool), async t => { const i = await pageInfo(t); return rollable(i) && i; });
-  const linked = (salt, not) => first(ranked(date, salt, pool), async t => {
-    const i = await pageInfo(t, { backlinks: MIN_BACKLINKS });
-    return rollable(i) && !not.includes(i.title) && i.backlinks >= MIN_BACKLINKS && i;
-  });
+  const start = await first('start', () => true);
+  const linked = (salt, not) => first(salt, t => !not.includes(t) && ARTICLES.get(t)?.body >= MIN_BACKLINKS);
   const goal = await linked('target', [start.title]);
   const via = rule === 'checkpoint' ? await linked('via', [start.title, goal.title]) : null;
   return { rule, start, via, goal };
@@ -993,16 +894,13 @@ async function navigate(title, fragment, { back = false } = {}) {
   hideToast();
   renderHud();
   showOverlay(`<div class="spinner"></div>Loading ${esc(title)}…`);
-  let page, hubs;
+  let page;
   try {
-    [page, hubs] = await Promise.all([
-      // A reply without an article has to fail here, where Retry is offered: past this point the game would stay
-      // loading, with Give up disabled.
-      parseCache.get(title) ||
-        api({ action: 'parse', page: title, prop: 'text|displaytitle', redirects: '1', disableeditsection: '1', disablelimitreport: '1' })
-          .then(d => d.parse || Promise.reject(new Error('The wiki sent no article'))),
-      game.rules.includes('nohubs') && hubTitles(),
-    ]);
+    // A reply without an article has to fail here, where Retry is offered: past this point the game would stay
+    // loading, with Give up disabled.
+    page = await (parseCache.get(title) ||
+      api({ action: 'parse', page: title, prop: 'text|displaytitle', redirects: '1', disableeditsection: '1', disablelimitreport: '1' })
+        .then(d => d.parse || Promise.reject(new Error('The wiki sent no article'))));
   } catch (e) {
     if (token !== game.navToken) return;
     game.loading = false;
@@ -1027,7 +925,8 @@ async function navigate(title, fragment, { back = false } = {}) {
   const keep = [game.goal.title, game.via?.title];
   // The objective is never marked: a target passed before the checkpoint still has to be reached again.
   const seen = [...game.seen].filter(([, t]) => t !== objective().title).map(([k]) => k);
-  renderArticle(page, fragment, token, hubs ? [...hubs.keys()].filter(t => !keep.includes(hubs.get(t))) : [], seen);
+  const blocked = game.rules.includes('nohubs') ? [...HUB_TITLES.keys()].filter(t => !keep.includes(HUB_TITLES.get(t))) : [];
+  renderArticle(page, fragment, token, blocked, seen);
   setTimeout(() => frameReady(token), 15000);   // a stalled stylesheet must not leave Back and Give up disabled
   // Compare the post-redirect title, so following a redirect onto the target counts as arriving.
   const won = page.title === game.goal.title && (!game.via || game.viaReached);

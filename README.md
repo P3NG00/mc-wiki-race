@@ -4,7 +4,7 @@ A wiki race (like [The Wiki Game](https://www.thewikigame.com/)) through [minecr
 
 Play it at **[mcwikirace.com](https://mcwikirace.com/)**.
 
-The whole game is one `index.html`, with no build step and no dependencies. Next to it are only the icon (`favicon.ico`, `apple-touch-icon.png`) and the link-preview image (`og-image.png`). Articles are fetched live from the minecraft.wiki API.
+The whole game is one `index.html`, with no build step and no dependencies. Next to it are `wiki-data.js`, what the game knows about the wiki (which articles it can roll, how well linked they are), generated from the wiki's offline copy by `tools/wikidata/`, the icon (`favicon.ico`, `apple-touch-icon.png`) and the link-preview image (`og-image.png`). Articles are fetched live from the minecraft.wiki API.
 
 ## Playing
 
@@ -32,7 +32,7 @@ Open `index.html` in a browser. Opening it straight from disk (`file://`) works 
 
 ## Hosting
 
-Serve `index.html` as a static file, with `favicon.ico`, `apple-touch-icon.png` and `og-image.png` next to it. Its `canonical` link and Open Graph tags point at https://mcwikirace.com/, so search engines treat other copies as duplicates of that one. To add a theme without editing it, put a stylesheet in its `<head>` marked with `data-mwr-theme`. It shows up in the theme picker, and `data-mwr-default` makes it the default:
+Serve `index.html` as a static file, with `wiki-data.js`, `favicon.ico`, `apple-touch-icon.png` and `og-image.png` next to it. Without `wiki-data.js` the game doesn't start. Its `canonical` link and Open Graph tags point at https://mcwikirace.com/, so search engines treat other copies as duplicates of that one. To add a theme without editing it, put a stylesheet in its `<head>` marked with `data-mwr-theme`. It shows up in the theme picker, and `data-mwr-default` makes it the default:
 
 ```html
 <link rel="stylesheet" href="my-theme.css" data-mwr-theme="My site" data-mwr-default>

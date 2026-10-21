@@ -217,8 +217,10 @@ await ev("document.querySelector('#rules input[value=limit]').click()");
 // Random rolls in both modes.
 await ev("document.querySelector('#mNew').click()");
 check('Classic roll', await until("!document.querySelector('#btnPlay').disabled", 60000), await ev("setup.start.title + ' -> ' + setup.goal.title"));
-// Balanced fetches every category at once, so it also checks that no more than API_CONCURRENCY requests are in flight.
-await ev(`window.inFlight = 0; window.maxInFlight = 0; window.fetch = Object.assign(async (...a) => {
+// Rolls take their titles and link counts from wiki-data.js, so the only requests they make are for page info. The fetch
+// wrapper records them, and counts how many are in flight at once.
+await ev(`window.inFlight = 0; window.maxInFlight = 0; window.requests = []; window.fetch = Object.assign(async (...a) => {
+  requests.push(String(a[0]));
   maxInFlight = Math.max(maxInFlight, ++inFlight);
   try { return await fetch.orig(...a); } finally { inFlight--; }
 }, { orig: fetch.bind(window) })`);
@@ -227,32 +229,35 @@ for (const m of ['balanced', 'even', 'chaos']) {
   await sleep(500);
   check(`${m} roll`, await until("!document.querySelector('#btnPlay').disabled", 60000), await ev("setup.start.title + ' -> ' + setup.goal.title"));
 }
+check('rolls only ask the wiki for page info', await ev("requests.length > 0 && requests.every(u => new URL(u).searchParams.get('prop') === INFO_PARAMS.prop && !/[?&](list|generator)=/.test(u))"),
+  await ev("requests.filter(u => !u.includes('prop=pageprops')).slice(0, 2).join(' ')"));
+// Ten at once: no more than API_CONCURRENCY are in flight, and the rest wait their turn.
+await ev("Promise.all(['Stone', 'Dirt', 'Sand', 'Gravel', 'Clay', 'Snow', 'Ice', 'Obsidian', 'Glass', 'Wool'].map(t => pageInfo(t)))");
 await ev('window.fetch = fetch.orig');
-check('Chaos rolls get descriptions', await ev('chaosQueue.some(i => i.desc)'));
 // pageprops' description on infobox pages is the infobox caption ("Java Edition"); the intro's first paragraph is used.
 const zpDesc = await ev("pageInfo('Zombified Piglin').then(i => i.desc)");
 check('description is the first paragraph', zpDesc.startsWith('Zombified piglins are') && !zpDesc.includes('\n'), zpDesc);
-// Manga objects are filed in game categories too (Frostgate in Weapons), and rolls skip them.
-check('book and comic objects are flagged', await ev("Promise.all(['Frostgate', 'Diamond'].map(t => pageInfo(t))).then(([f, d]) => f.fiction && !d.fiction)"));
+// Book and comic objects, joke and removed features are filed in game categories too: the pool leaves them out, Chaos doesn't.
+check('fictional, joke and removed things are left out of the pool', await ev("['Frostgate', 'Ankle Monitor', 'Steppe dirt'].every(t => ARTICLES.has(t) && !POOL_TITLES.includes(t)) && POOL_TITLES.includes('Diamond')"));
 check('at most API_CONCURRENCY requests at once', await ev('maxInFlight === API_CONCURRENCY'), `max=${await ev('maxInFlight')}`);
 
 // Difficulty rerolls only the target. Easy and Hard keep the best- or least-linked of five candidates, Any takes the first.
-// candidate() is stubbed with known counts, so this tests the selection rather than the wiki's link graph.
+// candidate() is stubbed to offer five pool articles in turn, so this tests the selection rather than the link counts.
 await ev("document.querySelector('input[name=diff][value=hard]').click()");
 await sleep(500);
-check('Hard roll (Chaos)', await until("!document.querySelector('#btnPlay').disabled", 60000) && await ev('setup.goal.backlinks >= 5'),
-  await ev("setup.goal.title + ' ' + setup.goal.backlinks"));
+check('Hard roll (Chaos)', await until("!document.querySelector('#btnPlay').disabled", 60000) && await ev('ARTICLES.get(setup.goal.title)?.body >= MIN_BACKLINKS'),
+  await ev("setup.goal.title + ' ' + JSON.stringify(ARTICLES.get(setup.goal.title))"));
 const startBefore = await ev('setup.start.title');
-await ev(`window.candidate = Object.assign(async limit => {
-  const i = candidate.n++;
-  return { title: 'Fake ' + i, desc: '', img: '', disambig: false, backlinks: [300, 50, 500, 500, 120][i % 5], limit };
-}, { orig: candidate, n: 0 })`);
-for (const [diff, want] of [['easy', 'Fake 2 500 500 easy'], ['hard', 'Fake 1 50 500 hard'], ['any', 'Fake 0 300 5 any']]) {
+// Five pool articles linked from enough articles, none the start, with different counts.
+await ev(`window.candidate = Object.assign(() => candidate.titles[candidate.n++ % 5], { orig: candidate, n: 0,
+  titles: POOL_TITLES.filter(t => ARTICLES.get(t).body >= MIN_BACKLINKS && t !== setup.start.title).filter((t, i, a) => a.findIndex(u => ARTICLES.get(u).links === ARTICLES.get(t).links) === i).slice(0, 5) })`);
+const byLinks = "[...candidate.titles].sort((a, b) => ARTICLES.get(a).links - ARTICLES.get(b).links)";
+for (const [diff, want] of [['easy', `${byLinks}.at(-1)`], ['hard', `${byLinks}[0]`], ['any', 'candidate.titles[0]']]) {
   await ev(`candidate.n = 0; document.querySelector('input[name=diff][value=${diff}]').click()`);
   await sleep(300);
   await until("!document.querySelector('#btnPlay').disabled", 15000);
-  const got = await ev("[setup.goal.title, setup.goal.backlinks, setup.goal.limit, setup.goal.difficulty].join(' ')");
-  check(`${diff} target selection`, got === want && await ev('setup.start.title') === startBefore, got);
+  const got = await ev("setup.goal.title + ' ' + setup.goal.difficulty");
+  check(`${diff} target selection`, got === await ev(`${want} + ' ${diff}'`) && await ev('setup.start.title') === startBefore, `${got} from ${await ev('candidate.titles.join(", ")')}`);
 }
 await ev('window.candidate = candidate.orig');
 
@@ -260,7 +265,7 @@ await ev('window.candidate = candidate.orig');
 await ev("(s => { s.value = 'mobs'; s.dispatchEvent(new Event('change', { bubbles: true })); })(document.querySelector('#topic'))");
 await sleep(500);
 check('Mobs topic target', await until("!document.querySelector('#btnPlay').disabled", 60000) && await ev('setup.start.title') === startBefore &&
-  await ev("Promise.all(TOPICS.mobs.cats.map(categoryMembers)).then(l => l.flat().includes(setup.goal.title))"), await ev("setup.goal.title"));
+  await ev("TOPICS.mobs.cats.some(c => POOL.get(c).includes(setup.goal.title))"), await ev("setup.goal.title"));
 // The result keeps how its target was rolled, and shows the topic.
 await ev("document.querySelector('#btnPlay').click()");
 await until("game.path.length === 1 && !game.loading");
@@ -339,7 +344,7 @@ check('a collapsed path stays collapsed after a reload', await ev("document.quer
 await ev("document.querySelector('#btnPath').click()");
 check('No hubs game loads', await until("game.path.length === 1 && !game.loading"));
 check('Blind target hides the HUD and path pictures and peek', await ev("document.querySelector('#hudImg').classList.contains('hidden') && document.querySelector('#pathArt').classList.contains('hidden') && document.querySelector('#btnPeek').classList.contains('hidden')"));
-check('hub redirects are known', await ev("hubTitles().then(m => m.get('Blocks') === 'Block' && m.get('Mining') === 'Breaking')"));
+check('hub redirects are known', await ev("HUB_TITLES.get('Blocks') === 'Block' && HUB_TITLES.get('Mining') === 'Breaking'"));
 f = await frameCtx();
 const hubLinks = JSON.parse(await ev(`JSON.stringify(Object.fromEntries(['Item', 'Java_Edition', 'Crafting', 'Pickaxe'].map(t =>
   [t, [...document.querySelectorAll('a[href^="/w/' + t + '"]')].filter(a => a.getAttribute('href').split('#')[0] === '/w/' + t).map(a => a.classList.contains('mwr-live') ? 'live' : 'dead')])))`, f));

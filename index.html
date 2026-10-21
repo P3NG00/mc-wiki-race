@@ -1122,6 +1122,44 @@ function renderArticle(page, fragment, token, blocked = [], seen = []) {
       for (const c of WGL.dark) document.body.classList.toggle(c, e.data.dark);
       for (const c of WGL.light) document.body.classList.toggle(c, !e.data.dark);
     });
+    // The wiki's element animator (MediaWiki:Common.js), which the frame doesn't load. Every 2 s each .animated shows its
+    // next child, and a child that is an .animated-subframe also moves on to its own next child. Without it every
+    // crafting slot stays on the frame the parse output marked, often a different one per slot.
+    const animated = [...document.querySelectorAll('#mw-content-text .animated')];
+    // Each animation is kept as tall as its tallest frame, so the text below doesn't jump.
+    for (const el of animated) el.classList.add('animated-visible');
+    const minHeights = animated.map(el => {
+      const hs = [...el.querySelectorAll(':scope > :not(.animated-subframe), :scope > .animated-subframe > *')].map(f => f.offsetHeight);
+      return hs.length && Math.min(...hs) !== Math.max(...hs) ? Math.max(...hs) + 'px' : '';
+    });
+    animated.forEach((el, i) => { el.style.minHeight = minHeights[i]; el.classList.remove('animated-visible'); });
+    // The hidden frames' images are lazy, so each would only start loading when its turn came.
+    const eager = new IntersectionObserver(entries => {
+      for (const e of entries) {
+        if (!e.isIntersecting) continue;
+        for (const img of e.target.querySelectorAll('img')) img.loading = 'eager';
+        eager.unobserve(e.target);
+      }
+    });
+    for (const el of animated) eager.observe(el);
+    const advance = el => {
+      const cur = el.querySelector(':scope > .animated-active');
+      cur?.classList.remove('animated-active');
+      const next = cur?.nextElementSibling || el.firstElementChild;
+      next?.classList.add('animated-active');
+      return next;
+    };
+    // As on the wiki, a crafting grid or infobox picture holds still while the pointer or focus is in it, so the slot
+    // being aimed at can be clicked.
+    const HOLD = '.animated-container:hover, .mcui:hover, .animated-container:focus-within, .mcui:focus-within';
+    if (animated.length) setInterval(() => {
+      if (document.hidden) return;
+      for (const el of animated) {
+        if (el.classList.contains('animated-paused') || el.closest(HOLD)) continue;
+        const next = advance(el);
+        if (next?.classList.contains('animated-subframe')) advance(next);
+      }
+    }, 2000);
     scrollToId(FRAG);
   `;
 

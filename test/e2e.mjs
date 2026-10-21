@@ -120,6 +120,21 @@ const seenLinks = JSON.parse(await ev(`JSON.stringify(['Diamond', 'Iron_Pickaxe'
   [...document.querySelectorAll('a.mwr-live')].filter(a => a.getAttribute('href').split('#')[0] === '/w/' + t).map(a => a.classList.contains('mwr-seen'))))`, f));
 check('links to articles on the path are marked', seenLinks[0].length > 0 && seenLinks[0].every(Boolean) &&
   seenLinks[1].length > 0 && !seenLinks[1].some(Boolean), JSON.stringify(seenLinks));
+// The crafting grid's slots cycle through their frames (Wooden, Golden, Stone… Pickaxe) and hold still under the pointer.
+const outputSlot = "document.querySelector('.mcui .invslot-large.animated')";
+const shownItem = `${outputSlot}?.querySelector(':scope > .animated-active a')?.title`;
+const firstItem = await ev(shownItem, f);
+const slotRef = (await send('script.evaluate', { target: { context: f }, expression: `(s => (s.scrollIntoView({ block: 'center' }), s))(${outputSlot})`, awaitPromise: false })).result?.result?.sharedId;
+check('crafting slots animate', !!firstItem && await until(`${shownItem} !== ${JSON.stringify(firstItem)}`, 5000, f),
+  `${firstItem} -> ${await ev(shownItem, f)}`);
+await moveTo({ type: 'element', element: { sharedId: slotRef } });
+await sleep(300);
+const heldItem = await ev(shownItem, f);
+await sleep(4500);
+const stillItem = await ev(shownItem, f);
+check('crafting slots hold still under the pointer', !!heldItem && stillItem === heldItem, `${heldItem} -> ${stillItem}`);
+await moveTo('viewport');
+await send('input.releaseActions', { context: ctx });
 
 // Back reuses the cached article instead of calling the API again.
 await ev("window.apiCalls = 0; { const orig = api; window.api = Object.assign(p => (apiCalls++, orig(p)), { orig }); }");

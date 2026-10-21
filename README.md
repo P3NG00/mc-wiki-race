@@ -10,32 +10,31 @@ The whole game is one `index.html`, with no build step and no dependencies. Next
 
 Open `index.html` in a browser. Opening it straight from disk (`file://`) works fine.
 
-- **Pools** decide which articles come up. The start and target are always from different topics (blocks, items, mobs, biomes & structures, enchantments & effects), since two things from the same topic are usually one click apart:
-  - **Popular:** the best-known game content, the 30% most linked across the wiki.
-  - **Everyday:** all the game content, each topic equally likely.
-  - **Deep cuts:** the least-known third of each topic.
-  - **Chaos:** any article on the wiki.
-- **Content** adds more to the pools: **April Fools** jokes, **Removed & unused** features, **Education** blocks, items and mobs, **Books & comics** objects, **Variants** (stairs, slabs, walls, dyes and the like) and **Mechanics** (breeding, brewing, game rules). Chaos has them all already.
-- **Spin-offs** (Dungeons, Dungeons II, Legends, Earth, Story Mode, Movie) add the wiki's pages about other Minecraft games, in any mode, and make links to them work. **All** switches every spin-off on or off. Without them, links into those pages are dead.
-- **Target** topic (Blocks, Items, Mobs, Biomes & structures, Enchantments & effects) picks the target from that part of the wiki, in any pool. The start comes from another topic. Changing it rerolls the target, and a target you type yourself skips it.
-- **Target par** beside it picks how far the target is: **Par 1** (it's linked straight from the start) or **Par 3+** (the far ones: almost every pair is par 2, and par 3 is only a few percent of them). Reroll all finds a start that has such a target.
-- **Reroll** any card, or type your own article.
-- **📅 Daily** loads today's pair, which is the same for everyone on the same date. It always plays on Normal with one extra rule of the day (No Back, Blind target, one or two checkpoints, Six clicks, a round trip, Exact clicks, a scavenger hunt, or Hard instead), it can always be done (on a Six clicks day in 4 clicks or fewer), and the result says it was the daily. `index.html#daily` opens it directly.
-- **Back** returns to the previous article and counts as a click. The clock pauses while an article loads.
-- **Par** is the fewest clicks the pair can be done in, with the same difficulty, checkpoints and spin-offs. It shows beside Start and in the game's header, and the result scores your win against it as golf does (Hole in one!, Par, Bogey, Double bogey…) and shows one route that takes that many. It goes by the wiki's offline copy, so the result names that copy's date.
-- **Difficulty** decides which links you can use:
-  - **Relaxed:** everything, including the big link tables at the bottom of articles (navboxes), so almost any sensible click gets you closer.
-  - **Normal** (the default): the navboxes are hidden, so you find your way through the article itself.
-  - **Hard:** no navboxes, and links to big overview pages like Block, Item, Mob, Crafting or Java Edition are dead too, unless that page is the target.
-- **Rules** are optional extras you can switch on:
+The setup screen puts playing first. Top to bottom:
+
+- **📅 Daily challenge** shows today's game. **Play the daily** loads today's pair, which is the same for everyone on the same date. It always plays on Normal with one extra rule of the day (No Back, Blind target, a relay, Six clicks, a round trip, Exact clicks, a scavenger hunt, or Hard instead), it can always be done (on a Six clicks day in 4 clicks or fewer), and the result says it was the daily. `index.html#daily` opens it directly.
+- **Your game** says what's set, and **Change game and settings** takes you down to the steps below the cards.
+- **The cards:** **Reroll** any of them, or type your own article. **Par** beside Start is the fewest clicks the game can be done in, with the same difficulty, checkpoints and spin-offs. It shows in the game's header too, and the result scores your win against it as golf does (Hole in one!, Par, Bogey, Double bogey…) and shows one route that takes that many. It goes by the wiki's offline copy, so the result names that copy's date.
+
+Under the cards are the steps for changing the game:
+
+- **1 · Choose a game.** One of these, with its own options in the strip under the tiles:
+  - **Race:** from the start to the target, the classic.
+  - **Relay:** one to three checkpoints to visit on the way, in order. Reaching the target before them doesn't count.
+  - **Round trip:** reach the target, then find your way back to the start. Back can't take you the way you came. With **No retracing** ticked as well, every page from the way there is a dead link on the way back.
+  - **Scavenger hunt:** instead of a target, find three things in any order: **3 kinds** (one of each, like a mob found in the Nether, an enchantment and a potion) or **3 articles**. A kind is a wiki category, hand-picked, with surprising members left out; the result says what each find was.
+  - **Exact clicks:** reach the target in exactly par + 2 clicks, never on the same page twice, so there's no Back. Getting there sooner loses, so you have to find a detour, and so does running out.
+- **2 · Extra rules**, in any mix:
   - **No Back:** the Back button is gone, so every click is final.
   - **Blind target:** you only get the target's name, with no picture or description.
   - **Hot/cold:** after each click, a hint says whether you got closer to the target (🔥 warmer) or further away (❄️ colder), never how close.
-  - **Six clicks:** reach the target in 6 clicks or fewer, Back included, or the game is over.
-  - **Exact clicks:** reach the target in exactly par + 2 clicks, never on the same page twice, so there's no Back. Getting there sooner loses, so you have to find a detour, and so does running out.
-  - **Checkpoint:** one to three more cards, a relay. You have to visit them on the way, in order, and reaching the target before them doesn't count.
-  - **Round trip:** reach the target, then find your way back to the start. Back can't take you the way you came. With **No retracing** ticked as well, every page from the way there is a dead link on the way back.
-  - **Scavenger:** instead of a target, find three things in any order: **3 kinds** (one of each, like a mob found in the Nether, an enchantment and a potion) or **3 articles**. A kind is a wiki category, hand-picked, with surprising members left out; the result says what each find was.
+  - **Six clicks:** reach the target in 6 clicks or fewer, Back included, or the game is over. Not with Exact clicks, which has its own count.
+- **3 · Articles and difficulty** is one line saying what's set. **Change** opens it:
+  - **Articles** decide which come up. The start and target are always from different topics (blocks, items, mobs, biomes & structures, enchantments & effects), since two things from the same topic are usually one click apart. **Popular** is the best-known game content, the 30% most linked across the wiki; **Everyday** all of it, each topic equally likely; **Deep cuts** the least-known third of each topic; **Chaos** any article on the wiki.
+  - **Difficulty** decides which links you can use. **Relaxed:** everything, including the big link tables at the bottom of articles (navboxes), so almost any sensible click gets you closer. **Normal** (the default): the navboxes are hidden, so you find your way through the article itself. **Hard:** no navboxes, and links to big overview pages like Block, Item, Mob, Crafting or Java Edition are dead too, unless that page is the target.
+  - **Target** topic (Blocks, Items, Mobs, Biomes & structures, Enchantments & effects) picks the target from that part of the wiki, in any pool, and the start comes from another topic. **Target par** picks how far it is: **Par 1** (linked straight from the start) or **Par 3+** (the far ones: almost every pair is par 2, and par 3 is only a few percent of them). Changing either rerolls the target, and a target you type yourself skips them.
+  - **Content** adds more to the articles: **April Fools** jokes, **Removed & unused** features, **Education** blocks, items and mobs, **Books & comics** objects, **Variants** (stairs, slabs, walls, dyes and the like) and **Mechanics** (breeding, brewing, game rules). Chaos has them all already. **Spin-offs** (Dungeons, Dungeons II, Legends, Earth, Story Mode, Movie) add the wiki's pages about other Minecraft games and make links to them work; **All** switches every one on or off.
+- **Back** returns to the previous article and counts as a click. The clock pauses while an article loads.
 - **Copy challenge link** shares the exact pair you're looking at, plus any checkpoints, the difficulty and rules, as `index.html#start=<Title>&target=<Title>&via=<Title>&rules=nonav,checkpoint` (`nonav` is Normal, `nonav,nohubs` Hard, neither Relaxed).
 - **Theme** (top right of the setup screen): Auto follows your system's light or dark setting. Articles switch to the wiki's own dark theme to match.
 - Your last 50 games, your personal best for each pair and your theme are kept in the browser. Personal bests are kept separately for each combination of rules. Each result also notes the target topic it was rolled with and the Content that was on.

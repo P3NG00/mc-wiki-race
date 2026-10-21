@@ -103,6 +103,42 @@
   .modes .lbl { align-self: center; min-width: 46px; color: var(--muted); font-size: 13.5px; }
   .modes select { padding: 6px 12px; border: 1px solid var(--line); border-radius: var(--radius-pill); background: var(--panel); }
   .mode-help { color: var(--muted); font-size: 13px; margin: -6px 0 18px 54px; }
+  /* The setup in steps: the daily, the game (one of the tiles, with its own options in the strip under them), extra rules
+     that go with any game, and the articles and difficulty folded into one line. */
+  .daily-box, .settings-sum { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; justify-content: space-between;
+    padding: 10px 12px 10px 16px; border: 1px solid var(--line); border-radius: var(--radius-lg); background: var(--panel); }
+  .daily-box { margin-bottom: 20px; }
+  /* What is set, above the cards: the game, extra rules, articles and difficulty, with a way down to change them. */
+  .your-game { display: flex; flex-wrap: wrap; gap: 4px 12px; align-items: baseline; margin-bottom: 10px; }
+  .your-game button.link { font-weight: 600; }
+  /* The game and settings, under the cards and Start: play first, adjust if you want to. */
+  .game-settings { margin-top: 36px; padding-top: 24px; border-top: 1px solid var(--line); }
+  .kicker, .step { font-size: 12px; font-weight: 700; letter-spacing: .07em; text-transform: uppercase; color: var(--muted); }
+  .daily-box .kicker { display: block; }
+  .step { margin: 0 0 10px; }
+  .step .note { text-transform: none; letter-spacing: 0; font-weight: 400; }
+  .games { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }   /* two across on a phone */
+  .games label { position: relative; display: flex; flex-direction: column; gap: 4px; padding: 12px 14px; border: 2px solid var(--line);
+    border-radius: var(--radius-lg); background: var(--panel); cursor: pointer; }
+  .games label:has(input:checked) { border-color: var(--accent); background: var(--accent-soft); }
+  .games label:has(input:focus-visible) { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .games input { position: absolute; opacity: 0; pointer-events: none; }
+  .games b { font-size: 16px; }
+  .games .diagram { font: 13px ui-monospace, Menlo, Consolas, monospace; color: var(--accent); }
+  .game-help { display: flex; flex-wrap: wrap; gap: 8px 20px; align-items: center; min-height: 52px; box-sizing: border-box;
+    margin: 10px 0 28px; padding: 10px 16px; border-radius: var(--radius-lg); background: var(--accent-soft); }
+  .game-help p { margin: 0; flex: 1 1 380px; }
+  .game-opt { display: flex; gap: 8px; align-items: center; }
+  .game-opt select { padding: 6px 10px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--panel); }
+  .game-opt input { accent-color: var(--accent); margin: 0; }
+  .extras { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin-bottom: 28px; }
+  .extras label { display: flex; gap: 10px; align-items: flex-start; padding: 10px 14px; border: 1px solid var(--line);
+    border-radius: var(--radius-lg); background: var(--panel); cursor: pointer; }
+  .extras label:has(input:checked) { border-color: var(--accent); background: var(--accent-soft); }
+  .extras label:has(input:disabled) { opacity: .6; cursor: default; }
+  .extras input { accent-color: var(--accent); margin: 3px 0 0; flex: none; }
+  .extras span { display: flex; flex-direction: column; gap: 2px; }
+  .settings { margin-top: 10px; padding: 16px 16px 2px; border: 1px solid var(--line); border-radius: var(--radius-lg); background: var(--panel); }
   .pair { display: grid; grid-template-columns: 1fr auto 1fr; gap: 12px; align-items: stretch; }
   .pair[data-vias="1"] { grid-template-columns: repeat(2, minmax(0, 1fr) auto) minmax(0, 1fr); }
   .pair[data-vias="2"] { grid-template-columns: repeat(3, minmax(0, 1fr) auto) minmax(0, 1fr); }
@@ -235,6 +271,11 @@
 
   @media (max-width: 720px) {
     .pair, .pair[data-vias] { grid-template-columns: 1fr; }
+    /* Stacked, the cards stay short enough that Start game fits on a phone's first screen. */
+    .card { min-height: 0; }
+    .card .desc { -webkit-line-clamp: 2; }
+    .daily-box { flex-wrap: nowrap; }
+    .daily-box button { flex: none; }
     .arrow { justify-self: center; transform: rotate(90deg); }
     .mode-help { margin-left: 0; }
     .setup-actions .primary { flex-basis: 100%; padding: 10px 14px; }
@@ -293,7 +334,7 @@
   }
 </style>
 <!-- Without JavaScript nothing on the setup screen works, so only the heading, the notice and the footer are shown. -->
-<noscript><style>.head-opts, .modes, .mode-help, .pair, .setup-actions { display: none !important; }</style></noscript>
+<noscript><style>.head-opts, .daily-box, .your-game, .game-settings, .step, .games, .game-help, .extras, .settings-sum, .settings, .modes, .mode-help, .pair, .setup-actions { display: none !important; }</style></noscript>
 </head>
 <body>
 <script id="theme-boot">
@@ -317,24 +358,19 @@ const THEMES = [...new Set(['auto', 'light', 'dark', ...Array.from(document.quer
       <label>Theme <select id="themeSelect"></select></label>
     </div>
   </div>
-  <p class="sub">A wiki race through the Minecraft Wiki: get from the start article to the target article using only the links inside articles. Fewest clicks and fastest time wins.</p>
+  <p class="sub">Get from the start article to the target using only the links inside articles. Fewest clicks and fastest time win.</p>
   <noscript><div class="noscript"><p><strong>This game needs JavaScript.</strong> It fetches articles from minecraft.wiki as you play, so turn JavaScript on for this page and reload it.</p></div></noscript>
 
-  <div class="modes" role="radiogroup" aria-label="Article pool">
-    <span class="lbl">Pool</span>
-    <label><input type="radio" name="mode" value="popular"> Popular</label>
-    <label><input type="radio" name="mode" value="everyday" checked> Everyday</label>
-    <label><input type="radio" name="mode" value="deep"> Deep cuts</label>
-    <label><input type="radio" name="mode" value="chaos"> Chaos</label>
+  <div class="daily-box">
+    <div><span class="kicker">Daily challenge · <span id="dailyDate"></span></span><b id="dailyWhat"></b> <span class="note" id="dailyDone"></span></div>
+    <button id="btnDaily" title="Today’s pair: the same for everyone">📅 Play the daily</button>
   </div>
-  <p class="mode-help" id="modeHelp"></p>
-  <div class="modes" role="radiogroup" aria-label="Difficulty" id="level"></div>
-  <p class="mode-help" id="levelHelp"></p>
-  <div class="modes" role="group" aria-label="Target" id="target"></div>
-  <div class="modes" role="group" aria-label="Rules" id="rules"></div>
-  <div class="modes" role="group" aria-label="Content" id="content"></div>
-  <div class="modes" role="group" aria-label="Spin-offs" id="spinoffs"></div>
 
+  <div class="your-game">
+    <span class="kicker">Your game</span>
+    <span id="gameSum"></span>
+    <button class="link" id="btnToSettings">Change game and settings ↓</button>
+  </div>
   <div class="pair">
     <div class="card start" id="cardStart">
       <span class="tag">Start</span>
@@ -367,10 +403,45 @@ const THEMES = [...new Set(['auto', 'light', 'dark', ...Array.from(document.quer
     <button class="primary" id="btnPlay" disabled>Start game</button>
     <span class="setup-par" id="setupPar" title="The fewest clicks this pair can be done in, going by the wiki’s offline copy"></span>
     <button id="btnRerollAll">🎲 Reroll all</button>
-    <button id="btnDaily" title="Today’s pair: the same for everyone">📅 Daily</button>
     <button id="btnSwap">⇄ Swap</button>
     <button id="btnCopy" title="Copy a link that opens this exact pair">Copy challenge link</button>
     <span class="status" id="setupStatus"></span>
+  </div>
+
+  <div class="game-settings" id="gameSettings">
+  <h2 class="step">1 · Choose a game</h2>
+  <div class="games" role="radiogroup" aria-label="Game" id="games"></div>
+  <div class="game-help">
+    <p id="gameHelp"></p>
+    <label class="game-opt" data-game="relay">Checkpoints <select id="viaCount"></select></label>
+    <label class="game-opt" data-game="scavenger">Find <select id="huntMode"></select></label>
+    <label class="game-opt" data-game="roundtrip"><input type="checkbox" class="rule" value="noretrace"> <span><b>No retracing</b> <span class="note">· the way there is dead on the way back</span></span></label>
+    <span class="game-opt" data-game="exact" id="exactInfo"></span>
+  </div>
+
+  <h2 class="step">2 · Extra rules <span class="note">(any mix)</span></h2>
+  <div class="extras" role="group" aria-label="Extra rules" id="rules"></div>
+
+  <h2 class="step">3 · Articles and difficulty</h2>
+  <div class="settings-sum">
+    <span id="settingsSum"></span>
+    <button id="btnSettings" aria-expanded="false" aria-controls="settings">Change</button>
+  </div>
+  <div class="settings hidden" id="settings">
+    <div class="modes" role="radiogroup" aria-label="Articles">
+      <span class="lbl">Articles</span>
+      <label><input type="radio" name="mode" value="popular"> Popular</label>
+      <label><input type="radio" name="mode" value="everyday" checked> Everyday</label>
+      <label><input type="radio" name="mode" value="deep"> Deep cuts</label>
+      <label><input type="radio" name="mode" value="chaos"> Chaos</label>
+    </div>
+    <p class="mode-help" id="modeHelp"></p>
+    <div class="modes" role="radiogroup" aria-label="Difficulty" id="level"></div>
+    <p class="mode-help" id="levelHelp"></p>
+    <div class="modes" role="group" aria-label="Target" id="target"></div>
+    <div class="modes" role="group" aria-label="Content" id="content"></div>
+    <div class="modes" role="group" aria-label="Spin-offs" id="spinoffs"></div>
+  </div>
   </div>
 
   <div class="history hidden" id="history">
@@ -629,24 +700,53 @@ const MODE_HELP = {
   chaos: 'Chaos: any article on the wiki, version pages, history subpages and April Fools jokes included. Expect obscure starting points.',
 };
 function updateModeHelp() { $('#modeHelp').textContent = MODE_HELP[mode()]; }
+// The folded settings in one line: the pool, the difficulty, the target's topic and par, and any Content that is on.
+function updateSettingsSum() {
+  const topic = $('#topic').value, par = $('#reach').value, hunt = huntMode(), extra = content();
+  const articles = $('input[name=mode]:checked').parentElement.textContent.trim() + ' articles';
+  $('#settingsSum').textContent = [articles, LEVELS[level()].label,
+    hunt !== 'kinds' && (topic === 'any' ? 'any topic' : TOPICS[topic].label), !hunt && (par === 'any' ? 'any par' : REACHES[par].label),
+    extra.length && 'with ' + extra.map(contentLabel).join(', ')].filter(Boolean).join(' · ');
+  // The line above the cards: the game (with its option), the extra rules, the articles and the difficulty.
+  const g = gameMode(), detail = { relay: `${viaCount()} checkpoint${viaCount() > 1 ? 's' : ''}`, scavenger: `${HUNT_SIZE} ${$('#huntMode').value}`,
+    roundtrip: rules().includes('noretrace') && 'No retracing' }[g];
+  $('#gameSum').textContent = [GAMES[g].label + (detail ? ` (${detail})` : ''), ...rules().filter(k => EXTRA_RULES.includes(k)).map(k => RULES[k].label),
+    articles, LEVELS[level()].label].join(' · ');
+}
 
 // Rules, stored with each result (personal bests only compare games with the same rules) and carried in challenge links.
-// No hubs and No navboxes are set by the difficulty (LEVELS); the rest are optional checkboxes.
+// No hubs and No navboxes are set by the difficulty (LEVELS), the games' rules by the game tiles (GAMES), and the extra
+// rules (EXTRA_RULES) are checkboxes, whose boxes show their help.
 const RULES = {
   noback: { label: 'No Back', help: 'The Back button is gone: every click is final.' },
-  nohubs: { label: 'No hubs', help: 'Links to big overview pages (Block, Item, Mob, Crafting, Java Edition…) are dead.' },
-  nonav: { label: 'No navboxes', help: 'The link tables at the bottom of articles are gone: only links in the article itself count.' },
+  nohubs: { label: 'No hubs' },
+  nonav: { label: 'No navboxes' },
   blind: { label: 'Blind target', help: 'You only get the target’s name: no picture or description.' },
-  hotcold: { label: 'Hot/cold', help: 'After each click, a hint says whether you got closer to the target (warmer) or further away (colder).' },
-  checkpoint: { label: 'Checkpoint', help: 'One to three more articles you have to visit, in order, on the way to the target.' },
-  roundtrip: { label: 'Round trip', help: 'Reach the target, then find your way back to the start. Back can’t take you the way you came.', over: ['checkpoint'] },
-  noretrace: { label: 'No retracing', help: 'On the way back, every page from the way there is a dead link.', needs: 'roundtrip' },
-  scavenger: { label: 'Scavenger', help: `Instead of a target, find ${HUNT_SIZE} articles, or one of each of ${HUNT_SIZE} kinds, in any order.`,
-    over: ['checkpoint', 'roundtrip', 'exact'] },
-  limit: { label: 'Six clicks', help: `Reach the target in ${CLICK_LIMIT} clicks or fewer, Back and the way through a checkpoint included.` },
-  exact: { label: 'Exact clicks', help: `Reach the target in exactly par + ${EXACT_EXTRA} clicks, never on a page twice (so no Back). Getting there sooner loses, and so does running out.`,
-    over: ['checkpoint', 'roundtrip', 'limit'] },
+  hotcold: { label: 'Hot/cold', help: 'After each click, a hint: warmer if you got closer to the target, colder if not.' },
+  checkpoint: { label: 'Relay' },
+  roundtrip: { label: 'Round trip' },
+  noretrace: { label: 'No retracing' },
+  scavenger: { label: 'Scavenger hunt' },
+  limit: { label: 'Six clicks', help: `Reach the target in ${CLICK_LIMIT} clicks or fewer, or lose. Back counts.` },
+  exact: { label: 'Exact clicks' },
 };
+// The game, one of the tiles: its rule (a Race has none), and what its tile and the strip under the tiles say. The games'
+// rules can't be played together, so the tiles pick one; the extra rules go with any game, Six clicks aside, which
+// Exact clicks has its own count in place of.
+const GAMES = {
+  race: { label: 'Race', diagram: 'A → B', blurb: 'Start to target. The classic.', help: 'get from the start to the target in as few clicks as you can.' },
+  relay: { rule: 'checkpoint', label: 'Relay', diagram: 'A → 1 → 2 → B', blurb: 'Checkpoints on the way, in order.',
+    help: 'visit each checkpoint, in order, before the target counts.' },
+  roundtrip: { rule: 'roundtrip', label: 'Round trip', diagram: 'A ⇄ B', blurb: 'There and back again.',
+    help: 'reach the target, then find your way back to the start. Back can’t retrace the way you came.' },
+  scavenger: { rule: 'scavenger', label: 'Scavenger hunt', diagram: 'A → ✓ ✓ ✓', blurb: `Find ${HUNT_SIZE} things, any order.`,
+    help: `instead of one target, find ${HUNT_SIZE} things in any order: one of each of ${HUNT_SIZE} kinds, or ${HUNT_SIZE} articles.` },
+  exact: { rule: 'exact', label: 'Exact clicks', diagram: 'A → → → → B', blurb: `Land on it in exactly par + ${EXACT_EXTRA}.`,
+    help: `reach the target in exactly par + ${EXACT_EXTRA} clicks, never on a page twice. Too soon loses too, so plan a detour.` },
+};
+const EXTRA_RULES = ['noback', 'blind', 'hotcold', 'limit'];
+// The game a set of rules plays: a link made by hand with more than one game's rule plays the first of these.
+const gameOf = keys => ['exact', 'scavenger', 'roundtrip', 'relay'].find(g => keys.includes(GAMES[g].rule)) ?? 'race';
 // Difficulty, as the rules it turns on. Navboxes decide how hard a game is far more than the pool does: with them almost any
 // sensible click gets closer (see tools/wikidata/RESEARCH.md), so Normal, the default, plays without them.
 const LEVELS = {
@@ -681,19 +781,19 @@ function setContent(keys) {
   syncAllSpinoffs();
 }
 
-// The rules in play, in RULES order: the difficulty's and the ticked ones. A rule leaves out the ones in its `over`, which
-// it can't be played with (Round trip takes Checkpoint's place, its target being the one stop on the way; Exact clicks
-// sets its own count and can't revisit a page), and one with `needs` only goes with that one (No retracing, Round trip).
-// Ticking a rule unticks the ones it can't be played with, so only a link made by hand can have both.
+// The rules in play, in RULES order: the difficulty's, the game's, and the ticked extra rules (input.rule), No retracing
+// only in a Round trip and Six clicks not with Exact clicks.
 function level() { return $('input[name=level]:checked').value; }
+function gameMode() { return $('input[name=game]:checked').value; }
 function rules() {
-  const on = k => LEVELS[level()].rules.includes(k) || !!$(`#rules input[value=${k}]`)?.checked;
-  const keys = Object.keys(RULES).filter(k => on(k) && !Object.keys(RULES).some(o => on(o) && RULES[o].over?.includes(k)));
-  return keys.filter(k => !RULES[k].needs || keys.includes(RULES[k].needs));
+  const g = GAMES[gameMode()].rule, ticked = k => !!$(`input.rule[value=${k}]`)?.checked;
+  return Object.keys(RULES).filter(k => LEVELS[level()].rules.includes(k) || k === g || (k === 'noretrace' && g === 'roundtrip' && ticked(k))
+    || (EXTRA_RULES.includes(k) && ticked(k) && !(k === 'limit' && g === 'exact')));
 }
 function setRules(keys) {
   $(`input[name=level][value=${levelOf(keys)}]`).checked = true;
-  for (const b of document.querySelectorAll('#rules input')) b.checked = keys.includes(b.value);
+  $(`input[name=game][value=${gameOf(keys)}]`).checked = true;
+  for (const b of document.querySelectorAll('input.rule')) b.checked = keys.includes(b.value);
   updateLevelHelp();
 }
 function updateLevelHelp() { $('#levelHelp').textContent = LEVELS[level()].help; }
@@ -756,6 +856,7 @@ let setupParToken = 0;
 async function updateSetupPar() {
   const token = ++setupParToken, titles = cardKeys().map(w => setup[w]?.title), r = rules(), kinds = huntMode() === 'kinds' ? setup.kinds : null;
   setup.exact = null;
+  $('#exactInfo').textContent = 'Working out the count…';
   let text = '';
   if (titles.every(Boolean) && (kinds?.length ?? true)) {
     const route = await cardsRoute(titles, r, kinds).catch(() => null);
@@ -765,6 +866,8 @@ async function updateSetupPar() {
       if (token !== setupParToken) return;
       setup.exact = exact;
       text = !route ? 'No par to count exact clicks from' : exact ? `${text} · exactly ${n}` : `${text} · no way in exactly ${n}`;
+      $('#exactInfo').textContent = !route ? 'This pair has no par to count from.' : exact ? `This pair: par ${n - EXACT_EXTRA}, so exactly ${n} clicks.`
+        : `This pair can’t be done in exactly ${n} clicks.`;
     }
   }
   if (token === setupParToken) { $('#setupPar').textContent = text; updatePlay(); }
@@ -786,11 +889,15 @@ function updatePlay() {
 // that have no article yet. They are numbered when there is more than one. A round trip shows No retracing beside it,
 // and the start as where it ends too.
 function syncVia() {
-  const keys = viaKeys(), roundTrip = rules().includes('roundtrip'), hunt = huntMode();
+  const keys = viaKeys(), roundTrip = rules().includes('roundtrip'), hunt = huntMode(), g = gameMode();
   $('.pair').dataset.vias = keys.length;
-  $('#viaCount').classList.toggle('hidden', !rules().includes('checkpoint'));
-  $('#huntMode').classList.toggle('hidden', !hunt);
-  $('#rules label[data-rule=noretrace]').classList.toggle('hidden', !roundTrip);
+  // The strip under the tiles: what the game is, and its own options.
+  $('#gameHelp').innerHTML = `<b>${esc(GAMES[g].label)}:</b> ${esc(GAMES[g].help)}`;
+  document.querySelectorAll('.game-opt').forEach(el => el.classList.toggle('hidden', el.dataset.game !== g));
+  const six = $('input.rule[value=limit]');
+  six.disabled = g === 'exact';
+  $('#rules [data-desc=limit]').textContent = g === 'exact' ? 'Off: Exact clicks has its own count.' : RULES.limit.help;
+  updateSettingsSum();
   $('#pairArrow').textContent = roundTrip ? '⇄' : '➜';
   $('#cardStart .tag').textContent = roundTrip ? 'Start and finish' : 'Start';
   // Scavenger's articles are on the checkpoint cards and the target card, joined by + since they go in any order.
@@ -979,6 +1086,21 @@ const DAILY_CHECKPOINTS = [1, 2];
 // A Scavenger day hunts kinds or articles, ranked like the rest.
 const DAILY_HUNTS = ['kinds', 'articles'];
 const dailyRule = date => ranked(date, 'rule', DAILY_RULES)[0];
+// What a day's daily plays, in words, from its rule alone (no lookups): "Relay, 2 checkpoints", "Scavenger hunt, 3 kinds".
+function dailyText(date) {
+  const rule = dailyRule(date);
+  if (rule === 'nohubs') return 'Hard';
+  if (rule === 'checkpoint') return (n => n > 1 ? `Relay, ${n} checkpoints` : 'Relay')(ranked(date, 'checkpoints', DAILY_CHECKPOINTS)[0]);
+  if (rule === 'scavenger') return `Scavenger hunt, ${HUNT_SIZE} ${ranked(date, 'hunt', DAILY_HUNTS)[0]}`;
+  return RULES[rule].label;
+}
+// The daily box at the top of the setup screen: today's game, and how you did if you have won it.
+function renderDailyBox() {
+  const date = today(), done = savedGames().find(r => r.daily === date && r.won);
+  $('#dailyDate').textContent = new Date().toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
+  $('#dailyWhat').textContent = dailyText(date);
+  $('#dailyDone').textContent = done ? `· done in ${done.clicks} clicks (${fmtTime(done.ms)})` : '';
+}
 
 // A daily can always be done: its target, checkpoints and finds are only taken where the link graph has a route under
 // its rules (on a Six clicks day, a short enough one; on an Exact clicks day, one of exactly its count), so the daily
@@ -1037,9 +1159,7 @@ async function loadDaily(date = today()) {
     syncVia();
     keys.forEach(renderCard);
     const done = savedGames().find(r => r.daily === date && r.won);
-    const what = rule === 'nohubs' ? 'on Hard' : hunt ? `with Scavenger (${HUNT_SIZE} ${hunt})` : rule === 'checkpoint' && vias.length > 1 ? `with ${vias.length} checkpoints`
-      : 'with ' + RULES[rule].label;
-    setStatus(`Daily challenge for ${date}, ${what}.` + (done ? ` You did it in ${done.clicks} clicks (${fmtTime(done.ms)}).` : ' Press Start when ready.'));
+    setStatus(`Daily challenge for ${date}: ${dailyText(date)}.` + (done ? ` You did it in ${done.clicks} clicks (${fmtTime(done.ms)}).` : ' Press Start when ready.'));
   });
 }
 
@@ -1060,6 +1180,7 @@ function challengeLink() {
 }
 
 function renderHistory() {
+  renderDailyBox();
   const rows = savedGames();
   $('#history').classList.toggle('hidden', rows.length === 0);
   $('#history tbody').innerHTML = rows.slice(0, 15).map(r => `
@@ -2005,13 +2126,12 @@ $('#modalBg').addEventListener('click', e => { if (e.target === $('#modalBg') &&
 document.addEventListener('keydown', e => { if (e.key === 'Escape' && modalDismissable) closeModal(); });
 
 // ---------------------------------------------------------------- Wiring
-// The checkpoint count sits beside its checkbox, not in its label, where a click on it would toggle the box.
-$('#rules').innerHTML = '<span class="lbl">Rules</span>' + Object.entries(RULES).filter(([k]) => !LEVEL_RULES.includes(k)).map(([k, r]) =>
-  `<label title="${esc(r.help)}" data-rule="${k}"><input type="checkbox" value="${k}"> ${esc(r.label)}</label>` + (k !== 'checkpoint' ? '' :
-  `<select id="viaCount" class="hidden" aria-label="How many checkpoints" title="How many checkpoints, visited in order">
-  ${VIA_KEYS.map((w, i) => `<option>${i + 1}</option>`).join('')}</select>`) + (k !== 'scavenger' ? '' :
-  `<select id="huntMode" class="hidden" aria-label="What to find" title="Articles to find, or kinds to find one of each">
-  <option value="kinds">${HUNT_SIZE} kinds</option><option value="articles">${HUNT_SIZE} articles</option></select>`)).join('');
+$('#games').innerHTML = Object.entries(GAMES).map(([k, g]) => `<label><input type="radio" name="game" value="${k}"${k === 'race' ? ' checked' : ''}>
+  <b>${esc(g.label)}</b><span class="diagram" aria-hidden="true">${esc(g.diagram)}</span><span class="note">${esc(g.blurb)}</span></label>`).join('');
+$('#rules').innerHTML = EXTRA_RULES.map(k => `<label><input type="checkbox" class="rule" value="${k}">
+  <span><b>${esc(RULES[k].label)}</b><span class="note" data-desc="${k}">${esc(RULES[k].help)}</span></span></label>`).join('');
+$('#viaCount').innerHTML = VIA_KEYS.map((w, i) => `<option>${i + 1}</option>`).join('');
+$('#huntMode').innerHTML = `<option value="kinds">${HUNT_SIZE} kinds</option><option value="articles">${HUNT_SIZE} articles</option>`;
 $('#vias').innerHTML = VIA_KEYS.map((w, i) => `
     <div class="via-slot hidden" id="slot-${w}">
       <div class="card via" id="card-${w}">
@@ -2061,13 +2181,8 @@ for (const row of ['#content', '#spinoffs']) $(row).addEventListener('change', e
   syncAllSpinoffs();
   reroll('all');
 });
-// A rule or the difficulty changing leaves a daily, but doesn't reroll. Ticking a rule unticks the ones it can't be
-// played with, either way round (see rules()).
-for (const row of ['#rules', '#level']) $(row).addEventListener('change', e => {
-  const ticked = e.target.checked && RULES[e.target.value];
-  if (ticked) for (const b of document.querySelectorAll('#rules input')) {
-    if (ticked.over?.includes(b.value) || RULES[b.value].over?.includes(e.target.value)) b.checked = false;
-  }
+// The game, a rule or the difficulty changing leaves a daily, but doesn't reroll.
+for (const row of ['#games', '.game-help', '#rules', '#level']) $(row).addEventListener('change', () => {
   if (leaveDaily()) setStatus(LEFT_DAILY);
   updateLevelHelp(); syncVia(); [...VIA_KEYS, 'goal'].forEach(renderCard);
 });
@@ -2109,6 +2224,13 @@ document.querySelectorAll('[data-custom]').forEach(inp => {
   inp.addEventListener('keydown', e => { if (e.key === 'Enter') { setCustom(inp.dataset.custom, inp.value); inp.value = ''; } });
 });
 $('#btnRerollAll').onclick = () => reroll('all');
+$('#settings').addEventListener('change', updateSettingsSum);
+$('#btnToSettings').onclick = () => $('#gameSettings').scrollIntoView({ behavior: 'smooth' });
+$('#btnSettings').onclick = () => {
+  const open = !$('#settings').classList.toggle('hidden');
+  $('#btnSettings').textContent = open ? 'Done' : 'Change';
+  $('#btnSettings').setAttribute('aria-expanded', String(open));
+};
 // Swap plays the whole chain backwards, checkpoints included.
 $('#btnSwap').onclick = () => {
   const keys = cardKeys(), cards = keys.map(w => setup[w]).reverse();

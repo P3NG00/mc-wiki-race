@@ -287,13 +287,13 @@ await ev("(s => { s.value = 'any'; s.dispatchEvent(new Event('change', { bubbles
 await sleep(500);
 await until("!document.querySelector('#btnPlay').disabled", 60000);
 
-// Ticking Checkpoint shows the checkpoint card with a third, different article; unticking hides it.
+// Picking Relay shows the checkpoint card with a third, different article; going back to Race hides it.
 const viaCard = "!document.querySelector('#slot-via0').classList.contains('hidden')";
-await ev("document.querySelector('#rules input[value=checkpoint]').click()");
-check('Checkpoint adds a distinct checkpoint', await until(`${viaCard} && !document.querySelector('#btnPlay').disabled`, 60000) &&
+await ev("document.querySelector('input[name=game][value=relay]').click()");
+check('Relay adds a distinct checkpoint', await until(`${viaCard} && !document.querySelector('#btnPlay').disabled`, 60000) &&
   await ev("new Set([setup.start.title, setup.via0.title, setup.goal.title]).size === 3"), await ev("setup.via0?.title"));
-await ev("document.querySelector('#rules input[value=checkpoint]').click()");
-check('unticking Checkpoint hides it', await ev(`!(${viaCard}) && !document.querySelector('#btnPlay').disabled`));
+await ev("document.querySelector('input[name=game][value=race]').click()");
+check('back to Race hides it', await ev(`!(${viaCard}) && !document.querySelector('#btnPlay').disabled`));
 
 // An interwiki title has no page in the API response; it must read as "not found", not a network error.
 await ev("(() => { const i = document.querySelector('[data-custom=start]'); i.value = 'de:Diamant'; i.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter' })); })()");
@@ -493,7 +493,7 @@ check('a daily is Normal with one more rule, No hubs making it Hard', await ev("
 // A daily can always be done: a route under its rules, and on a Six clicks day (2026-01-01) par 4 or less.
 check('a Six clicks daily has par 4 or less', await ev(`dailyPair('2026-01-01').then(async p => p.rule === 'limit' &&
   (await parRoute({ start: p.start.title, goal: p.goal.title, rules: ['nonav', 'limit'] })).length - 1 <= DAILY_SIX_CLICKS_PAR)`));
-check('daily sets its rule and checkpoint', await ev(`rules().join() === 'nonav,checkpoint' && !!setup.via0 && ${viaCard} && document.querySelector('#setupStatus').textContent.includes('with Checkpoint')`));
+check('daily sets its rule and checkpoint', await ev(`rules().join() === 'nonav,checkpoint' && !!setup.via0 && ${viaCard} && document.querySelector('#setupStatus').textContent.includes(': Relay.')`));
 const pairOf = p => `[${p}.start, ...${p}.vias, ${p}.goal].map(c => c.title).join(' -> ')`;
 const daily = await ev("cardKeys().map(w => setup[w].title).join(' -> ')");
 check('daily pair is deterministic', await ev(`dailyPair('2026-01-06').then(p => p.rule === 'checkpoint' && ${pairOf('p')})`) === daily &&
@@ -510,7 +510,7 @@ check('daily result is recorded', await ev("(r => r.daily === '2026-01-06' && r.
 await ev("document.querySelector('#mNew').click()");
 await until('setup.busy === 0', 60000);
 check('New game leaves the daily without the notice', await ev("setup.daily === null && document.querySelector('#setupStatus').textContent !== LEFT_DAILY"));
-check('history marks the daily', await ev("document.querySelector('#history tbody tr').textContent.includes('Daily 2026-01-06, Checkpoint')"));
+check('history marks the daily', await ev("document.querySelector('#history tbody tr').textContent.includes('Daily 2026-01-06, Relay')"));
 await ev("loadDaily('2026-01-06')");
 await until("setup.daily === '2026-01-06' && setup.busy === 0", 60000);
 await ev("document.querySelector('#rules input[value=limit]').click()");
@@ -723,7 +723,8 @@ const leaveAfter = async giveUp => {
   await send('browsingContext.navigate', { context: ctx, url: 'about:blank', wait: 'complete' });
   await send('browsingContext.navigate', { context: ctx, url: fileUrl + '#start=Diamond&target=Diamond%20Pickaxe', wait: 'complete' });
   await until("!document.querySelector('#btnPlay').disabled");
-  const play = (await send('script.evaluate', { target: { context: ctx }, expression: "document.querySelector('#btnPlay')", awaitPromise: false })).result?.result?.sharedId;
+  // A real click needs Start on screen; below the setup steps it may not be.
+  const play = (await send('script.evaluate', { target: { context: ctx }, expression: "(b => (b.scrollIntoView({ block: 'center' }), b))(document.querySelector('#btnPlay'))", awaitPromise: false })).result?.result?.sharedId;
   await send('input.performActions', { context: ctx, actions: [{ type: 'pointer', id: 'mouse', actions: [
     { type: 'pointerMove', x: 0, y: 0, origin: { type: 'element', element: { sharedId: play } } }, { type: 'pointerDown', button: 0 }, { type: 'pointerUp', button: 0 }] }] });
   await send('input.releaseActions', { context: ctx });

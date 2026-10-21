@@ -203,14 +203,14 @@ await setCount(1);
 await ev("reroll('all')");
 check('back to one checkpoint, Reroll all drops the others', await until(ready) &&
   await ev("cardKeys().join() === 'start,via0,goal' && !setup.via1 && !setup.via2 && document.querySelector('#card-via0 .tag').textContent === 'Checkpoint'"));
-await ev("document.querySelector('#rules input[value=checkpoint]').click()");
-check('the count hides with the rule', await ev("document.querySelector('#viaCount').classList.contains('hidden') && document.querySelector('.pair').dataset.vias === '0'"));
+await ev("document.querySelector('input[name=game][value=race]').click()");
+check('the count hides with the Relay', await ev("document.querySelector('.game-opt[data-game=relay]').classList.contains('hidden') && document.querySelector('.pair').dataset.vias === '0'"));
 
 // Round trip: the target, then back to the start. Reaching the target starts Back again from there, and with No
 // retracing every page of the way there goes dead. Checkpoint and Round trip untick each other.
 await open('#start=Diamond&target=Zombie&rules=roundtrip,noretrace');
 check('a round trip shows the start as the finish, ⇄ and No retracing', await until(ready) && await ev(`document.querySelector('#cardStart .tag').textContent === 'Start and finish'
-  && document.querySelector('#pairArrow').textContent === '⇄' && !document.querySelector('#rules label[data-rule=noretrace]').classList.contains('hidden')
+  && document.querySelector('#pairArrow').textContent === '⇄' && !document.querySelector('.game-opt[data-game=roundtrip]').classList.contains('hidden') && gameMode() === 'roundtrip'
   && rules().join() === 'roundtrip,noretrace' && challengeLink().endsWith('&rules=roundtrip,noretrace')`));
 const rtPar = await ev("cardsRoute(['Diamond', 'Zombie'], rules()).then(r => r.length - 1)");
 check('setup par is the round trip\'s', await until(`document.querySelector('#setupPar').textContent === 'Par ${rtPar}'`), `par ${rtPar}`);
@@ -242,12 +242,12 @@ await until('game.path.length === 3 && !game.loading');
 rtLinks = await liveLinks();
 check('without No retracing the way there stays live, and Back still starts again', rtLinks['/w/Crafting'] === true && await ev("game.stack.join() === 'Zombie'"));
 await ev("finish(false); closeModal(); toSetup()");
-await ev("document.querySelector('#rules input[value=checkpoint]').click()");
-check('Checkpoint unticks Round trip and hides No retracing', await until(ready) && await ev(`!document.querySelector('#rules input[value=roundtrip]').checked
-  && rules().join() === 'checkpoint' && document.querySelector('#rules label[data-rule=noretrace]').classList.contains('hidden')
+await ev("document.querySelector('input[name=game][value=relay]').click()");
+check('picking Relay leaves Round trip and hides No retracing', await until(ready) && await ev(`rules().join() === 'checkpoint'
+  && document.querySelector('.game-opt[data-game=roundtrip]').classList.contains('hidden') && document.querySelector('#gameHelp').textContent.startsWith('Relay:')
   && document.querySelector('#cardStart .tag').textContent === 'Start' && document.querySelector('#pairArrow').textContent === '➜'`));
-await ev("document.querySelector('#rules input[value=roundtrip]').click()");
-check('Round trip unticks Checkpoint', await until(ready) && await ev("rules().join() === 'roundtrip' && cardKeys().join() === 'start,goal'"));
+await ev("document.querySelector('input[name=game][value=roundtrip]').click()");
+check('picking Round trip leaves Relay', await until(ready) && await ev("rules().join() === 'roundtrip' && cardKeys().join() === 'start,goal'"));
 // A target with no way back that doesn't retrace (a dead end has no way back at all) says so as it is reached.
 await open(`#start=Diamond&target=${encodeURIComponent(deadEnd)}&rules=roundtrip,noretrace`);
 await until(ready);
@@ -302,12 +302,13 @@ for (const [i, t] of wander.entries()) {
 }
 check('running out loses: Out of clicks', await until('!game.active') && await ev("store.get('mwr.history', [])[0].outOfClicks === true && document.querySelector('#modal h2').textContent === 'Out of clicks'"));
 await ev("closeModal(); toSetup()");
-await ev("document.querySelector('#rules input[value=limit]').click()");
-check('Six clicks unticks Exact clicks', await ev("rules().join() === 'limit' && !document.querySelector('#rules input[value=exact]').checked"));
-await ev("document.querySelector('#rules input[value=checkpoint]').click()");
-await ev("document.querySelector('#rules input[value=exact]').click()");
-check('Exact clicks unticks Checkpoint and Six clicks', await until(ready) && await ev("rules().join() === 'exact' && cardKeys().join() === 'start,goal'"));
-check('a link with both plays Exact clicks only', await ev("(setRules(['checkpoint', 'roundtrip', 'noretrace', 'exact', 'limit']), rules().join()) === 'exact'"));
+check('Exact clicks greys out Six clicks and says why', await ev(`gameMode() === 'exact' && document.querySelector('input.rule[value=limit]').disabled
+  && document.querySelector('[data-desc=limit]').textContent.startsWith('Off: Exact clicks')`));
+await ev("(b => { b.checked = true; b.dispatchEvent(new Event('change', { bubbles: true })); })(document.querySelector('input.rule[value=limit]'))");
+check('ticked anyway, Six clicks isn\'t played with Exact clicks', await ev("rules().join() === 'exact'"));
+await ev("document.querySelector('input[name=game][value=relay]').click()");
+check('another game takes Six clicks back', await until(ready) && await ev("rules().join() === 'checkpoint,limit' && !document.querySelector('input.rule[value=limit]').disabled"));
+check('a link with several games plays Exact clicks only', await ev("(setRules(['checkpoint', 'roundtrip', 'noretrace', 'exact', 'limit']), rules().join()) === 'exact' && gameMode() === 'exact'"));
 await ev("setRules([])");
 
 // Scavenger, kinds: a link's kinds go on the hunt card, par is a route through a member of each, and a find ticks its
@@ -380,8 +381,8 @@ await ev("closeModal(); toSetup()");
 await ev("(s => { s.value = 'kinds'; s.dispatchEvent(new Event('change', { bubbles: true })); })(document.querySelector('#huntMode'))");
 check('switching to kinds rolls them onto the hunt card', await until(ready) && await ev(`setup.kinds?.length === 3 && cardKeys().join() === 'start'
   && !document.querySelector('#cardHunt').classList.contains('hidden') && document.querySelector('#slot-via0').classList.contains('hidden')`));
-await ev("document.querySelector('#rules input[value=checkpoint]').click()");
-check('Checkpoint unticks Scavenger, giving the target back', await until(ready) && await ev(`!rules().includes('scavenger') && document.querySelector('#huntMode').classList.contains('hidden')
+await ev("document.querySelector('input[name=game][value=relay]').click()");
+check('picking Relay leaves Scavenger, giving the target back', await until(ready) && await ev(`!rules().includes('scavenger') && document.querySelector('.game-opt[data-game=scavenger]').classList.contains('hidden')
   && !document.querySelector('#cardGoal').classList.contains('hidden') && document.querySelector('#cardGoal .tag').textContent === 'Target'`));
 await ev("setRules([])");
 
@@ -459,7 +460,7 @@ check('the daily is Normal with Checkpoint on 2026-01-06, its cards from differe
   await ev("rules().join() === 'nonav,checkpoint' && new Set(cardKeys().map(w => groupOf(setup[w].title))).size === cardKeys().length"), daily);
 await open('#daily=2026-01-02');
 check('a Round trip daily (2026-01-02) goes without No retracing', await until(ready) && await ev(`rules().join() === 'nonav,roundtrip'
-  && cardKeys().join() === 'start,goal' && document.querySelector('#setupStatus').textContent.includes('with Round trip')`), await ev(pairOf));
+  && cardKeys().join() === 'start,goal' && document.querySelector('#setupStatus').textContent.includes(': Round trip.')`), await ev(pairOf));
 // Every daily can be done: a route under its rules, and on a Six clicks day par 4 or less. A month of them.
 const dailies = JSON.parse(await ev(`(async () => {
   const out = [];
@@ -477,10 +478,10 @@ check('a month of dailies all have a route: Six clicks days par 4 or less, Check
     && (d.hunt === 'kinds' ? d.kinds === 3 : !d.kinds)) && ['roundtrip', 'limit', 'exact', 'scavenger'].every(r => dailies.some(d => d.rule === r)),
   dailies.map(d => `${d.rule}${d.hunt ? '/' + d.hunt : d.vias > 1 ? '×' + d.vias : ''}:${d.par}`).join(' '));
 // Exact clicks and Scavenger days load with their rule, ready to start.
-for (const [date, rules, cards, what] of [['2026-01-24', 'nonav,exact', 'start,goal', 'with Exact clicks'], ['2026-01-08', 'nonav,scavenger', 'start', 'with Scavenger (3 kinds)'],
-  ['2026-01-10', 'nonav,scavenger', 'start,via0,via1,goal', 'with Scavenger (3 articles)']]) {
+for (const [date, rules, cards, what] of [['2026-01-24', 'nonav,exact', 'start,goal', ': Exact clicks.'], ['2026-01-08', 'nonav,scavenger', 'start', ': Scavenger hunt, 3 kinds.'],
+  ['2026-01-10', 'nonav,scavenger', 'start,via0,via1,goal', ': Scavenger hunt, 3 articles.']]) {
   await open('#daily=' + date);
-  check(`the ${date} daily loads ${what}`, await until(ready, 30000) && await ev(`rules().join() === '${rules}' && cardKeys().join() === '${cards}'
+  check(`the ${date} daily loads as${what.slice(1, -1)}`, await until(ready, 30000) && await ev(`rules().join() === '${rules}' && cardKeys().join() === '${cards}'
     && document.querySelector('#setupStatus').textContent.includes('${what}') && (!rules().includes('exact') || !!setup.exact) && (huntMode() !== 'kinds' || setup.kinds.length === 3)`),
     await ev("document.querySelector('#setupStatus').textContent"));
 }

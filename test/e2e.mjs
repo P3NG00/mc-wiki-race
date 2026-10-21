@@ -304,6 +304,21 @@ f = await frameCtx();
 const areas = JSON.parse(await ev("JSON.stringify({ all: document.querySelectorAll('area').length, live: document.querySelectorAll('area.mwr-live').length })", f));
 check('image-map links are clickable', areas.live > 0, `areas=${areas.all} live=${areas.live}`);
 
+// Beacon's layered blueprint: its layer names become buttons, and choosing one hides the layers above it.
+await send('browsingContext.navigate', { context: ctx, url: 'about:blank', wait: 'complete' });
+await send('browsingContext.navigate', { context: ctx, url: fileUrl + '#start=Beacon&target=Diamond', wait: 'complete' });
+await until("!document.querySelector('#btnPlay').disabled");
+await ev("document.querySelector('#btnPlay').click()");
+await until("game.path.length === 1 && !game.loading");
+f = await frameCtx();
+// The wiki fades layers in and out over 200 ms, so each state is waited for. Beacon's starts on its top layer, all shown.
+const layers = "[...document.querySelector('.layered-blueprint').querySelectorAll('.layered-blueprint-layer')].map(l => getComputedStyle(l).visibility[0]).join('')";
+const allShown = await until(`/^v{3,}$/.test(${layers})`, 3000, f);
+const layersBefore = await ev(layers, f);
+await ev("document.querySelector('.layered-blueprint label.layered-blueprint-tab:nth-of-type(2)').click()", f);
+const aboveHidden = await until(`/^vvh+$/.test(${layers})`, 3000, f);
+check('blueprint layers can be chosen', allShown && aboveHidden && await ev('game.path.length === 1'), `${layersBefore} -> ${await ev(layers, f)}`);
+
 // No hubs: links to hubs and their redirects are dead, except a hub that is the target.
 // Blind target: no target picture or description on the card or in the HUD, and no peek.
 await ev("store.set('mwr.pathCollapsed', true)");   // stands in for collapsing it before the reload

@@ -1184,6 +1184,14 @@ function renderArticle(page, fragment, token, blocked = [], seen = []) {
       tabber.classList.add('tabberlive');
       show(Math.max(0, panels.findIndex(p => p.contains(fragEl))));
     }
+    // The wiki's layered blueprint gadget, which turns each layer's name (Layer 1, Layer 2…) into a radio button and its
+    // label. The wiki's CSS then hides the layers above the chosen one; without the buttons the names do nothing.
+    for (const tab of document.querySelectorAll('#mw-content-text .layered-blueprint-tab')) {
+      const radio = Object.assign(document.createElement('input'), { type: 'radio', id: tab.id, name: tab.dataset.name,
+        className: 'layered-blueprint-radio', checked: tab.hasAttribute('data-checked') });
+      const label = Object.assign(document.createElement('label'), { htmlFor: tab.id, className: 'layered-blueprint-tab', textContent: tab.textContent });
+      tab.replaceWith(radio, label);
+    }
     scrollToId(FRAG);
   `;
 

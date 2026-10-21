@@ -89,8 +89,8 @@
   #setup .sub, .mode-help, .noscript { max-width: 760px; }   /* the cards use the width, prose keeps a readable line */
   .setup-head { display: flex; justify-content: space-between; align-items: baseline; gap: 4px 16px; flex-wrap: wrap; }
   #setup h1 { font-size: 28px; margin: 0 0 4px; letter-spacing: -.01em; }
-  .theme-pick { color: var(--muted); font-size: 13.5px; }
-  .theme-pick select { margin-left: 4px; padding: 3px 6px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--panel); }
+  .head-opts { display: flex; gap: 16px; align-items: baseline; color: var(--muted); font-size: 13.5px; }
+  .head-opts select { margin-left: 4px; padding: 3px 6px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--panel); }
   #setup .sub { color: var(--muted); margin: 0 0 24px; }
   .modes { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; }
   .modes label {
@@ -284,7 +284,7 @@
   }
 </style>
 <!-- Without JavaScript nothing on the setup screen works, so only the heading, the notice and the footer are shown. -->
-<noscript><style>.theme-pick, .modes, .mode-help, .pair, .setup-actions { display: none !important; }</style></noscript>
+<noscript><style>.head-opts, .modes, .mode-help, .pair, .setup-actions { display: none !important; }</style></noscript>
 </head>
 <body>
 <script id="theme-boot">
@@ -303,7 +303,10 @@ const THEMES = [...new Set(['auto', 'light', 'dark', ...Array.from(document.quer
 <section id="setup">
   <div class="setup-head">
     <h1>MC Wiki Race</h1>
-    <label class="theme-pick">Theme <select id="themeSelect"></select></label>
+    <div class="head-opts">
+      <label><input type="checkbox" id="soundToggle"> Sound</label>
+      <label>Theme <select id="themeSelect"></select></label>
+    </div>
   </div>
   <p class="sub">A wiki race through the Minecraft Wiki: get from the start article to the target article using only the links inside articles. Fewest clicks and fastest time wins.</p>
   <noscript><div class="noscript"><p><strong>This game needs JavaScript.</strong> It fetches articles from minecraft.wiki as you play, so turn JavaScript on for this page and reload it.</p></div></noscript>
@@ -387,6 +390,7 @@ const THEMES = [...new Set(['auto', 'light', 'dark', ...Array.from(document.quer
     <div class="stat"><div class="v mono" id="hudClicks">0</div><div class="k">Clicks</div></div>
     <div class="stat"><div class="v mono" id="hudTime">0:00</div><div class="k">Time</div></div>
     <div class="btns">
+      <button id="btnSound" aria-label="Sound"></button>
       <button id="btnBack" title="Go back to the previous article (counts as a click)">← Back</button>
       <button id="btnGiveUp">Give up</button>
     </div>
@@ -940,6 +944,7 @@ function celebrateCheckpoint() {
   $('#toast').classList.remove('hidden');
   $('.hud .goal').classList.add('reached');
   game.toastTimer = setTimeout(hideToast, 3000);
+  play('checkpoint');
 }
 function hideToast() { clearTimeout(game.toastTimer); $('#toast').classList.add('hidden'); $('.hud .goal').classList.remove('reached'); }
 
@@ -982,6 +987,7 @@ function cacheParse(keys, page) {
 async function navigate(title, fragment, { back = false } = {}) {
   if (!game.active || game.loading) return;
   const token = ++game.navToken;
+  if (game.path.length) play(back ? 'back' : 'click', game.path.length - 1);
   game.loading = true;   // stays set until the frame reports it has rendered (frameReady)
   pauseClock();
   hideToast();
@@ -1038,6 +1044,84 @@ function frameReady(token) {
   renderHud();
   resumeClock();
   if (game.celebrate) { game.celebrate = false; celebrateCheckpoint(); }
+}
+
+// ---------------------------------------------------------------- Sounds
+// Short blips in the spirit of note blocks and the XP orb, synthesized with Web Audio so there are no sound files.
+// The AudioContext is made on first use, which always follows a click or key press, as browsers require.
+let audio;
+let soundOn = store.get('mwr.sound', true) !== false;
+function audioOut() {
+  if (!audio) {
+    const ctx = new AudioContext();
+    audio = { ctx, out: new GainNode(ctx, { gain: 0.35 }) };
+    audio.out.connect(ctx.destination);
+  }
+  if (audio.ctx.state === 'suspended') audio.ctx.resume().catch(() => {});
+  return audio;
+}
+// A quick attack, then an exponential decay over dur seconds.
+function envelope(t, gain, dur) {
+  const g = new GainNode(audio.ctx);
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.exponentialRampToValueAtTime(gain, t + 0.008);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  g.connect(audio.out);
+  return g;
+}
+// One note, starting at seconds from now. slide glides the pitch to that frequency, vibrato wobbles it by that many Hz,
+// cutoff low-passes it (takes the buzz off square and sawtooth waves).
+function tone(freq, at, dur, { type = 'triangle', gain = 1, slide, vibrato, cutoff } = {}) {
+  const { ctx } = audio, t = ctx.currentTime + at;
+  const o = new OscillatorNode(ctx, { type, frequency: freq });
+  if (slide) o.frequency.exponentialRampToValueAtTime(slide, t + dur);
+  if (vibrato) {
+    const lfo = new OscillatorNode(ctx, { frequency: 6 });
+    lfo.connect(new GainNode(ctx, { gain: vibrato })).connect(o.frequency);
+    lfo.start(t); lfo.stop(t + dur);
+  }
+  const g = envelope(t, gain, dur);
+  if (cutoff) o.connect(new BiquadFilterNode(ctx, { type: 'lowpass', frequency: cutoff })).connect(g);
+  else o.connect(g);
+  o.start(t); o.stop(t + dur + 0.05);
+}
+function noise(at, dur, { gain = 1, cutoff = 800 } = {}) {
+  const { ctx } = audio, t = ctx.currentTime + at;
+  const buffer = ctx.createBuffer(1, Math.ceil(ctx.sampleRate * dur), ctx.sampleRate);
+  const d = buffer.getChannelData(0);
+  for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+  const src = new AudioBufferSourceNode(ctx, { buffer });
+  src.connect(new BiquadFilterNode(ctx, { type: 'lowpass', frequency: cutoff })).connect(envelope(t, gain, dur));
+  src.start(t);
+}
+// A note block's harp: a soft body and a short bright edge an octave up.
+function pling(freq, at = 0) { tone(freq, at, 0.4); tone(freq * 2, at, 0.12, { type: 'sine', gain: 0.3 }); }
+const PENTATONIC = [0, 2, 4, 7, 9];
+const SOUNDS = {
+  // Each click of a game plays the next note of a pentatonic scale up from F#4, back to the bottom after two octaves.
+  click(n) { pling(370 * 2 ** ((12 * Math.floor(n % 10 / 5) + PENTATONIC[n % 5]) / 12)); },
+  back() { pling(494); pling(370, 0.08); },
+  dead() { tone(140, 0, 0.14, { type: 'sine', slide: 55 }); noise(0, 0.07, { gain: 0.5, cutoff: 500 }); },
+  checkpoint() { [1319, 1661, 1976].forEach((f, i) => tone(f, i * 0.07, 0.3, { type: 'sine', gain: 0.6 })); },
+  win() {
+    [523, 659, 784, 1047].forEach((f, i) => tone(f, i * 0.09, i === 3 ? 0.9 : 0.2, { type: 'square', gain: 0.25, cutoff: 2500 }));
+    [523, 659, 784].forEach(f => tone(f, 0.27, 1, { gain: 0.35 }));
+  },
+  best() {
+    SOUNDS.win();
+    [2093, 2637, 3136, 2637, 3520].forEach((f, i) => tone(f, 0.45 + i * 0.07, 0.25, { type: 'sine', gain: 0.25 }));
+  },
+  // The sad trombone.
+  lose() {
+    [392, 370, 349].forEach((f, i) => tone(f, i * 0.3, 0.32, { type: 'sawtooth', gain: 0.4, cutoff: 1100 }));
+    tone(330, 0.9, 1, { type: 'sawtooth', gain: 0.4, cutoff: 1100, slide: 300, vibrato: 6 });
+  },
+  giveUp() { tone(262, 0, 0.25); tone(196, 0.18, 0.6); },
+};
+// Unplayable audio (no Web Audio, a blocked context) just means silence.
+function play(name, ...args) {
+  if (!soundOn) return;
+  try { audioOut(); SOUNDS[name](...args); } catch { /* no sound */ }
 }
 
 // ---------------------------------------------------------------- Themes
@@ -1121,7 +1205,7 @@ function renderArticle(page, fragment, token, blocked = [], seen = []) {
       if (!a) return;
       e.preventDefault();
       const c = classify(a);
-      if (!c || c.kind === 'blocked') return;
+      if (!c || c.kind === 'blocked') { parent.postMessage({ mwr: 'dead' }, '*'); return; }
       if (c.kind === 'anchor') scrollToId(c.id);
       else parent.postMessage({ mwr: 'nav', title: c.title, frag: c.frag }, '*');
     }, true);
@@ -1265,6 +1349,7 @@ ${WIKI_STYLES.map(h => `<link rel="stylesheet" href="${esc(h)}">`).join('\n')}
 window.addEventListener('message', e => {
   if (e.source !== $('#frame').contentWindow || !e.data) return;
   if (e.data.mwr === 'nav') navigate(e.data.title, e.data.frag);
+  if (e.data.mwr === 'dead' && game.active && !game.loading) play('dead');
   if (e.data.mwr === 'ready') { syncFrameTheme(); frameReady(e.data.token); }
   if (e.data.mwr === 'key' && e.data.key === 'Escape' && modalDismissable) closeModal();
 });
@@ -1294,11 +1379,13 @@ function finish(won, outOfClicks = false) {
   const route = [rec.start, rec.via, rec.goal].filter(Boolean).join(' → ');
   const pathHtml = game.path.map(p => `<li><a href="${esc(wikiUrl(p.title))}" target="_blank" rel="noopener">${esc(p.title)}</a>${p.back ? ' <span class="note">(back)</span>' : ''}${p.via ? ' <span class="note">(checkpoint)</span>' : ''}</li>`).join('');
   let bestNote = '';
+  const newBest = won && best && (rec.clicks < best.clicks || (rec.clicks === best.clicks && rec.ms < best.ms));
   if (won && best) {
-    bestNote = (rec.clicks < best.clicks || (rec.clicks === best.clicks && rec.ms < best.ms))
+    bestNote = newBest
       ? '<p class="note">New personal best for this pair!</p>'
       : `<p class="note">Your best for this pair: ${best.clicks} clicks in ${fmtTime(best.ms)}.</p>`;
   }
+  play(newBest ? 'best' : won ? 'win' : outOfClicks ? 'lose' : 'giveUp');
   openModal(`
     <h2>${won ? '🎉 You made it!' : outOfClicks ? 'Out of clicks' : 'Game over'}</h2>
     <p class="note">${rec.daily ? `Daily ${rec.daily}: ` : ''}${esc(route)}${settingsNote ? ' · ' + esc(settingsNote) : ''}</p>
@@ -1382,6 +1469,17 @@ setPathCollapsed(store.get('mwr.pathCollapsed', false));
 $('#btnPath').onclick = () => setPathCollapsed(!pathCollapsed);
 $('.path-list').addEventListener('scroll', markPathScroll, { passive: true });
 addEventListener('resize', scrollPathToEnd);   // turning a phone switches between the sidebar and the one-line path
+function setSound(on) {
+  soundOn = on;
+  store.set('mwr.sound', on);
+  $('#soundToggle').checked = on;
+  $('#btnSound').textContent = on ? '🔊' : '🔇';
+  $('#btnSound').title = on ? 'Sound on (click to mute)' : 'Sound off (click to unmute)';
+  $('#btnSound').setAttribute('aria-pressed', String(on));
+}
+setSound(soundOn);
+$('#soundToggle').onchange = e => { setSound(e.target.checked); play('click', 0); };
+$('#btnSound').onclick = () => { setSound(!soundOn); play('click', 0); };
 $('#themeSelect').innerHTML = THEMES.map(t => `<option value="${esc(t)}">${esc(THEME_LABELS[t] || t)}</option>`).join('');
 $('#themeSelect').value = document.documentElement.dataset.theme || 'auto';
 $('#themeSelect').onchange = e => setTheme(e.target.value);

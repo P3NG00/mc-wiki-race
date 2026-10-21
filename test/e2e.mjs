@@ -210,7 +210,8 @@ await ev("document.querySelector('#rules input[value=noback]').click()");
 await ev("document.querySelector('#rules input[value=limit]').click()");
 await ev("document.querySelector('#mSame').click()");
 await until("game.path.length === 1 && !game.loading");
-check('Six clicks shows the limit', await ev("document.querySelector('#hudClicks').textContent === '0/6'"), await ev("document.querySelector('#hudClicks').textContent"));
+check('Six clicks shows the limit', await ev("document.querySelector('#hudClicks').textContent === '0' && document.querySelector('#hudClicksK').textContent === 'of 6' && document.querySelectorAll('#hudMeter i').length === 6"),
+  await ev("document.querySelector('.hud .stat').textContent"));
 for (let i = 1; i <= 6; i++) {
   await ev(i % 2 ? "navigate('Pickaxe', null)" : 'goBack()');
   await until(`game.path.length === ${i + 1} && !game.loading`);

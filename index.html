@@ -29,6 +29,7 @@
     --accent-ink: #ffffff;
     --accent-soft: #e3f0dc;
     --target: #b8452f;
+    --warm: #8a3b0a; --warm-soft: #fde7d4; --cold: #1d4f86; --cold-soft: #dbe8f7;   /* Hot/cold's hint */
     --shadow: 0 1px 2px rgba(0,0,0,.06), 0 4px 16px rgba(0,0,0,.06);
     --font: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
     --radius: 8px;        /* buttons, inputs */
@@ -43,6 +44,7 @@
       --bg: #161814; --panel: #1f221d; --ink: #e8e9e3; --muted: #9da196; --line: #33372f;
       --accent: #6cbf55; --accent-ink: #0d1409; --accent-soft: #24331f;
       --target: #ec8a73;
+      --warm: #f5b183; --warm-soft: #3a2616; --cold: #9cc3ef; --cold-soft: #182a3d;
       --shadow: 0 1px 2px rgba(0,0,0,.4), 0 4px 16px rgba(0,0,0,.3);
       --art-opacity: .17;
       color-scheme: dark;
@@ -52,6 +54,7 @@
     --bg: #161814; --panel: #1f221d; --ink: #e8e9e3; --muted: #9da196; --line: #33372f;
     --accent: #6cbf55; --accent-ink: #0d1409; --accent-soft: #24331f;
     --target: #ec8a73;
+    --warm: #f5b183; --warm-soft: #3a2616; --cold: #9cc3ef; --cold-soft: #182a3d;
     --shadow: 0 1px 2px rgba(0,0,0,.4), 0 4px 16px rgba(0,0,0,.3);
     --art-opacity: .17;
     color-scheme: dark;
@@ -196,13 +199,40 @@
   #game { display: grid; grid-template-rows: auto 1fr; height: 100%; height: 100dvh; }   /* dvh: not under a phone browser's toolbars */
   .hud {
     display: flex; gap: 16px; align-items: center; padding: 8px 16px; background: var(--panel);
-    border-bottom: 1px solid var(--line); flex-wrap: wrap;
+    border-bottom: 1px solid var(--line); flex-wrap: wrap; min-width: 0;   /* the route scrolls inside it, not the page */
   }
-  .hud .goal { display: flex; align-items: center; gap: 8px; min-width: 0; flex: 1; }
-  .hud .goal img { width: 32px; height: 32px; object-fit: contain; image-rendering: pixelated; }
-  .hud .goal .lbl { font-size: 11px; font-weight: 700; color: var(--target); letter-spacing: .06em; text-transform: uppercase; }
-  .hud .goal .name { font-weight: 650; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .hud .peek-link { margin-left: 6px; font-size: 13px; flex: none; }
+  /* The game and its rules as labels, then the route: every stop as a chip, done, now (the objective) or ahead. */
+  .hud .goal { display: flex; flex-direction: column; gap: 5px; min-width: 0; flex: 1; }
+  .hud-top, .hud-tags { display: flex; flex-wrap: wrap; gap: 4px 6px; align-items: center; }
+  .hud-top { gap: 4px 10px; }
+  .hud-tags .tag { font-size: 11px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; border-radius: var(--radius-pill);
+    padding: 1px 8px; border: 1px solid var(--line); background: var(--bg); color: var(--muted); }
+  .hud-tags .tag.game { background: var(--ink); border-color: var(--ink); color: var(--panel); }
+  .route-row { display: flex; gap: 8px; align-items: center; min-width: 0; }
+  .route { position: relative; display: flex; gap: 6px; align-items: center; min-width: 0; overflow-x: auto; scrollbar-width: thin; padding: 2px; }
+  .route .sep { flex: none; color: var(--muted); }
+  .chip { flex: none; display: inline-flex; gap: 6px; align-items: center; white-space: nowrap; border: 1px solid var(--line);
+    border-radius: var(--radius); padding: 2px 9px; background: var(--panel); color: var(--ink); font: inherit; line-height: 1.4; }
+  .chip .k { font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+  .chip .sub { font-size: 12.5px; color: var(--muted); }
+  .chip img { width: 24px; height: 24px; object-fit: contain; image-rendering: pixelated; }
+  .chip.now { border: 2px solid var(--accent); background: var(--accent-soft); font-weight: 650; }
+  .chip.now .k { color: var(--accent); }
+  .chip.now.target .k { color: var(--target); }
+  .chip.done { background: var(--bg); color: var(--muted); cursor: pointer; }
+  .chip.done::before { content: '✓'; }
+  .chip.ahead { border-style: dashed; }
+  /* On a long route the stops done shrink to their ✓ until a click on one opens them all. */
+  .route:not(.open) .chip.done.short > span { display: none; }
+  .hud .peek { flex: none; width: 28px; height: 28px; padding: 0; border-radius: var(--radius-pill); font-weight: 700; color: var(--accent); }
+  /* Hot/cold's latest hint, beside the game's labels. */
+  .hint { flex: none; font-size: 13px; font-weight: 700; border-radius: var(--radius-pill); padding: 4px 10px; background: var(--bg); color: var(--muted); }
+  .hint.warmer { background: var(--warm-soft); color: var(--warm); }
+  .hint.colder { background: var(--cold-soft); color: var(--cold); }
+  /* Six clicks' and Exact clicks's count, a dot a click. */
+  .meter { display: flex; gap: 3px; justify-content: flex-end; margin: 2px 0 1px; }
+  .meter i { width: 8px; height: 8px; box-sizing: border-box; border-radius: 50%; border: 1.5px solid var(--muted); }
+  .meter i.on { background: var(--ink); border-color: var(--ink); }
   .stat { text-align: right; }
   .stat .v { font-size: 20px; font-weight: 700; line-height: 1.1; }
   .stat .k { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; }
@@ -297,6 +327,7 @@
     .hud { gap: 6px 14px; padding: 8px 12px; }
     .hud .goal { flex-basis: 100%; }
     .hud .btns { margin-left: auto; }
+    .hud .word { display: none; }   /* Back is its arrow */
     .stat .v { font-size: 17px; }
     /* The path is one line of breadcrumbs that scrolls sideways, with Hide beside it and the credit under it. */
     .main { grid-template-columns: 1fr; grid-template-rows: auto 1fr; }
@@ -323,7 +354,7 @@
   @media (pointer: coarse) {
     input, select { font-size: 16px; }
     .path-toggle { min-height: 32px; padding: 4px 12px; }
-    .hud .peek-link { min-height: 32px; }
+    .hud .peek { width: 36px; height: 36px; }
   }
   /* A phone on its side: a narrower path and a shorter header, leaving the article most of the screen. */
   @media (max-height: 500px) {
@@ -461,19 +492,18 @@ const THEMES = [...new Set(['auto', 'light', 'dark', ...Array.from(document.quer
 <section id="game" class="hidden">
   <div class="hud">
     <div class="goal">
-      <img alt="" id="hudImg" class="hidden">
-      <div style="min-width:0">
-        <div class="lbl" id="hudLbl">Target</div>
-        <div class="name" id="hudGoal"></div>
+      <div class="hud-top"><div class="hud-tags" id="hudTags"></div><span class="hint hidden" id="hudHint" role="status"></span></div>
+      <div class="route-row">
+        <div class="route" id="hudRoute" role="group" aria-label="Your route"></div>
+        <button class="peek" id="btnPeek" title="What is it?" aria-label="What is it?">?</button>
       </div>
-      <button class="link peek-link" id="btnPeek">what is it?</button>
     </div>
-    <div class="stat"><div class="v mono" id="hudClicks">0</div><div class="k">Clicks</div></div>
+    <div class="stat"><div class="v mono" id="hudClicks">0</div><div class="meter" id="hudMeter" aria-hidden="true"></div><div class="k" id="hudClicksK">Clicks</div></div>
     <div class="stat"><div class="v mono" id="hudPar">–</div><div class="k">Par</div></div>
     <div class="stat"><div class="v mono" id="hudTime">0:00</div><div class="k">Time</div></div>
     <div class="btns">
       <button id="btnSound" aria-label="Sound"></button>
-      <button id="btnBack" title="Go back to the previous article (counts as a click)">← Back</button>
+      <button id="btnBack" title="Go back to the previous article (counts as a click)" aria-label="Back">←<span class="word"> Back</span></button>
       <button id="btnGiveUp">Give up</button>
     </div>
   </div>
@@ -1230,7 +1260,14 @@ function resumeClock() { if (!game.runningSince && game.active) game.runningSinc
 function clicks() { return Math.max(0, game.path.length - 1); }
 
 function renderHud() {
-  $('#hudClicks').textContent = clicks() + (game.limit ? '/' + game.limit : '');
+  $('#hudClicks').textContent = clicks();
+  // A limit (Six clicks, or Exact clicks's count) shows as its own dots, a click each, and under the count.
+  $('#hudClicksK').textContent = !game.limit ? 'Clicks' : game.exact ? `of exactly ${game.limit}` : `of ${game.limit}`;
+  $('#hudMeter').innerHTML = game.limit ? Array.from({ length: game.limit }, (_, i) => `<i${i < clicks() ? ' class="on"' : ''}></i>`).join('') : '';
+  // Hot/cold: the latest arrival's hint, until the next.
+  const hint = game.rules.includes('hotcold') && game.path.at(-1)?.hint;
+  $('#hudHint').className = `hint ${hint || 'hidden'}`;
+  $('#hudHint').textContent = hint ? HINTS[hint].text : '';
   $('#hudPar').textContent = game.par ?? '–';
   $('#hudTime').textContent = fmtTime(now());
   $('#btnBack').disabled = game.stack.length < 2 || game.loading || !game.active;
@@ -1256,14 +1293,36 @@ const huntLeft = () => game.hunt.filter(h => !h.found);
 const ahead = () => game.hunt ? huntLeft().filter(h => h.info).map(h => h.info) : [...game.vias.slice(game.viaNext), game.goal];
 // Every article the game is after, which stay live under No hubs.
 const cardTitles = () => [game.goal, ...game.vias, ...(game.hunt ?? []).map(h => h.info)].filter(Boolean).map(c => c.title);
-// The HUD shows what is still to find; its picture, the one article left.
+// The header: the game and its rules as labels with how far along it is, and the route as chips, every stop done, now
+// (the objective, with #hudLbl, #hudGoal and #hudImg) or ahead, or for Scavenger what is found and what is left. A route
+// of more than ROUTE_FULL stops shrinks the stops done to their ✓; a click on one opens them all again, and the row scrolls.
+const ROUTE_FULL = 3;
 function renderObjective() {
-  const left = game.hunt && huntLeft(), next = left ? left.length === 1 && left[0].info : objective();
-  $('#hudLbl').textContent = objectiveLabel();
-  $('#hudGoal').textContent = left ? left.map(h => h.label).join(', ') : objective().title;
+  const n = game.vias.length, left = game.hunt && huntLeft(), next = left ? left.length === 1 && left[0].info : objective();
+  const g = game.hunt ? 'scavenger' : game.exact ? 'exact' : game.roundTrip ? 'roundtrip' : n ? 'relay' : 'race';
+  const progress = left ? `Found ${game.hunt.length - left.length} of ${game.hunt.length}` : game.exact ? `Land on the target on click ${game.limit}, not before`
+    : game.roundTrip ? (game.viaNext ? 'On the way back' : 'On the way there') : n ? `${game.viaNext} of ${n} checkpoint${n > 1 ? 's' : ''} reached` : '';
+  $('#hudTags').innerHTML = [GAMES[g].label, ...game.rules.filter(k => EXTRA_RULES.includes(k) || k === 'noretrace').map(k => RULES[k].label)]
+    .map((t, i) => `<span class="tag${i ? '' : ' game'}">${esc(t)}</span>`).join('') + (progress ? ` <span class="note">${esc(progress)}</span>` : '');
+  const stops = game.hunt ? game.hunt.map(h => ({ state: h.found ? 'done' : 'ahead', name: h.label, sub: h.kind && h.found }))
+    : [{ state: 'done', k: 'Start', name: game.start.title },
+      ...game.vias.map((v, i) => ({ state: i < game.viaNext ? 'done' : i === game.viaNext ? 'now' : 'ahead', k: viaName(i + 1), name: v.title })),
+      { state: objective() === game.goal ? 'now' : 'ahead', k: game.roundTrip ? 'Back to' : game.exact ? `Target · exactly ${game.limit}` : 'Target', name: game.goal.title, goal: true }];
+  const short = stops.length > ROUTE_FULL, full = s => [s.k, s.name, s.sub].filter(Boolean).join(': ');
+  $('#hudRoute').innerHTML = stops.map((s, i) => (i && !game.hunt ? '<span class="sep" aria-hidden="true">→</span>' : '') + (s.state === 'now'
+    ? `<span class="chip now${s.goal ? ' target' : ''}"><img alt="" id="hudImg" class="hidden"><span class="k" id="hudLbl">${esc(s.k)}</span> <span class="n" id="hudGoal">${esc(s.name)}</span></span>`
+    : `<${s.state === 'done' ? `button class="chip done${short ? ' short' : ''}" title="${esc(full(s))}" aria-label="${esc('Done: ' + full(s))}"` : 'span class="chip ahead"'}>`
+      + (s.k ? `<span class="k">${esc(s.k)}</span> ` : '') + `<span class="n">${esc(s.name)}</span>` + (s.sub ? ` <span class="sub">(${esc(s.sub)})</span>` : '')
+      + `</${s.state === 'done' ? 'button' : 'span'}>`)).join('');
   const img = game.rules.includes('blind') ? '' : next?.img;
-  setImg($('#hudImg'), img);
+  if ($('#hudImg')) setImg($('#hudImg'), img);
   setImg($('#pathArt'), img);
+  scrollRouteToNow();
+}
+// Keeps the objective's chip in view in a route too long for the header, with as many stops before it as fit.
+function scrollRouteToNow() {
+  const route = $('#hudRoute'), now = $('#hudRoute .now');
+  if (now) route.scrollLeft = Math.min(now.offsetLeft, now.offsetLeft + now.offsetWidth - route.clientWidth);
 }
 
 // Called once the checkpoint's article has rendered, so the banner isn't hidden behind the loading overlay.
@@ -1322,6 +1381,7 @@ function startGame() {
   $('#credit').textContent = '';
   $('#setup').classList.add('hidden');
   $('#game').classList.remove('hidden');
+  scrollRouteToNow();   // laid out only now
   clearInterval(game.timer);
   game.timer = setInterval(() => { $('#hudTime').textContent = fmtTime(now()); }, 250);
   addEventListener('beforeunload', guardLeaving);
@@ -2202,7 +2262,7 @@ function setPathCollapsed(on) {
 setPathCollapsed(store.get('mwr.pathCollapsed', false));
 $('#btnPath').onclick = () => setPathCollapsed(!pathCollapsed);
 $('.path-list').addEventListener('scroll', markPathScroll, { passive: true });
-addEventListener('resize', scrollPathToEnd);   // turning a phone switches between the sidebar and the one-line path
+addEventListener('resize', () => { scrollPathToEnd(); scrollRouteToNow(); });   // turning a phone switches layouts
 function setSound(on) {
   soundOn = on;
   store.set('mwr.sound', on);
@@ -2246,6 +2306,7 @@ $('#btnCopy').onclick = async () => {
   catch { setStatus(challengeLink()); }
 };
 $('#btnBack').onclick = goBack;
+$('#hudRoute').addEventListener('click', e => { if (e.target.closest('.chip.done')) $('#hudRoute').classList.toggle('open'); });
 $('#btnGiveUp').onclick = () => {
   if (!game.active) return;
   pauseClock();

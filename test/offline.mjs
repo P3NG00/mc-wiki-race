@@ -137,7 +137,8 @@ await play();
 await ev(`navigate(${JSON.stringify(far[1])}, null)`);
 check('Hot/cold: a step along a shortest route is warmer, shown over the article and on the path', await until("game.path.at(-1).hint === 'warmer' && !game.loading") &&
   await ev("!document.querySelector('#toast').classList.contains('hidden') && document.querySelector('#toast').textContent === HINTS.warmer.text") &&
-  await ev("document.querySelector('#pathList li.cur').textContent.endsWith(HINTS.warmer.icon)"), far.join(' → '));
+  await ev("document.querySelector('#pathList li.cur').textContent.endsWith(HINTS.warmer.icon)")
+  && await ev("document.querySelector('#hudHint').className === 'hint warmer' && document.querySelector('#hudHint').textContent === HINTS.warmer.text"), far.join(' → '));
 await ev(`navigate(${JSON.stringify(far[0])}, null)`);
 check('Hot/cold: going back is colder', await until("game.path.at(-1).hint === 'colder' && !game.loading"), await ev('game.path.at(-1).hint'));
 // A dead end, a page with no route anywhere (no links outside navboxes, no navboxes), counts as farthest: colder.
@@ -180,6 +181,12 @@ await ev("navigate('Creeper', null)");
 await until('game.path.length === 3 && !game.loading');
 check('reaching the first checkpoint names the second', await ev(`game.path[2].via === 1 && ${toast} === '✓ Checkpoint 1 of 2 reached! Now find Zombie'`) &&
   await ev(hud) === 'Checkpoint 2 Zombie', await ev(toast));
+// The header's route: four stops, so the two done shrink to their ✓ until one is clicked, which opens them all.
+const routeState = "[...document.querySelectorAll('#hudRoute .chip')].map(c => c.className.replace('chip ', '') + ':' + c.querySelector('.n').textContent).join(' | ')";
+check('the route shows every stop, done, now or ahead, the done ones shrunk', await ev(`${routeState} === 'done short:Diamond | done short:Creeper | now:Zombie | ahead:Crafting'
+  && !document.querySelector('#hudRoute .chip.done .n').checkVisibility() && document.querySelector('#hudTags').textContent.includes('1 of 2 checkpoints reached')`), await ev(routeState));
+await ev("document.querySelector('#hudRoute .chip.done').click()");
+check('a click on a stop done shows them all in full', await ev("document.querySelector('#hudRoute').classList.contains('open') && document.querySelector('#hudRoute .chip.done .n').checkVisibility()"));
 await ev("navigate('Crafting', null)");
 await until('game.path.length === 4 && !game.loading');
 check('the target before the last checkpoint doesn\'t win', await ev('game.active'));
@@ -271,7 +278,7 @@ check('Exact clicks: setup finds a route of exactly par + 2 on no page twice, an
   await ev(`document.querySelector('#setupPar').textContent === 'Par ${exact.par} · exactly ${exact.par + 2}'`), exact.route?.join(' → '));
 const n = exact.par + 2;
 await play();
-check('the header counts toward it and Back is gone', await ev(`document.querySelector('#hudClicks').textContent === '0/${n}' && document.querySelector('#btnBack').classList.contains('hidden')`));
+check('the header counts toward it and Back is gone', await ev(`document.querySelector('#hudClicks').textContent === '0' && document.querySelector('#hudClicksK').textContent === 'of exactly ${n}' && document.querySelectorAll('#hudMeter i').length === ${n} && document.querySelector('#btnBack').classList.contains('hidden')`));
 await ev("navigate('Crafting', null)");
 await until('game.path.length === 2 && !game.loading');
 rtLinks = await liveLinks();
@@ -324,14 +331,15 @@ const kindsPar = JSON.parse(await ev(`cardsRoute(['Diamond'], rules(), setup.kin
 check('its par is a route through a member of each kind', kindsPar.each && await until(`document.querySelector('#setupPar').textContent === 'Par ${kindsPar.route.length - 1}'`),
   kindsPar.route.join(' → '));
 await play();
-check('the HUD lists the kinds to find', await ev(hud) === 'Find a mob found in the Nether, an enchantment, a potion', await ev(hud));
+const hunt = "[...document.querySelectorAll('#hudRoute .chip')].map(c => (c.classList.contains('done') ? '✓ ' : '') + c.textContent.replace(/\\s+/g, ' ').trim()).join(', ')";
+check('the header lists the kinds to find', await ev(hunt) === 'a mob found in the Nether, an enchantment, a potion' && await ev("document.querySelector('#hudTags').textContent.includes('Found 0 of 3')"), await ev(hunt));
 await ev("navigate('Chicken', null)");
 await until('game.path.length === 2 && !game.loading');
 check('an excluded page in the live category isn\'t a find', await ev('!game.path[1].found && game.hunt.every(h => !h.found)'));
 await ev("navigate('Brand New Mob', null)");
 await until('game.path.length === 3 && !game.loading');
 check('a page only the live wiki puts in the category is a find', await ev(`game.path[2].found?.join() === 'a mob found in the Nether'
-  && ${toast} === '✓ Found a mob found in the Nether: Brand New Mob (1 of 3)'`) && await ev(hud) === 'Find an enchantment, a potion', await ev(toast));
+  && ${toast} === '✓ Found a mob found in the Nether: Brand New Mob (1 of 3)'`) && await ev(hunt) === '✓ a mob found in the Nether (Brand New Mob), an enchantment, a potion', await ev(hunt));
 await ev("navigate('Sharpness', null)");
 await until('game.path.length === 4 && !game.loading');
 await ev("navigate('Potion of Swiftness', null)");

@@ -21,6 +21,8 @@ class Snapshot:
             for line in f:
                 o = json.loads(line)
                 if 'page' in o:
+                    # Links in any navbox, the page's own title (added to its navboxes) aside.
+                    o['nav'] = sorted(set().union(*o['boxes']) - {o['page']})
                     self.pages[o['page']] = o
                 else:
                     self.redirects[o['redirect']] = o['to']

@@ -3,10 +3,11 @@
     .venv/bin/python -I tools/wikidata/extract.py minecraft.wiki_en_all_2026-08.zim [-o snapshot.jsonl.gz]
 
 The first line is {"meta": …} (the ZIM's file name, sha256, date and scraper) with "namespaces" (number to name, from
-the pages' body classes). Then {"page": title, "ns", "cats", "body", "nav"} for every page, where body and nav are the
-titles it links to outside and inside navbox tables (one title may be in both), and {"redirect": title, "to": title} for
-every redirect. Titles are in display form (spaces, no fragment). build.py and report.py read this file, so the ZIM is
-only scanned once, which takes about a minute.
+the pages' body classes). Then {"page": title, "ns", "cats", "body", "boxes"} for every page, where body is the titles
+it links to outside navbox tables and boxes its navboxes, each the titles it links to. A navbox shows the page it is on as
+plain text, so that title is added back: every copy of a navbox then has the same titles, and build.py stores each once.
+Then {"redirect": title, "to": title} for every redirect. Titles are in display form (spaces, no fragment). build.py and
+report.py read this file, so the ZIM is only scanned once, which takes about a minute.
 """
 import argparse, gzip, hashlib, html, json, os, posixpath, re, sys
 from urllib.parse import unquote
@@ -34,11 +35,12 @@ def link_title(href, page):
 
 
 def page_links(doc, page):
-    """Titles linked outside and inside navbox tables, from the parser output (not the page's header or footer)."""
+    """Titles linked outside navbox tables, and each navbox (an outermost .navbox table, nested tables included) as the
+    titles it links to plus the page's own. From the parser output only, not the page's header or footer."""
     start = doc.find('mw-parser-output')
     end = doc.find('id="catlinks"')
     region = doc[max(start, 0):end if end >= 0 else len(doc)]
-    body, nav, tables = set(), set(), []   # tables: for each open table, whether it or one around it is a navbox
+    body, boxes, tables = set(), [], []   # tables: for each open table, whether it or one around it is a navbox
     for m in TOKEN.finditer(region):
         close, tag, attrs = m.groups()
         if tag == 'table':
@@ -47,7 +49,10 @@ def page_links(doc, page):
                     tables.pop()
             else:
                 cls = CLASS.search(attrs)
-                tables.append(bool(tables and tables[-1]) or bool(cls and 'navbox' in cls.group(1).split()))
+                inside, navbox = bool(tables and tables[-1]), bool(cls and 'navbox' in cls.group(1).split())
+                if navbox and not inside:
+                    boxes.append({page.replace('_', ' ')})
+                tables.append(inside or navbox)
             continue
         if close:
             continue
@@ -57,8 +62,8 @@ def page_links(doc, page):
             continue
         title = link_title(href.group(1), page)
         if title:
-            (nav if tables and tables[-1] else body).add(title)
-    return body, nav
+            (boxes[-1] if tables and tables[-1] else body).add(title)
+    return body, boxes
 
 
 def page_categories(doc):
@@ -107,8 +112,9 @@ def extract(zim_path, out_path):
         ns = int(ns.group(1))
         if ns:
             namespaces.setdefault(ns, title.split(':')[0])
-        body, nav = page_links(doc, entry.path)
-        pages.append({'page': title, 'ns': ns, 'cats': page_categories(doc), 'body': sorted(body), 'nav': sorted(nav)})
+        body, boxes = page_links(doc, entry.path)
+        pages.append({'page': title, 'ns': ns, 'cats': page_categories(doc), 'body': sorted(body),
+                      'boxes': sorted(sorted(b) for b in boxes)})
     pages.sort(key=lambda p: p['page'])
     redirects.sort(key=lambda r: r['redirect'])
     os.makedirs(os.path.dirname(os.path.abspath(out_path)), exist_ok=True)

@@ -4,7 +4,7 @@ A wiki race (like [The Wiki Game](https://www.thewikigame.com/)) through [minecr
 
 Play it at **[mcwikirace.com](https://mcwikirace.com/)**.
 
-The whole game is one `index.html`, with no build step and no dependencies. Next to it are `wiki-data.js`, what the game knows about the wiki (which articles it can roll, how well linked they are), generated from the wiki's offline copy by `tools/wikidata/`, the icon (`favicon.ico`, `apple-touch-icon.png`) and the link-preview image (`og-image.png`). Articles are fetched live from the minecraft.wiki API.
+The whole game is one `index.html`, with no build step and no dependencies. Next to it are `wiki-data.js`, what the game knows about the wiki (which articles it can roll, how well linked they are), and `wiki-links.js` and `wiki-navboxes.js`, the links between its pages, which the result uses to work out the fewest clicks, all generated from the wiki's offline copy by `tools/wikidata/`, the icon (`favicon.ico`, `apple-touch-icon.png`) and the link-preview image (`og-image.png`). Articles are fetched live from the minecraft.wiki API.
 
 ## Playing
 
@@ -21,6 +21,7 @@ Open `index.html` in a browser. Opening it straight from disk (`file://`) works 
 - **Reroll** any card, or type your own article.
 - **📅 Daily** loads today's pair, which is the same for everyone on the same date. It always plays on Normal with one extra rule of the day (No Back, Blind target, Checkpoint, or Hard instead), and the result says it was the daily. `index.html#daily` opens it directly.
 - **Back** returns to the previous article and counts as a click. The clock pauses while an article loads.
+- **The result** says the fewest clicks the pair could be done in, with the same difficulty, checkpoint and spin-offs, and shows one route that takes that many. It goes by the wiki's offline copy, so it names that copy's date.
 - **Difficulty** decides which links you can use:
   - **Relaxed:** everything, including the big link tables at the bottom of articles (navboxes), so almost any sensible click gets you closer.
   - **Normal** (the default): the navboxes are hidden, so you find your way through the article itself.
@@ -36,7 +37,7 @@ Open `index.html` in a browser. Opening it straight from disk (`file://`) works 
 
 ## Hosting
 
-Serve `index.html` as a static file, with `wiki-data.js`, `favicon.ico`, `apple-touch-icon.png` and `og-image.png` next to it. Without `wiki-data.js` the game doesn't start. Its `canonical` link and Open Graph tags point at https://mcwikirace.com/, so search engines treat other copies as duplicates of that one. To add a theme without editing it, put a stylesheet in its `<head>` marked with `data-mwr-theme`. It shows up in the theme picker, and `data-mwr-default` makes it the default:
+Serve `index.html` as a static file, with `wiki-data.js`, `wiki-links.js`, `wiki-navboxes.js`, `favicon.ico`, `apple-touch-icon.png` and `og-image.png` next to it. Without `wiki-data.js` the game doesn't start, and without the other two the result can't say the fewest clicks. All three change together with each new copy of the wiki, so serve them without long caching. Its `canonical` link and Open Graph tags point at https://mcwikirace.com/, so search engines treat other copies as duplicates of that one. To add a theme without editing it, put a stylesheet in its `<head>` marked with `data-mwr-theme`. It shows up in the theme picker, and `data-mwr-default` makes it the default:
 
 ```html
 <link rel="stylesheet" href="my-theme.css" data-mwr-theme="My site" data-mwr-default>
@@ -73,7 +74,7 @@ See `CLAUDE.md` for how the game works internally.
 
 ## License
 
-[MIT](LICENSE). Article content shown in the game comes from [minecraft.wiki](https://minecraft.wiki), is licensed under [CC BY-NC-SA 3.0](https://creativecommons.org/licenses/by-nc-sa/3.0/) unless noted otherwise on the wiki, and is not covered by this license. Neither is `wiki-data.js`, whose titles, categories and link counts come from the wiki's offline copy under the same license. The game credits the wiki in the footer and with a link to each article it shows.
+[MIT](LICENSE). Article content shown in the game comes from [minecraft.wiki](https://minecraft.wiki), is licensed under [CC BY-NC-SA 3.0](https://creativecommons.org/licenses/by-nc-sa/3.0/) unless noted otherwise on the wiki, and is not covered by this license. Neither are `wiki-data.js`, `wiki-links.js` and `wiki-navboxes.js`, whose titles, categories and links come from the wiki's offline copy under the same license. The game credits the wiki in the footer and with a link to each article it shows.
 
 MC Wiki Race is not an official Minecraft product, and is not approved by or associated with Mojang or Microsoft. Contact: [BryantF.xyz+mcwikirace@gmail.com](mailto:BryantF.xyz+mcwikirace@gmail.com).
 

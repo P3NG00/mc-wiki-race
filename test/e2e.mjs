@@ -169,6 +169,9 @@ f = await frameCtx();
 await ev("[...document.querySelectorAll('a.mwr-live')].find(a => /Diamond_Pickaxe/i.test(a.getAttribute('href'))).click()", f);
 check('reaching the target wins', await until("!game.active && !document.querySelector('#modalBg').classList.contains('hidden')"),
   `clicks=${await ev('clicks()')}`);
+// The result works out the fewest clicks from the link graph files: this Relaxed game's pair is linked directly or nearly.
+check('the result shows the fewest clicks and a route', await until("/^Fewest clicks: [12], .* One way: Diamond → .*Diamond Pickaxe\\.$/.test(document.querySelector('#par').textContent)"),
+  await ev("document.querySelector('#par').textContent"));
 await shot('3-win');
 
 // Escape pressed inside the iframe must not dismiss the win modal.

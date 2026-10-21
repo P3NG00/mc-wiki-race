@@ -9,7 +9,7 @@ from libzim.writer import Creator, Hint, Item, StringProvider
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))   # for the tools under python -I
 from common import Snapshot, load_config, read_data
 from extract import extract
-from build import build, render
+from build import build, graph, render, render_graph
 from diff import diff
 from report import report
 
@@ -38,6 +38,9 @@ def page(title, ns, content, cats=(), hidden=()):
 NAVBOX = ('<table class="navbox hlist collapsible"><tr><td><a href="Creeper">Creeper</a>'
           '<table class="navbox-inner"><tr><td><a href="Block">Block</a></td></tr></table>'
           '<a href="Diamond_Pickaxe">again in a navbox</a></td></tr></table>')
+# A navbox both its pages carry, each showing itself as plain text, as mwoffliner does: build.py stores it once.
+family = lambda own: '<table class="navbox"><tr><td>' + ' '.join(
+    f'<b>{t}</b>' if t == own else f'<a href="{t.replace(" ", "_")}">{t}</a>' for t in ('Charcoal', 'Iron Ingot')) + '</td></tr></table>'
 PAGES = {
     'Diamond': (0, '<p><a href="Diamond_Pickaxe">pickaxe</a>, <a href="Iron_ingot#Uses">ingot</a> (a redirect), '
                    '<a href="Tutorial%3AMining">tutorial</a>, <a href="#Obtaining">same page</a>, '
@@ -46,7 +49,7 @@ PAGES = {
                    '<map><area href="Breaking" shape="rect"></map>' + NAVBOX, ['Items'], ['Pages with sound tables']),
     'Diamond Pickaxe': (0, '<a href="Diamond">diamond</a> <a href="Block">block</a>', ['Items', 'Tools']),
     'Creeper': (0, '<a href="Diamond">diamond</a> <a href="Dungeons%3ACreeper">in Dungeons</a>', ['Hostile mobs', 'Entities']),
-    'Iron Ingot': (0, '<a href="Diamond">diamond</a>', ['Items']),
+    'Iron Ingot': (0, '<a href="Diamond">diamond</a>' + family('Iron Ingot'), ['Items']),
     'Block': (0, '<a href="Diamond">diamond</a>', []),
     'Breaking': (0, '<a href="Block">block</a>', []),
     'Village & Pillage': (0, '', []),
@@ -60,7 +63,7 @@ PAGES = {
     'Rose': (0, '', ['Items', 'Removed features']),
     'Frostgate': (0, '', ['Items', 'Fictional mods']),
     'Balloon': (0, '', ['Items', 'Minecraft Education', 'Minecraft Education items']),
-    'Charcoal': (0, '', ['Items', 'Minecraft Education']),
+    'Charcoal': (0, family('Charcoal'), ['Items', 'Minecraft Education']),
     'Oak Slab': (0, '', ['Items', 'Slabs']),
     'Breeding': (0, '', ['Gameplay']),
     'Dirt (Minecraft 4k)': (0, '', ['Items', 'Minecraft 4k']),
@@ -156,7 +159,8 @@ with tempfile.TemporaryDirectory() as tmp:
     check('links counted per article, through redirects', rows['Diamond'][1:3] == [8, 8], rows['Diamond'])
     check('navbox-only links counted apart', rows['Creeper'][1:3] == [1, 0] and rows['Diamond Pickaxe'][1:3] == [1, 1],
           (rows['Creeper'], rows['Diamond Pickaxe']))
-    check('a link through a redirect counts', rows['Iron Ingot'][1:3] == [1, 1], rows['Iron Ingot'])
+    # Iron Ingot: from Diamond through a redirect, and from Charcoal's navbox.
+    check('a link through a redirect counts', rows['Iron Ingot'][1:3] == [2, 1], rows['Iron Ingot'])
     check('a topic per pool article, the first in config order', [rows[t][3] for t in ('Diamond Pickaxe', 'Creeper', 'Block')] == ['items', 'mobs', ''])
     # Popular is the best-linked 30% of the five in the pool (rounded to 2: Diamond, then Iron Ingot before Diamond Pickaxe
     # on a tie, by title); Deep cuts, at a share of 1 here, every item linked well enough to be a target.
@@ -179,6 +183,19 @@ with tempfile.TemporaryDirectory() as tmp:
     with open(out, 'w', encoding='utf-8') as f:
         f.write(render(data))
     check('rendering is stable and reads back', render(build(Snapshot(again), CONFIG)[0]) == render(data) and read_data(out) == data)
+
+    links, boxes, carries = graph(snap, data)
+    number = {r[0]: n for n, r in enumerate(data['articles'])}
+    names = lambda ids: [data['articles'][n][0] for n in ids]
+    check('the graph: links outside navboxes by page number, through redirects, other namespaces left out',
+          names(links[number['Diamond']]) == ['Breaking', 'Diamond Pickaxe', 'Iron Ingot', 'Village & Pillage'], names(links[number['Diamond']]))
+    check('the graph: a navbox two pages carry is stored once, with both',
+          carries[number['Charcoal']] == carries[number['Iron Ingot']] and [names(boxes[b]) for b in carries[number['Charcoal']]] == [['Charcoal', 'Iron Ingot']]
+          and [names(boxes[b]) for b in carries[number['Diamond']]] == [['Block', 'Creeper', 'Diamond', 'Diamond Pickaxe']], [names(b) for b in boxes])
+    graph_files = render_graph(data, links, boxes, carries)
+    check('the graph files are stable and carry the snapshot\'s sha256', render_graph(data, *graph(Snapshot(again), data)) == graph_files
+          and all(f'"sha256": "{data["sha256"]}"' in text for text in graph_files) and 'const WIKI_LINKS = {' in graph_files[0]
+          and 'const WIKI_NAVBOXES = {' in graph_files[1])
 
     newer = copy.deepcopy(data)
     newer['snapshot'] = '2026-11-21'

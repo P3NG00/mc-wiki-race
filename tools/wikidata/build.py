@@ -1,6 +1,7 @@
-"""Builds wiki-data.js, the game's data about minecraft.wiki, from a snapshot made by extract.py and config.json.
+"""Builds wiki-data.js, the game's data about minecraft.wiki, and the link graph files beside it, from a snapshot made by
+extract.py and config.json.
 
-    .venv/bin/python -I tools/wikidata/build.py tools/wikidata/cache/minecraft.wiki_en_all_2026-08.jsonl.gz [-o wiki-data.js]
+    .venv/bin/python -I tools/wikidata/build.py tools/wikidata/cache/minecraft.wiki_en_all_2026-08.jsonl.gz [-o folder]
 
 The output defines WIKI_DATA, which index.html loads with a script tag (a JSON file couldn't be fetched from file://):
   snapshot, file, sha256  where it came from
@@ -17,6 +18,12 @@ in a spin-off namespace, has that family. Other content in a topic's categories 
 its tiers say whether it is Popular (the config's best-linked share of the pool) or in Deep cuts (the least-linked share
 of its topic, among articles linked well enough to be a target). Everything else has neither topic nor family, so only
 Chaos rolls it.
+The link graph, for par, numbers pages by their place in articles and goes through redirects:
+  wiki-links.js           WIKI_LINKS: for every page, the pages it links to outside navboxes
+  wiki-navboxes.js        WIKI_NAVBOXES: every distinct navbox, as the pages it links to (the copies of a navbox only
+                          differ by which page shows as plain text, which extract.py adds back), and for every page the
+                          navboxes it carries. Stored once each, they are a tenth of the size of every page's own list.
+Both have the sha256 of wiki-data.js's ZIM, and the game only uses them with a wiki-data.js that has the same.
 Links are counted per linking page, through redirects. An article's count only has links from articles. A spin-off
 page's count also has links from its own namespace, since those links are live when its spin-off is on. The same
 snapshot always gives the same bytes, one entry per line, so a new snapshot reads as a normal git diff (diff.py
@@ -27,7 +34,7 @@ import argparse, json, os, sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))   # for common.py under python -I
 from common import CONFIG, HERE, MIN_BACKLINKS, Snapshot, load_config, spinoff_backlinks
 
-DEFAULT_OUT = os.path.join(HERE, '..', '..', 'wiki-data.js')
+DEFAULT_OUT = os.path.join(HERE, '..', '..')
 
 
 def namespaces(snap, config):
@@ -111,34 +118,79 @@ def build(snap, config):
     }, sizes
 
 
-def render(data):
-    j = lambda v: json.dumps(v, ensure_ascii=False)
-    lines = [
-        f'// minecraft.wiki as of {data["snapshot"]}, for MC Wiki Race: made by tools/wikidata/build.py from {data["file"]}.',
-        '// Its titles, categories and link counts come from minecraft.wiki (https://minecraft.wiki), licensed under CC BY-NC-SA 3.0',
+def graph(snap, data):
+    """The link graph between data's pages, by their index in its articles: for each page the pages it links to outside
+    navboxes, the distinct navboxes (each the pages it links to, sorted), and for each page the navboxes it carries."""
+    titles = [r[0] for r in data['articles']]
+    index = {t: i for i, t in enumerate(titles)}
+    ids = lambda ts: tuple(sorted({index[r] for r in map(snap.resolve, ts) if r in index}))
+    links = [[i for i in ids(snap.pages[t]['body']) if i != index[t]] for t in titles]
+    carried = [[k for k in map(ids, snap.pages[t]['boxes']) if k] for t in titles]
+    boxes = sorted({k for ks in carried for k in ks})
+    box_id = {k: i for i, k in enumerate(boxes)}
+    return links, boxes, [sorted({box_id[k] for k in ks}) for ks in carried]
+
+
+def encode(ids):
+    """Sorted numbers as the gaps between them, from -1, in base 36, joined with commas."""
+    digits, out, prev = '0123456789abcdefghijklmnopqrstuvwxyz', [], -1
+    for i in ids:
+        gap, s = i - prev, ''
+        while gap:
+            gap, d = divmod(gap, 36)
+            s = digits[d] + s
+        out.append(s)
+        prev = i
+    return ','.join(out)
+
+
+# One entry per line, and no trailing commas, so what follows the = is JSON (common.read_data reads it back).
+j = lambda v: json.dumps(v, ensure_ascii=False)
+field = lambda key, value: f'  {j(key)}: {value}'
+block = lambda items, open_, close: open_ + '\n' + ',\n'.join(f'    {i}' for i in items) + '\n  ' + close
+
+
+def js_file(data, what, holds, name, fields):
+    """A generated file: where it comes from and its license, then const name = {fields}."""
+    return '\n'.join([
+        f'// {what} as of {data["snapshot"]}, for MC Wiki Race: made by tools/wikidata/build.py from {data["file"]}.',
+        f'// Its {holds} come from minecraft.wiki (https://minecraft.wiki), licensed under CC BY-NC-SA 3.0',
         '// (https://creativecommons.org/licenses/by-nc-sa/3.0/), not under the game\'s MIT license.',
         '// Don\'t edit it by hand; rebuild it from a newer ZIM (see CLAUDE.md, "Wiki data").',
-    ]
-    # One entry per line, and no trailing commas, so what follows the = is JSON (diff.py reads it back).
-    block = lambda items, open_, close: open_ + '\n' + ',\n'.join(f'    {i}' for i in items) + '\n  ' + close
-    fields = [f'  {j(k)}: {j(data[k])}' for k in ('snapshot', 'file', 'sha256', 'namespaces', 'topics', 'families', 'spinoffs')]
-    fields.append('  "articles": ' + block(map(j, data['articles']), '[', ']'))
-    fields.append('  "hubs": ' + block((f'{j(k)}: {j(v)}' for k, v in data['hubs'].items()), '{', '}'))
-    lines.append('const WIKI_DATA = {\n' + ',\n'.join(fields) + '\n};')
-    return '\n'.join(lines) + '\n'
+        f'const {name} = {{', ',\n'.join(fields), '};']) + '\n'
+
+
+def render(data):
+    """wiki-data.js."""
+    fields = [field(k, j(data[k])) for k in ('snapshot', 'file', 'sha256', 'namespaces', 'topics', 'families', 'spinoffs')]
+    fields.append(field('articles', block(map(j, data['articles']), '[', ']')))
+    fields.append(field('hubs', block((f'{j(k)}: {j(v)}' for k, v in data['hubs'].items()), '{', '}')))
+    return js_file(data, 'minecraft.wiki', 'titles, categories and link counts', 'WIKI_DATA', fields)
+
+
+def render_graph(data, links, boxes, carries):
+    """wiki-links.js and wiki-navboxes.js."""
+    sha = field('sha256', j(data['sha256']))
+    entries = lambda lists: block((j(encode(ids)) for ids in lists), '[', ']')
+    return (js_file(data, 'Links between minecraft.wiki\'s pages outside navboxes', 'links', 'WIKI_LINKS', [sha, field('links', entries(links))]),
+            js_file(data, 'minecraft.wiki\'s navboxes', 'links', 'WIKI_NAVBOXES',
+                    [sha, field('navboxes', entries(boxes)), field('carries', entries(carries))]))
 
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__.split('\n')[0])
     ap.add_argument('snapshot')
-    ap.add_argument('-o', '--out', default=DEFAULT_OUT)
+    ap.add_argument('-o', '--out', default=DEFAULT_OUT, help='folder for wiki-data.js, wiki-links.js and wiki-navboxes.js')
     ap.add_argument('--config', default=CONFIG)
     args = ap.parse_args()
-    data, sizes = build(Snapshot(args.snapshot), load_config(args.config))
-    with open(args.out, 'w', encoding='utf-8', newline='\n') as f:
-        f.write(render(data))
-    print(f'{os.path.normpath(args.out)}: {len(data["articles"])} pages, {len(data["hubs"])} hub titles; content '
-          + ', '.join(f'{c} {n}' for c, n in sizes.items()), file=sys.stderr)
+    snap = Snapshot(args.snapshot)
+    data, sizes = build(snap, load_config(args.config))
+    links, boxes, carries = graph(snap, data)
+    for name, text in zip(('wiki-data.js', 'wiki-links.js', 'wiki-navboxes.js'), (render(data), *render_graph(data, links, boxes, carries))):
+        with open(os.path.join(args.out, name), 'w', encoding='utf-8', newline='\n') as f:
+            f.write(text)
+    print(f'{os.path.normpath(args.out)}: {len(data["articles"])} pages, {len(data["hubs"])} hub titles, {sum(map(len, links)):,} links outside '
+          f'navboxes, {len(boxes)} navboxes ({sum(map(len, boxes)):,} links); content ' + ', '.join(f'{c} {n}' for c, n in sizes.items()), file=sys.stderr)
 
 
 if __name__ == '__main__':

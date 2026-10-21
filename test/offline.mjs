@@ -97,6 +97,10 @@ await play();
 links = await linkStates();
 check('Hard: hubs, redirects to them and navboxes dead; the target hub and other links live',
   links.Block === 'dead' && links.Blocks === 'dead' && links.Creeper === 'dead' && links.Crafting === 'live' && links.Diamond_Pickaxe === 'live', JSON.stringify(links));
+await ev('finish(false)');
+check('the result shows the fewest clicks', await until("document.querySelector('#par')?.textContent.startsWith('Fewest clicks: ')"),
+  await ev("document.querySelector('#par')?.textContent"));
+await ev('closeModal(); toSetup()');
 check('difficulty from a link\'s rules, and its words', await ev(`(() => {
   const got = [[], ['nonav'], ['nonav', 'nohubs'], ['noback', 'nonav']].map(r => (setRules(r), level() + ':' + rulesText(rules()))).join(' ');
   setRules([]);
@@ -183,6 +187,36 @@ await play();
 check('a card in a spin-off turns its links on without the checkbox', await ev("game.content.join() === 'Dungeons'") && (await linkStates())['Dungeons:Creeper'] === 'live');
 await ev("finish(false); closeModal(); toSetup()");
 check('history entries with an unknown Content key are left out', await ev("(r => isRecord(r) && !isRecord({ ...r, content: ['Nope'] }))(savedGames()[0])"));
+
+// Par: routes go by the graph files and keep to the game's settings. Each step must be a link in the graph it was found
+// in, Relaxed's are never longer than Normal's nor Normal's than Hard's, Hard's avoid hubs but the target, a spin-off page
+// is only reachable with its spin-off on, and a checkpoint's route goes through it.
+const par = JSON.parse(await ev(`(async () => {
+  const relaxed = await linkGraph(true), id = t => PAGE_IDS.get(t);
+  const linked = (g, a, b) => g.links[id(a)].includes(id(b)) || (g.carries?.[id(a)] ?? []).some(x => g.boxes[x].includes(id(b)));
+  const follows = (g, route) => route.every((t, i) => i === 0 || linked(g, route[i - 1], t));
+  const hubs = new Set(HUB_TITLES.values()), bad = [];
+  for (let i = 0; i < 30; i++) {
+    const start = pick(POOL_TITLES), goal = pick(POOL_TITLES);
+    if (start === goal) continue;
+    const [r, n, h] = await Promise.all([[], ['nonav'], ['nohubs', 'nonav']].map(rules => parRoute({ start, goal, rules })));
+    if (!r || !n || !follows(relaxed, r) || !follows({ links: relaxed.links }, n) || r.length > n.length || (h && (h.length < n.length
+      || h.slice(1).some(t => hubs.has(t) && t !== goal)))) bad.push(start + ' -> ' + goal);
+  }
+  const off = await parRoute({ start: 'Minecraft Dungeons', goal: 'Dungeons:Creeper', rules: ['nonav'] });
+  const on = await parRoute({ start: 'Minecraft Dungeons', goal: 'Dungeons:Creeper', rules: ['nonav'], content: ['Dungeons'] });
+  const via = await parRoute({ start: 'Diamond', via: 'Creeper', goal: 'Bamboo', rules: ['nonav'] });
+  return JSON.stringify({ bad, spinoff: off === null && on?.at(-1) === 'Dungeons:Creeper', via: via?.includes('Creeper') && via.at(-1) === 'Bamboo' });
+})()`));
+check('par routes follow the graph, Relaxed ≤ Normal ≤ Hard, Hard without hubs', par.bad.length === 0, par.bad.slice(0, 3).join(', '));
+check('par reaches a spin-off page only with its spin-off on', par.spinoff);
+check('par goes through the checkpoint', par.via);
+await open('#start=Brand%20New%20Mob&target=Diamond');
+await play();
+await ev('finish(false)');
+check('par names a card\'s page that isn\'t in the snapshot', await until("document.querySelector('#par')?.textContent.startsWith('“Brand New Mob” isn’t in the wiki')"),
+  await ev("document.querySelector('#par')?.textContent"));
+await ev('closeModal(); toSetup()');
 
 check('only page info and articles are asked for', [...requests.keys()].every(k => k === 'query prop=pageprops|pageimages|extracts' || k === 'parse prop=text|displaytitle'),
   JSON.stringify(Object.fromEntries(requests)));

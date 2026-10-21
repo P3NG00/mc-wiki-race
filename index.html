@@ -1336,6 +1336,84 @@ function goBack() {
   navigate(game.stack[game.stack.length - 2], null, { back: true });
 }
 
+// ---------------------------------------------------------------- Par
+// The link graph between the pages of WIKI_DATA.articles, by their place there: wiki-links.js (links outside navboxes)
+// and, for Relaxed, wiki-navboxes.js (each navbox once, and the navboxes each page carries), both made by
+// tools/wikidata/build.py with wiki-data.js. They are loaded the first time a result needs them, and refused if their
+// sha256 isn't wiki-data.js's, since a mismatch would give wrong routes. Each entry lists page numbers as the gaps between
+// them in base 36.
+const PAGE_IDS = new Map(WIKI_DATA.articles.map(([title], i) => [title, i]));
+const decodeIds = s => { let n = -1; return s ? s.split(',').map(gap => n += parseInt(gap, 36)) : []; };
+const graphFiles = new Map();
+function loadGraphFile(file, read) {
+  if (!graphFiles.has(file)) graphFiles.set(file, new Promise((resolve, reject) => {
+    const script = Object.assign(document.createElement('script'), { src: file });
+    script.onload = () => { const d = read(); d.sha256 === WIKI_DATA.sha256 ? resolve(d) : reject(new Error(`${file} doesn’t match wiki-data.js`)); };
+    script.onerror = () => { graphFiles.delete(file); script.remove(); reject(new Error(`couldn’t load ${file}`)); };
+    document.head.append(script);
+  }));
+  return graphFiles.get(file);
+}
+// The graph a game is played on: links outside navboxes, and the navboxes too when they are on (Relaxed).
+async function linkGraph(navboxes) {
+  const links = await loadGraphFile('wiki-links.js', () => WIKI_LINKS);
+  links.decoded ??= links.links.map(decodeIds);
+  if (!navboxes) return { links: links.decoded };
+  const boxes = await loadGraphFile('wiki-navboxes.js', () => WIKI_NAVBOXES);
+  boxes.decoded ??= { boxes: boxes.navboxes.map(decodeIds), carries: boxes.carries.map(decodeIds) };
+  return { links: links.decoded, ...boxes.decoded };
+}
+
+// One route with the fewest clicks from one page to another, as titles, or null if there is none. usable(page): whether
+// the route may go through a page.
+function shortestRoute(graph, from, to, usable) {
+  const start = PAGE_IDS.get(from), goal = PAGE_IDS.get(to);
+  if (start === undefined || goal === undefined) return null;
+  const prev = new Map([[start, -1]]), opened = new Set(), queue = [start];
+  for (let i = 0; i < queue.length; i++) {
+    const u = queue[i];
+    if (u === goal) {
+      const route = [];
+      for (let v = u; v !== -1; v = prev.get(v)) route.unshift(WIKI_DATA.articles[v][0]);
+      return route;
+    }
+    const reach = v => { if (!prev.has(v) && usable(v)) { prev.set(v, u); queue.push(v); } };
+    graph.links[u].forEach(reach);
+    // A navbox links the same pages wherever it is, so it is only opened the first, nearest time.
+    for (const b of graph.carries?.[u] ?? []) if (!opened.has(b)) { opened.add(b); graph.boxes[b].forEach(reach); }
+  }
+  return null;
+}
+
+// A shortest route for a game, through its checkpoint if it has one, going by the snapshot: navbox links count only in
+// Relaxed, hubs are dead in Hard (the target's and the checkpoint's aside, as in play), and a spin-off's pages only count
+// when it is on. Null if there is none, or if a card's page isn't in the snapshot.
+async function parRoute({ start, via, goal, rules, content = [] }) {
+  const graph = await linkGraph(!rules.includes('nonav'));
+  const hubs = new Set(rules.includes('nohubs') ? HUB_TITLES.values() : []);
+  const usable = v => {
+    const title = WIKI_DATA.articles[v][0], spinoff = spinoffOf(title);
+    return !(hubs.has(title) && title !== goal && title !== via) && (!spinoff || content.includes(spinoff));
+  };
+  const legs = (via ? [[start, via], [via, goal]] : [[start, goal]]).map(([a, b]) => shortestRoute(graph, a, b, usable));
+  return legs.every(Boolean) ? legs.reduce((route, leg) => route.concat(leg.slice(1))) : null;
+}
+
+// Fills the result's par line, unless that result has been closed by then.
+async function showPar(rec) {
+  const el = $('#par'), missing = [rec.start, rec.via, rec.goal].find(t => t && !PAGE_IDS.has(t));
+  let text;
+  try {
+    const route = !missing && await parRoute(rec);
+    text = missing ? `“${missing}” isn’t in the wiki as of ${WIKI_DATA.snapshot}, so the fewest clicks are unknown.`
+      : route ? `Fewest clicks: ${route.length - 1}, going by the wiki on ${WIKI_DATA.snapshot}. One way: ${route.join(' → ')}.`
+      : `No route going by the wiki on ${WIKI_DATA.snapshot}, with these settings.`;
+  } catch (e) {
+    text = `Couldn’t work out the fewest clicks: ${e.message}.`;
+  }
+  if (el.isConnected) el.textContent = text;
+}
+
 function finish(won, outOfClicks = false) {
   pauseClock();
   game.active = false;
@@ -1373,6 +1451,7 @@ function finish(won, outOfClicks = false) {
       <div class="stat"><div class="v mono">${game.path.length}</div><div class="k">Pages seen</div></div>
     </div>
     ${bestNote}
+    <p class="note" id="par">Working out the fewest clicks…</p>
     <strong>Path</strong>
     <ol>${pathHtml}</ol>
     <div class="actions">
@@ -1380,6 +1459,7 @@ function finish(won, outOfClicks = false) {
       <button id="mSame">Retry this pair</button>
       <button class="primary" id="mNew">New game</button>
     </div>`, false);
+  showPar(rec);
   $('#mCopy').onclick = async () => {
     const text = `MC Wiki Race${rec.daily ? ` daily ${rec.daily}` : ''}: ${route}${settingsNote ? ` (${settingsNote})` : ''}\n` +
       (won ? `${rec.clicks} clicks in ${fmtTime(ms)}\n` : `${outOfClicks ? 'Out of clicks' : 'Gave up'} after ${fmtTime(ms)}\n`) +

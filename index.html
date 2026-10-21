@@ -465,6 +465,19 @@ const TOPICS = {
   world: { label: 'Biomes & structures' },
   magic: { label: 'Enchantments & effects' },
 };
+// Target par (the Target row's second select): how far a rolled target is from the start, going by the link graph under
+// the difficulty and Content. Almost every pool pair is par 2, and none is 4 or more, so the choice is the one-click
+// targets or the farthest: par 3 is 4% of targets in Normal and 17% in Hard, and in Relaxed only a quarter of starts
+// have one, and very few a mob (measured on the 2026-08 snapshot). So a start rolled with the target is checked for one
+// before its lookup, the target may come from any topic but the start's unless one is chosen, and after PAR_STARTS
+// starts the roll gives up rather than search on for a pairing there may be none of.
+const REACHES = {
+  any: { label: 'Any par' },
+  short: { label: 'Par 1', fits: p => p === 1 },
+  long: { label: 'Par 3+', fits: p => p >= 3 },
+};
+const PAR_DRAWS = 400;     // titles to draw for one a roll accepts, before taking it that there is none
+const PAR_STARTS = 150;     // starts to search from for one with a target at the par, before giving up
 const CLICK_LIMIT = 6;     // Six clicks rule: the game is lost once this many clicks haven't reached the target
 const EXACT_EXTRA = 2;     // Exact clicks rule: the target has to be reached in exactly par + this many clicks
 const HUNT_SIZE = 3;       // Scavenger rule: how many articles, or kinds, to find
@@ -507,7 +520,7 @@ const isRecord = r => typeof r === 'object' && r !== null && typeof r.start === 
   [typeof r.goal === 'string', isTitles(r.finds), isTitles(r.kinds) && r.kinds.every(k => isKey(KINDS, k))].filter(Boolean).length === 1 &&
   optional(r.vias, isTitles) && optional(r.daily, v => typeof v === 'string') &&
   optional(r.exact, Number.isInteger) &&
-  optional(r.topic, v => isKey(TOPICS, v)) && optional(r.par, Number.isInteger) &&
+  optional(r.topic, v => isKey(TOPICS, v)) && optional(r.reach, v => isKey(REACHES, v)) && optional(r.par, Number.isInteger) &&
   optional(r.content, v => Array.isArray(v) && v.every(k => CONTENT.has(k))) &&
   Array.isArray(r.rules) && r.rules.every(k => isKey(RULES, k)) && typeof r.won === 'boolean' &&
   [r.clicks, r.ms, r.at].every(Number.isFinite);
@@ -690,7 +703,8 @@ function rulesText(keys) {
   return [l !== 'normal' && LEVELS[l].label, ...keys.filter(k => !LEVEL_RULES.includes(k)).map(k => RULES[k].label)].filter(Boolean).join(', ');
 }
 // A result's rules plus its target's topic, when that wasn't Any, and its Content.
-const settingsText = r => [r.topic && r.topic !== 'any' && TOPICS[r.topic].label, r.content && 'Content: ' + r.content.map(contentLabel).join(', '),
+const settingsText = r => [r.topic && r.topic !== 'any' && TOPICS[r.topic].label, r.reach && r.reach !== 'any' && REACHES[r.reach].label,
+  r.content && 'Content: ' + r.content.map(contentLabel).join(', '),
   rulesText(r.rules)].filter(Boolean).join(', ');
 const sameRules = (a, b) => a.rules.join() === b.rules.join();
 // A record's articles in the order they are played: start, checkpoints, target, and the start again on a round trip;
@@ -788,6 +802,7 @@ function syncVia() {
   $('#cardGoal').classList.toggle('hidden', hunt === 'kinds');
   $('#cardHunt').classList.toggle('hidden', hunt !== 'kinds');
   $('#btnSwap').classList.toggle('hidden', hunt === 'kinds');   // nothing to swap the start with
+  $('#reach').classList.toggle('hidden', !!hunt);
   if (hunt === 'kinds' && !setup.kinds?.length) setKinds(rollKinds());
   const missing = keys.filter(w => !setup[w]);
   if (missing.length) reroll(missing);
@@ -839,18 +854,26 @@ function candidate(group, linked) {
   if (group === null) return pick(pickWeighted([...groups.values()], l => l.length));
   return pick(groups.get(group) ?? rollGroups('everyday', linked).get(group));
 }
+// Every title candidate can draw.
+const candidates = (group, linked) => group === null ? [...rollGroups(mode(), linked).values()].flat()
+  : rollGroups(mode(), linked).get(group) ?? rollGroups('everyday', linked).get(group);
 
 // A checkpoint needs incoming links like a target, but the topic only applies to the target.
-async function rollOne(which, group) {
-  const linked = which !== 'start';
+// For the target par: accept, whether a title may take the card, checked before it is looked up, or titles, the ones
+// to draw from in place of the group's. Null if none drawn is accepted, or there are no titles.
+async function rollOne(which, group, accept = () => true, titles = null) {
+  const linked = which !== 'start', draw = () => titles ? pick(titles) : candidate(group, linked);
   const others = () => cardKeys().filter(w => w !== which).map(w => setup[w]?.title);
+  if (titles?.length === 0) return null;
   for (let attempt = 0; attempt < 12; attempt++) {
-    const title = candidate(group, linked);
+    let title = draw();
+    for (let i = 0; !accept(title) && i < PAR_DRAWS; i++) title = draw();
+    if (!accept(title)) return null;
     if (others().includes(title)) continue;
     const info = await pageInfo(title);
-    // Check the other cards again after the await: they may be rolling at the same time. The target's topic goes into
-    // the result (see finish).
-    if (info && !others().includes(info.title)) return Object.assign(info, which === 'goal' && { topic: $('#topic').value });
+    // Check the other cards again after the await: they may be rolling at the same time. The target's topic and par go
+    // into the result (see finish).
+    if (info && !others().includes(info.title)) return Object.assign(info, which === 'goal' && { topic: $('#topic').value, reach: reach() });
   }
   throw new Error('Gave up finding a good article');
 }
@@ -872,13 +895,34 @@ async function reroll(which) {
   setStatus('Picking…');
   await withBusy(async () => {
     for (const w of targets) { setup[w] = null; renderCard(w); }
-    // allSettled, so one card failing doesn't end the busy state while the other is still rolling.
-    const results = await Promise.allSettled(targets.map(async w => {
+    // allSettled, so one card failing doesn't end the busy state while the other is still rolling. With a target par,
+    // the start and target roll after the rest: a start only if some target is at that par from it, then a target that is.
+    const par = targets.includes('goal') && reach() !== 'any' && REACHES[reach()].fits;
+    const results = await Promise.allSettled(targets.filter(w => !par || (w !== 'start' && w !== 'goal')).map(async w => {
       const info = await rollOne(w, plan[w]);
       if (current(w)) { setup[w] = info; renderCard(w); }
     }));
     const failed = results.find(r => r.status === 'rejected');
     if (failed) throw failed.reason;
+    if (par) {
+      const graph = await linkGraph(!rules().includes('nonav')), dists = new Map();
+      const topic = POOL.has($('#topic').value) ? plan.goal : null, aims = candidates(topic, true);
+      const from = t => dists.get(t) ?? dists.set(t, distancesFrom(graph, t)).get(t);
+      // A target at the par from s, not from its topic (Chaos aside) unless that is the chosen one.
+      const fits = (s, t) => par(from(s)[PAGE_IDS.get(t)] ?? -1) && (topic || mode() === 'chaos' || groupOf(t) !== groupOf(s));
+      const what = REACHES[reach()].label.toLowerCase();
+      if (targets.includes('start')) {
+        const start = await rollOne('start', plan.start, s => (dists.has(s) || dists.size < PAR_STARTS) && aims.some(t => fits(s, t)));
+        if (!current('start')) return;
+        setup.start = start;
+        renderCard('start');
+        if (!start) { setStatus(`No start found with a target at ${what} for this topic and difficulty.`, true); return; }
+      }
+      if (!setup.start || !current('goal')) return;
+      setup.goal = await rollOne('goal', topic, undefined, aims.filter(t => fits(setup.start.title, t)));
+      renderCard('goal');
+      if (!setup.goal) { setStatus(`No target at ${what} from ${setup.start.title}. Reroll the start, or all.`, true); return; }
+    }
     if (which === 'all' && huntMode() === 'kinds') setKinds(rollKinds());   // after the start, which they mustn't hold
     if (targets.every(current)) setStatus(left ? LEFT_DAILY : '');
   });
@@ -1653,6 +1697,22 @@ function distancesTo(graph, goal, usable) {
   return dist;
 }
 
+// Target par: the fewest clicks from a page to every page (-1 for none), under the setup's difficulty and Content.
+function distancesFrom(graph, title) {
+  const usable = routeUsable({ keep: [], rules: rules(), content: contentInPlay([title]) });
+  const dist = new Int32Array(graph.links.length).fill(-1), start = PAGE_IDS.get(title), opened = new Set();
+  if (start === undefined) return dist;
+  const queue = [start];
+  dist[start] = 0;
+  for (let i = 0; i < queue.length; i++) {
+    const u = queue[i];
+    const step = v => { if (dist[v] < 0 && usable(v)) { dist[v] = dist[u] + 1; queue.push(v); } };
+    graph.links[u].forEach(step);
+    for (const b of graph.carries?.[u] ?? []) if (!opened.has(b)) { opened.add(b); graph.boxes[b].forEach(step); }
+  }
+  return dist;
+}
+
 // Exact clicks: a route of exactly n clicks from the first card to the last that is on no page twice, as titles, or null.
 // Whether there is one is NP-hard in general (it can be a longest-route question), so this searches depth first, only
 // through pages the target can still be reached from in the clicks left, the farthest first, since the detour has to
@@ -1848,7 +1908,8 @@ function finish(won, lost = null) {
   const target = game.roundTrip ? game.vias[0] : game.goal, vias = game.roundTrip ? [] : game.vias;
   const hunt = game.hunt && (game.hunt[0].kind ? { kinds: game.hunt.map(h => h.kind) } : { finds: game.hunt.map(h => h.info.title) });
   const rec = { start: game.start.title, ...(target && { goal: target.title }), ...hunt, ...(vias.length && { vias: vias.map(v => v.title) }), ...(game.daily && { daily: game.daily }),
-    ...(target?.topic && { topic: target.topic }),
+    // The par the target was rolled at, unless a new start or difficulty has moved the game off it since.
+    ...(target?.topic && { topic: target.topic }), ...(target?.reach && REACHES[target.reach].fits?.(game.par) !== false && { reach: target.reach }),
     ...(game.content.length && { content: game.content }), ...(game.par !== null && { par: game.par }), ...(game.exact && { exact: game.limit }), rules: game.rules, won, ...(lost && { [lost]: true }), clicks: clicks(), ms, at: Date.now(), path: game.path.map(p => p.title) };
   const settingsNote = settingsText(rec);
   const hist = savedGames();
@@ -1953,8 +2014,12 @@ $('#level').innerHTML = '<span class="lbl">Difficulty</span>' + Object.entries(L
   `<label title="${esc(l.help)}"><input type="radio" name="level" value="${k}"${k === 'normal' ? ' checked' : ''}> ${esc(l.label)}</label>`).join('');
 $('#target').innerHTML = '<span class="lbl">Target</span>' +
   `<select id="topic" aria-label="Target topic" title="Only targets from this topic. The start comes from another one.">
-  ${Object.entries(TOPICS).map(([k, t]) => `<option value="${k}">${esc(t.label)}</option>`).join('')}</select>`;
-// A new topic rerolls the target, and in the pool modes the start too if it is from that topic.
+  ${Object.entries(TOPICS).map(([k, t]) => `<option value="${k}">${esc(t.label)}</option>`).join('')}</select>` +
+  `<select id="reach" aria-label="Target par" title="How many clicks the target is from the start, at the fewest. Par 3 or more is rare: in Relaxed only some starts have one.">
+  ${Object.entries(REACHES).map(([k, r]) => `<option value="${k}">${esc(r.label)}</option>`).join('')}</select>`;
+// The target's par, beside its topic, unless Scavenger is on (it has no target to roll).
+const reach = () => huntMode() ? 'any' : $('#reach').value;
+// A new topic or par rerolls the target, and in the pool modes the start too if it is from that topic.
 $('#target').addEventListener('change', () => reroll(mode() !== 'chaos' && groupOf(setup.start?.title) === $('#topic').value ? 'all' : 'goal'));
 $('#content').innerHTML = '<span class="lbl">Content</span>' + WIKI_DATA.families.map(k =>
   `<label title="${esc(FAMILIES[k].help)}"><input type="checkbox" value="${k}"> ${esc(FAMILIES[k].label)}</label>`).join('');

@@ -30,6 +30,7 @@ const ARTICLE = title => `<div class="mw-parser-output"><p>${title}: <a href="/w
   <table class="navbox"><tr><td><a href="/w/Creeper">Creeper</a></td></tr></table></div>`;
 // The live categories a parse reply gives, as the API writes them: Brand New Mob is only in the live wiki's Nether mobs,
 // and Chicken is in it too but excluded from the kind.
+const REACH_LABEL = { short: 'Par 1', long: 'Par 3+' };
 const LIVE_CATEGORIES = { 'Brand New Mob': ['Nether_mobs', 'Verify'], Chicken: ['Nether_mobs', 'Passive_mobs'] };
 const reply = (request, body, type = 'application/json') => send('network.provideResponse', { request, statusCode: 200, body: { type: 'string', value: body },
   headers: [['Access-Control-Allow-Origin', '*'], ['Content-Type', type]].map(([name, value]) => ({ name, value: { type: 'string', value } })) });
@@ -383,6 +384,35 @@ await ev("document.querySelector('#rules input[value=checkpoint]').click()");
 check('Checkpoint unticks Scavenger, giving the target back', await until(ready) && await ev(`!rules().includes('scavenger') && document.querySelector('#huntMode').classList.contains('hidden')
   && !document.querySelector('#cardGoal').classList.contains('hidden') && document.querySelector('#cardGoal .tag').textContent === 'Target'`));
 await ev("setRules([])");
+
+// Target par: Par 1 and Par 3+ roll a start and a target at that par from it, Par 3+ in Relaxed too, where only about a
+// quarter of starts have one, and the record and the history keep it.
+await open('');
+await until(ready);
+for (const [level, value, ok] of [['normal', 'long', p => p >= 3], ['normal', 'short', p => p === 1], ['relaxed', 'long', p => p >= 3], ['hard', 'long', p => p >= 3]]) {
+  await ev(`document.querySelector('input[name=level][value=${level}]').click()`);
+  await ev(`document.querySelector('#reach').value = '${value}'`);
+  await ev("reroll('all')");
+  const got = await until(ready, 30000) && JSON.parse(await ev(`cardsRoute([setup.start.title, setup.goal.title], rules()).then(r =>
+    JSON.stringify({ par: r && r.length - 1, reach: setup.goal.reach, pair: setup.start.title + ' -> ' + setup.goal.title }))`));
+  check(`target par ${REACH_LABEL[value]} in ${level}: the target is at that par`, got && ok(got.par) && got.reach === value && await ev(`document.querySelector('#setupPar').textContent === 'Par ${got?.par}'`),
+    got ? `${got.pair}: par ${got.par}` : await ev("document.querySelector('#setupStatus').textContent"));
+}
+// With no pairing at all (here a link graph where nothing is reachable), the roll gives up after PAR_STARTS starts and
+// says so, quickly.
+await ev("window.realDistancesFrom = distancesFrom; distancesFrom = () => new Int32Array(WIKI_DATA.articles.length).fill(-1)");
+const t0 = Date.now();
+await ev("reroll('all')");
+check('a target par with no pairs gives up and says so', await until("setup.busy === 0 && document.querySelector('#setupStatus').textContent.startsWith('No start found with a target at par 3+')", 30000),
+  `${((Date.now() - t0) / 1000).toFixed(1)} s: ${await ev("document.querySelector('#setupStatus').textContent")}`);
+await ev("distancesFrom = realDistancesFrom");
+await ev("reroll('all')");
+await until(ready, 30000);
+await play();
+await until('game.par !== null');
+await ev("finish(false); closeModal(); toSetup()");
+check('the record and the history keep the target par, when the game is at it', await ev("store.get('mwr.history', [])[0].reach === 'long' && document.querySelector('#history tbody tr').textContent.includes('Par 3+')"));
+await ev("document.querySelector('#reach').value = 'any'; setRules(['nonav'])");
 
 // Rolls: each pool keeps to its tier, starts and targets come from different topics (Chaos aside), and targets are linked
 // well enough to be reached. planGroups and rollOne are called directly, with the pool's button set without a change event.

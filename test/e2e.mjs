@@ -169,8 +169,11 @@ f = await frameCtx();
 await ev("[...document.querySelectorAll('a.mwr-live')].find(a => /Diamond_Pickaxe/i.test(a.getAttribute('href'))).click()", f);
 check('reaching the target wins', await until("!game.active && !document.querySelector('#modalBg').classList.contains('hidden')"),
   `clicks=${await ev('clicks()')}`);
-// The result works out the fewest clicks from the link graph files: this Relaxed game's pair is linked directly or nearly.
-check('the result shows the fewest clicks and a route', await until("/^Fewest clicks: [12], .* One way: Diamond → .*Diamond Pickaxe\\.$/.test(document.querySelector('#par').textContent)"),
+// Golf: the result scores the win against par, from the link graph files, and shows a shortest route. This Relaxed game
+// took 3 clicks, Back included, for a pair linked directly or nearly.
+check('the result scores the win against par and shows a route', await until(`(t => t.startsWith(golfScore(clicks(), game.par) + '. Par ' + game.par +
+  ', going by the wiki on ' + WIKI_DATA.snapshot + '. One way: Diamond → ') && t.endsWith('Diamond Pickaxe.'))(document.querySelector('#par').textContent)`) &&
+  await ev("game.par >= 1 && game.par <= 2 && savedGames()[0].par === game.par && document.querySelector('#mPar').textContent === String(game.par)"),
   await ev("document.querySelector('#par').textContent"));
 await shot('3-win');
 

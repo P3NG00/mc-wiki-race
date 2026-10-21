@@ -93,13 +93,21 @@ check('Relaxed: hubs and navboxes live, other namespaces dead', links.Block === 
   links['Dungeons:Creeper'] === 'dead', JSON.stringify(links));
 await open('#start=Diamond&target=Crafting&rules=nohubs');
 check('No hubs alone is Hard', await ev("level() === 'hard' && rules().join() === 'nohubs,nonav'"));
+// Golf: par shows beside Start once the link graph has loaded, and in the header while playing.
+check('the setup screen shows par', await until("/^Par \\d+$/.test(document.querySelector('#setupPar').textContent)"), await ev("document.querySelector('#setupPar').textContent"));
 await play();
+check('the header shows par', await until("/^\\d+$/.test(document.querySelector('#hudPar').textContent)"), await ev("document.querySelector('#hudPar').textContent"));
 links = await linkStates();
 check('Hard: hubs, redirects to them and navboxes dead; the target hub and other links live',
   links.Block === 'dead' && links.Blocks === 'dead' && links.Creeper === 'dead' && links.Crafting === 'live' && links.Diamond_Pickaxe === 'live', JSON.stringify(links));
 await ev('finish(false)');
-check('the result shows the fewest clicks', await until("document.querySelector('#par')?.textContent.startsWith('Fewest clicks: ')"),
+check('the result shows par and a route', await until("/^Par \\d+, going by the wiki on .* One way: Diamond → .*Crafting\\.$/.test(document.querySelector('#par')?.textContent)"),
   await ev("document.querySelector('#par')?.textContent"));
+check('the record keeps par, and the history shows it', await ev("Number.isInteger(savedGames()[0].par)") && await until(
+  "toSetup(), document.querySelector('#history tbody tr td:nth-child(5)').textContent === 'par ' + savedGames()[0].par"),
+  await ev("document.querySelector('#history tbody tr td:nth-child(5)').textContent"));
+check('golf names a win against par', await ev("[[1, 1], [2, 2], [3, 2], [4, 2], [5, 2], [9, 2], [1, 2], [1, 3]].map(([c, p]) => golfScore(c, p)).join('|')")
+  === 'Hole in one!|Par|Bogey (+1)|Double bogey (+2)|Triple bogey (+3)|7 over par|Birdie (−1)|Eagle (−2)');
 await ev('closeModal(); toSetup()');
 check('difficulty from a link\'s rules, and its words', await ev(`(() => {
   const got = [[], ['nonav'], ['nonav', 'nohubs'], ['noback', 'nonav']].map(r => (setRules(r), level() + ':' + rulesText(rules()))).join(' ');

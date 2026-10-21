@@ -21,7 +21,7 @@ Open `index.html` in a browser. Opening it straight from disk (`file://`) works 
 - **Reroll** any card, or type your own article.
 - **📅 Daily** loads today's pair, which is the same for everyone on the same date. It always plays on Normal with one extra rule of the day (No Back, Blind target, Checkpoint, or Hard instead), and the result says it was the daily. `index.html#daily` opens it directly.
 - **Back** returns to the previous article and counts as a click. The clock pauses while an article loads.
-- **The result** says the fewest clicks the pair could be done in, with the same difficulty, checkpoint and spin-offs, and shows one route that takes that many. It goes by the wiki's offline copy, so it names that copy's date.
+- **Par** is the fewest clicks the pair can be done in, with the same difficulty, checkpoint and spin-offs. It shows beside Start and in the game's header, and the result scores your win against it as golf does (Hole in one!, Par, Bogey, Double bogey…) and shows one route that takes that many. It goes by the wiki's offline copy, so the result names that copy's date.
 - **Difficulty** decides which links you can use:
   - **Relaxed:** everything, including the big link tables at the bottom of articles (navboxes), so almost any sensible click gets you closer.
   - **Normal** (the default): the navboxes are hidden, so you find your way through the article itself.

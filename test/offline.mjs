@@ -40,7 +40,7 @@ const ARTICLE = title => title === HUBS_ONLY
   <table class="navbox"><tr><td><a href="/w/Creeper">Creeper</a></td></tr></table></div>`;
 // The live categories a parse reply gives, as the API writes them: Brand New Mob is only in the live wiki's Nether mobs,
 // and Chicken is in it too but excluded from the kind.
-const REACH_LABEL = { short: 'Par 1', long: 'Par 3+' };
+const REACH_LABEL = { p1: 'Par 1', p2: 'Par 2', p3: 'Par 3', p4: 'Par 4', p5: 'Par 5+' };
 const LIVE_CATEGORIES = { 'Brand New Mob': ['Nether_mobs', 'Verify'], Chicken: ['Nether_mobs', 'Passive_mobs'] };
 const reply = (request, body, type = 'application/json') => send('network.provideResponse', { request, statusCode: 200, body: { type: 'string', value: body },
   headers: [['Access-Control-Allow-Origin', '*'], ['Content-Type', type]].map(([name, value]) => ({ name, value: { type: 'string', value } })) });
@@ -413,10 +413,10 @@ check('Start picks a target with a route of exactly par + 2', await ev(`!!game.e
 await ev("finish(false); closeModal(); toSetup()");
 // A target topic and par under Blind target: the start is rolled with a target at that par, which Start then picks.
 await ev("document.querySelector('input[name=game][value=race]').click()");
-await ev("document.querySelector('#topic').value = 'blocks'; (s => { s.value = 'long'; s.dispatchEvent(new Event('change', { bubbles: true })); })(document.querySelector('#reach'))");
+await ev("document.querySelector('#topic').value = 'blocks'; (s => { s.value = 'p3'; s.dispatchEvent(new Event('change', { bubbles: true })); })(document.querySelector('#reach'))");
 await until(ready, 30000);
 await play();
-check('Start picks a target from the topic at the par chosen', await until('game.par !== null') && await ev("game.par >= 3 && game.goal.reach === 'long' && groupOf(game.goal.title) === 'blocks'"),
+check('Start picks a target from the topic at the par chosen', await until('game.par !== null') && await ev("game.par === 3 && game.goal.reach === 'p3' && groupOf(game.goal.title) === 'blocks'"),
   await ev("game.par + ' ' + game.goal.title"));
 await ev("finish(false); closeModal(); toSetup(); document.querySelector('#reach').value = 'any'; document.querySelector('#topic').value = 'any'");
 // A Blind target daily is held unseen, the same for everyone, and leaving it drops its cards.
@@ -612,12 +612,14 @@ check('picking Relay leaves Scavenger, giving the target back', await until(read
   && !document.querySelector('#cardGoal').classList.contains('hidden') && document.querySelector('#cardGoal .tag').textContent === 'Target'`));
 await ev("setRules([])");
 
-// Target par: Par 1 and Par 3+ roll a start and a target at that par from it, Par 3+ in Relaxed too, where only about a
-// quarter of starts have one, and the record and the history keep it.
+// Target par: each par rolls a start and a target at exactly that par from it: Par 3 in Relaxed too, where only about a
+// third of starts have one, Par 4 in Hard, where few have one, and Par 5+ with every family and spin-off on, the only
+// way to have one. The record and the history keep it.
 await open('');
 await until(ready);
-for (const [level, value, ok] of [['normal', 'long', p => p >= 3], ['normal', 'short', p => p === 1], ['relaxed', 'long', p => p >= 3], ['hard', 'long', p => p >= 3]]) {
-  await ev(`document.querySelector('input[name=level][value=${level}]').click()`);
+for (const [level, value, ok, content = []] of [['normal', 'p1', p => p === 1], ['normal', 'p2', p => p === 2], ['normal', 'p3', p => p === 3],
+  ['relaxed', 'p3', p => p === 3], ['hard', 'p4', p => p === 4], ['normal', 'p5', p => p >= 5, 'all']]) {
+  await ev(`document.querySelector('input[name=level][value=${level}]').click(); setContent(${content === 'all' ? '[...CONTENT.keys()]' : '[]'})`);
   await ev(`document.querySelector('#reach').value = '${value}'`);
   await ev("reroll('all')");
   const got = await until(ready, 30000) && JSON.parse(await ev(`cardsRoute([setup.start.title, setup.goal.title], rules()).then(r =>
@@ -625,13 +627,35 @@ for (const [level, value, ok] of [['normal', 'long', p => p >= 3], ['normal', 's
   check(`target par ${REACH_LABEL[value]} in ${level}: the target is at that par`, got && ok(got.par) && got.reach === value && await ev(`document.querySelector('#setupPar').textContent === 'Par ${got?.par}'`),
     got ? `${got.pair}: par ${got.par}` : await ev("document.querySelector('#setupStatus').textContent"));
 }
-// A topic with no start at the par gives way to another: in Popular on Relaxed only six starts have a target at par 3+,
+await ev('setContent([])');
+// Every start's pars, worked out at once with bitsets (startPars), match a search from each start: in Relaxed, through
+// navboxes, and in Hard, around hubs.
+const parsOff = JSON.parse(await ev(`(async () => {
+  const off = [];
+  for (const level of ['relaxed', 'hard']) {
+    document.querySelector('input[name=level][value=' + level + ']').click();
+    const pars = await startPars(null), graph = await linkGraph(level === 'relaxed'), web = distancesFrom(graph, WEB_HEART);
+    for (let i = 0; i < 25; i++) {
+      const s = pick(candidates(null, false)), d = distancesFrom(graph, s);
+      let m = 0;
+      for (const t of candidates(null, true)) {
+        const p = d[PAGE_IDS.get(t)];
+        if (groupOf(t) !== groupOf(s)) m |= p >= 1 && p < PAR_TOP ? 1 << p - 1 : web[PAGE_IDS.get(t)] >= 0 ? 1 << PAR_TOP - 1 : 0;
+      }
+      if (m !== pars.get(s)) off.push(level + ': ' + s);
+    }
+  }
+  return JSON.stringify(off);
+})()`));
+check('every start\'s pars, worked out at once, match a search from it, in Relaxed and Hard', !parsOff.length, parsOff.slice(0, 3).join(', '));
+await until(ready, 30000);
+// A topic with no start at the par gives way to another: in Popular on Relaxed only six starts have a target at par 3,
 // none of them Blocks or Mobs, so stopping at the planned topic would often give up.
 const pool = await ev("mode()"), status = "document.querySelector('#setupStatus').textContent";
 await ev("document.querySelector('input[name=mode][value=popular]').click(); document.querySelector('input[name=level][value=relaxed]').click()");
 await until(ready, 30000);
-await ev("document.querySelector('#reach').value = 'long'; document.querySelector('#topic').value = 'any'");
-const pairAtPar = `setup.start && setup.goal && $('#reach').value === 'long' ? cardsRoute([setup.start.title, setup.goal.title], rules().filter(k => k !== 'checkpoint'))
+await ev("document.querySelector('#reach').value = 'p3'; document.querySelector('#topic').value = 'any'");
+const pairAtPar = `setup.start && setup.goal && $('#reach').value === 'p3' ? cardsRoute([setup.start.title, setup.goal.title], rules().filter(k => k !== 'checkpoint'))
   .then(r => setup.start.title + ' -> ' + setup.goal.title + ': par ' + (r.length - 1)) : ${status}`;
 const popularRolls = [];
 for (let i = 0; i < 5; i++) {
@@ -639,54 +663,54 @@ for (let i = 0; i < 5; i++) {
   await until(ready, 30000);
   popularRolls.push(await ev(pairAtPar));
 }
-check('target par Par 3+ in Popular on Relaxed tries the other topics', popularRolls.every(r => / -> .*: par [3-9]$/.test(r)), popularRolls.join(' | '));
+check('target par Par 3 in Popular on Relaxed tries the other topics', popularRolls.every(r => / -> .*: par 3$/.test(r)), popularRolls.join(' | '));
 // In a Relay the start rolls first and the checkpoints take the topics it leaves: rolled after them, three checkpoints
 // took the one topic with a start on most rolls.
 await ev("setRules(['checkpoint'])");
 await setCount(3);
 await until(ready, 30000);
-await ev("document.querySelector('#reach').value = 'long'");
+await ev("document.querySelector('#reach').value = 'p3'");
 const relayRolls = [];
 for (let i = 0; i < 5; i++) {
   await ev("reroll('all')");
   await until(ready, 30000);
   relayRolls.push(await ev(pairAtPar) + (await ev("viaKeys().some(w => groupOf(setup[w]?.title) === groupOf(setup.start?.title))") ? ' (a checkpoint in its topic)' : ''));
 }
-check('and in a Relay of three, the checkpoints go round the start\'s topic', relayRolls.every(r => / -> .*: par [3-9]$/.test(r)), relayRolls.join(' | '));
+check('and in a Relay of three, the checkpoints go round the start\'s topic', relayRolls.every(r => / -> .*: par 3$/.test(r)), relayRolls.join(' | '));
 await ev("setRules([])");
 await until(ready, 30000);
 // Rerolling only the start keeps the target, with a start at the par from it, or at the nearest par if none has it (in
 // Popular on Relaxed no start has a mob 3 clicks away).
-await ev("document.querySelector('#reach').value = 'long'; reroll('all')");
+await ev("document.querySelector('#reach').value = 'p3'; reroll('all')");
 await until(ready, 30000);
 const keptGoal = await ev('setup.goal.title'), oldStart = await ev('setup.start.title');
 await ev("reroll('start')");
 check('rerolling only the start keeps the target at the par', await until(ready, 30000) && await ev(`setup.goal.title === ${JSON.stringify(keptGoal)}`)
-  && / -> .*: par [3-9]$/.test(await ev(pairAtPar)), `${oldStart} then ${await ev(pairAtPar)}`);
+  && / -> .*: par 3$/.test(await ev(pairAtPar)), `${oldStart} then ${await ev(pairAtPar)}`);
 await ev("setCustom('goal', 'Zombie')");
 await until("setup.goal?.title === 'Zombie' && setup.busy === 0");
 await ev("reroll('start')");
 const keptPar = await until(ready, 30000) && await ev("cardsRoute([setup.start.title, 'Zombie'], rules()).then(r => r.length - 1)");
-check('and with none at the par, one at the nearest par', await ev(`setup.goal.title === 'Zombie' && ${status} === 'No Popular start has Zombie at par 3+, so this one is par ${keptPar}.'`)
+check('and with none at the par, one at the nearest par', await ev(`setup.goal.title === 'Zombie' && ${status} === 'No Popular start has Zombie at par 3, so this one is par ${keptPar}.'`)
   && keptPar === 2, `${await ev(status)} (par ${keptPar})`);
-// Settings with no pair at all (in Popular on Relaxed no start has a Blocks target at par 3+) roll with any par instead,
-// saying why, and the option is off until they change.
-await ev("document.querySelector('#topic').value = 'blocks'; document.querySelector('#reach').value = 'long'");
+// Settings with no pair at the par (in Popular on Relaxed no start has a Blocks target at par 3) roll at the nearest par
+// that has one, the lower first, saying why, and the option is off until they change.
+await ev("document.querySelector('#topic').value = 'blocks'; document.querySelector('#reach').value = 'p3'");
 await ev("reroll('all')");
-const longOff = "(document.querySelector('#reach').dispatchEvent(new Event('focus')), document.querySelector('#reach option[value=long]').disabled)";
-check('settings with no pair at the par roll with any par, saying why, and the option is off', await until(ready, 30000)
-  && await ev(`${status} === 'No Popular start has a Blocks target at par 3+ on Relaxed, so Target par is back to Any par.' && $('#reach').value === 'any'
-    && groupOf(setup.goal.title) === 'blocks' && ${longOff}`), await ev(status));
-check('until the settings change', await ev(`(document.querySelector('#topic').value = 'world', !${longOff})`));
+const p3Off = "(document.querySelector('#reach').dispatchEvent(new Event('focus')), document.querySelector('#reach option[value=p3]').disabled)";
+const nearPar = await until(ready, 30000) && await ev(`cardsRoute([setup.start.title, setup.goal.title], rules()).then(r => r.length - 1)`);
+check('settings with no pair at the par roll at the nearest par, saying why, and the option is off', await ev(`${status} === 'No Popular start has a Blocks target at par 3 on Relaxed, so this one is par 2.'
+    && $('#reach').value === 'p2' && groupOf(setup.goal.title) === 'blocks' && ${p3Off}`) && nearPar === 2, `${await ev(status)} (par ${nearPar})`);
+check('until the settings change', await ev(`(document.querySelector('#topic').value = 'world', !${p3Off})`));
 // A start typed in is kept when a par is picked, and with no target at it (in Popular on Relaxed no start has a Mobs
-// target at par 3+) gets one at the nearest par it has.
+// target at par 3) gets one at the nearest par it has.
 await ev("document.querySelector('input[name=level][value=relaxed]').click()");
 await ev("setCustom('start', 'Diamond')");
 await until("setup.start?.title === 'Diamond' && setup.busy === 0");
-await ev("document.querySelector('#topic').value = 'mobs'; document.querySelector('#reach').value = 'long'; document.querySelector('#target').dispatchEvent(new Event('change'))");
+await ev("document.querySelector('#topic').value = 'mobs'; document.querySelector('#reach').value = 'p3'; document.querySelector('#target').dispatchEvent(new Event('change'))");
 const nearest = await until(ready, 30000) && await ev(`cardsRoute(['Diamond', setup.goal.title], rules()).then(r => r.length - 1)`);
 check('a typed-in start with no target at the par is kept, with one at the nearest par', await ev(`setup.start.title === 'Diamond' && groupOf(setup.goal.title) === 'mobs'
-  && ${status} === 'Diamond has no target at par 3+, so this one is par ${nearest}.'`) && nearest === 2, `${await ev(status)} (par ${nearest})`);
+  && ${status} === 'Diamond has no target at par 3, so this one is par ${nearest}.'`) && nearest === 2, `${await ev(status)} (par ${nearest})`);
 // A start typed in isn't checked to join the web of links, so its target comes from its whole search: from a dead end
 // nothing can be reached, where the quicker search the rolled starts get would count every target the web reaches.
 await ev(`setCustom('start', ${JSON.stringify(deadEnd)})`);
@@ -695,13 +719,13 @@ await ev("reroll('goal')");
 check('a typed-in start that reaches nothing says so', await until(`setup.busy === 0 && ${status}.startsWith('No target can be reached from ')`), await ev(status));
 await ev(`document.querySelector('input[name=mode][value=${pool}]').click()`);
 await until(ready, 30000);
-await ev("document.querySelector('#topic').value = 'any'; document.querySelector('#reach').value = 'long'");
+await ev("document.querySelector('#topic').value = 'any'; document.querySelector('#reach').value = 'p3'");
 await ev("reroll('all')");
 await until(ready, 30000);
 await play();
 await until('game.par !== null');
 await ev("finish(false); closeModal(); toSetup()");
-check('the record and the history keep the target par, when the game is at it', await ev("store.get('mwr.history', [])[0].reach === 'long' && document.querySelector('#history tbody tr').textContent.includes('Par 3+')"));
+check('the record and the history keep the target par, when the game is at it', await ev("store.get('mwr.history', [])[0].reach === 'p3' && document.querySelector('#history tbody tr').textContent.includes('Par 3')"));
 await ev("document.querySelector('#reach').value = 'any'; setRules(['nonav'])");
 
 // Rolls: each pool keeps to its tier, starts and targets come from different topics (Chaos aside), and targets are linked

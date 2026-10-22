@@ -608,19 +608,24 @@ const TOPICS = {
   magic: { label: 'Enchantments & effects' },
 };
 // Target par (the Target row's second select): how far a rolled target is from the start, going by the link graph under
-// the difficulty and Content. Most pool pairs are par 2, and none is more than 4, so the choice is the one-click
-// targets or the farthest: par 3 is 14% of targets in Normal and 31% in Hard, where a few pairs are par 4, and 1% in
-// Relaxed, where only a third of starts have one, and very few a mob (measured on the 2026-08 snapshot). So a start
-// rolled with the target is checked for one before its lookup (in each topic it may come from, in turn), by a search
-// that tells par 1, 2 and further apart (see reroll), and the target may come from any topic but the start's unless one
-// is chosen. A start typed in with none gets a target at the par nearest to near instead.
+// the difficulty and Content. On the 2026-08 snapshot most pool pairs are par 2: par 3 is 14% of targets in Normal and
+// 31% in Hard, where a few pairs are par 4, and 1% in Relaxed, where only a third of starts have one. With every family
+// and spin-off on, par 3 and 4 are the most common and par 5 is 5–7%, and only Chaos's odd pages (chains of subpages,
+// spin-off dead ends) go past 6, so the last choice takes every par from PAR_TOP. A start rolled with the target
+// is checked for one before its lookup (in each topic it may come from, in turn), from the pars every start has
+// (startPars), and the target may come from any topic but the start's unless one is chosen. When no start has one, the
+// roll takes the nearest par that has one; a start typed in with none gets a target at the par nearest to near instead.
+const PAR_TOP = 5;
 const REACHES = {
   any: { label: 'Any par' },
-  short: { label: 'Par 1', fits: p => p === 1, near: 1 },
-  long: { label: 'Par 3+', fits: p => p >= 3, near: 3 },
+  p1: { label: 'Par 1', fits: p => p === 1, near: 1 },
+  p2: { label: 'Par 2', fits: p => p === 2, near: 2 },
+  p3: { label: 'Par 3', fits: p => p === 3, near: 3 },
+  p4: { label: 'Par 4', fits: p => p === 4, near: 4 },
+  p5: { label: 'Par 5+', fits: p => p >= PAR_TOP, near: PAR_TOP },
 };
-// The target pars a roll has found no pair at, by the settings that decide it, so their options are off while those
-// settings stay (syncReach, when the select is focused, so it is never stale when picked from).
+// The target pars no start has a target at, by the settings that decide it, so their options are off while those
+// settings stay (syncReach, when the select is focused, so it is never stale when picked from). Found by a roll at a par.
 const noPair = new Set();
 const pairKey = r => [mode(), rules().join(), content().join(), $('#topic').value, r].join('|');
 function syncReach() {
@@ -1212,7 +1217,7 @@ async function reroll(which, atStart = false) {
     const apart = (s, t) => topic || mode() === 'chaos' || groupOf(t) !== groupOf(s);
     if (par && targets.includes('start')) {
       // Every topic no other card holds, in random order, since a whole topic can lack a start with a target at the par
-      // (in Popular on Relaxed only six starts have one at par 3+, none of them Blocks or Mobs). Cards kept from before
+      // (in Popular on Relaxed only six starts have one at par 3, none of them Blocks or Mobs). Cards kept from before
       // hold theirs; checkpoints rolled now go round the start's.
       const taken = cardKeys().filter(w => w !== 'start' && !targets.includes(w)).map(w => groupOf(setup[w]?.title)).filter(Boolean);
       const groups = mode() === 'chaos' ? [null] : shuffled([...rollGroups(mode(), false).keys()].filter(g => g !== topic && !taken.includes(g)));
@@ -1220,23 +1225,34 @@ async function reroll(which, atStart = false) {
       const toKept = kept && distancesTo(graph, PAGE_IDS.get(kept.title),
         routeUsable({ keep: [kept.title], rules: rules(), content: contentInPlay([kept.title]) }));
       const keptPar = s => toKept[PAGE_IDS.get(s)] ?? -1;
-      // Otherwise whether a start has a target at the par, telling only par 1, 2 and further apart: further is any page
-      // the web of links reaches, since the start has to join it too (rollOne checks that next). Searching only two
-      // clicks deep is five times quicker than the whole graph, which matters when a whole topic has no start that fits.
-      const web = !kept && distancesFrom(graph, WEB_HEART), near = new Map();
-      const fitsSome = kept ? s => par(keptPar(s)) : s => {
-        const d = near.get(s) ?? near.set(s, distancesFrom(graph, s, 2)).get(s);
-        return aims.some(t => { const v = PAGE_IDS.get(t); return apart(s, t) && par(d[v] >= 0 ? d[v] : web[v] >= 0 ? 3 : -1); });
-      };
-      let start = null;
-      for (const g of groups) {
-        // Drawn at random, then from the rest of the topic, which the draws can miss when few fit (Chaos, the whole
-        // wiki, only by draws).
-        start = await rollOne('start', g, fitsSome)
-          ?? (g === null ? null : await rollOne('start', g, undefined, candidates(g, false).filter(s => !near.has(s) && fitsSome(s))));
-        if (start || !current('start')) break;
-      }
+      // Otherwise the pars each start has a target at, worked out once for these settings.
+      const pars = !kept && await startPars(topic);
       if (!current('start')) return;
+      const fitsSome = r => kept ? s => REACHES[r].fits(keptPar(s)) : s => (pars.get(s) & 1 << REACHES[r].near - 1) !== 0;
+      // The par chosen, then, if no start has a target at it, the others by how near they are to it, the lower first.
+      // A kept target has its own way out below.
+      const chosen = reach(), gap = r => Math.abs(REACHES[r].near - REACHES[chosen].near);
+      const tries = kept ? [chosen] : Object.keys(REACHES).filter(r => REACHES[r].fits).sort((a, b) => gap(a) - gap(b) || REACHES[a].near - REACHES[b].near);
+      let start = null;
+      for (const r of tries) {
+        const ok = fitsSome(r);
+        for (const g of groups) {
+          // Drawn at random, then from the rest of its group, which the draws can miss when few fit.
+          start = await rollOne('start', g, ok) ?? await rollOne('start', g, undefined, candidates(g, false).filter(ok));
+          if (start || !current('start')) break;
+        }
+        if (!current('start')) return;
+        if (start) {
+          if (r !== chosen) {
+            notice = `No ${poolLabel()} start has a ${topic ? TOPICS[topic].label + ' ' : ''}target at ${what} on ${LEVELS[level()].label}, so this one is ${REACHES[r].label.toLowerCase()}.`;
+            $('#reach').value = r;
+            par = REACHES[r].fits;
+          }
+          break;
+        }
+        // Unless a kept card held a topic, there is certainly none, so the option is off until the settings change.
+        if (!kept && !taken.length) noPair.add(pairKey(r));
+      }
       if (!start && kept) {
         // None has the kept target at the par: a start at the nearest par to it instead.
         const reached = groups.flatMap(g => candidates(g, false)).filter(s => keptPar(s) > 0);
@@ -1250,12 +1266,10 @@ async function reroll(which, atStart = false) {
         renderCard('start');
         plan = planGroups(targets.filter(w => w !== 'start'));
       } else {
-        // No start has a target at the par with these settings, so the game rolls with any par and says why. Unless a
-        // kept card held a topic, or Chaos only drew, that is certain, so the option is off until they change. (A kept
+        // No start has a target at any par with these settings, so the game rolls with any par and says why. (A kept
         // target nothing reaches leaves the start rolled without a par.)
         if (!kept) {
-          if (!taken.length && mode() !== 'chaos') noPair.add(pairKey(reach()));
-          notice = `No ${poolLabel()} start has a ${topic ? TOPICS[topic].label + ' ' : ''}target at ${what} on ${LEVELS[level()].label}, so Target par is back to Any par.`;
+          notice = `No ${poolLabel()} start has a ${topic ? TOPICS[topic].label + ' ' : ''}target at any par on ${LEVELS[level()].label}, so Target par is back to Any par.`;
           $('#reach').value = 'any';
         }
         par = false;
@@ -2199,13 +2213,13 @@ function legsRoute(graph, stops, usable) {
   return legs.every(Boolean) ? legs.reduce((route, leg) => route.concat(leg.slice(1))) : null;
 }
 // Which pages a route may go through, by page number: as in play, hubs are dead in Hard but the ones kept (the cards),
-// a spin-off's pages only count when it is on, and the titles to avoid (a round trip's way there) are dead.
+// a spin-off's pages only count when it is on, and the titles to avoid (a round trip's way there) are dead. It runs for
+// every page a search reaches, so it goes by page numbers alone: each page's spin-off and the hubs are worked out once.
+const PAGE_SPINOFFS = WIKI_DATA.articles.map(([title]) => spinoffOf(title));
+const HUB_PAGES = new Set([...HUB_TITLES.values()].map(t => PAGE_IDS.get(t)));
 function routeUsable({ keep, avoid = new Set(), rules, content = [] }) {
-  const hubs = new Set(rules.includes('nohubs') ? HUB_TITLES.values() : []);
-  return v => {
-    const title = WIKI_DATA.articles[v][0], spinoff = spinoffOf(title);
-    return !(hubs.has(title) && !keep.includes(title)) && (!spinoff || content.includes(spinoff)) && !avoid.has(title);
-  };
+  const ids = titles => new Set([...titles].map(t => PAGE_IDS.get(t))), kept = ids(keep), avoided = ids(avoid), hubs = rules.includes('nohubs');
+  return v => !(hubs && HUB_PAGES.has(v) && !kept.has(v)) && (!PAGE_SPINOFFS[v] || content.includes(PAGE_SPINOFFS[v])) && !avoided.has(v);
 }
 
 // Reverse edges for searching back from a target, made once per graph file: the pages linking to each page, and for the
@@ -2236,21 +2250,62 @@ function distancesTo(graph, goal, usable) {
   return dist;
 }
 
-// Target par: the fewest clicks from a page to every page (-1 for none), under the setup's difficulty and Content, or
-// only to those at most depth clicks away.
-function distancesFrom(graph, title, depth = Infinity) {
-  const usable = routeUsable({ keep: [], rules: rules(), content: contentInPlay([title]) });
+// Target par: the fewest clicks from a page to every page (-1 for none), under the setup's difficulty and Content.
+function distancesFrom(graph, title, usable = routeUsable({ keep: [], rules: rules(), content: contentInPlay([title]) })) {
   const dist = new Int32Array(graph.links.length).fill(-1), start = PAGE_IDS.get(title), opened = new Set();
   if (start === undefined) return dist;
   const queue = [start];
   dist[start] = 0;
-  for (let i = 0; i < queue.length && dist[queue[i]] < depth; i++) {
+  for (let i = 0; i < queue.length; i++) {
     const u = queue[i];
     const step = v => { if (dist[v] < 0 && usable(v)) { dist[v] = dist[u] + 1; queue.push(v); } };
     graph.links[u].forEach(step);
     for (const b of graph.carries?.[u] ?? []) if (!opened.has(b)) { opened.add(b); graph.boxes[b].forEach(step); }
   }
   return dist;
+}
+
+// Target par: the pars each start the setup's pool and Content can roll has a target at, from the targets it can roll in
+// topic (null: any), under its difficulty, as a bitmask: bit k - 1 for one exactly k clicks away, and bit PAR_TOP - 1 for
+// one PAR_TOP or more away, which is any target the web of links reaches that is further (a start has to join the web
+// too, which rollOne checks next). The target can't be from the start's group, unless a topic is chosen or in Chaos. It
+// is one search for every start at once: each page's bitset of the targets it reaches within k clicks is its links'
+// within k - 1, for k up to PAR_TOP - 1. Searching from each start in turn took seconds when few have a target at the
+// par. Kept per settings, which are all read before the graph is waited for, so a change meanwhile can't mix them.
+const startParsCache = new Map();
+async function startPars(topic) {
+  const key = pairKey(''), r = rules(), usable = routeUsable({ keep: [], rules: r, content: contentInPlay([]) });
+  const aims = candidates(topic, true), starts = candidates(null, false), group = topic || mode() === 'chaos' ? null : groupOf;
+  if (startParsCache.has(key)) return startParsCache.get(key);
+  const graph = await linkGraph(!r.includes('nonav')), n = graph.links.length, W = Math.ceil(aims.length / 32);
+  const set = (bits, at, i) => { bits[at + (i >> 5)] |= 1 << (i & 31); };
+  const own = new Uint32Array(n * W), web = distancesFrom(graph, WEB_HEART, usable), far = new Uint32Array(W), groups = new Map();
+  aims.forEach((t, i) => {
+    set(own, PAGE_IDS.get(t) * W, i);
+    if (web[PAGE_IDS.get(t)] >= 0) set(far, 0, i);
+    const g = group?.(t);
+    if (group) set(groups.get(g) ?? groups.set(g, new Uint32Array(W)).get(g), 0, i);
+  });
+  const pars = new Map(starts.map(s => [s, 0]));
+  let within = own;   // the aims each page reaches within k - 1 clicks
+  // Gives par k to the starts with an aim in word w of reach(at, w) that isn't within k - 1 clicks nor in their group.
+  const mark = (k, reach) => starts.forEach(s => {
+    const at = PAGE_IDS.get(s) * W, same = group && groups.get(group(s));
+    for (let w = 0; w < W; w++) if (reach(at, w) & ~within[at + w] & ~(same?.[w] ?? 0)) { pars.set(s, pars.get(s) | 1 << k - 1); break; }
+  });
+  for (let k = 1; k < PAR_TOP; k++) {
+    const next = own.slice(), boxes = graph.boxes && new Uint32Array(graph.boxes.length * W);
+    graph.boxes?.forEach((ms, b) => { for (const m of ms) if (usable(m)) for (let w = 0; w < W; w++) boxes[b * W + w] |= within[m * W + w]; });
+    for (let v = 0; v < n; v++) {
+      for (const u of graph.links[v]) if (usable(u)) for (let w = 0; w < W; w++) next[v * W + w] |= within[u * W + w];
+      for (const b of graph.carries?.[v] ?? []) for (let w = 0; w < W; w++) next[v * W + w] |= boxes[b * W + w];
+    }
+    mark(k, (at, w) => next[at + w]);
+    within = next;
+  }
+  mark(PAR_TOP, (at, w) => far[w]);
+  startParsCache.set(key, pars);
+  return pars;
 }
 
 // Exact clicks: a route of exactly n clicks from the first card to the last that is on no page twice, as titles, or null.

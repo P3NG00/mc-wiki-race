@@ -401,8 +401,9 @@
     .hud { padding: 4px 16px; }
   }
 </style>
-<!-- Without JavaScript nothing on the setup screen works, so only the heading, the notice and the footer are shown. -->
-<noscript><style>.head-opts, .daily-box, .your-game, .game-settings, .step, .games, .game-help, .extras, .settings-sum, .settings, .modes, .mode-help, .pair, .setup-actions { display: none !important; }</style></noscript>
+<!-- Without JavaScript nothing on the setup screen works, so only the heading, the notice and the footer are shown, less
+     the footer's date line, which the script fills. -->
+<noscript><style>.head-opts, .daily-box, .your-game, .game-settings, .step, .games, .game-help, .extras, .settings-sum, .settings, .modes, .mode-help, .pair, .setup-actions, #wikiCopy { display: none !important; }</style></noscript>
 </head>
 <body>
 <script id="theme-boot">
@@ -522,6 +523,7 @@ const THEMES = [...new Set(['auto', 'light', 'dark', ...Array.from(document.quer
     <p>Made and run by <a href="https://BryantF.xyz">BryantF.xyz</a> · Contact: <a href="mailto:BryantF.xyz+mcwikirace@gmail.com">BryantF.xyz+mcwikirace@gmail.com</a></p>
     <p><a href="https://github.com/P3NG00/mc-wiki-race">Source on GitHub</a> · MIT License</p>
     <p>Articles and images are from <a href="https://minecraft.wiki">minecraft.wiki</a>. Article text is licensed under <a href="https://creativecommons.org/licenses/by-nc-sa/3.0/">CC BY-NC-SA 3.0</a> unless noted otherwise on the wiki.</p>
+    <p id="wikiCopy">Which articles come up, and par, go by the wiki’s <a href="https://minecraft.wiki/w/Minecraft_Wiki:Offline_use">offline copy</a> from <span id="wikiCopyDate"></span>.</p>
     <p>Not an official Minecraft product. Not affiliated with or endorsed by Mojang Studios, Microsoft, Minecraft or minecraft.wiki.</p>
   </footer>
 </section>
@@ -2685,6 +2687,7 @@ const cardsLoaded = () => !!setup.start && !!(huntMode() === 'kinds' ? setup.kin
 // #daily=YYYY-MM-DD, a past day) that day's pair and rule, otherwise roll a random one. A #g= hash is read on its own:
 // anything beside it is left out.
 (async function init() {
+  $('#wikiCopyDate').textContent = WIKI_DATA.snapshot;
   updateModeHelp();
   updateLevelHelp();
   syncContentToMode();   // a reload may bring the Pool radio button back on Chaos

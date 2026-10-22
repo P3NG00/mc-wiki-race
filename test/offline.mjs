@@ -101,6 +101,7 @@ const play = async () => {
 // Links by difficulty. A challenge link without rules is Relaxed: everything but other namespaces is live. No hubs alone
 // (from an older link) is Hard: hubs and redirects to them are dead, the target hub stays live, and so are navboxes' links.
 check('the data loads', await open('#start=Diamond&target=Crafting') && await ev("WIKI_DATA.snapshot.length === 10 && POOL.size === 5"));
+check('the footer names the offline copy\'s date and links where it comes from', await ev(`$('#wikiCopyDate').textContent === WIKI_DATA.snapshot && $('#wikiCopy a').href === 'https://minecraft.wiki/w/Minecraft_Wiki:Offline_use'`));
 // What the checks below take from the snapshot by name. A new one that changes any of these fails here, by name, rather
 // than leaving a check further down passing without testing anything (Crafting no longer a hub would leave "the target hub
 // stays live" true of any link, and Blaze in no kind would leave "a start in a kind rolls them again" nothing to roll).

@@ -605,7 +605,29 @@ for (const [level, value, ok] of [['normal', 'long', p => p >= 3], ['normal', 's
   check(`target par ${REACH_LABEL[value]} in ${level}: the target is at that par`, got && ok(got.par) && got.reach === value && await ev(`document.querySelector('#setupPar').textContent === 'Par ${got?.par}'`),
     got ? `${got.pair}: par ${got.par}` : await ev("document.querySelector('#setupStatus').textContent"));
 }
-// With no pairing at all (here a link graph where nothing is reachable), the roll gives up after PAR_STARTS starts and
+// A topic with no start at the par gives way to another: in Popular on Relaxed only Enchantments & effects starts have a
+// target at par 3+, so stopping at the planned topic gave up on four rolls in five.
+const pool = await ev("mode()");
+await ev("document.querySelector('input[name=mode][value=popular]').click(); document.querySelector('input[name=level][value=relaxed]').click()");
+await until(ready, 30000);
+await ev("document.querySelector('#reach').value = 'long'; document.querySelector('#topic').value = 'any'");
+const popularRolls = [];
+for (let i = 0; i < 5; i++) {
+  await ev("reroll('all')");
+  await until(ready, 30000);
+  popularRolls.push(await ev("setup.start && setup.goal ? setup.start.title + ' -> ' + setup.goal.title + ': par ' + document.querySelector('#setupPar').textContent : document.querySelector('#setupStatus').textContent"));
+}
+check('target par Par 3+ in Popular on Relaxed tries the other topics', popularRolls.every(r => / -> .*: par Par [3-9]$/.test(r)), popularRolls.join(' | '));
+await ev(`document.querySelector('input[name=mode][value=${pool}]').click()`);
+await until(ready, 30000);
+// A start typed in isn't checked to join the web of links, so its target comes from its whole search: from a dead end,
+// none is at the par, where the quicker search the rolled starts get would count every target the web reaches.
+await ev(`setCustom('start', ${JSON.stringify(deadEnd)})`);
+await until(`setup.start?.title === ${JSON.stringify(deadEnd)} && setup.busy === 0`);
+await ev("reroll('goal')");
+check('a typed-in start that reaches nothing gets no target at the par', await until(`setup.busy === 0 && document.querySelector('#setupStatus').textContent.startsWith('No target at par 3+ from ')`),
+  await ev("document.querySelector('#setupStatus').textContent"));
+// With no pairing at all (here a link graph where nothing is reachable), the roll gives up after trying every topic and
 // says so, quickly.
 await ev("window.realDistancesFrom = distancesFrom; distancesFrom = () => new Int32Array(WIKI_DATA.articles.length).fill(-1)");
 const t0 = Date.now();

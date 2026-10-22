@@ -611,15 +611,14 @@ const TOPICS = {
 // the difficulty and Content. Almost every pool pair is par 2, and none is more than 4, so the choice is the one-click
 // targets or the farthest: par 3 is 4% of targets in Normal and 17% in Hard, where six pairs are par 4, and in Relaxed
 // only a quarter of starts have one, and very few a mob (measured on the 2026-08 snapshot). So a start rolled with the
-// target is checked for one before its lookup, the target may come from any topic but the start's unless one is chosen,
-// and after PAR_STARTS starts the roll gives up rather than search on for a pairing there may be none of.
+// target is checked for one before its lookup (in each topic it may come from, in turn), by a search that tells par 1, 2
+// and further apart (see reroll), and the target may come from any topic but the start's unless one is chosen.
 const REACHES = {
   any: { label: 'Any par' },
   short: { label: 'Par 1', fits: p => p === 1 },
   long: { label: 'Par 3+', fits: p => p >= 3 },
 };
 const PAR_DRAWS = 400;     // titles to draw for one a roll accepts, before taking it that there is none
-const PAR_STARTS = 150;     // starts to search from for one with a target at the par, before giving up
 const CLICK_LIMIT = 6;     // Six clicks rule: the game is lost once this many clicks haven't reached the target
 const EXACT_EXTRA = 2;     // Exact clicks rule: the target has to be reached in exactly par + this many clicks
 const HUNT_SIZE = 3;       // Scavenger rule: how many articles, or kinds, to find
@@ -650,6 +649,7 @@ const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;'
 const LICENSE_URL = 'https://creativecommons.org/licenses/by-nc-sa/3.0/';
 const wikiUrl = title => `${WIKI}/w/${encodeURIComponent(title.replace(/ /g, '_')).replace(/%2F/g, '/').replace(/%3A/g, ':')}`;
 const pick = arr => arr[Math.floor(Math.random() * arr.length)];
+const shuffled = arr => arr.map(x => [Math.random(), x]).sort((a, b) => a[0] - b[0]).map(([, x]) => x);
 
 const store = {
   get(k, d) { try { const v = localStorage.getItem(k); return v == null ? d : JSON.parse(v); } catch { return d; } },
@@ -977,7 +977,7 @@ function firstKinds(order, start) {
   }
   return picked;
 }
-const rollKinds = () => firstKinds(Object.keys(KINDS).map(k => [Math.random(), k]).sort((a, b) => a[0] - b[0]).map(([, k]) => k), setup.start?.title);
+const rollKinds = () => firstKinds(shuffled(Object.keys(KINDS)), setup.start?.title);
 
 // Par for the pair on the cards, under the difficulty, checkpoint and Content in play, beside Start, shown only with
 // Distance on: par says how far the target is, as Distance does. The first card rendered loads the link graph, so it is
@@ -1204,22 +1204,44 @@ async function reroll(which, atStart = false) {
     const failed = results.find(r => r.status === 'rejected');
     if (failed) throw failed.reason;
     if (par) {
-      const graph = await linkGraph(!rules().includes('nonav')), dists = new Map();
+      const graph = await linkGraph(!rules().includes('nonav'));
       const topic = POOL.has($('#topic').value) ? $('#topic').value : null, aims = candidates(topic, true);
-      const from = t => dists.get(t) ?? dists.set(t, distancesFrom(graph, t)).get(t);
-      // A target at the par from s, not from its topic (Chaos aside) unless that is the chosen one.
-      const fits = (s, t) => par(from(s)[PAGE_IDS.get(t)] ?? -1) && (topic || mode() === 'chaos' || groupOf(t) !== groupOf(s));
+      // Whether t, p clicks from start s, may be its target: at the par, and not from its topic (Chaos aside) unless that
+      // is the chosen one.
+      const fits = (s, t, p) => par(p) && (topic || mode() === 'chaos' || groupOf(t) !== groupOf(s));
       const what = REACHES[reach()].label.toLowerCase();
       if (targets.includes('start')) {
-        const start = await rollOne('start', plan.start, s => (dists.has(s) || dists.size < PAR_STARTS) && aims.some(t => fits(s, t)));
+        // The planned group first, then the others no other card holds, in random order: a whole topic can lack a start
+        // with a target at the par (in Popular on Relaxed only Enchantments & effects starts have one at par 3+), and
+        // giving up on it would fail most rolls there.
+        const taken = [...viaKeys().map(w => groupOf(setup[w]?.title)), topic], groups = plan.start === null ? [null]
+          : [plan.start, ...shuffled([...rollGroups(mode(), false).keys()].filter(g => g !== plan.start && !taken.includes(g)))];
+        // Whether a start has a target at the par, telling only par 1, 2 and further apart: further is any page the web of
+        // links reaches, since the start has to join it too (rollOne checks that next). Searching only two clicks deep is
+        // five times quicker than the whole graph, which matters when a whole topic has no start that fits.
+        const web = distancesFrom(graph, WEB_HEART), near = new Map();
+        const fitsSome = s => {
+          const d = near.get(s) ?? near.set(s, distancesFrom(graph, s, 2)).get(s);
+          return aims.some(t => { const v = PAGE_IDS.get(t); return fits(s, t, d[v] >= 0 ? d[v] : web[v] >= 0 ? 3 : -1); });
+        };
+        let start = null;
+        for (const g of groups) {
+          // Drawn at random, then from the rest of the topic, which the draws can miss when few fit (Chaos, the whole
+          // wiki, only by draws).
+          start = await rollOne('start', g, fitsSome)
+            ?? (g === null ? null : await rollOne('start', g, undefined, candidates(g, false).filter(s => !near.has(s) && fitsSome(s))));
+          if (start || !current('start')) break;
+        }
         if (!current('start')) return;
         setup.start = start;
         renderCard('start');
-        if (!start) { setStatus(`No start found with a target at ${what} for this topic and difficulty.`, true); return; }
+        if (!start) { setStatus(`No start found with a target at ${what} for this pool, topic and difficulty.`, true); return; }
       }
       if (targets.includes('goal')) {
         if (!setup.start || !current('goal')) return;
-        setup.goal = await rollOne('goal', topic, undefined, aims.filter(t => fits(setup.start.title, t)));
+        // Drawn by the start's whole search, since a start typed in hasn't been checked to join the web of links.
+        const s = setup.start.title, dist = distancesFrom(graph, s);
+        setup.goal = await rollOne('goal', topic, undefined, aims.filter(t => fits(s, t, dist[PAGE_IDS.get(t)] ?? -1)));
         renderCard('goal');
         if (!setup.goal) { setStatus(`No target at ${what} from ${setup.start.title}. Reroll the start, or all.`, true); return; }
       }
@@ -2163,14 +2185,15 @@ function distancesTo(graph, goal, usable) {
   return dist;
 }
 
-// Target par: the fewest clicks from a page to every page (-1 for none), under the setup's difficulty and Content.
-function distancesFrom(graph, title) {
+// Target par: the fewest clicks from a page to every page (-1 for none), under the setup's difficulty and Content, or
+// only to those at most depth clicks away.
+function distancesFrom(graph, title, depth = Infinity) {
   const usable = routeUsable({ keep: [], rules: rules(), content: contentInPlay([title]) });
   const dist = new Int32Array(graph.links.length).fill(-1), start = PAGE_IDS.get(title), opened = new Set();
   if (start === undefined) return dist;
   const queue = [start];
   dist[start] = 0;
-  for (let i = 0; i < queue.length; i++) {
+  for (let i = 0; i < queue.length && dist[queue[i]] < depth; i++) {
     const u = queue[i];
     const step = v => { if (dist[v] < 0 && usable(v)) { dist[v] = dist[u] + 1; queue.push(v); } };
     graph.links[u].forEach(step);

@@ -15,6 +15,7 @@ The setup screen puts playing first. Top to bottom:
 - **📅 Daily challenge** shows today's game. **Play the daily** loads today's pair, which is the same for everyone on the same date. It always plays on Normal with one extra rule of the day (No Back, Blind target, a relay, Six clicks, a round trip, Exact clicks, a scavenger hunt, or Hard instead), it can always be done (on a Six clicks day in 4 clicks or fewer), and the result says it was the daily. `index.html#daily` opens it directly.
 - **Your game** says what's set.
 - **The cards:** **Reroll** any of them, or type your own article. **Par** is the fewest clicks the game can be done in, with the same difficulty, checkpoints and spin-offs. It shows beside Start and in the game's header, and the result scores your win against it as golf does, with what each name means (Par, even with par; Bogey, 1 over par; Birdie, 1 under…), and shows your path beside one route that takes that many, with how many clicks each page was from the target and how many of your clicks got no closer, so you can see where you lost ground. Share's path has the same counts. It goes by the wiki's offline copy, so the result names that copy's date.
+- **🎲 Random game** sets everything under the cards at random (the game and its options, the extra rules, the articles, the difficulty, the target and the Content, each on its own) and rolls new cards for it. Sound, Timer and Theme stay as they are.
 
 Under the cards are the steps for changing the game:
 

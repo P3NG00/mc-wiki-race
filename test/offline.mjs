@@ -1019,6 +1019,17 @@ await open('#start=Java%20Edition%20version%20history&target=Diamond');
 check('so is a left-out page', await until("document.querySelector('#setupStatus').textContent.startsWith('The challenge link’s article “Java Edition version history” doesn’t exist')"),
   await ev("document.querySelector('#setupStatus').textContent"));
 
+// Random game: every setting at random, then new cards for them. Eight clicks each fill the cards the settings use (the
+// start only under Blind target), with the line above the cards naming the game, and they don't all come out the same.
+const randomDone = `setup.busy === 0 && (isBlind() ? ['start'] : cardKeys()).every(w => setup[w]) && (huntMode() !== 'kinds' || isBlind() || setup.kinds?.length === 3)
+  && document.querySelector('.pair').dataset.vias === String(viaKeys().length) && document.querySelector('#gameSum').textContent.startsWith(GAMES[gameMode()].label)`;
+const randoms = [];
+for (let i = 0; i < 8; i++) {
+  await ev("document.querySelector('#btnRandom').click()");
+  randoms.push(await until(randomDone) && await ev("[gameMode(), level(), mode(), rules().join(), content().join(), document.querySelector('#topic').value, document.querySelector('#reach').value].join('|')"));
+}
+check('Random game sets the settings at random and fills the cards they use', randoms.every(Boolean) && new Set(randoms).size > 4, randoms.join(' ; '));
+
 // Injection: a link can carry any text, so a sealed one whose titles are markup and script, with junk rules, kinds and
 // back, is played through every place a title shows (cards, header, path, a frame link, the banner, the peek, the result,
 // the history). The made-up wiki takes the titles as real pages, which the live one never would, so it is the stricter

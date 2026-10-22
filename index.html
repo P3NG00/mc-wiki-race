@@ -472,6 +472,7 @@ const THEMES = [...new Set(['auto', 'light', 'dark', ...Array.from(document.quer
     <button class="primary" id="btnPlay" disabled>Start game</button>
     <span class="setup-par" id="setupPar" title="The fewest clicks this pair can be done in, going by the wiki’s offline copy"></span>
     <button id="btnRerollAll">🎲 Reroll all</button>
+    <button id="btnRandom" title="Every setting below at random, then new cards">🎲 Random game</button>
     <button id="btnSwap">⇄ Swap</button>
     <button id="btnCopy" title="Copy a link that opens this exact pair">Copy challenge link</button>
     <span class="status" id="setupStatus"></span>
@@ -2791,6 +2792,26 @@ document.querySelectorAll('[data-custom]').forEach(inp => {
   inp.addEventListener('keydown', e => { if (e.key === 'Enter') { setCustom(inp.dataset.custom, inp.value); inp.value = ''; } });
 });
 $('#btnRerollAll').onclick = () => reroll('all');
+// Random game: every setting under the cards at random, each on its own (every box a coin flip, every choice as likely as
+// the others), then new cards. Sound, Timer and Theme are the player's, so they stay.
+function randomGame() {
+  const coin = () => Math.random() < 0.5;
+  setRules([...LEVELS[pick(Object.keys(LEVELS))].rules, GAMES[pick(Object.keys(GAMES))].rule, ...EXTRA_RULES.filter(coin)].filter(Boolean));
+  for (const s of ['#viaCount', '#huntMode', '#exactExtra', '#topic']) $(s).value = pick([...$(s).options]).value;
+  setExtra();
+  pick([...document.querySelectorAll('input[name=mode]')]).checked = true;
+  updateModeHelp(); syncContentToMode();   // before the Content, whose family boxes Chaos disables
+  setContent([...CONTENT.keys()].filter(coin));
+  // Last, since whether a par has a pair goes by everything above.
+  $('#reach').value = pick(Object.keys(REACHES).filter(r => !noPair.has(pairKey(r))));
+  // Every card goes, so nothing held unseen (a Blind target daily or link) shows, and with no start syncVia rolls no
+  // cards of its own beside reroll's.
+  dropHidden();
+  setup.start = null;
+  syncVia();
+  return reroll('all');
+}
+$('#btnRandom').onclick = randomGame;
 $('#settings').addEventListener('change', updateGameSum);
 // Swap plays the whole chain backwards, checkpoints included. A round trip goes round the same loop from its target
 // instead: the start and target change places, and the checkpoints of the way back come first.

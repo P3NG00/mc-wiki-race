@@ -605,11 +605,11 @@ const TOPICS = {
   magic: { label: 'Enchantments & effects' },
 };
 // Target par (the Target row's second select): how far a rolled target is from the start, going by the link graph under
-// the difficulty and Content. Almost every pool pair is par 2, and none is 4 or more, so the choice is the one-click
-// targets or the farthest: par 3 is 4% of targets in Normal and 17% in Hard, and in Relaxed only a quarter of starts
-// have one, and very few a mob (measured on the 2026-08 snapshot). So a start rolled with the target is checked for one
-// before its lookup, the target may come from any topic but the start's unless one is chosen, and after PAR_STARTS
-// starts the roll gives up rather than search on for a pairing there may be none of.
+// the difficulty and Content. Almost every pool pair is par 2, and none is more than 4, so the choice is the one-click
+// targets or the farthest: par 3 is 4% of targets in Normal and 17% in Hard, where six pairs are par 4, and in Relaxed
+// only a quarter of starts have one, and very few a mob (measured on the 2026-08 snapshot). So a start rolled with the
+// target is checked for one before its lookup, the target may come from any topic but the start's unless one is chosen,
+// and after PAR_STARTS starts the roll gives up rather than search on for a pairing there may be none of.
 const REACHES = {
   any: { label: 'Any par' },
   short: { label: 'Par 1', fits: p => p === 1 },

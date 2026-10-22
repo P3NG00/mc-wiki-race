@@ -13,7 +13,7 @@ def load_config(path=CONFIG):
 
 class Snapshot:
     def __init__(self, path):
-        self.pages, self.redirects = {}, {}
+        self.pages, self.redirects, self.left_out = {}, {}, {}
         with gzip.open(path, 'rt', encoding='utf-8') as f:
             head = json.loads(f.readline())
             self.meta = head['meta']
@@ -27,6 +27,14 @@ class Snapshot:
                 else:
                     self.redirects[o['redirect']] = o['to']
         self.articles = sorted(t for t, p in self.pages.items() if p['ns'] == 0)
+        self._graph = None
+
+    def leave_out(self, titles):
+        """Drops these pages, so links to them, or to redirects to them, lead nowhere and count for nothing. They are kept
+        in left_out, so what decided it can be worked out again."""
+        for t in titles:
+            self.left_out[t] = self.pages.pop(t)
+        self.articles = [t for t in self.articles if t in self.pages]
         self._graph = None
 
     def resolve(self, title):

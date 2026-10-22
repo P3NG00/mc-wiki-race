@@ -49,7 +49,8 @@ PAGES = {
                    '<a href="Diamond">itself</a>, <a href="Village_%26_Pillage">encoded</a>, <a href="Village_&amp;_Pillage">escaped</a></p>'
                    '<map><area href="Breaking" shape="rect"></map>' + NAVBOX, ['Items'], ['Pages with sound tables']),
     'Diamond Pickaxe': (0, '<a href="Diamond">diamond</a> <a href="Block">block</a>', ['Items', 'Tools']),
-    'Creeper': (0, '<a href="Diamond">diamond</a> <a href="Dungeons%3ACreeper">in Dungeons</a>', ['Hostile mobs', 'Entities']),
+    'Creeper': (0, '<a href="Diamond">diamond</a> <a href="Dungeons%3ACreeper">in Dungeons</a> <a href="1.0">a version</a>',
+                ['Hostile mobs', 'Entities']),
     'Iron Ingot': (0, '<a href="Diamond">diamond</a>' + family('Iron Ingot'), ['Items']),
     'Block': (0, '<a href="Diamond">diamond</a>', []),
     'Breaking': (0, '<a href="Block">block</a>', []),
@@ -68,13 +69,19 @@ PAGES = {
     'Oak Slab': (0, '', ['Items', 'Slabs']),
     'Breeding': (0, '', ['Gameplay']),
     'Dirt (Minecraft 4k)': (0, '', ['Items', 'Minecraft 4k']),
+    # Version pages, left out: one by a category ending in " versions", one by a version category. A page in a family
+    # stays, though it is in a version category too.
+    'Java Edition 1.0': (0, '<a href="Diamond">diamond</a> <a href="Creeper">creeper</a>', ['Java Edition versions']),
+    'Bedrock Edition exclusive features': (0, '<a href="Diamond">diamond</a>', ['Versions']),
+    'Java Edition removed features': (0, '', ['Removed features', 'Versions']),
     # A spin-off: its pages link to articles (which don't count) and to each other (which do), and a version page.
     'Dungeons:Creeper': (10000, '<a href="Diamond">diamond</a> <a href="Dungeons%3AArch_Illager">arch illager</a>', ['Minecraft Dungeons entities']),
     'Dungeons:Arch Illager': (10000, '', ['Minecraft Dungeons entities']),
     'Dungeons:1.0.5.0': (10000, '<a href="Dungeons%3ACreeper">creeper</a>', ['Minecraft Dungeons versions']),
     'Category:Items': (14, '<a href="Diamond">diamond</a>', []),
 }
-REDIRECTS = {'Blocks': 'Block', 'Iron ingot': 'Iron Ingot'}
+# A redirect to a version page that a page links to, and one nothing links to.
+REDIRECTS = {'Blocks': 'Block', 'Iron ingot': 'Iron Ingot', '1.0': 'Java Edition 1.0', 'JE 1.0': 'Java Edition 1.0'}
 # mwoffliner writes a redirect to a section as a forwarding page, with a link relative to its own path.
 SECTION_REDIRECTS = {'Mining': './Breaking#Speed', 'Breaking/Mining': '../Breaking#Speed'}
 
@@ -113,6 +120,7 @@ CONFIG = {**load_config(), 'topics': {'items': ['Items', 'Tools'], 'mobs': ['Hos
           'families': {'joke': ['Joke features'], 'removed': ['Removed features'], 'education': ['Minecraft Education items'],
                        'fiction': ['Fictional mods'], 'variants': ['Slabs'], 'mechanics': ['Gameplay']},
           'not_content_categories': ['Minecraft 4k'], 'not_content_titles': ['Village & Pillage'], 'disambiguation_categories': ['Disambiguation pages'],
+          'version_categories': ['Versions'],
           'kinds': {'Items': {'label': 'an item', 'exclude': ['Iron Ingot']}}}
 build_module.MIN_KIND = 1   # the fixture's only item linked well enough to be a target is Diamond
 
@@ -145,24 +153,32 @@ with tempfile.TemporaryDirectory() as tmp:
 
     data, sizes = build(snap, CONFIG)
     rows = {r[0]: r for r in data['articles']}
-    check('every article and spin-off page is listed, and nothing else', sorted(rows) == sorted(t for t, (ns, *_) in PAGES.items() if ns in (0, 10000)),
-          sorted(rows))
+    versions = ['Java Edition 1.0', 'Bedrock Edition exclusive features', 'Dungeons:1.0.5.0']
+    check('every article and spin-off page is listed but the version pages, and nothing else',
+          sorted(rows) == sorted(t for t, (ns, *_) in PAGES.items() if ns in (0, 10000) and t not in versions), sorted(rows))
+    check('version pages and the redirects to them that pages link to', data['versions'] == sorted([*versions, '1.0']), data['versions'])
+    # Minecraft Dungeons versions holds only a left-out page, which the config's check has to find all the same.
+    dungeons_versions = {**CONFIG, 'version_categories': ['Versions', 'Minecraft Dungeons versions']}
+    check('building again from the same snapshot gives the same', build(snap, CONFIG)[0] == data
+          and build(snap, dungeons_versions)[0] == build(Snapshot(again), dungeons_versions)[0])
     check('the pool leaves out subpages, disambiguation pages, non-content pages and Content families',
           all(rows[t][3] == '' for t in ('Diamond Pickaxe/Render', 'Diamond (disambiguation)', 'Dirt (Minecraft 4k)', 'Ankle Monitor', 'Rose',
                                          'Frostgate', 'Balloon', 'Oak Slab', 'Breeding')), sorted(rows))
     check('Content families by category, Education by its exact categories only',
-          [rows[t][4] for t in ('Ankle Monitor', 'Rose', 'Balloon', 'Frostgate', 'Oak Slab', 'Breeding', 'Dirt (Minecraft 4k)', 'Diamond Pickaxe/Render')]
-          == [['joke'], ['removed'], ['education'], ['fiction'], ['variants'], ['mechanics'], [], []] and rows['Charcoal'][3:5] == ['items', []],
+          [rows[t][4] for t in ('Ankle Monitor', 'Rose', 'Java Edition removed features', 'Balloon', 'Frostgate', 'Oak Slab', 'Breeding',
+                                'Dirt (Minecraft 4k)', 'Diamond Pickaxe/Render')]
+          == [['joke'], ['removed'], ['removed'], ['education'], ['fiction'], ['variants'], ['mechanics'], [], []] and rows['Charcoal'][3:5] == ['items', []],
           [rows[t][3:] for t in ('Ankle Monitor', 'Rose', 'Balloon', 'Frostgate', 'Oak Slab', 'Breeding', 'Charcoal')])
-    check('spin-off pages are content of their spin-off, except version pages',
-          [rows[t][4] for t in ('Dungeons:Creeper', 'Dungeons:Arch Illager', 'Dungeons:1.0.5.0')] == [['Dungeons'], ['Dungeons'], []]
+    check('spin-off pages are content of their spin-off',
+          [rows[t][4] for t in ('Dungeons:Creeper', 'Dungeons:Arch Illager')] == [['Dungeons'], ['Dungeons']]
           and data['spinoffs'] == {'Dungeons': 10000} and data['families'] == list(CONFIG['families']))
+    # Dungeons:Creeper: from Creeper; not from Dungeons:1.0.5.0, a version page.
     check('a spin-off page counts links from articles and its own namespace',
-          rows['Dungeons:Creeper'][1:3] == [2, 2] and rows['Dungeons:Arch Illager'][1:3] == [1, 1], (rows['Dungeons:Creeper'], rows['Dungeons:Arch Illager']))
+          rows['Dungeons:Creeper'][1:3] == [1, 1] and rows['Dungeons:Arch Illager'][1:3] == [1, 1], (rows['Dungeons:Creeper'], rows['Dungeons:Arch Illager']))
     check('an article with a colon in its title is still an article', 'Minecraft: Story Mode' in rows)
     # Diamond: linked from Diamond Pickaxe, Creeper, Iron Ingot, Block and Minecraft: Story Mode, plus the subpage,
     # disambiguation page and joke article, which are articles even if rolls skip them. Not from Tutorial:Mining or
-    # Dungeons:Creeper, which are in other namespaces.
+    # Dungeons:Creeper, which are in other namespaces, nor from the version pages.
     check('links counted per article, through redirects', rows['Diamond'][1:3] == [8, 8], rows['Diamond'])
     check('navbox-only links counted apart', rows['Creeper'][1:3] == [1, 0] and rows['Diamond Pickaxe'][1:3] == [1, 1],
           (rows['Creeper'], rows['Diamond Pickaxe']))
@@ -173,7 +189,7 @@ with tempfile.TemporaryDirectory() as tmp:
     # on a tie, by title); Deep cuts, at a share of 1 here, every item linked well enough to be a target.
     check('tiers: Popular and Deep cuts', {t: r[5] for t, r in rows.items() if r[5]} == {'Diamond': ['popular', 'deep'], 'Iron Ingot': ['popular']},
           {t: r[5] for t, r in rows.items() if r[5]})
-    check('sizes', sizes == {'items': 4, 'mobs': 1, 'popular': 2, 'deep': 1, 'joke': 1, 'removed': 1, 'education': 1, 'fiction': 1,
+    check('sizes', sizes == {'items': 4, 'mobs': 1, 'popular': 2, 'deep': 1, 'joke': 1, 'removed': 2, 'education': 1, 'fiction': 1,
                              'variants': 1, 'mechanics': 1, 'Dungeons': 2}, sizes)
     check('namespaces: core, then the ZIM\'s with their talk namespaces',
           data['namespaces'] == ['Special', 'File', 'Category', 'Category talk', 'Dungeons', 'Dungeons talk', 'Tutorial', 'Tutorial talk'],
@@ -234,11 +250,12 @@ with tempfile.TemporaryDirectory() as tmp:
     newer['articles'] = [r for r in newer['articles'] if r[0] != 'Creeper'] + [['Copper Golem', 40, 30, 'mobs', [], []]]
     newer['articles'][[r[0] for r in newer['articles']].index('Diamond')][2] = 30
     newer['hubs'].pop('Mining')
+    newer['versions'].remove('1.0')
     newer['kinds']['Items']['members'] = ['Charcoal']
     report = diff(data, newer, min_links=5)
-    check('diff lists added and removed articles, category and kind moves, link changes and hubs',
+    check('diff lists added and removed articles, category and kind moves, link changes, hubs and version pages',
           all(s in report for s in ('2026-08-21', '2026-11-21', 'added (1): Copper Golem', 'removed (1): Creeper',
-                                    'mobs: 1 → 1', 'Kind Items: 1 → 1\n  joined: Charcoal\n  left: Diamond', 'Diamond: 8 → 30', 'Hubs: +none; −Mining')), report)
+                                    'mobs: 1 → 1', 'Kind Items: 1 → 1\n  joined: Charcoal\n  left: Diamond', 'Diamond: 8 → 30', 'Hubs: +none; −Mining', 'Versions: +none; −1.0')), report)
 
 # The game labels every topic and family the data names; a key without a label stops the page from loading.
 game = open(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..', 'index.html'), encoding='utf-8').read()

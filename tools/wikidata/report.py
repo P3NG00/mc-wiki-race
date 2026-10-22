@@ -7,8 +7,8 @@ The pool designs compared are the pools as built (Everyday, Popular, Deep cuts),
 in the config's research section, and the Variants family on its own and added to Everyday (see RESEARCH.md for what the
 first comparison found). Each is measured on
 --pairs random pairs (200 by default, about 3 minutes in all) with a seed taken from its name, so a report is repeatable,
-in three graphs: all links, without navboxes (the No navboxes rule), and without navboxes or the config's hubs (both
-rules). Per design:
+in three graphs, all without the version pages, which build.py leaves out: all links, without navboxes (the No navboxes
+rule), and without navboxes or the config's hubs (both rules). Per design:
   1, 2, 3, 4+, none   share of pairs by fewest clicks (none: no route at all)
   good first clicks   how many links on the start page begin a shortest route (median)
   only one            share of pairs with exactly one good first click

@@ -78,8 +78,8 @@ const liveOff = JSON.parse(await ev(`(async () => {
     'Diamond links Pickaxe (plain), Diamond Pickaxe and Tutorial: pages, 100+ links in all, 50+ outside its navboxes': () =>
       hrefs(diamond).includes('/w/Pickaxe') && linksTo(diamond, 'Diamond_Pickaxe') && hrefs(diamond).some(h => h.startsWith('/w/Tutorial:')) &&
       hrefs(diamond).length > 100 && textTitles(diamond).filter(t => !t.includes(':')).length > 50 && !!diamond.querySelector('.navbox'),
-    'Diamond’s text links hubs, the Crafting hub and Pickaxe': () => (ts => ts.some(t => HUB_TITLES.has(t) && HUB_TITLES.get(t) !== 'Crafting') &&
-      ts.some(t => HUB_TITLES.get(t) === 'Crafting') && ts.includes('Pickaxe'))(textTitles(diamond)),
+    'Diamond’s text links hubs, the Crafting hub, Pickaxe and version pages': () => (ts => ts.some(t => HUB_TITLES.has(t) && HUB_TITLES.get(t) !== 'Crafting') &&
+      ts.some(t => HUB_TITLES.get(t) === 'Crafting') && ts.includes('Pickaxe') && ts.some(t => VERSION_TITLES.has(t)))(textTitles(diamond)),
     'Pickaxe links Diamond, Iron Pickaxe and Diamond Pickaxe, and Diamond Pickaxe links Pickaxe (plain)': () =>
       ['Diamond', 'Iron_Pickaxe', 'Diamond_Pickaxe'].every(t => linksTo(pickaxe, t)) && hrefs(diamondPickaxe).includes('/w/Pickaxe'),
     'Pickaxe has a crafting output slot of two or more items and infobox tabs of three or more panels': () =>
@@ -423,7 +423,8 @@ await until("!document.querySelector('#btnPlay').disabled && setup.busy === 0", 
 await send('browsingContext.navigate', { context: ctx, url: 'about:blank', wait: 'complete' });
 await send('browsingContext.navigate', { context: ctx, url: fileUrl + '#start=Minecraft%20Dungeons&target=Diamond', wait: 'complete' });
 await until("!document.querySelector('#btnPlay').disabled");
-const dungeonsLinks = async () => JSON.parse(await ev("JSON.stringify([...document.querySelectorAll('a[href^=\"/w/Dungeons:\"]')].map(a => a.classList.contains('mwr-live')))", await frameCtx()));
+// Links to Dungeons pages, but its version pages, which stay dead.
+const dungeonsLinks = async () => JSON.parse(await ev("JSON.stringify([...document.querySelectorAll('a[href^=\"/w/Dungeons:\"]')].filter(a => a.title !== 'Off limits: a version page').map(a => a.classList.contains('mwr-live')))", await frameCtx()));
 await ev("document.querySelector('#btnPlay').click()");
 await until("game.path.length === 1 && !game.loading");
 const offLinks = await dungeonsLinks();
@@ -448,7 +449,7 @@ check('a card in a spin-off turns its links on without the checkbox', await ev("
 await ev("finish(false); closeModal(); toSetup()");
 check('history entries with unknown Content are left out', await ev(`(r => isRecord(r) && !isRecord({ ...r, content: ['Nope'] }))(savedGames()[0])`));
 
-// No hubs: links to hubs and their redirects are dead, except a hub that is the target.
+// No hubs: links to hubs and their redirects are dead, except a hub that is the target. Version pages are dead too.
 // Blind target: a link's target held unseen, then named in the HUD with no picture, and no peek. Picking at Start is in offline.mjs.
 await ev("store.set('mwr.pathCollapsed', true)");   // stands in for collapsing it before the reload
 await send('browsingContext.navigate', { context: ctx, url: 'about:blank', wait: 'complete' });
@@ -473,6 +474,8 @@ const liveness = keep => textLinks.filter(([title]) => keep(title)).map(([, live
 const toHubs = liveness(t => hubMap[t] && hubMap[t] !== 'Crafting'), toTarget = liveness(t => hubMap[t] === 'Crafting'), toPickaxe = liveness(t => t === 'Pickaxe');
 check('No hubs disables hub links', toHubs.length > 0 && toHubs.every(live => !live), `${toHubs.length} hub links, ${toHubs.filter(Boolean).length} live`);
 check('No hubs keeps the target and other links live', toTarget.length > 0 && toTarget.every(Boolean) && toPickaxe.length > 0 && toPickaxe.every(Boolean));
+const versionSet = new Set(JSON.parse(await ev('JSON.stringify(WIKI_DATA.versions)'))), toVersions = liveness(t => versionSet.has(t));
+check('links to version pages are dead', toVersions.length > 0 && toVersions.every(live => !live), `${toVersions.length} version links, ${toVersions.filter(Boolean).length} live`);
 
 // No navboxes: the navbox tables (and their Navigation heading) are hidden and their links dead; links in the text still work.
 await send('browsingContext.navigate', { context: ctx, url: 'about:blank', wait: 'complete' });

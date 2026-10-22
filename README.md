@@ -83,7 +83,7 @@ git config core.hooksPath .githooks
 
 Run this once per clone. Every commit then runs the offline test first and stops if a check fails (`git commit --no-verify` skips it). The live test isn't in the hook: run it by hand for changes to rendering, the article frame, API handling or layout, before a release, and always after updating the wiki snapshot (`wiki-data.js`, `wiki-links.js`, `wiki-navboxes.js`), which the hook reminds you of.
 
-See `CLAUDE.md` for how the game works internally.
+See `CLAUDE.md` and `docs/` for how the game works internally.
 
 ## License
 

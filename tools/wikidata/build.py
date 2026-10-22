@@ -196,7 +196,7 @@ def js_file(data, what, holds, name, fields):
         f'// {what} as of {data["snapshot"]}, for MC Wiki Race: made by tools/wikidata/build.py from {data["file"]}.',
         f'// Its {holds} come from minecraft.wiki (https://minecraft.wiki), licensed under CC BY-NC-SA 3.0',
         '// (https://creativecommons.org/licenses/by-nc-sa/3.0/), not under the game\'s MIT license.',
-        '// Don\'t edit it by hand; rebuild it from a newer ZIM (see CLAUDE.md, "Wiki data").',
+        '// Don\'t edit it by hand; rebuild it from a newer ZIM (see docs/wiki-data.md).',
         f'const {name} = {{', ',\n'.join(fields), '};']) + '\n'
 
 

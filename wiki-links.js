@@ -1,7 +1,7 @@
 // Links between minecraft.wiki's pages outside navboxes as of 2026-08-21, for MC Wiki Race: made by tools/wikidata/build.py from minecraft.wiki_en_all_2026-08.zim.
 // Its links come from minecraft.wiki (https://minecraft.wiki), licensed under CC BY-NC-SA 3.0
 // (https://creativecommons.org/licenses/by-nc-sa/3.0/), not under the game's MIT license.
-// Don't edit it by hand; rebuild it from a newer ZIM (see CLAUDE.md, "Wiki data").
+// Don't edit it by hand; rebuild it from a newer ZIM (see docs/wiki-data.md).
 const WIKI_LINKS = {
   "sha256": "1abbdd90762ab56676dc43bc4e1f019dd04fba3e9c97a3ac520a1c4f769c94d5",
   "links": [

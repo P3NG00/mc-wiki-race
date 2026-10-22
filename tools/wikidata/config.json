@@ -18,7 +18,7 @@
     "joke": ["Joke features"],
     "removed": ["Removed features", "Unused features"],
     "education": ["Minecraft Education blocks", "Minecraft Education items", "Minecraft Education entities", "Minecraft Education mobs"],
-    "fiction": ["Book objects", "Fictional mods"],
+    "fiction": ["Fictional mods"],
     "variants": ["Slabs", "Stairs", "Walls", "Pottery sherds", "Music discs", "Dyes", "Smithing templates", "Banner patterns"],
     "mechanics": ["Gameplay"]
   },

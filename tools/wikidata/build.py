@@ -73,6 +73,20 @@ def tiers(rows, config, popular_share, deep_share):
     return {r[0] for r in popular}, {r[0] for r in deep}
 
 
+def check_config(snap, config):
+    """Stops if the config names a category no page is in, or a not-content title that is no longer an article: a
+    rename on the wiki would otherwise move articles out of their topic, family or kind, or let a list page under its
+    new title into the pool, without a word."""
+    named = dict.fromkeys([*(c for topic in config['topics'].values() for c in topic), *(c for family in config['families'].values() for c in family),
+                           *config['not_content_categories'], *config['disambiguation_categories'], *config['kinds']])
+    seen = {c for p in snap.pages.values() for c in p['cats']}
+    problems = [f'category no page is in: {c}' for c in named if c not in seen]
+    problems += [f'not-content title that is no longer an article: {t}' + (f' (now a redirect to {snap.resolve(t)})' if t in snap.redirects else '')
+                 for t in config['not_content_titles'] if snap.pages.get(t, {}).get('ns') != 0]
+    if problems:
+        sys.exit('To look at in config.json:\n  ' + '\n  '.join(problems))
+
+
 def kinds(snap, config, rows):
     """Scavenger kinds, by category (see the docstring). Stops if an excluded title has left its category or a kind has
     too few members, so a new snapshot gets the hand-picked list looked at again."""
@@ -94,6 +108,7 @@ def kinds(snap, config, rows):
 
 
 def build(snap, config):
+    check_config(snap, config)
     families = config['families']
     full, outside = snap.backlinks()
     rows = []

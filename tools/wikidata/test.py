@@ -109,6 +109,10 @@ def write_zim(path):
 # Every Deep cuts share of the one item linked well enough to be a target (Diamond), as a third would round to nothing.
 CONFIG = {**load_config(), 'topics': {'items': ['Items', 'Tools'], 'mobs': ['Hostile mobs']}, 'hubs': ['Block', 'Breaking'],
           'core_namespaces': ['Special', 'File', 'Category'], 'spinoffs': ['Dungeons'], 'deep_cuts_share': 1,
+          # The config's categories and titles cut down to the fixture's, since the build stops on one it doesn't have.
+          'families': {'joke': ['Joke features'], 'removed': ['Removed features'], 'education': ['Minecraft Education items'],
+                       'fiction': ['Fictional mods'], 'variants': ['Slabs'], 'mechanics': ['Gameplay']},
+          'not_content_categories': ['Minecraft 4k'], 'not_content_titles': ['Village & Pillage'], 'disambiguation_categories': ['Disambiguation pages'],
           'kinds': {'Items': {'label': 'an item', 'exclude': ['Iron Ingot']}}}
 build_module.MIN_KIND = 1   # the fixture's only item linked well enough to be a target is Diamond
 
@@ -192,6 +196,15 @@ with tempfile.TemporaryDirectory() as tmp:
         check('a kind with too few members stops the build', False)
     except SystemExit as e:
         check('a kind with too few members stops the build', 'Hostile mobs: 0 members' in str(e), e)
+    try:
+        build(snap, {**CONFIG, 'families': {**CONFIG['families'], 'fiction': ['Fictional mods', 'Book objects']},
+                     'not_content_titles': ['Village & Pillage', 'Iron ingot', 'Drinks']})
+        check('a category no page is in and a not-content title that is gone or now redirects stop the build', False)
+    except SystemExit as e:
+        check('a category no page is in and a not-content title that is gone or now redirects stop the build',
+              str(e).split('\n  ')[1:] == ['category no page is in: Book objects',
+                                           'not-content title that is no longer an article: Iron ingot (now a redirect to Iron Ingot)',
+                                           'not-content title that is no longer an article: Drinks'], e)
 
     text = report(snap, CONFIG, 20)
     check('the report runs, with its topics, kinds, pool definitions and designs',

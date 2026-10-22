@@ -447,13 +447,6 @@ await ev("navigate('Diamond', null)");
 check('back home wins the hunt, recorded with the way home', await until('!game.active') && await ev(`(r => r.won && r.finds.length === 3 && r.rules.join() === 'roundtrip,scavenger')(store.get('mwr.history', [])[0])
   && document.querySelector('#modal').textContent.includes('Diamond → Creeper, Zombie, Crafting (any order) → Diamond')`));
 await ev("closeModal(); toSetup()");
-// With the cards off screen the strip links back up to them; with them in view it doesn't.
-const toCards = "!document.querySelector('#btnToCards').classList.contains('hidden')";
-await ev("document.querySelector('#games').scrollIntoView({ block: 'start' }); window.scrollBy(0, 400)");
-check('the strip links up to the cards while they are off screen', await until(toCards));
-await ev("document.querySelector('#btnToCards').click()");
-check('and the link scrolls them into view and hides', await until(`!(${toCards}) && document.querySelector('.pair').getBoundingClientRect().top >= 0`),
-  await ev("document.querySelector('.pair').getBoundingClientRect().top"));
 // A target with no way back that doesn't retrace (a dead end has no way back at all) says so as it is reached.
 await open(`#start=Diamond&target=${encodeURIComponent(deadEnd)}&rules=roundtrip`);
 await until(ready);

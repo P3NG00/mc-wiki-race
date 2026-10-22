@@ -69,11 +69,15 @@ PAGES = {
     'Oak Slab': (0, '', ['Items', 'Slabs']),
     'Breeding': (0, '', ['Gameplay']),
     'Dirt (Minecraft 4k)': (0, '', ['Items', 'Minecraft 4k']),
-    # Version pages, left out: one by a category ending in " versions", one by a version category. A page in a family
-    # stays, though it is in a version category too.
+    # Version pages, left out: one by a category ending in " versions", one by a version category, and a subpage. A
+    # page in a family stays, though it is in a version category too.
     'Java Edition 1.0': (0, '<a href="Diamond">diamond</a> <a href="Creeper">creeper</a>', ['Java Edition versions']),
     'Bedrock Edition exclusive features': (0, '<a href="Diamond">diamond</a>', ['Versions']),
     'Java Edition removed features': (0, '', ['Removed features', 'Versions']),
+    'Java Edition 1.0/Notes': (0, '<a href="Diamond">diamond</a>', []),
+    # A list page, left out though it is in a family, with its subpage.
+    'Creative inventory': (0, '<a href="Diamond">diamond</a> <a href="Creeper">creeper</a>', ['Gameplay']),
+    'Creative inventory/Old': (0, '', ['History']),
     # A spin-off: its pages link to articles (which don't count) and to each other (which do), and a version page.
     'Dungeons:Creeper': (10000, '<a href="Diamond">diamond</a> <a href="Dungeons%3AArch_Illager">arch illager</a>', ['Minecraft Dungeons entities']),
     'Dungeons:Arch Illager': (10000, '', ['Minecraft Dungeons entities']),
@@ -120,7 +124,7 @@ CONFIG = {**load_config(), 'topics': {'items': ['Items', 'Tools'], 'mobs': ['Hos
           'families': {'joke': ['Joke features'], 'removed': ['Removed features'], 'education': ['Minecraft Education items'],
                        'fiction': ['Fictional mods'], 'variants': ['Slabs'], 'mechanics': ['Gameplay']},
           'not_content_categories': ['Minecraft 4k'], 'not_content_titles': ['Village & Pillage'], 'disambiguation_categories': ['Disambiguation pages'],
-          'version_categories': ['Versions'],
+          'version_categories': ['Versions'], 'list_titles': ['Creative inventory'],
           'kinds': {'Items': {'label': 'an item', 'exclude': ['Iron Ingot']}}}
 build_module.MIN_KIND = 1   # the fixture's only item linked well enough to be a target is Diamond
 
@@ -153,10 +157,12 @@ with tempfile.TemporaryDirectory() as tmp:
 
     data, sizes = build(snap, CONFIG)
     rows = {r[0]: r for r in data['articles']}
-    versions = ['Java Edition 1.0', 'Bedrock Edition exclusive features', 'Dungeons:1.0.5.0']
-    check('every article and spin-off page is listed but the version pages, and nothing else',
-          sorted(rows) == sorted(t for t, (ns, *_) in PAGES.items() if ns in (0, 10000) and t not in versions), sorted(rows))
-    check('version pages and the redirects to them that pages link to', data['versions'] == sorted([*versions, '1.0']), data['versions'])
+    left = ['Java Edition 1.0', 'Bedrock Edition exclusive features', 'Dungeons:1.0.5.0', 'Java Edition 1.0/Notes', 'Creative inventory',
+            'Creative inventory/Old']
+    check('every article and spin-off page is listed but the left-out pages, and nothing else',
+          sorted(rows) == sorted(t for t, (ns, *_) in PAGES.items() if ns in (0, 10000) and t not in left), sorted(rows))
+    check('version and list pages, their subpages and the redirects to them that pages link to', data['left_out'] == sorted([*left, '1.0']),
+          data['left_out'])
     # Minecraft Dungeons versions holds only a left-out page, which the config's check has to find all the same.
     dungeons_versions = {**CONFIG, 'version_categories': ['Versions', 'Minecraft Dungeons versions']}
     check('building again from the same snapshot gives the same', build(snap, CONFIG)[0] == data
@@ -178,7 +184,7 @@ with tempfile.TemporaryDirectory() as tmp:
     check('an article with a colon in its title is still an article', 'Minecraft: Story Mode' in rows)
     # Diamond: linked from Diamond Pickaxe, Creeper, Iron Ingot, Block and Minecraft: Story Mode, plus the subpage,
     # disambiguation page and joke article, which are articles even if rolls skip them. Not from Tutorial:Mining or
-    # Dungeons:Creeper, which are in other namespaces, nor from the version pages.
+    # Dungeons:Creeper, which are in other namespaces, nor from the left-out pages.
     check('links counted per article, through redirects', rows['Diamond'][1:3] == [8, 8], rows['Diamond'])
     check('navbox-only links counted apart', rows['Creeper'][1:3] == [1, 0] and rows['Diamond Pickaxe'][1:3] == [1, 1],
           (rows['Creeper'], rows['Diamond Pickaxe']))
@@ -214,13 +220,14 @@ with tempfile.TemporaryDirectory() as tmp:
         check('a kind with too few members stops the build', 'Hostile mobs: 0 members' in str(e), e)
     try:
         build(snap, {**CONFIG, 'families': {**CONFIG['families'], 'fiction': ['Fictional mods', 'Book objects']},
-                     'not_content_titles': ['Village & Pillage', 'Iron ingot', 'Drinks']})
-        check('a category no page is in and a not-content title that is gone or now redirects stop the build', False)
+                     'not_content_titles': ['Village & Pillage', 'Iron ingot', 'Drinks'], 'list_titles': ['Creative inventory', 'Blocks']})
+        check('a category no page is in and a not-content or list title that is gone or now redirects stop the build', False)
     except SystemExit as e:
-        check('a category no page is in and a not-content title that is gone or now redirects stop the build',
+        check('a category no page is in and a not-content or list title that is gone or now redirects stop the build',
               str(e).split('\n  ')[1:] == ['category no page is in: Book objects',
                                            'not-content title that is no longer an article: Iron ingot (now a redirect to Iron Ingot)',
-                                           'not-content title that is no longer an article: Drinks'], e)
+                                           'not-content title that is no longer an article: Drinks',
+                                           'list title that is no longer an article: Blocks (now a redirect to Block)'], e)
 
     text = report(snap, CONFIG, 20)
     check('the report runs, with its topics, kinds, pool definitions and designs',
@@ -250,12 +257,12 @@ with tempfile.TemporaryDirectory() as tmp:
     newer['articles'] = [r for r in newer['articles'] if r[0] != 'Creeper'] + [['Copper Golem', 40, 30, 'mobs', [], []]]
     newer['articles'][[r[0] for r in newer['articles']].index('Diamond')][2] = 30
     newer['hubs'].pop('Mining')
-    newer['versions'].remove('1.0')
+    newer['left_out'].remove('1.0')
     newer['kinds']['Items']['members'] = ['Charcoal']
     report = diff(data, newer, min_links=5)
-    check('diff lists added and removed articles, category and kind moves, link changes, hubs and version pages',
+    check('diff lists added and removed articles, category and kind moves, link changes, hubs and left-out pages',
           all(s in report for s in ('2026-08-21', '2026-11-21', 'added (1): Copper Golem', 'removed (1): Creeper',
-                                    'mobs: 1 → 1', 'Kind Items: 1 → 1\n  joined: Charcoal\n  left: Diamond', 'Diamond: 8 → 30', 'Hubs: +none; −Mining', 'Versions: +none; −1.0')), report)
+                                    'mobs: 1 → 1', 'Kind Items: 1 → 1\n  joined: Charcoal\n  left: Diamond', 'Diamond: 8 → 30', 'Hubs: +none; −Mining', 'Left out: +none; −1.0')), report)
 
 # The game labels every topic and family the data names; a key without a label stops the page from loading.
 game = open(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..', 'index.html'), encoding='utf-8').read()

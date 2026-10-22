@@ -570,7 +570,7 @@ const API = WIKI + '/api.php';
 // of minecraft.wiki (see docs/wiki-data.md). ARTICLES holds every article and every spin-off page, with how many pages link to it
 // (links), how many of those from outside navboxes (body), its topic if it is in the pool, its Content (fams: a family
 // such as joke, or its spin-off) and its tiers (popular, deep). Subpages, disambiguation and other non-content pages
-// have neither topic nor Content, so only Chaos rolls them. Version pages aren't in it at all (see VERSION_TITLES).
+// have neither topic nor Content, so only Chaos rolls them. Version and list pages aren't in it at all (see LEFT_OUT).
 const ARTICLES = new Map(WIKI_DATA.articles.map(([title, links, body, topic, fams, tiers]) => [title, { links, body, topic, fams, tiers }]));
 // The pool: game content by topic (TOPICS has their labels), which the Popular, Everyday and Deep cuts pools draw from.
 const POOL = new Map(WIKI_DATA.topics.map(k => [k, []]));
@@ -579,12 +579,13 @@ const POOL_TITLES = [...POOL.values()].flat();
 
 // Non-article namespaces on minecraft.wiki. Links into these are disabled, except a spin-off's in a game that has it on.
 const NAMESPACES = WIKI_DATA.namespaces;
-// Version pages (releases, snapshots, version histories) and the redirects to them. Almost every article links to some
-// from its history, and they link to most of the pool, so any pair would be two clicks through one. They are left out
-// like the namespaces: links to them are dead in every difficulty, no card can be one, and the data and the link graph
-// don't have them. Written once for the article frame, which gets the list every time.
-const VERSION_TITLES = new Set(WIKI_DATA.versions);
-const VERSIONS_JSON = JSON.stringify(WIKI_DATA.versions).replace(/</g, '\\u003c');
+// The left-out pages: version pages (releases, snapshots, version histories), list pages (data values, Closed captions,
+// Creative inventory…), their subpages and the redirects to them. Many articles link to them and they link to much of
+// the pool, so a route through one is a cheat: almost every article links to some version page from its history. They
+// are left out like the namespaces: links to them are dead in every difficulty, no card can be one, and the data and the
+// link graph don't have them. Written once for the article frame, which gets the list every time.
+const LEFT_OUT = new Set(WIKI_DATA.left_out);
+const LEFT_OUT_JSON = JSON.stringify(WIKI_DATA.left_out).replace(/</g, '\\u003c');
 // Spin-off games' namespaces, name to number. Their pages are in ARTICLES too, titled "Dungeons:…".
 const SPINOFFS = WIKI_DATA.spinoffs;
 const spinoffOf = title => Object.keys(SPINOFFS).find(n => title.startsWith(n + ':'));
@@ -608,7 +609,7 @@ const TOPICS = {
 };
 // Target par (the Target row's second select): how far a rolled target is from the start, going by the link graph under
 // the difficulty and Content. Most pool pairs are par 2, and none is more than 4, so the choice is the one-click
-// targets or the farthest: par 3 is 13% of targets in Normal and 25% in Hard, where a few pairs are par 4, and 1% in
+// targets or the farthest: par 3 is 14% of targets in Normal and 31% in Hard, where a few pairs are par 4, and 1% in
 // Relaxed, where only a third of starts have one, and very few a mob (measured on the 2026-08 snapshot). So a start
 // rolled with the target is checked for one before its lookup (in each topic it may come from, in turn), by a search
 // that tells par 1, 2 and further apart (see reroll), and the target may come from any topic but the start's unless one
@@ -722,7 +723,7 @@ const INFO_PARAMS = {
 const firstParagraph = text => (text || '').trim().split('\n')[0].trim();
 
 function toInfo(p) {
-  if (!p || p.missing || p.invalid || (p.ns !== 0 && !Object.values(SPINOFFS).includes(p.ns)) || VERSION_TITLES.has(p.title)) return null;
+  if (!p || p.missing || p.invalid || (p.ns !== 0 && !Object.values(SPINOFFS).includes(p.ns)) || LEFT_OUT.has(p.title)) return null;
   return {
     title: p.title,
     desc: firstParagraph(p.extract),
@@ -1211,7 +1212,7 @@ async function reroll(which, atStart = false) {
     const apart = (s, t) => topic || mode() === 'chaos' || groupOf(t) !== groupOf(s);
     if (par && targets.includes('start')) {
       // Every topic no other card holds, in random order, since a whole topic can lack a start with a target at the par
-      // (in Popular on Relaxed only five starts have one at par 3+, none of them Blocks or Mobs). Cards kept from before
+      // (in Popular on Relaxed only six starts have one at par 3+, none of them Blocks or Mobs). Cards kept from before
       // hold theirs; checkpoints rolled now go round the start's.
       const taken = cardKeys().filter(w => w !== 'start' && !targets.includes(w)).map(w => groupOf(setup[w]?.title)).filter(Boolean);
       const groups = mode() === 'chaos' ? [null] : shuffled([...rollGroups(mode(), false).keys()].filter(g => g !== topic && !taken.includes(g)));
@@ -1923,7 +1924,7 @@ function renderArticle(page, fragment, token, blocked = [], seen = []) {
     const FRAG = ${js(fragment || '')};
     const WGL = ${js(WGL_THEME_CLASSES)};
     const BLOCKED = new Set(${js(blocked)});
-    const VERSIONS = new Set(${VERSIONS_JSON});
+    const LEFT_OUT = new Set(${LEFT_OUT_JSON});
     const SEEN = new Set(${js(seen)});
     const NO_NAV = ${noNav};
     function classify(a) {
@@ -1941,7 +1942,7 @@ function renderArticle(page, fragment, token, blocked = [], seen = []) {
       const c = t.indexOf(':');
       if (c > 0 && NS.has(t.slice(0, c).trim().toLowerCase())) return null;
       t = t.charAt(0).toUpperCase() + t.slice(1);   // as MediaWiki does, so titles match the blocked and seen lists
-      if (VERSIONS.has(t)) return { kind: 'blocked', why: 'a version page' };
+      if (LEFT_OUT.has(t)) return { kind: 'blocked', why: 'a version or list page' };
       if (BLOCKED.has(t)) return { kind: 'blocked', why: 'No hubs' };
       return { kind: 'article', title: t, frag, seen: SEEN.has(t) };
     }
@@ -2149,8 +2150,9 @@ async function linkGraph(navboxes) {
   return { links: links.decoded, ...boxes.decoded };
 }
 
-// Whether a page is game content (it has a topic or a family), by page number. Data values, lists and the like link to
-// much of the wiki, so they are on a shortest route for many pairs, though one through content alone is often as short.
+// Whether a page is game content (it has a topic or a family), by page number. Pages that aren't, such as Minecraft
+// Dungeons, Particles or Minecraft.net, are on a shortest route for many pairs, though one through content alone is often
+// as short.
 const CONTENT_PAGES = WIKI_DATA.articles.map(([, , , topic, families]) => !!topic || families.length > 0);
 // One route with the fewest clicks from one page to another (or to the nearest of a list), as titles, or null if there
 // is none. usable(page): whether the route may go through a page. Of the routes with the fewest clicks it takes one

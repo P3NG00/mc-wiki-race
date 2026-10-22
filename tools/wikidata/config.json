@@ -69,7 +69,12 @@
   "kinds_comment": "Scavenger kinds: wiki categories (hand-picked, approved 2026-10-21) with the name the game shows ('a hostile mob'). A kind's members are the pool articles in it that are linked well enough to be a target, less its exclude list: overview pages (Food, Tree), mob combinations (jockeys) and members a player wouldn't expect (Chicken in Nether mobs, Elytra in Tools). build.py stops if an excluded title has left the category, or a kind has fewer than 5 members, so a new snapshot gets the list looked at again.",
   "disambiguation_categories": ["Disambiguation pages", "Version disambiguation pages"],
   "version_categories": ["Versions", "Development version lists"],
-  "versions_comment": "Version pages: articles and spin-off pages in a category ending in ' versions' or in one of these, but those with a topic or a family (the removed and unused features lists). Their history sections link them from almost every article, and they link to most of the pool, so they make any pair two clicks: build.py leaves them out of the data and the game kills links to them and their redirects.",
+  "versions_comment": "Version pages: articles and spin-off pages in a category ending in ' versions' or in one of these, but those with a topic or a family (the removed and unused features lists). Their history sections link them from almost every article, and they link to most of the pool, so they make any pair two clicks: build.py leaves them out of the data, with their subpages, and the game kills links to them and their redirects.",
+  "list_titles": [
+    "Closed captions", "Bedrock Edition data values", "Java Edition data values", "Java Edition Flattening", "Block sound type",
+    "Map item format", "Entity format", "Block tag (Java Edition)", "Item tag (Java Edition)", "Creative inventory", "Instant mining"
+  ],
+  "list_titles_comment": "List pages, left out like the version pages, with their subpages, even from a family: tables of game data that many articles link to and that link to much of the pool, so a route through one feels like a cheat (hand-picked 2026-10-22 from the pages most often on a shortest route; Particles and Block states were kept on purpose). build.py stops if one is no longer an article.",
   "hubs": [
     "Minecraft", "Java Edition", "Bedrock Edition", "Edition", "Minecraft Education", "Commands", "Identifier", "Block", "Item",
     "Mob", "Biome", "Structure", "Overworld", "The Nether", "The End", "Player", "Creative", "Crafting", "Smelting", "Breaking",

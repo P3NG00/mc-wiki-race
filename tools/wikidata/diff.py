@@ -1,5 +1,5 @@
 """Summarises what changed between two wiki-data.js files: pages, topic, tier, Content and Scavenger kind members added and
-removed, link counts that moved a lot, and hub, version page and namespace changes. Compare with the committed one by reading it from git:
+removed, link counts that moved a lot, and hub, left-out page and namespace changes. Compare with the committed one by reading it from git:
 
     .venv/bin/python -I tools/wikidata/diff.py <(git show HEAD:wiki-data.js) wiki-data.js
 """
@@ -52,10 +52,10 @@ def diff(old, new, moved=0.5, min_links=20):
         w(f'Links from outside navboxes moved by {moved:.0%} or more ({len(changed)}):')
         for t, x, y in changed[:40]:
             w(f'  {t}: {x} → {y}')
-    for key in ('hubs', 'versions', 'namespaces'):
+    for key, name in (('hubs', 'Hubs'), ('left_out', 'Left out'), ('namespaces', 'Namespaces')):
         x, y = set(old[key]), set(new[key])
         if x != y:
-            w(f'{key.capitalize()}: +{listing(y - x) or "none"}; −{listing(x - y) or "none"}')
+            w(f'{name}: +{listing(y - x) or "none"}; −{listing(x - y) or "none"}')
     return '\n'.join(out) + '\n'
 
 

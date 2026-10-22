@@ -9,17 +9,19 @@ The output defines WIKI_DATA, which index.html loads with a script tag (a JSON f
   topics                  the pool's topics, in config order
   families                the Content families' keys, in config order
   spinoffs                each spin-off namespace's name and number, in config order
-  articles                every article and every spin-off page but the version pages: [title, linked from, linked
+  articles                every article and every spin-off page but the left-out pages: [title, linked from, linked
                           from outside navboxes, topic, families, tiers]
   hubs                    for the No hubs rule, every hub and every redirect to one, mapped to the hub
-  versions                the version pages and the redirects to them that pages link to, whose links the game kills
+  left_out                the left-out pages and the redirects to them that pages link to, whose links the game kills
   kinds                   for Scavenger, each of the config's kinds (a category): the name the game shows, its members'
                           commonest topic, its members (pool articles in the category linked well enough to be a
                           target, less the config's exclusions) and the exclusions, which the game also applies to a
                           page's live categories
+The left-out pages are the version pages, the config's list pages (even those in a family) and the subpages of either.
 Version pages are the articles and spin-off pages in a category ending in " versions" or in the config's version
-categories, but those with a topic or a family. They link to most of the pool and almost every article links to them,
-so they are left out altogether: they aren't listed, their links don't count, and the graph doesn't go through them.
+categories, but those with a topic or a family. Both link to much of the pool and many articles link to them, so a route
+through one is a cheat. They are left out altogether: they aren't listed, their links don't count, and the graph
+doesn't go through them.
 A pool-mode roll may only pick content: a page that isn't a subpage, a disambiguation page or in the config's
 not-content categories or titles. Content in a family's categories, or in a spin-off namespace, has that family. Other
 content in a topic's categories is in the pool, with that topic, and its tiers say whether it is Popular (the config's
@@ -76,33 +78,35 @@ def tiers(rows, config, popular_share, deep_share):
     return {r[0] for r in popular}, {r[0] for r in deep}
 
 
-def versions(snap, config, spinoff_ns, prefixes):
-    """Leaves the version pages out of snap (see the docstring), if they aren't already, and returns their titles with
+def left_out(snap, config, spinoff_ns, prefixes):
+    """Leaves the left-out pages out of snap (see the docstring), if they aren't already, and returns their titles with
     the redirects to them that another article or spin-off page links to, sorted. Redirects nothing links to are left
     out, like pages newer than the snapshot: the list goes into every article the game shows."""
     extra, families = set(config['version_categories']), [set(f) for f in config['families'].values()]
     played = {t: p for t, p in (*snap.pages.items(), *snap.left_out.items()) if p['ns'] == 0 or p['ns'] in spinoff_ns}
-    pages = set()
+    pages = set(config['list_titles'])
     for title, p in played.items():
         cats = set(p['cats'])
         if any(c.endswith(' versions') or c in extra for c in cats) and not (
                 is_content(title, cats, config) and (p['ns'] or topic_of(cats, config) or any(cats & f for f in families))):
             pages.add(title)
+    pages |= {t for t in played if any('/'.join(t.split('/')[:i]) in pages for i in range(1, t.count('/') + 1))}   # subpages
     linked = {t for title, p in played.items() if title not in pages for t in (*p['body'], *p['nav'])}
     snap.leave_out(pages - snap.left_out.keys())
     return sorted(pages | {t for t in snap.redirects if t in linked and snap.resolve(t) in pages and not t.startswith(prefixes)})
 
 
 def check_config(snap, config):
-    """Stops if the config names a category no page is in, or a not-content title that is no longer an article: a
-    rename on the wiki would otherwise move articles out of their topic, family or kind, or let a list page under its
-    new title into the pool, without a word."""
+    """Stops if the config names a category no page is in, or a not-content or list title that is no longer an article:
+    a rename on the wiki would otherwise move articles out of their topic, family or kind, or let a list page under its
+    new title into the pool or the game, without a word."""
     named = dict.fromkeys([*(c for topic in config['topics'].values() for c in topic), *(c for family in config['families'].values() for c in family),
                            *config['not_content_categories'], *config['disambiguation_categories'], *config['version_categories'], *config['kinds']])
     seen = {c for p in (*snap.pages.values(), *snap.left_out.values()) for c in p['cats']}   # the left-out pages from a build before
     problems = [f'category no page is in: {c}' for c in named if c not in seen]
-    problems += [f'not-content title that is no longer an article: {t}' + (f' (now a redirect to {snap.resolve(t)})' if t in snap.redirects else '')
-                 for t in config['not_content_titles'] if snap.pages.get(t, {}).get('ns') != 0]
+    problems += [f'{what} title that is no longer an article: {t}' + (f' (now a redirect to {snap.resolve(t)})' if t in snap.redirects else '')
+                 for what, key in (('not-content', 'not_content_titles'), ('list', 'list_titles'))
+                 for t in config[key] if snap.pages.get(t, snap.left_out.get(t, {})).get('ns') != 0]
     if problems:
         sys.exit('To look at in config.json:\n  ' + '\n  '.join(problems))
 
@@ -128,7 +132,7 @@ def kinds(snap, config, rows):
 
 
 def build(snap, config):
-    """The data for wiki-data.js and the content sizes. Leaves the version pages out of snap, for graph() and report.py."""
+    """The data for wiki-data.js and the content sizes. Leaves the left-out pages out of snap, for graph() and report.py."""
     check_config(snap, config)
     by_name = {name: ns for ns, name in snap.namespaces.items()}
     missing = [n for n in config['spinoffs'] if n not in by_name]
@@ -137,7 +141,7 @@ def build(snap, config):
     spinoffs = {n: by_name[n] for n in config['spinoffs']}
     name_of = {ns: n for n, ns in spinoffs.items()}
     ns_names = namespaces(snap, config)
-    version_titles = versions(snap, config, set(name_of), tuple(n + ':' for n in ns_names if n not in spinoffs))
+    left_out_titles = left_out(snap, config, set(name_of), tuple(n + ':' for n in ns_names if n not in spinoffs))
     families = config['families']
     full, outside = snap.backlinks()
     rows = []
@@ -176,7 +180,7 @@ def build(snap, config):
     return {
         'snapshot': snap.meta['date'], 'file': snap.meta['file'], 'sha256': snap.meta['sha256'],
         'namespaces': ns_names, 'topics': list(config['topics']), 'families': list(families), 'spinoffs': spinoffs, 'articles': rows,
-        'hubs': dict(sorted(hubs.items())), 'versions': version_titles, 'kinds': kinds(snap, config, rows),
+        'hubs': dict(sorted(hubs.items())), 'left_out': left_out_titles, 'kinds': kinds(snap, config, rows),
     }, sizes
 
 
@@ -227,7 +231,7 @@ def render(data):
     fields = [field(k, j(data[k])) for k in ('snapshot', 'file', 'sha256', 'namespaces', 'topics', 'families', 'spinoffs')]
     fields.append(field('articles', block(map(j, data['articles']), '[', ']')))
     fields.append(field('hubs', block((f'{j(k)}: {j(v)}' for k, v in data['hubs'].items()), '{', '}')))
-    fields.append(field('versions', block(map(j, data['versions']), '[', ']')))
+    fields.append(field('left_out', block(map(j, data['left_out']), '[', ']')))
     fields.append(field('kinds', block((f'{j(k)}: {j(v)}' for k, v in data['kinds'].items()), '{', '}')))
     return js_file(data, 'minecraft.wiki', 'titles, categories and link counts', 'WIKI_DATA', fields)
 
@@ -253,7 +257,7 @@ def main():
     for name, text in zip(('wiki-data.js', 'wiki-links.js', 'wiki-navboxes.js'), (render(data), *render_graph(data, links, boxes, carries))):
         with open(os.path.join(args.out, name), 'w', encoding='utf-8', newline='\n') as f:
             f.write(text)
-    print(f'{os.path.normpath(args.out)}: {len(data["articles"])} pages, {len(data["hubs"])} hub titles, {len(data["versions"])} version titles, {len(data["kinds"])} kinds, {sum(map(len, links)):,} links outside '
+    print(f'{os.path.normpath(args.out)}: {len(data["articles"])} pages, {len(data["hubs"])} hub titles, {len(data["left_out"])} left-out titles, {len(data["kinds"])} kinds, {sum(map(len, links)):,} links outside '
           f'navboxes, {len(boxes)} navboxes ({sum(map(len, boxes)):,} links); content ' + ', '.join(f'{c} {n}' for c, n in sizes.items()), file=sys.stderr)
 
 

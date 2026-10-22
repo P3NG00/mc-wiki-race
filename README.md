@@ -23,7 +23,7 @@ Under the cards are the steps for changing the game:
   - **Relay:** one to three checkpoints to visit on the way, in order. Reaching the target before them doesn't count.
   - **Round trip:** reach the target, then find your way back to the start. Back can't take you the way you came. With **No retracing** ticked as well, every page from the way there is a dead link on the way back.
   - **Scavenger hunt:** instead of a target, find three things in any order: **3 kinds** (one of each, like a mob found in the Nether, an enchantment and a potion) or **3 articles**. A kind is a wiki category, hand-picked, with surprising members left out; the result says what each find was.
-  - **Exact clicks:** reach the target in exactly par + 2 clicks, never on the same page twice, so there's no Back. Getting there sooner loses, so you have to find a detour, and so does running out.
+  - **Exact clicks:** reach the target in exactly par + a few clicks, never on the same page twice, so there's no Back. **Count** picks how many over par: 1 to 5 (2 at first), or **Random** for one rolled with the cards. Getting there sooner loses, so you have to find a detour, and so does running out.
 - **2 · Extra rules**, in any mix:
   - **No Back:** the Back button is gone, so every click is final.
   - **Blind target:** the target isn't even picked until you press Start (Copy challenge link picks it unseen, and the daily keeps it hidden), so the setup screen shows no target, par or Exact clicks count, and there's no Swap. Once the game starts you only get its name, with no picture or description. In a relay each checkpoint, and the target, only shows once you reach the stop before it, so you don't know where it ends; a scavenger hunt's kinds or articles all show when you start.

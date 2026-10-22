@@ -135,6 +135,11 @@ const shortest = "[...document.querySelectorAll('#mBest li')].map(li => li.textC
 check('the result shows par and a shortest route beside your path', await until(`/^Shortest route · par \\d+$/.test(document.querySelector('#mBestTitle').textContent)
   && /^Diamond → .*Crafting$/.test(${shortest}) && document.querySelector('#par').textContent.startsWith('Going by the wiki’s copy from ')`),
   await ev(shortest));
+// Share copies the game, its result, the path and a link that plays it; Copy challenge link that link alone.
+const shared = "shareText(savedGames()[0], game.link)";
+check('Share gives the game, the result, the path and the game\'s link', await ev(`(t => document.querySelector('#mShare') && document.querySelector('#mLink')
+  && t.startsWith('MC Wiki Race\\nRace · Hard\\nDiamond → Crafting\\n❌ Gave up after ') && t.includes('\\nMy path: Diamond\\n') && t.endsWith('\\nPlay it: ' + game.link)
+  && openLink(new URL(game.link).hash.slice(3)) === 'start=Diamond&target=Crafting&rules=nohubs,nonav')(${shared})`), await ev(shared));
 check('the record keeps par, and the history shows it', await ev("Number.isInteger(savedGames()[0].par)") && await until(
   "toSetup(), document.querySelector('#history tbody tr .h-result .note').textContent.endsWith('par ' + savedGames()[0].par)"),
   await ev("document.querySelector('#history tbody tr .h-result')?.textContent"));
@@ -328,7 +333,11 @@ check('Blind target leaves the hidden cards unpicked, with no Reroll, Swap or pa
 await play();
 check('Start picks them from different topics, showing the checkpoint only', await ev(`(cs => cs.every(Boolean) && new Set(cs.map(c => groupOf(c.title))).size === 3)([game.start, ...game.vias, game.goal])`)
   && await ev(route) === await ev("[game.start.title, game.vias[0].title, '?'].join()"), await ev(route));
-await ev("finish(false); closeModal(); toSetup()");
+await ev("finish(false)");
+check('Share under Blind target names only the start, with no path, and the link holds the rest', await ev(`(t => t.includes('\\n' + game.start.title + ' → ? → ?\\n')
+  && !t.includes(game.vias[0].title) && !t.includes(game.goal.title) && !t.includes('My path')
+  && openLink(new URL(game.link).hash.slice(3)).includes('&via=' + encodeURIComponent(game.vias[0].title)))(${shared})`), await ev(shared));
+await ev("closeModal(); toSetup()");
 await ev("reroll('all')");
 await until(ready);
 await ev("document.querySelector('#btnCopy').click()");
@@ -357,6 +366,12 @@ await ev("finish(false); closeModal(); toSetup(); document.querySelector('#reach
 const blindDay = await ev("(() => { for (let d = new Date(today()); ; d.setDate(d.getDate() - 1)) { const s = d.toISOString().slice(0, 10); if (dailyRule(s) === 'blind') return s; } })()");
 await open('#daily=' + blindDay);
 check(`a Blind target daily (${blindDay}) holds its target unseen`, await ev(`setup.daily === '${blindDay}' && !!setup.goal && ${visibleCards}.endsWith(',Hidden')`), await ev(visibleCards));
+check('a daily\'s challenge link is its day', await ev(`gameLink().endsWith('#daily=${blindDay}')`), await ev('gameLink()'));
+await play();
+await ev("finish(false)");
+check('a daily\'s share links its day and names only its start', await ev(`(t => game.link.endsWith('#daily=${blindDay}') && t.startsWith('MC Wiki Race · Daily ${blindDay}\\n')
+  && t.includes('\\n' + game.start.title + ' → ?\\n') && !t.includes(game.goal.title))(${shared})`), await ev(shared));
+await ev("closeModal(); toSetup()");
 await ev("window.held = setup.goal; document.querySelector('#rules input[value=blind]').click()");
 check('turning Blind target off leaves it, saying so, and drops the target', await until(ready) && await ev(`setup.daily === null && !!setup.goal && setup.goal !== held
   && document.querySelector('#setupStatus').textContent === LEFT_DAILY

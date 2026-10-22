@@ -919,6 +919,9 @@ const recordKey = r => [...chain(r), ...(r.kinds ?? []).toSorted()].join('|');
 // What a record was after: its target, or Scavenger's articles or kinds.
 const targetText = r => r.finds ? `${r.finds.join(', ')} (any order)` : r.kinds ? r.kinds.map(k => KINDS[k].label).join(', ') : r.goal;
 const routeText = r => r.goal === undefined ? [r.start, targetText(r), ...r.rules.includes('roundtrip') ? [r.start] : []].join(' → ') : chain(r).join(' → ');
+// The route as a share gives it: under Blind target every stop but the start is ?, as the link would hold it unseen.
+const shareRouteText = r => !r.rules.includes('blind') ? routeText(r)
+  : (r.goal === undefined ? [r.start, '?', ...r.rules.includes('roundtrip') ? [r.start] : []] : chain(r).map(t => t === r.start ? t : '?')).join(' → ');
 
 function renderCard(which) {
   const card = $({ start: '#cardStart', goal: '#cardGoal' }[which] ?? '#card-' + which);
@@ -1378,6 +1381,9 @@ function challengeQuery() {
     (back ? `&back=${back}` : '') + (r.length ? '&rules=' + r.join(',') : '');
 }
 const challengeLink = () => location.href.split('#')[0] + '#g=' + sealLink(challengeQuery());
+// The link to the game on the cards: a daily's is its day, since a sealed link holds the setup only and its game
+// wouldn't count as the daily.
+const gameLink = () => setup.daily ? location.href.split('#')[0] + '#daily=' + setup.daily : challengeLink();
 
 // A challenge link carries that query sealed in a blob, so the URL doesn't give the pair, or Blind target's hidden cards,
 // away at a glance. It hides them from a glance only: the key is in this file, so anyone can open one. That is why a
@@ -1455,6 +1461,7 @@ const game = {
   start: null, goal: null,
   rules: [],         // rule keys in play, read from the checkboxes at start
   daily: null,       // the date, if this is that day's daily pair
+  link: '',          // a link that plays this game (gameLink), made at the start
   vias: [],          // the checkpoints (Checkpoint rule), to be reached in order before the target counts
   viaNext: 0,        // how many of them have been reached
   roundTrip: false,  // Round trip: the target is one more checkpoint, where the game turns back, and the start the goal
@@ -1608,7 +1615,7 @@ function startGame() {
   const cps = hunt ? [] : cards.slice(1, -1), out = cps.length - back;
   const vias = roundTrip && !hunt ? [...cps.slice(0, out), setup.goal, ...cps.slice(out)] : cps, goal = roundTrip ? setup.start : hunt ? null : setup.goal;
   const exact = r.includes('exact') ? setup.exact : null, limit = exact ? exact.length - 1 : r.includes('limit') ? CLICK_LIMIT : 0;
-  Object.assign(game, { active: true, start: setup.start, goal, vias, viaNext: 0, roundTrip, turn: roundTrip && !hunt ? out + 1 : 0, hunt,
+  Object.assign(game, { active: true, link: gameLink(), start: setup.start, goal, vias, viaNext: 0, roundTrip, turn: roundTrip && !hunt ? out + 1 : 0, hunt,
     dead: new Set(), exact, limit, celebrate: false, stuck: false, daily: setup.daily, rules: r, content: contentInPlay(cards.map(c => c.title)), path: [],
     seen: new Map(), stack: [], elapsed: 0, runningSince: 0, loading: false, par: null });
   // Par shows in the header once it is known: at once when the setup screen has loaded the link graph.
@@ -2377,6 +2384,10 @@ async function showPar(rec, routeReady) {
 const LOSSES = { outOfClicks: 'Out of clicks', tooSoon: 'Too soon' };
 const lossOf = r => Object.keys(LOSSES).find(k => r[k]);
 
+// A result's game and extra rules as labels, and the settings the labels don't say.
+const resultLabels = rec => ({ tags: [GAMES[gameOf(rec.rules)].label, ...rec.rules.filter(k => EXTRA_RULES.includes(k)).map(k => RULES[k].label)],
+  otherSettings: settingsText({ ...rec, rules: rec.rules.filter(k => LEVEL_RULES.includes(k)) }) });
+
 // lost: a LOSSES key, for a game lost rather than won or given up.
 function finish(won, lost = null) {
   pauseClock();
@@ -2396,7 +2407,6 @@ function finish(won, lost = null) {
     // The par the target was rolled at, unless a new start or difficulty has moved the game off it since.
     ...(target?.topic && { topic: target.topic }), ...(target?.reach && REACHES[target.reach].fits?.(game.par) !== false && { reach: target.reach }),
     ...(game.content.length && { content: game.content }), ...(game.par !== null && { par: game.par }), ...(game.exact && { exact: game.limit }), rules: game.rules, won, ...(lost && { [lost]: true }), clicks: clicks(), ms, at: Date.now(), path: game.path.map(p => p.title) };
-  const settingsNote = settingsText(rec);
   const hist = savedGames();
   const best = hist.filter(r => r.won && recordKey(r) === recordKey(rec) && sameRules(r, rec))
     .sort((a, b) => a.clicks - b.clicks || a.ms - b.ms)[0];
@@ -2416,8 +2426,7 @@ function finish(won, lost = null) {
   const title = won ? (game.hunt && !game.roundTrip ? '🎉 You found them all!' : '🎉 You made it!') : LOSSES[lost] ?? 'Game over';
   const reason = lost === 'tooSoon' ? `You reached ${target.title} on click ${rec.clicks}, but it had to be exactly ${game.limit}.`
     : lost === 'outOfClicks' ? `All ${game.limit} clicks used, ${hunting() ? 'with something still to find' : game.roundTrip ? `and not back at ${game.goal.title} yet` : 'and no target yet'}.` : '';
-  const tags = [GAMES[gameOf(rec.rules)].label, ...rec.rules.filter(k => EXTRA_RULES.includes(k)).map(k => RULES[k].label)];
-  const otherSettings = settingsText({ ...rec, rules: rec.rules.filter(k => LEVEL_RULES.includes(k)) });   // what the labels don't say
+  const { tags, otherSettings } = resultLabels(rec);
   play(newBest ? 'best' : won ? 'win' : lost ? 'lose' : 'giveUp');
   openModal(`<div class="result">
     <div class="result-head"><h2${won ? '' : ' class="lost"'}>${title}</h2><span class="score hidden" id="mScore"></span></div>
@@ -2438,22 +2447,37 @@ function finish(won, lost = null) {
         <p class="note" id="par">Working out par…</p></div>
     </div>
     <div class="actions">
-      <button id="mCopy">Copy result</button>
+      <button id="mShare" title="Copy your result and a link to play this game">Share</button>
+      <button id="mLink" title="Copy a link that opens this exact game">Copy challenge link</button>
       <button id="mSame">Retry this pair</button>
       <button class="primary" id="mNew">New game</button>
     </div></div>`, false);
   showPar(rec, game.parReady);
-  $('#mCopy').onclick = async () => {
-    const text = `MC Wiki Race${rec.daily ? ` daily ${rec.daily}` : ''}: ${route}${settingsNote ? ` (${settingsNote})` : ''}\n` +
-      (won ? `${rec.clicks} clicks in ${fmtTime(ms)}` : `${LOSSES[lost] ?? 'Gave up'} after ${fmtTime(ms)}`) +
-      (rec.par === undefined ? '' : `, par ${rec.par}${won && !rec.exact ? ': ' + golfText(golfScore(rec.clicks, rec.par)) : ''}`) + '\n' +
-      rec.path.join(' → ');
-    try { await navigator.clipboard.writeText(text); $('#mCopy').textContent = 'Copied!'; }
-    catch { $('#mCopy').textContent = 'Copy failed'; }
+  // Share's text is made on the click, since showPar may only have rec.par by then.
+  const copy = async (id, text) => {
+    try { await navigator.clipboard.writeText(text); $(id).textContent = 'Copied!'; }
+    catch { $(id).textContent = 'Copy failed'; }
   };
+  $('#mShare').onclick = () => copy('#mShare', shareText(rec, game.link));
+  $('#mLink').onclick = () => copy('#mLink', game.link);
   $('#mSame').onclick = () => { closeModal(); startGame(); };
   // Leaving a finished daily isn't a change to it, so no notice.
   $('#mNew').onclick = () => { closeModal(); toSetup(); setup.daily = null; reroll('all'); };
+}
+
+// The text Share copies: the game, its result, your path and the link to play it. Under Blind target the path is left
+// out, since it names the stops the link holds unseen.
+function shareText(rec, link) {
+  const { tags, otherSettings } = resultLabels(rec);
+  const result = rec.won ? `${rec.clicks} click${rec.clicks === 1 ? '' : 's'} in ${fmtTime(rec.ms)}`
+    : `${LOSSES[lossOf(rec)] ?? 'Gave up'} after ${rec.exact ? `${rec.clicks} of ${rec.exact} clicks, ` : ''}${fmtTime(rec.ms)}`;
+  const par = rec.par === undefined ? '' : ` · par ${rec.par}${rec.won && !rec.exact ? ': ' + golfText(golfScore(rec.clicks, rec.par)) : ''}`;
+  return [`MC Wiki Race${rec.daily ? ` · Daily ${rec.daily}` : ''}`,
+    [...tags, otherSettings].filter(Boolean).join(' · '),
+    shareRouteText(rec),
+    `${rec.won ? '✅' : '❌'} ${result}${par}`,
+    !rec.rules.includes('blind') && 'My path: ' + rec.path.join(' → '),
+    `Play it: ${link}`].filter(Boolean).join('\n');
 }
 
 function toSetup() {
@@ -2617,7 +2641,7 @@ $('#btnPlay').onclick = async () => { if (!isBlind() || await pickHidden()) star
 $('#btnCopy').onclick = async () => {
   if (isBlind() && !await pickHidden()) return;
   if (cardKeys().some(w => !setup[w]) || (huntMode() === 'kinds' && !setup.kinds?.length)) return;
-  const link = challengeLink();
+  const link = gameLink();
   try { await navigator.clipboard.writeText(link); setStatus('Challenge link copied.'); }
   catch { setStatus(link); }
 };

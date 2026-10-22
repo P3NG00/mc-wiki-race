@@ -208,6 +208,11 @@ const counts = "JSON.stringify([...document.querySelectorAll('#mPath li')].map(l
 const expected = JSON.stringify([[`${farPar} to go`, ''], [`${farPar - 1} to go`, ''], [`${farPar} to go`, 'worse'], ['no route', 'worse'], ['?', '']]);
 check('the result shows each page\'s count, and the clicks that got no closer in red', await until(`${counts} === ${JSON.stringify(expected)}`) &&
   await ev(`${hudHint}.classList.contains('hidden') && !document.querySelector('#mPathNote').classList.contains('hidden')`), await ev(counts));
+check('and how many got no closer, in a line', await ev("document.querySelector('#mPathSum').textContent === '2 of your 4 clicks got no closer.'"),
+  await ev("document.querySelector('#mPathSum').textContent"));
+const sharedPath = "shareText(savedGames()[0], game.link, game.path).split('\\n').find(l => l.startsWith('My path: '))";
+check('Share gives each page\'s count on the path', await ev(sharedPath)
+  === `My path: ${far[0]} (${farPar} to go) → ${far[1]} (${farPar - 1} to go) → ${far[0]} (${farPar} to go) → ${deadEnd} (no route) → Brand New Mob (?)`, await ev(sharedPath));
 await ev('closeModal(); toSetup()');
 // With a checkpoint, the target reached before it counts to the checkpoint.
 await open('#start=Diamond&via=Creeper&target=Crafting&rules=distance');
@@ -224,6 +229,15 @@ check('without the rule every arrival is still measured, but not shown in play, 
   await ev(`${hudHint}.classList.contains('hidden') && !document.querySelector('#pathList .note') && document.querySelector('#hudParStat').classList.contains('hidden')`));
 await ev('finish(false)');
 check('and the result shows them', await until("document.querySelectorAll('#mPath .togo').length === 2"));
+await ev("closeModal(); toSetup()");
+// A game along a shortest route: every click got closer.
+await open(`#start=${encodeURIComponent(far[0])}&target=Crafting`);
+await play();
+await ev(`navigate(${JSON.stringify(far[1])}, null)`);
+await until('game.path.length === 2 && !game.loading');
+await ev('finish(false)');
+check('a path where every click got closer says so', await until("document.querySelector('#mPathSum').textContent === 'Every click got closer.'"),
+  await ev("document.querySelector('#mPathSum').textContent"));
 await ev("closeModal(); toSetup()");
 
 // Relay: two checkpoints from a challenge link, reached in order. One reached early doesn't count, the banner and the HUD
@@ -486,7 +500,8 @@ check('on the count wins, with no golf score', await until('!game.active') && aw
   await ev("document.querySelector('#mBestTitle')?.textContent"));
 // Par + 2 clicks means at least two that get no closer, which Exact clicks needs, so none is marked.
 check('its path has each page\'s count but marks no click that got no closer', await until(`document.querySelectorAll('#mPath .togo').length === ${n}`)
-  && await ev("!document.querySelector('#mPath .worse') && !document.querySelector('#mPathNote').textContent.includes('red')"), await ev("document.querySelector('#mPath').textContent"));
+  && await ev("!document.querySelector('#mPath .worse') && !document.querySelector('#mPathNote').textContent.includes('red') && !document.querySelector('#mPathSum').textContent"),
+  await ev("document.querySelector('#mPath').textContent"));
 await ev("closeModal(); toSetup()");
 check('the history marks the win as the pair\'s best, played today', await ev(`(tr => tr.querySelector('.res.won').textContent === '✓ ${n} clicks' && !!tr.querySelector('.best-tag')
   && tr.querySelector('.h-when').textContent === 'Today' && tr.querySelector('.h-route').textContent.startsWith('Diamond → Zombie'))(document.querySelector('#history tbody tr'))`),

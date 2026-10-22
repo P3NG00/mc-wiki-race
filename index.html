@@ -329,6 +329,8 @@
   .routes ol { margin: 6px 0 4px; }
   .routes .note { margin: 0; }
   .routes .note.worse { color: var(--target); }   /* a click that got no closer */
+  .routes .path-sum { margin-top: 6px; color: var(--ink); }
+  .routes .path-sum:empty { display: none; }
   .result .actions { border-top: 1px solid var(--line); padding-top: 12px; }
   .note { color: var(--muted); font-size: 13px; }
 
@@ -1590,7 +1592,7 @@ function renderHud() {
   $('#btnBack').disabled = game.stack.length < 2 || game.loading || !game.active;
   $('#btnGiveUp').disabled = game.loading || !game.active;
   $('#pathList').innerHTML = game.path.map((p, i) =>
-    `<li class="${i === game.path.length - 1 ? 'cur' : ''} ${p.back ? 'back' : ''} ${p.via || p.found ? 'via' : ''}">${esc(p.title)}${p.back ? ' (back)' : ''}${p.via ? ' ✓ ' + viaName(p.via).toLowerCase() : ''}${p.found ? ' ✓ ' + esc(p.found.join(', ')) : ''}${p.stranded ? ` <span title="${STRANDED}">⛔</span>` : ''}${distance && 'togo' in p && p.togo !== 0 ? ` <span class="note">${toGoText(p.togo)}</span>` : ''}</li>`).join('');
+    `<li class="${i === game.path.length - 1 ? 'cur' : ''} ${p.back ? 'back' : ''} ${p.via || p.found ? 'via' : ''}">${esc(p.title)}${p.back ? ' (back)' : ''}${p.via ? ' ✓ ' + viaName(p.via).toLowerCase() : ''}${p.found ? ' ✓ ' + esc(p.found.join(', ')) : ''}${p.stranded ? ` <span title="${STRANDED}">⛔</span>` : ''}${distance && toGoText(p) ? ` <span class="note">${toGoText(p)}</span>` : ''}</li>`).join('');
   scrollPathToEnd();
 }
 // Keeps the newest entry in view: at the bottom of the sidebar, or at the end of the one-line path on phones, whose
@@ -2371,8 +2373,8 @@ async function clicksToGo(title) {
   const route = shortestRoute(await linkGraph(!game.rules.includes('nonav')), title, aim, usable);
   return route ? route.length - 1 : null;
 }
-// An arrival's count, as the paths show it beside the page.
-const toGoText = n => n === undefined ? '?' : n === null ? 'no route' : `${n} to go`;
+// An arrival's count, as the paths and Share show it beside the page: none until it is measured, nor once nothing is next.
+const toGoText = p => !('togo' in p) || p.togo === 0 ? '' : p.togo === undefined ? '?' : p.togo === null ? 'no route' : `${p.togo} to go`;
 // Reaching a round trip's target (or Scavenger's last find) turns the game around: Back starts again from here, so it
 // can't walk the way there backwards, and every page of the way there (and every link title that led to one) goes dead,
 // but those still ahead: the checkpoints of the way back and the start. If the snapshot has no way on around them, the
@@ -2494,7 +2496,7 @@ function finish(won, lost = null) {
   const pathHtml = () => path.map((p, i) => `<li><a href="${esc(wikiUrl(p.title))}" target="_blank" rel="noopener">${esc(p.title)}</a>` +
     [p.back && 'back', p.via && viaName(p.via).toLowerCase(), p.found && p.found.join(', '), i === last && (won || lost === 'tooSoon') && game.goal && goalWord,
       p.stranded && '⛔'].filter(Boolean).map(w => ` <span class="note">${esc(w)}</span>`).join('') +
-    ('togo' in p && p.togo !== 0 ? ` <span class="note togo${worse(p, i) ? ' worse' : ''}">${toGoText(p.togo)}</span>` : '') + '</li>').join('');
+    (toGoText(p) ? ` <span class="note togo${worse(p, i) ? ' worse' : ''}">${toGoText(p)}</span>` : '') + '</li>').join('');
   const newBest = won && best && beats(rec, best);
   const bestNote = !won || !best ? '' : newBest ? '<p class="best new">New personal best for this pair!</p>'
     : `<p class="best note">Your best for this pair: ${wonText(best)}.</p>`;
@@ -2517,7 +2519,7 @@ function finish(won, lost = null) {
     </div>
     ${bestNote}
     <div class="routes">
-      <div><h3>Your path · ${clicksText(rec.clicks)}</h3><ol id="mPath">${pathHtml()}</ol>
+      <div><h3>Your path · ${clicksText(rec.clicks)}</h3><p class="note path-sum" id="mPathSum"></p><ol id="mPath">${pathHtml()}</ol>
         <p class="note hidden" id="mPathNote">Beside each page, the fewest clicks from it to what was next.${exact ? '' : ' In red, a click that got no closer.'}</p></div>
       <div><h3 id="mBestTitle">${game.exact ? `One way in exactly ${game.limit}` : 'Shortest route'}</h3>
         <ol id="mBest">${game.exact ? game.exact.map(t => `<li>${esc(t)}</li>`).join('') : ''}</ol>
@@ -2534,14 +2536,20 @@ function finish(won, lost = null) {
   Promise.all(path.map(p => p.measured)).then(() => {
     if (!ol.isConnected) return;
     ol.innerHTML = pathHtml();
-    $('#mPathNote').classList.toggle('hidden', !path.some(p => 'togo' in p));   // none if the link graph couldn't load
+    const measured = path.some(p => 'togo' in p);   // none if the link graph couldn't load
+    $('#mPathNote').classList.toggle('hidden', !measured);
+    // How many clicks got no closer, in a line, but for Exact clicks, which has to take detours. Every one got closer only
+    // if every page could be measured: one the snapshot lacks can't be told.
+    const n = path.filter(worse).length, all = path.every(p => p.togo !== undefined);
+    $('#mPathSum').textContent = !measured || exact || !rec.clicks ? '' : n ? `${n} of your ${clicksText(rec.clicks)} got no closer.`
+      : all ? 'Every click got closer.' : '';
   });
   // Share's text is made on the click, since showPar may only have rec.par by then.
   const copy = async (id, text) => {
     try { await navigator.clipboard.writeText(text); $(id).textContent = 'Copied!'; }
     catch { $(id).textContent = 'Copy failed'; }
   };
-  $('#mShare').onclick = () => copy('#mShare', shareText(rec, game.link));
+  $('#mShare').onclick = () => copy('#mShare', shareText(rec, game.link, path));
   $('#mLink').onclick = () => copy('#mLink', game.link);
   $('#mSame').onclick = () => { closeModal(); startGame(); };
   // Leaving a finished daily isn't a change to it, so no notice.
@@ -2550,7 +2558,8 @@ function finish(won, lost = null) {
 
 // The text Share copies: the game, its result, your path and the link to play it. Under Blind target the path is left
 // out, since it names the stops the link holds unseen.
-function shareText(rec, link) {
+// steps: the game's path entries, for each page's count (toGoText), when Share is pressed in its result.
+function shareText(rec, link, steps = []) {
   const { tags, otherSettings } = resultLabels(rec);
   // A loss says how far it got: Exact clicks's count, the time, or with neither the clicks.
   const time = rec.ms !== undefined && fmtTime(rec.ms), count = rec.exact ? `${rec.clicks} of ${rec.exact} clicks` : !time && clicksText(rec.clicks);
@@ -2560,7 +2569,7 @@ function shareText(rec, link) {
     [...tags, otherSettings].filter(Boolean).join(' · '),
     shareRouteText(rec),
     `${rec.won ? '✅' : '❌'} ${result}${par}`,
-    !rec.rules.includes('blind') && 'My path: ' + rec.path.join(' → '),
+    !rec.rules.includes('blind') && 'My path: ' + rec.path.map((t, i) => steps[i] && toGoText(steps[i]) ? `${t} (${toGoText(steps[i])})` : t).join(' → '),
     `Play it: ${link}`].filter(Boolean).join('\n');
 }
 

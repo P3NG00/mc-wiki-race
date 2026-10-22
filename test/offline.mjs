@@ -123,10 +123,16 @@ check('Relaxed: hubs and navboxes live, other namespaces dead', links.Block === 
   links['Dungeons:Creeper'] === 'dead', JSON.stringify(links));
 await open('#start=Diamond&target=Crafting&rules=nohubs');
 check('No hubs alone is Hard', await ev("level() === 'hard' && rules().join() === 'nohubs,nonav'"));
-// Golf: par shows beside Start once the link graph has loaded, and in the header while playing.
-check('the setup screen shows par', await until("/^Par \\d+$/.test(document.querySelector('#setupPar').textContent)"), await ev("document.querySelector('#setupPar').textContent"));
+// Golf: par is worked out beside Start once the link graph has loaded, but only shows with Distance on, as in the header
+// while playing.
+const setupParShown = "!document.querySelector('#setupPar').classList.contains('hidden')";
+check('the setup screen works out par but hides it without Distance', await until("/^Par \\d+$/.test(document.querySelector('#setupPar').textContent)") && !await ev(setupParShown),
+  await ev("document.querySelector('#setupPar').textContent"));
+await ev("document.querySelector('input.rule[value=distance]').click()");
+check('and shows it with Distance', await until(setupParShown));
 await play();
-check('the header shows par', await until("/^\\d+$/.test(document.querySelector('#hudPar').textContent)"), await ev("document.querySelector('#hudPar').textContent"));
+check('the header shows par with Distance', await until("/^\\d+$/.test(document.querySelector('#hudPar').textContent)") && await ev("!document.querySelector('#hudParStat').classList.contains('hidden')"),
+  await ev("document.querySelector('#hudPar').textContent"));
 links = await linkStates();
 check('Hard: hubs, redirects to them and navboxes dead; the target hub and other links live',
   links.Block === 'dead' && links.Blocks === 'dead' && links.Creeper === 'dead' && links.Crafting === 'live' && links.Diamond_Pickaxe === 'live'
@@ -139,8 +145,8 @@ check('the result shows par and a shortest route beside your path', await until(
 // Share copies the game, its result, the path and a link that plays it; Copy challenge link that link alone.
 const shared = "shareText(savedGames()[0], game.link)";
 check('Share gives the game, the result, the path and the game\'s link', await ev(`(t => document.querySelector('#mShare') && document.querySelector('#mLink')
-  && t.startsWith('MC Wiki Race\\nRace · Hard\\nDiamond → Crafting\\n❌ Gave up after ') && t.includes('\\nMy path: Diamond\\n') && t.endsWith('\\nPlay it: ' + game.link)
-  && openLink(new URL(game.link).hash.slice(3)) === 'start=Diamond&target=Crafting&rules=nohubs,nonav')(${shared})`), await ev(shared));
+  && t.startsWith('MC Wiki Race\\nRace · Distance · Hard\\nDiamond → Crafting\\n❌ Gave up after ') && t.includes('\\nMy path: Diamond\\n') && t.endsWith('\\nPlay it: ' + game.link)
+  && openLink(new URL(game.link).hash.slice(3)) === 'start=Diamond&target=Crafting&rules=nohubs,nonav,distance')(${shared})`), await ev(shared));
 check('the record keeps par, and the history shows it', await ev("Number.isInteger(savedGames()[0].par)") && await until(
   "toSetup(), document.querySelector('#history tbody tr .h-result .note').textContent.endsWith('par ' + savedGames()[0].par)"),
   await ev("document.querySelector('#history tbody tr .h-result')?.textContent"));
@@ -166,9 +172,9 @@ check('difficulty from a link\'s rules, and its words', await ev(`(() => {
   return got;
 })()`) === 'relaxed:Relaxed normal: hard:Hard normal:No Back');
 
-// Hot/cold: after a click, a hint says whether the page is closer to the objective than the one before, by the link graph,
-// shown over the article and kept on the path; a page the snapshot lacks gets no hint, and a game without the rule none.
-// A start two or more clicks from Crafting (Relaxed): the first step of its shortest route is warmer, going back colder.
+// Distance: every arrival is measured, the fewest clicks from it to what is next by the link graph, and the result's path
+// shows each page's, marking in red a click that got no closer; with the rule on, the header and the path list show them
+// during play. A start two or more clicks from Crafting (Relaxed): a step along its shortest route is a click closer.
 const far = JSON.parse(await ev(`(async () => {
   for (const start of POOL_TITLES) {
     const route = await parRoute({ start, goal: 'Crafting', rules: [] });
@@ -177,37 +183,48 @@ const far = JSON.parse(await ev(`(async () => {
   return 'null';
 })()`));
 check('the snapshot has a start two or more clicks from Crafting', !!far);
-await open(`#start=${encodeURIComponent(far[0])}&target=Crafting&rules=hotcold`);
+const farPar = far.length - 1, hudHint = "document.querySelector('#hudHint')";
+await open(`#start=${encodeURIComponent(far[0])}&target=Crafting&rules=distance`);
 await play();
+check('Distance: the start is par away, in the header', await until(`game.path[0].togo === ${farPar} && !game.loading`) &&
+  await ev(`!${hudHint}.classList.contains('hidden') && ${hudHint}.textContent === '${farPar} clicks to go'`), await ev(`${hudHint}.textContent`));
 await ev(`navigate(${JSON.stringify(far[1])}, null)`);
-check('Hot/cold: a step along a shortest route is warmer, shown over the article and on the path', await until("game.path.at(-1).hint === 'warmer' && !game.loading") &&
-  await ev("!document.querySelector('#toast').classList.contains('hidden') && document.querySelector('#toast').textContent === HINTS.warmer.text") &&
-  await ev("document.querySelector('#pathList li.cur').textContent.endsWith(HINTS.warmer.icon)")
-  && await ev("document.querySelector('#hudHint').className === 'hint warmer' && document.querySelector('#hudHint').textContent === HINTS.warmer.text"), far.join(' → '));
+check('Distance: a step along a shortest route is a click closer, in the header and on the path', await until(`game.path.at(-1).togo === ${farPar - 1} && !game.loading`) &&
+  await ev(`${hudHint}.textContent === clicksText(${farPar - 1}) + ' to go' && document.querySelector('#pathList li.cur').textContent.endsWith(' ${farPar - 1} to go')`), far.join(' → '));
 await ev(`navigate(${JSON.stringify(far[0])}, null)`);
-check('Hot/cold: going back is colder', await until("game.path.at(-1).hint === 'colder' && !game.loading"), await ev('game.path.at(-1).hint'));
-// A dead end, a page with no route anywhere (no links outside navboxes, no navboxes), counts as farthest: colder.
+check('Distance: going back is a click further', await until(`game.path.at(-1).togo === ${farPar} && !game.loading`), await ev('game.path.at(-1).togo'));
+// A dead end, a page with no route anywhere (no links outside navboxes, no navboxes), has no route.
 const deadEnd = await ev(`linkGraph(true).then(g => WIKI_DATA.articles.map(([t]) => t).find(t => !spinoffOf(t) && !g.links[PAGE_IDS.get(t)].length && !g.carries[PAGE_IDS.get(t)].length))`);
 check('the snapshot has a dead end', typeof deadEnd === 'string' && await ev(`PAGE_IDS.has(${JSON.stringify(deadEnd)})`), String(deadEnd));
 await ev(`navigate(${JSON.stringify(deadEnd)}, null)`);
-check('Hot/cold: walking into a dead end is colder', await until("game.path.at(-1).hint === 'colder' && !game.loading"), `${deadEnd}: ${await ev('game.path.at(-1).hint')}`);
+check('Distance: a dead end has no route', await until(`game.path.at(-1).togo === null && !game.loading`) && await ev(`${hudHint}.textContent === 'No route from here'`),
+  `${deadEnd}: ${await ev('game.path.at(-1).togo')}`);
 await ev("navigate('Brand New Mob', null)");
-check('Hot/cold has no hint for a page the snapshot lacks', await until("game.path.at(-1).hint === 'unknown' && !game.loading"));
-check('the rule is in the game\'s rules and its challenge link', await ev("game.rules.includes('hotcold') && openLink(new URL(challengeLink()).hash.slice(3)).includes('hotcold')"));
-await ev("finish(false); closeModal(); toSetup()");
-// With a checkpoint, the target reached before it isn't the objective yet, so it gets a hint too.
-await open('#start=Diamond&via=Creeper&target=Crafting&rules=hotcold');
+check('Distance: a page the snapshot lacks is unknown', await until("'togo' in game.path.at(-1) && game.path.at(-1).togo === undefined && !game.loading") &&
+  await ev(`${hudHint}.textContent.startsWith('Distance unknown')`));
+check('the rule is in the game\'s rules and its challenge link', await ev("game.rules.includes('distance') && openLink(new URL(challengeLink()).hash.slice(3)).includes('distance')"));
+await ev('finish(false)');
+const counts = "JSON.stringify([...document.querySelectorAll('#mPath li')].map(li => [li.querySelector('.togo')?.textContent, li.querySelector('.togo.worse') ? 'worse' : '']))";
+const expected = JSON.stringify([[`${farPar} to go`, ''], [`${farPar - 1} to go`, ''], [`${farPar} to go`, 'worse'], ['no route', 'worse'], ['?', '']]);
+check('the result shows each page\'s count, and the clicks that got no closer in red', await until(`${counts} === ${JSON.stringify(expected)}`) &&
+  await ev(`${hudHint}.classList.contains('hidden') && !document.querySelector('#mPathNote').classList.contains('hidden')`), await ev(counts));
+await ev('closeModal(); toSetup()');
+// With a checkpoint, the target reached before it counts to the checkpoint.
+await open('#start=Diamond&via=Creeper&target=Crafting&rules=distance');
 await play();
+const toCreeper = await ev("parRoute({ start: 'Crafting', goal: 'Creeper', rules: [] }).then(r => r.length - 1)");
 await ev("navigate('Crafting', null)");
-check('Hot/cold hints the target reached before the checkpoint', await until("game.active && !!game.path.at(-1).hint && !game.loading"), await ev('game.path.at(-1).hint'));
+check('Distance counts to the checkpoint from the target reached before it', await until(`game.active && game.path.at(-1).togo === ${toCreeper} && !game.loading`),
+  `${await ev('game.path.at(-1).togo')}, expected ${toCreeper}`);
 await ev("finish(false); closeModal(); toSetup()");
 await open('#start=Diamond&target=Crafting');
 await play();
 await ev("navigate('Diamond Pickaxe', null)");
-await until('game.path.length === 2 && !game.loading');
-await sleep(300);
-check('no hints without the rule', await ev('game.path.every(p => !p.hint)'));
-await ev("finish(false); closeModal(); toSetup()");
+check('without the rule every arrival is still measured, but not shown in play, nor par', await until("game.path.length === 2 && !game.loading && game.path.every(p => Number.isInteger(p.togo))") &&
+  await ev(`${hudHint}.classList.contains('hidden') && !document.querySelector('#pathList .note') && document.querySelector('#hudParStat').classList.contains('hidden')`));
+await ev('finish(false)');
+check('and the result shows them', await until("document.querySelectorAll('#mPath .togo').length === 2"));
+await ev("closeModal(); toSetup()");
 
 // Relay: two checkpoints from a challenge link, reached in order. One reached early doesn't count, the banner and the HUD
 // name the next one, the record keeps both, and par goes through both.
@@ -428,7 +445,7 @@ await open(`#start=Diamond&target=${encodeURIComponent(deadEnd)}&rules=roundtrip
 await until(ready);
 await play();
 await ev(`navigate(${JSON.stringify(deadEnd)}, null)`);
-check('a target with no way back says so', await until("game.path.at(-1).hint === 'stranded' && !game.loading") &&
+check('a target with no way back says so', await until("game.path.at(-1).stranded && !game.loading") &&
   await ev(`${toast} === '✓ Target reached, but there’s no way back to Diamond that doesn’t retrace your steps.'`), await ev(toast));
 await ev("finish(false); closeModal(); toSetup()");
 
@@ -467,6 +484,9 @@ check('on the count wins, with no golf score', await until('!game.active') && aw
   await until("document.querySelector('#par').textContent.startsWith('Going by')") && await ev(`document.querySelector('#mScore').classList.contains('hidden')
   && document.querySelector('#mBestTitle').textContent === 'One way in exactly ${n}' && document.querySelectorAll('#mBest li').length === ${n + 1}`),
   await ev("document.querySelector('#mBestTitle')?.textContent"));
+// Par + 2 clicks means at least two that get no closer, which Exact clicks needs, so none is marked.
+check('its path has each page\'s count but marks no click that got no closer', await until(`document.querySelectorAll('#mPath .togo').length === ${n}`)
+  && await ev("!document.querySelector('#mPath .worse') && !document.querySelector('#mPathNote').textContent.includes('red')"), await ev("document.querySelector('#mPath').textContent"));
 await ev("closeModal(); toSetup()");
 check('the history marks the win as the pair\'s best, played today', await ev(`(tr => tr.querySelector('.res.won').textContent === '✓ ${n} clicks' && !!tr.querySelector('.best-tag')
   && tr.querySelector('.h-when').textContent === 'Today' && tr.querySelector('.h-route').textContent.startsWith('Diamond → Zombie'))(document.querySelector('#history tbody tr'))`),
@@ -539,24 +559,23 @@ await ev("setCustom('start', 'Blaze')");
 check('a start in one of the kinds rolls them again', await ev("KIND_MEMBERS.get('Hostile mobs').has('Blaze')") && await until("setup.start?.title === 'Blaze' && setup.busy === 0") &&
   await ev("setup.kinds.length === 3 && !setup.kinds.some(k => KIND_MEMBERS.get(k).has('Blaze'))"), await ev('setup.kinds.join()'));
 
-// Scavenger, articles: three Find cards joined by +, par the best order, any order wins, Hot/cold aims at the nearest.
-await open('#start=Diamond&target=Bamboo&via=Ghast&via=Sharpness&rules=scavenger,hotcold');
+// Scavenger, articles: three Find cards joined by +, par the best order, any order wins, Distance counts to the nearest.
+await open('#start=Diamond&target=Bamboo&via=Ghast&via=Sharpness&rules=scavenger,distance');
 check('Scavenger: an articles link shows three Find cards joined by +', await until(ready) && await ev(`huntMode() === 'articles' && cardKeys().join() === 'start,via0,via1,goal'
   && ['#card-via0', '#card-via1', '#cardGoal'].every(c => document.querySelector(c + ' .tag').textContent === 'Find')
-  && document.querySelector('#slot-via0 .arrow').textContent === '+' && openLink(new URL(challengeLink()).hash.slice(3)).endsWith('&target=Bamboo&via=Ghast&via=Sharpness&rules=hotcold,scavenger')`),
+  && document.querySelector('#slot-via0 .arrow').textContent === '+' && openLink(new URL(challengeLink()).hash.slice(3)).endsWith('&target=Bamboo&via=Ghast&via=Sharpness&rules=distance,scavenger')`),
   await ev('openLink(new URL(challengeLink()).hash.slice(3))'));
 const best = JSON.parse(await ev(`Promise.all(orders(['Ghast', 'Sharpness', 'Bamboo']).map(o => parRoute({ start: 'Diamond', vias: o.slice(0, -1), goal: o.at(-1), rules: ['nonav'] })))
   .then(rs => JSON.stringify([Math.min(...rs.map(r => r.length - 1)), document.querySelector('#setupPar').textContent]))`));
 check('its par is the best of the orders', await until(`document.querySelector('#setupPar').textContent === 'Par ${best[0]}'`), best.join(' / '));
 await play();
-// The expected hint, from the fewest clicks to each find on its own (Relaxed, as the link plays).
+// The expected count, from the fewest clicks to each find on its own (Relaxed, as the link plays).
 const nearestFind = t => `Promise.all(['Ghast', 'Sharpness', 'Bamboo'].map(f => parRoute({ start: '${t}', goal: f, rules: [] })))
   .then(rs => Math.min(...rs.map(r => r?.length ?? Infinity)))`;
 const [fromDiamond, fromCrafting] = [await ev(nearestFind('Diamond')), await ev(nearestFind('Crafting'))];
-const aimed = fromCrafting < fromDiamond ? 'warmer' : fromCrafting > fromDiamond ? 'colder' : 'same';
 await ev("navigate('Crafting', null)");
-check('Hot/cold aims at the nearest find', await until("game.path.length === 2 && !game.loading && !!game.path[1].hint") && await ev('game.path[1].hint') === aimed,
-  `${await ev('game.path[1].hint')}, expected ${aimed}: the nearest find ${fromDiamond - 1} clicks from Diamond, ${fromCrafting - 1} from Crafting`);
+check('Distance counts to the nearest find', await until(`game.path.length === 2 && !game.loading && game.path[1].togo === ${fromCrafting - 1}`) && await ev(`game.path[0].togo === ${fromDiamond - 1}`),
+  `${await ev('JSON.stringify(game.path.map(p => p.togo))')}, expected the nearest find ${fromDiamond - 1} clicks from Diamond, ${fromCrafting - 1} from Crafting`);
 for (const [i, t] of ['Sharpness', 'Bamboo', 'Ghast'].entries()) {
   await ev(`navigate(${JSON.stringify(t)}, null)`);
   await until(`game.path.length === ${i + 3} && !game.loading || !game.active`);

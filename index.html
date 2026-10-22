@@ -29,7 +29,7 @@
     --accent-ink: #ffffff;
     --accent-soft: #e3f0dc;
     --target: #b8452f;
-    --warm: #8a3b0a; --warm-soft: #fde7d4; --cold: #1d4f86; --cold-soft: #dbe8f7;   /* Hot/cold's hint */
+    --warm: #8a3b0a; --warm-soft: #fde7d4;   /* a loss, and a score over par */
     --shadow: 0 1px 2px rgba(0,0,0,.06), 0 4px 16px rgba(0,0,0,.06);
     --font: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
     --radius: 8px;        /* buttons, inputs */
@@ -44,7 +44,7 @@
       --bg: #161814; --panel: #1f221d; --ink: #e8e9e3; --muted: #9da196; --line: #33372f;
       --accent: #6cbf55; --accent-ink: #0d1409; --accent-soft: #24331f;
       --target: #ec8a73;
-      --warm: #f5b183; --warm-soft: #3a2616; --cold: #9cc3ef; --cold-soft: #182a3d;
+      --warm: #f5b183; --warm-soft: #3a2616;
       --shadow: 0 1px 2px rgba(0,0,0,.4), 0 4px 16px rgba(0,0,0,.3);
       --art-opacity: .17;
       color-scheme: dark;
@@ -54,7 +54,7 @@
     --bg: #161814; --panel: #1f221d; --ink: #e8e9e3; --muted: #9da196; --line: #33372f;
     --accent: #6cbf55; --accent-ink: #0d1409; --accent-soft: #24331f;
     --target: #ec8a73;
-    --warm: #f5b183; --warm-soft: #3a2616; --cold: #9cc3ef; --cold-soft: #182a3d;
+    --warm: #f5b183; --warm-soft: #3a2616;
     --shadow: 0 1px 2px rgba(0,0,0,.4), 0 4px 16px rgba(0,0,0,.3);
     --art-opacity: .17;
     color-scheme: dark;
@@ -236,10 +236,8 @@
   /* On a long route the stops done shrink to their ✓ until a click on one opens them all. */
   .route:not(.open) .chip.done.short > span { display: none; }
   .hud .peek { flex: none; width: 28px; height: 28px; padding: 0; border-radius: var(--radius-pill); font-weight: 700; color: var(--accent); }
-  /* Hot/cold's latest hint, beside the game's labels. */
+  /* Distance's count for the latest arrival, beside the game's labels. */
   .hint { flex: none; font-size: 13px; font-weight: 700; border-radius: var(--radius-pill); padding: 4px 10px; background: var(--bg); color: var(--muted); }
-  .hint.warmer { background: var(--warm-soft); color: var(--warm); }
-  .hint.colder { background: var(--cold-soft); color: var(--cold); }
   /* Six clicks' and Exact clicks's count, a dot a click. */
   .meter { display: flex; gap: 3px; justify-content: flex-end; margin: 2px 0 1px; }
   .meter i { width: 8px; height: 8px; box-sizing: border-box; border-radius: 50%; border: 1.5px solid var(--muted); }
@@ -330,6 +328,7 @@
   .routes h3 { margin: 0; font-size: 12px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
   .routes ol { margin: 6px 0 4px; }
   .routes .note { margin: 0; }
+  .routes .note.worse { color: var(--target); }   /* a click that got no closer */
   .result .actions { border-top: 1px solid var(--line); padding-top: 12px; }
   .note { color: var(--muted); font-size: 13px; }
 
@@ -541,7 +540,7 @@ const THEMES = [...new Set(['auto', 'light', 'dark', ...Array.from(document.quer
       </div>
     </div>
     <div class="stat"><div class="v mono" id="hudClicks">0</div><div class="meter" id="hudMeter" aria-hidden="true"></div><div class="k" id="hudClicksK">Clicks</div></div>
-    <div class="stat"><div class="v mono" id="hudPar">–</div><div class="k">Par</div></div>
+    <div class="stat" id="hudParStat"><div class="v mono" id="hudPar">–</div><div class="k">Par</div></div>
     <div class="stat" id="hudTimeStat"><div class="v mono" id="hudTime">0:00</div><div class="k">Time</div></div>
     <div class="btns">
       <button id="btnSound" aria-label="Sound"></button>
@@ -827,7 +826,7 @@ const RULES = {
   nohubs: { label: 'No hubs' },
   nonav: { label: 'No navboxes' },
   blind: { label: 'Blind target', help: 'The target is hidden until you start, then you only get its name. A Relay shows each stop once you reach the one before.' },
-  hotcold: { label: 'Hot/cold', help: 'After each click, a hint: warmer if you got closer to the target, colder if not.' },
+  distance: { label: 'Distance', help: 'Shows par, and always how many clicks the target is from your page, by the shortest route.' },
   checkpoint: { label: 'Relay' },
   roundtrip: { label: 'Round trip', help: 'Then go back to the start, never through a page of the way there.' },
   scavenger: { label: 'Scavenger hunt' },
@@ -851,7 +850,7 @@ const GAMES = {
   exact: { rule: 'exact', label: 'Exact clicks', diagram: 'A → → → → B', blurb: `Land on it in exactly par + ${EXACT_EXTRA}.`,
     help: `reach the target in exactly par + ${EXACT_EXTRA} clicks, never on a page twice. Too soon loses too, so plan a detour.` },
 };
-const EXTRA_RULES = ['roundtrip', 'noback', 'blind', 'hotcold', 'limit'];
+const EXTRA_RULES = ['roundtrip', 'noback', 'blind', 'distance', 'limit'];
 // The extra rules Exact clicks plays without, and why: it has its own count, and a round trip ends on a page already visited.
 const OFF_IN_EXACT = { limit: 'Off: Exact clicks has its own count.', roundtrip: 'Off: Exact clicks never visits a page twice.' };
 // The game a set of rules plays: a link made by hand with more than one game's rule plays the first of these.
@@ -980,8 +979,9 @@ function firstKinds(order, start) {
 }
 const rollKinds = () => firstKinds(Object.keys(KINDS).map(k => [Math.random(), k]).sort((a, b) => a[0] - b[0]).map(([, k]) => k), setup.start?.title);
 
-// Par for the pair on the cards, under the difficulty, checkpoint and Content in play, beside Start. The first card
-// rendered loads the link graph, so it is ready by the time a game starts. setupParToken drops answers to older pairs.
+// Par for the pair on the cards, under the difficulty, checkpoint and Content in play, beside Start, shown only with
+// Distance on: par says how far the target is, as Distance does. The first card rendered loads the link graph, so it is
+// ready by the time a game starts. setupParToken drops answers to older pairs.
 let setupParToken = 0;
 // With Exact clicks it also finds a route of exactly par + EXACT_EXTRA (setup.exact), which Start waits for.
 // setup.parRun is the latest run, which pickHidden waits for.
@@ -989,7 +989,7 @@ function updateSetupPar() { return setup.parRun = setupPar(); }
 async function setupPar() {
   const token = ++setupParToken, titles = cardKeys().map(w => setup[w]?.title), r = rules(), kinds = huntMode() === 'kinds' ? setup.kinds : null;
   // Under Blind target par and the count would say something about the hidden cards, so they wait for the game.
-  const blind = r.includes('blind');
+  const blind = r.includes('blind'), shown = r.includes('distance');
   setup.exact = null;
   $('#exactInfo').textContent = blind ? 'Blind target: the count shows when you start.' : 'Working out the count…';
   let text = '';
@@ -1001,11 +1001,15 @@ async function setupPar() {
       if (token !== setupParToken) return;
       setup.exact = exact;
       text = !route ? 'No par to count exact clicks from' : exact ? `${text} · exactly ${n}` : `${text} · no way in exactly ${n}`;
-      if (!blind) $('#exactInfo').textContent = !route ? 'This pair has no par to count from.' : exact ? `This pair: par ${n - EXACT_EXTRA}, so exactly ${n} clicks.`
+      if (!blind) $('#exactInfo').textContent = !route ? 'This pair has no par to count from.' : exact ? `This pair: ${shown ? `par ${n - EXACT_EXTRA}, so ` : ''}exactly ${n} clicks.`
         : `This pair can’t be done in exactly ${n} clicks.`;
     }
   }
-  if (token === setupParToken) { $('#setupPar').textContent = blind ? 'Par shows when you start' : text; updatePlay(); }
+  if (token === setupParToken) {
+    $('#setupPar').textContent = blind ? 'Par shows when you start' : text;
+    $('#setupPar').classList.toggle('hidden', !shown);
+    updatePlay();
+  }
 }
 
 // A shortest route for the cards' titles, in cardKeys order, and Scavenger's kinds if it has them, under rules, with
@@ -1510,16 +1514,17 @@ function renderHud() {
   // A limit (Six clicks, or Exact clicks's count) shows as its own dots, a click each, and under the count.
   $('#hudClicksK').textContent = !game.limit ? 'Clicks' : game.exact ? `of exactly ${game.limit}` : `of ${game.limit}`;
   $('#hudMeter').innerHTML = game.limit ? Array.from({ length: game.limit }, (_, i) => `<i${i < clicks() ? ' class="on"' : ''}></i>`).join('') : '';
-  // Hot/cold: the latest arrival's hint, until the next.
-  const hint = game.rules.includes('hotcold') && game.path.at(-1)?.hint;
-  $('#hudHint').className = `hint ${hint || 'hidden'}`;
-  $('#hudHint').textContent = hint ? HINTS[hint].text : '';
+  // Distance: the latest arrival's count once it is measured, until the next, and each page's on the path.
+  const distance = game.rules.includes('distance'), latest = game.path.at(-1), shown = distance && game.active && latest && 'togo' in latest;
+  $('#hudHint').classList.toggle('hidden', !shown);
+  $('#hudHint').textContent = !shown ? '' : latest.togo === undefined ? 'Distance unknown: not in the wiki’s offline copy'
+    : latest.togo === null ? 'No route from here' : `${clicksText(latest.togo)} to go`;
   $('#hudPar').textContent = game.par ?? '–';
   $('#hudTime').textContent = fmtTime(now());
   $('#btnBack').disabled = game.stack.length < 2 || game.loading || !game.active;
   $('#btnGiveUp').disabled = game.loading || !game.active;
   $('#pathList').innerHTML = game.path.map((p, i) =>
-    `<li class="${i === game.path.length - 1 ? 'cur' : ''} ${p.back ? 'back' : ''} ${p.via || p.found ? 'via' : ''}">${esc(p.title)}${p.back ? ' (back)' : ''}${p.via ? ' ✓ ' + viaName(p.via).toLowerCase() : ''}${p.found ? ' ✓ ' + esc(p.found.join(', ')) : ''}${p.hint ? ` <span title="${esc(HINTS[p.hint].text)}">${HINTS[p.hint].icon}</span>` : ''}</li>`).join('');
+    `<li class="${i === game.path.length - 1 ? 'cur' : ''} ${p.back ? 'back' : ''} ${p.via || p.found ? 'via' : ''}">${esc(p.title)}${p.back ? ' (back)' : ''}${p.via ? ' ✓ ' + viaName(p.via).toLowerCase() : ''}${p.found ? ' ✓ ' + esc(p.found.join(', ')) : ''}${p.stranded ? ` <span title="${STRANDED}">⛔</span>` : ''}${distance && 'togo' in p && p.togo !== 0 ? ` <span class="note">${toGoText(p.togo)}</span>` : ''}</li>`).join('');
   scrollPathToEnd();
 }
 // Keeps the newest entry in view: at the bottom of the sidebar, or at the end of the one-line path on phones, whose
@@ -1597,7 +1602,7 @@ function showToast(text, ms = null) {
 // Called once the checkpoint's article has rendered, so the banner isn't hidden behind the loading overlay.
 // Scavenger's finds get one too: "✓ Found a Nether mob: Blaze (2 of 3)".
 function celebrateCheckpoint() {
-  const n = checkpoints(), entry = game.path.at(-1), stranded = entry.hint === 'stranded', next = objective();
+  const n = checkpoints(), entry = game.path.at(-1), stranded = entry.stranded, next = objective();
   const what = game.hunt ? `Found ${game.hunt[0].kind ? `${entry.found.join(' and ')}: ${entry.title}` : entry.title} (${game.hunt.length - huntLeft().length} of ${game.hunt.length})`
     : entry.via === game.turn ? 'Target reached' : `Checkpoint ${n > 1 ? `${checkpointNumber(entry.via)} of ${n} ` : ''}reached`;
   // What comes next, or that the way on is cut off: on a round trip only giving up is left then (see turnBack).
@@ -1635,6 +1640,7 @@ function startGame() {
   $('#btnBack').classList.toggle('hidden', !canGoBack());
   $('#btnPeek').classList.toggle('hidden', game.rules.includes('blind'));
   $('#hudTimeStat').classList.toggle('hidden', !game.timed);
+  $('#hudParStat').classList.toggle('hidden', !game.rules.includes('distance'));   // see setupPar
   renderObjective();
   hideOverlay();
   hideToast();
@@ -1693,22 +1699,18 @@ async function navigate(title, fragment, { back = false } = {}) {
   game.path.push({ title: page.title, back, ...(via && { via }), ...(finds.length && { found: finds.map(h => h.label) }) });
   for (const h of finds) h.found = page.title;
   game.seen.set(title, page.title).set(page.title, page.title);   // the link's title too, in case it was a redirect
-  // With Exact clicks every page visited is dead, by every title that led to it, before Hot/cold looks; only the target
-  // can still be arrived at, too soon.
+  // With Exact clicks every page visited is dead, by every title that led to it, before the arrival is measured; only the
+  // target can still be arrived at, too soon.
   if (game.exact) game.dead = new Set([...game.seen].filter(([, t]) => t !== game.goal.title).map(([k]) => k));
   if (via || finds.length) { game.celebrate = true; renderObjective(); }
   // A round trip turns back at its target, or Scavenger's at the last find.
   if (game.roundTrip && (via ? via === game.turn : finds.length && !hunting())) turnBack(game.path.at(-1));
-  // Hot/cold, on every arrival but the first and the objective's own (a target or later checkpoint passed early gets one):
-  // the hint goes onto the path and shows over the article once both are ready (showHint, here and in frameReady),
-  // unless the player has moved on by then.
-  if (game.rules.includes('hotcold') && game.path.length > 1 && !via && !finds.length && page.title !== objective()?.title) {
-    const entry = game.path.at(-1);
-    hotColdHint(game.path.at(-2).title, entry.title).then(hint => {
-      entry.hint = hint;
-      if (game.path.at(-1) === entry && game.active) { renderHud(); showHint(); }
-    }, () => {});
-  }
+  // Every arrival is measured, for the result's path and for Distance's count in the header (renderHud).
+  const entry = game.path.at(-1);
+  entry.measured = clicksToGo(entry.title).then(n => {
+    entry.togo = n;
+    if (game.path.at(-1) === entry && game.active) renderHud();
+  }, () => {});
   $('#credit').innerHTML = `<a href="${esc(wikiUrl(page.title))}" target="_blank" rel="noopener">View on minecraft.wiki</a> · ` +
     `<a href="${LICENSE_URL}" target="_blank" rel="noopener">CC BY-NC-SA 3.0</a>`;
   // The target and checkpoints stay reachable even if they are hubs.
@@ -1739,7 +1741,6 @@ function frameReady(token, live) {
   resumeClock();
   if (game.celebrate) { game.celebrate = false; celebrateCheckpoint(); }
   else if (game.stuck) showToast(stuckText());
-  else showHint();
 }
 
 // ---------------------------------------------------------------- Sounds
@@ -2291,29 +2292,25 @@ function roundTripRoute(graph, there, back, usable) {
   return best;
 }
 
-// Hot/cold: whether an arrival is closer to the objective than the page before it, going by the link graph under the
-// game's settings. It never says how close: only warmer, colder, the same, or unknown for a page the snapshot lacks. A
-// page with no route to the objective counts as farthest of all, so walking into a dead end is colder.
-const HINTS = {
-  warmer: { icon: '🔥', text: '🔥 Warmer' },
-  colder: { icon: '❄️', text: '❄️ Colder' },
-  same: { icon: '＝', text: 'Same distance' },
-  unknown: { icon: '?', text: 'No hint: this page isn’t in the wiki’s offline copy' },
-  stranded: { icon: '⛔', text: 'There’s no way back that doesn’t retrace your steps' },   // see turnBack
-};
-async function hotColdHint(from, to) {
-  if (!PAGE_IDS.has(from) || !PAGE_IDS.has(to)) return 'unknown';
-  // Scavenger aims at the nearest of what is still to find.
-  const aim = hunting() ? huntLeft().flatMap(h => h.info ? [h.info.title] : KINDS[h.kind].members) : objective().title;
+// The fewest clicks from an arrival to what is next (the objective, or the nearest of what Scavenger still has to find),
+// going by the link graph under the game's settings and around the pages dead as it arrives, which is why it is measured
+// then: null if there is no route, and undefined if the snapshot lacks the page, or what is next. The result's path shows
+// every arrival's, and Distance the latest's during play.
+async function clicksToGo(title) {
+  const aim = hunting() ? huntLeft().flatMap(h => h.info ? [h.info.title] : KINDS[h.kind].members) : objective()?.title;
+  if (!aim) return 0;   // nothing is next: Scavenger's last find, with no way home to go
+  if (!PAGE_IDS.has(title) || ![aim].flat().some(t => PAGE_IDS.has(t))) return undefined;
   const usable = routeUsable({ keep: cardTitles(), avoid: game.dead, rules: game.rules, content: game.content });
-  const graph = await linkGraph(!game.rules.includes('nonav'));
-  const [before, after] = [from, to].map(t => shortestRoute(graph, t, aim, usable)?.length ?? Infinity);
-  return after < before ? 'warmer' : after > before ? 'colder' : 'same';
+  const route = shortestRoute(await linkGraph(!game.rules.includes('nonav')), title, aim, usable);
+  return route ? route.length - 1 : null;
 }
+// An arrival's count, as the paths show it beside the page.
+const toGoText = n => n === undefined ? '?' : n === null ? 'no route' : `${n} to go`;
 // Reaching a round trip's target (or Scavenger's last find) turns the game around: Back starts again from here, so it
 // can't walk the way there backwards, and every page of the way there (and every link title that led to one) goes dead,
 // but those still ahead: the checkpoints of the way back and the start. If the snapshot has no way on around them, the
-// arrival gets the stranded hint: only giving up is left.
+// arrival is marked stranded and says so: only giving up is left.
+const STRANDED = 'There’s no way back that doesn’t retrace your steps';
 function turnBack(entry) {
   game.stack = [entry.title];
   const left = ahead().map(c => c.title);
@@ -2321,8 +2318,9 @@ function turnBack(entry) {
   linkGraph(!game.rules.includes('nonav')).then(graph => {
     const usable = routeUsable({ keep: cardTitles(), avoid: game.dead, rules: game.rules, content: game.content });
     if (PAGE_IDS.has(entry.title) && !legsRoute(graph, [entry.title, ...left], usable)) {
-      entry.hint = 'stranded';
-      if (game.path.at(-1) === entry && game.active) { renderHud(); showHint(); }
+      entry.stranded = true;
+      // Said over the article here if the banner reaching it has already been (celebrateCheckpoint says it otherwise).
+      if (game.path.at(-1) === entry && game.active) { renderHud(); if (!game.loading && !game.stuck) showToast(STRANDED, 6000); }
     }
   }, () => {});
 }
@@ -2335,12 +2333,6 @@ function huntFinds(page) {
     : KIND_MEMBERS.get(h.kind).has(page.title) || (live.has(h.kind) && !KINDS[h.kind].exclude.includes(page.title)));
 }
 
-// Shows the latest arrival's hint over the article, once both the hint and the article are ready, unless the stuck
-// banner is there (the hint still goes on the path).
-function showHint() {
-  const hint = game.path.at(-1)?.hint;
-  if (hint && game.active && !game.loading && !game.stuck) showToast(HINTS[hint].text, hint === 'stranded' ? 6000 : 2000);
-}
 // The stuck banner: no link on the article works. Rolls never give such a page (joinsWeb), but a custom article, a
 // challenge link or a live edit since the snapshot can, and No hubs, Exact clicks or a round trip's way back can leave
 // every link on a page dead.
@@ -2426,11 +2418,16 @@ function finish(won, lost = null) {
   store.set('mwr.history', hist.slice(0, 50));
 
   const route = routeText(rec);
-  // Your path, each page marked with what it was to the game: back, a checkpoint, a find, the target, Hot/cold's hint.
-  const last = game.path.length - 1, goalWord = lost === 'tooSoon' ? 'too soon' : game.roundTrip ? 'back home' : 'target';
-  const pathHtml = game.path.map((p, i) => `<li><a href="${esc(wikiUrl(p.title))}" target="_blank" rel="noopener">${esc(p.title)}</a>` +
+  // Your path, each page marked with what it was to the game (back, a checkpoint, a find, the target, stranded) and, once
+  // every arrival is measured (clicksToGo), how many clicks it was from what was next, marked worse where a click got no
+  // closer to the same objective, but for Exact clicks, which has to take detours.
+  const path = game.path, last = path.length - 1, goalWord = lost === 'tooSoon' ? 'too soon' : game.roundTrip ? 'back home' : 'target';
+  const exact = !!game.exact, worse = (p, i) => !exact && i > 0 && !p.via && !p.found
+    && Number.isInteger(path[i - 1].togo) && (p.togo === null || p.togo >= path[i - 1].togo);
+  const pathHtml = () => path.map((p, i) => `<li><a href="${esc(wikiUrl(p.title))}" target="_blank" rel="noopener">${esc(p.title)}</a>` +
     [p.back && 'back', p.via && viaName(p.via).toLowerCase(), p.found && p.found.join(', '), i === last && (won || lost === 'tooSoon') && game.goal && goalWord,
-      p.hint && HINTS[p.hint].icon].filter(Boolean).map(w => ` <span class="note">${esc(w)}</span>`).join('') + '</li>').join('');
+      p.stranded && '⛔'].filter(Boolean).map(w => ` <span class="note">${esc(w)}</span>`).join('') +
+    ('togo' in p && p.togo !== 0 ? ` <span class="note togo${worse(p, i) ? ' worse' : ''}">${toGoText(p.togo)}</span>` : '') + '</li>').join('');
   const newBest = won && best && beats(rec, best);
   const bestNote = !won || !best ? '' : newBest ? '<p class="best new">New personal best for this pair!</p>'
     : `<p class="best note">Your best for this pair: ${wonText(best)}.</p>`;
@@ -2453,7 +2450,8 @@ function finish(won, lost = null) {
     </div>
     ${bestNote}
     <div class="routes">
-      <div><h3>Your path · ${clicksText(rec.clicks)}</h3><ol>${pathHtml}</ol></div>
+      <div><h3>Your path · ${clicksText(rec.clicks)}</h3><ol id="mPath">${pathHtml()}</ol>
+        <p class="note hidden" id="mPathNote">Beside each page, the fewest clicks from it to what was next.${exact ? '' : ' In red, a click that got no closer.'}</p></div>
       <div><h3 id="mBestTitle">${game.exact ? `One way in exactly ${game.limit}` : 'Shortest route'}</h3>
         <ol id="mBest">${game.exact ? game.exact.map(t => `<li>${esc(t)}</li>`).join('') : ''}</ol>
         <p class="note" id="par">Working out par…</p></div>
@@ -2465,6 +2463,12 @@ function finish(won, lost = null) {
       <button class="primary" id="mNew">New game</button>
     </div></div>`, false);
   showPar(rec, game.parReady);
+  const ol = $('#mPath');
+  Promise.all(path.map(p => p.measured)).then(() => {
+    if (!ol.isConnected) return;
+    ol.innerHTML = pathHtml();
+    $('#mPathNote').classList.toggle('hidden', !path.some(p => 'togo' in p));   // none if the link graph couldn't load
+  });
   // Share's text is made on the click, since showPar may only have rec.par by then.
   const copy = async (id, text) => {
     try { await navigator.clipboard.writeText(text); $(id).textContent = 'Copied!'; }

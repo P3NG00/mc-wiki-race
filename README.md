@@ -73,7 +73,15 @@ Plays a real game in headless Firefox against the live wiki. Needs `firefox`, No
 test/run-e2e.sh --offline
 ```
 
-Checks the game's own logic (rolls, the daily, Content, difficulty, which links are live, every rule) in about 20 seconds, with every request to the wiki answered by the test, so it works without network access or while the wiki is down.
+Checks the game's own logic (rolls, the daily, Content, difficulty, which links are live, every rule) in just over a minute, with every request to the wiki answered by the test, so it works without network access or while the wiki is down.
+
+### Pre-commit hook
+
+```sh
+git config core.hooksPath .githooks
+```
+
+Run this once per clone. Every commit then runs the offline test first and stops if a check fails (`git commit --no-verify` skips it). The live test isn't in the hook: run it by hand for changes to rendering, the article frame, API handling or layout, before a release, and always after updating the wiki snapshot (`wiki-data.js`, `wiki-links.js`, `wiki-navboxes.js`), which the hook reminds you of.
 
 See `CLAUDE.md` for how the game works internally.
 

@@ -405,21 +405,19 @@ await ev("finish(false); closeModal(); toSetup()");
 check('history entries with unknown Content are left out', await ev(`(r => isRecord(r) && !isRecord({ ...r, content: ['Nope'] }))(savedGames()[0])`));
 
 // No hubs: links to hubs and their redirects are dead, except a hub that is the target.
-// Blind target: no target picture or description on the card or in the HUD, and no peek.
+// Blind target: a link's target held unseen, then named in the HUD with no picture, and no peek. Picking at Start is in offline.mjs.
 await ev("store.set('mwr.pathCollapsed', true)");   // stands in for collapsing it before the reload
 await send('browsingContext.navigate', { context: ctx, url: 'about:blank', wait: 'complete' });
 await send('browsingContext.navigate', { context: ctx, url: fileUrl + '#start=Diamond&target=Crafting&rules=nohubs,blind', wait: 'complete' });
 await until("!document.querySelector('#btnPlay').disabled");
-const blindCard = "document.querySelector('#cardGoal .desc').textContent + ' ' + [...document.querySelectorAll('#cardGoal img')].every(i => i.classList.contains('hidden'))";
-check('Blind target hides the target card', await ev(blindCard) === 'Hidden: Blind target. true', await ev(blindCard));
-await ev("document.querySelector('#rules input[value=blind]').click()");
-check('turning Blind target off shows it again', !(await ev(blindCard)).startsWith('Hidden'), await ev(blindCard));
-await ev("document.querySelector('#rules input[value=blind]').click()");
+const blindCard = "['.title', '.desc'].map(c => document.querySelector('#cardGoal ' + c).textContent).join(': ') + ' ' + [...document.querySelectorAll('#cardGoal img')].every(i => i.classList.contains('hidden'))";
+check('Blind target hides the link\'s target, held unseen, and par', await ev(blindCard) === 'Hidden: Blind target: picked and shown when you start. true'
+  && await ev("setup.goal?.title === 'Crafting' && document.querySelector('#setupPar').textContent === 'Par shows when you start'"), await ev(blindCard));
 await ev("document.querySelector('#btnPlay').click()");
 check('a collapsed path stays collapsed after a reload', await ev("document.querySelector('.main').classList.contains('collapsed') && document.querySelector('#btnPath').getAttribute('aria-expanded') === 'false'"));
 await ev("document.querySelector('#btnPath').click()");
 check('No hubs game loads', await until("game.path.length === 1 && !game.loading"));
-check('Blind target hides the HUD and path pictures and peek', await ev("document.querySelector('#hudImg').classList.contains('hidden') && document.querySelector('#pathArt').classList.contains('hidden') && document.querySelector('#btnPeek').classList.contains('hidden')"));
+check('Blind target names the target once the game starts, but hides the HUD and path pictures and peek', await ev("document.querySelector('#hudGoal').textContent === 'Crafting' && document.querySelector('#hudImg').classList.contains('hidden') && document.querySelector('#pathArt').classList.contains('hidden') && document.querySelector('#btnPeek').classList.contains('hidden')"));
 check('hub redirects are known', await ev("HUB_TITLES.get('Blocks') === 'Block' && HUB_TITLES.get('Mining') === 'Breaking'"));
 f = await frameCtx();
 // No hubs on its own is Hard, so the navboxes are gone too; this looks at links in the article itself. Every link to a

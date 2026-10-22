@@ -745,8 +745,9 @@ async function pageInfo(title) {
 // via0…via2: the checkpoints, in order, as many as the Checkpoint rule's count while it is on.
 const VIA_KEYS = ['via0', 'via1', 'via2'];
 // exact: Exact clicks's route for the cards (updateSetupPar). kinds: Scavenger's kinds, by category. back: in a Relay
-// with Round trip, how many of the checkpoints come after the target, on the way back (see syncVia).
-const setup = { start: null, via0: null, via1: null, via2: null, goal: null, daily: null, busy: 0, exact: null, kinds: null, back: null,
+// with Round trip, how many of the checkpoints come after the target, on the way back (see syncVia). blind: whether
+// Blind target was on when the rules were last set, so turning it off drops the cards it held unseen (see hiddenKeys).
+const setup = { start: null, via0: null, via1: null, via2: null, goal: null, daily: null, busy: 0, exact: null, kinds: null, back: null, blind: false,
   rolls: { start: 0, via0: 0, via1: 0, via2: 0, goal: 0 } };
 const viaCount = () => +$('#viaCount').value;
 // Scavenger's mode while it is on: 'articles' (the checkpoint cards and the target card hold them) or 'kinds'.
@@ -765,6 +766,16 @@ function rollBack(n) {
 const tripRelay = () => rules().includes('roundtrip') && rules().includes('checkpoint');
 // How many of the checkpoints come after the target, on the way back.
 const backCount = () => tripRelay() ? setup.back : 0;
+// Under Blind target every card after the start, and Scavenger's kinds, is hidden: not picked until Start (pickHidden),
+// so the setup screen has nothing to give away, or held unseen when the game was fixed beforehand (the daily, a
+// challenge link). Any change drops them, so turning the rule off or swapping can't show them.
+const isBlind = () => rules().includes('blind');
+const hiddenKeys = () => isBlind() ? cardKeys().slice(1) : [];
+function dropHidden() {
+  for (const w of [...VIA_KEYS, 'goal']) { setup.rolls[w]++; setup[w] = null; renderCard(w); }
+  setup.kinds = null;
+  renderKinds();
+}
 
 function mode() { return $('input[name=mode]:checked').value; }
 
@@ -800,7 +811,7 @@ const RULES = {
   noback: { label: 'No Back', help: 'The Back button is gone: every click is final.' },
   nohubs: { label: 'No hubs' },
   nonav: { label: 'No navboxes' },
-  blind: { label: 'Blind target', help: 'You only get the target’s name: no picture or description.' },
+  blind: { label: 'Blind target', help: 'The target is hidden until you start, then you only get its name. A Relay shows each stop once you reach the one before.' },
   hotcold: { label: 'Hot/cold', help: 'After each click, a hint: warmer if you got closer to the target, colder if not.' },
   checkpoint: { label: 'Relay' },
   roundtrip: { label: 'Round trip', help: 'Then go back to the start, never through a page of the way there.' },
@@ -877,6 +888,7 @@ function setRules(keys) {
   $(`input[name=level][value=${levelOf(keys)}]`).checked = true;
   $(`input[name=game][value=${gameOf(keys)}]`).checked = true;
   for (const b of document.querySelectorAll('input.rule')) b.checked = keys.includes(b.value);
+  setup.blind = keys.includes('blind');
   updateLevelHelp();
 }
 function updateLevelHelp() { $('#levelHelp').textContent = LEVELS[level()].help; }
@@ -906,9 +918,10 @@ const routeText = r => r.goal === undefined ? [r.start, targetText(r), ...r.rule
 function renderCard(which) {
   const card = $({ start: '#cardStart', goal: '#cardGoal' }[which] ?? '#card-' + which);
   const info = setup[which];
-  const blind = which !== 'start' && rules().includes('blind');
-  $('.title', card).textContent = info ? info.title : '…';
-  $('.desc', card).textContent = !info ? '' : blind ? 'Hidden: Blind target.' : info.desc || 'No description available.';
+  const blind = which !== 'start' && isBlind();
+  $('.title', card).textContent = blind ? 'Hidden' : info ? info.title : '…';
+  $('.desc', card).textContent = blind ? `Blind target: picked and shown ${shownWhen(which)}.` : !info ? '' : info.desc || 'No description available.';
+  $('.actions', card).classList.toggle('hidden', blind);
   setImg($('img.icon', card), blind ? '' : info?.img);
   setImg($('img.art', card), blind ? '' : info?.img);
   // A start in one of Scavenger's kinds would be a find before the first click, so the kinds are rolled again.
@@ -917,12 +930,26 @@ function renderCard(which) {
   updatePlay();
 }
 
-// Scavenger's kinds card: each kind's name and its best-known members.
+// Under Blind target the cards after the start are hidden until the game starts, and in a Relay each until the stop
+// before it is reached, in the order they are played (the target among the checkpoints on a round trip). Scavenger's
+// are all shown at the start, since they go in any order.
+function shownWhen(which) {
+  const keys = viaKeys(), out = keys.length - backCount(), order = huntMode() ? [] : [...keys.slice(0, out), 'goal', ...keys.slice(out)];
+  const prev = order[order.indexOf(which) - 1];
+  return !prev ? 'when you start' : `when you reach ${prev === 'goal' ? 'the target' : keys.length > 1 ? `checkpoint ${keys.indexOf(prev) + 1}` : 'the checkpoint'}`;
+}
+
+// Scavenger's kinds card: each kind's name and its best-known members, hidden under Blind target until the game starts.
 function setKinds(kinds) {
   setup.kinds = kinds;
-  $('#cardHunt .kinds').innerHTML = kinds.map(k => `<li><b>${esc(KINDS[k].label)}</b><br><span class="note">e.g. ${esc(kindExamples(k).join(', '))}</span></li>`).join('');
+  renderKinds();
   updateSetupPar();
   updatePlay();
+}
+function renderKinds() {
+  $('#cardHunt .actions').classList.toggle('hidden', isBlind());
+  $('#cardHunt .kinds').innerHTML = isBlind() ? `<li><b>${HUNT_SIZE} hidden kinds</b><br><span class="note">Blind target: picked and shown when you start.</span></li>`
+    : (setup.kinds ?? []).map(k => `<li><b>${esc(KINDS[k].label)}</b><br><span class="note">e.g. ${esc(kindExamples(k).join(', '))}</span></li>`).join('');
 }
 // The first kinds in an order that come from different topics, none holding the start. Rolled in a random order, and
 // the daily's in the day's ranking.
@@ -939,10 +966,14 @@ const rollKinds = () => firstKinds(Object.keys(KINDS).map(k => [Math.random(), k
 // rendered loads the link graph, so it is ready by the time a game starts. setupParToken drops answers to older pairs.
 let setupParToken = 0;
 // With Exact clicks it also finds a route of exactly par + EXACT_EXTRA (setup.exact), which Start waits for.
-async function updateSetupPar() {
+// setup.parRun is the latest run, which pickHidden waits for.
+function updateSetupPar() { return setup.parRun = setupPar(); }
+async function setupPar() {
   const token = ++setupParToken, titles = cardKeys().map(w => setup[w]?.title), r = rules(), kinds = huntMode() === 'kinds' ? setup.kinds : null;
+  // Under Blind target par and the count would say something about the hidden cards, so they wait for the game.
+  const blind = r.includes('blind');
   setup.exact = null;
-  $('#exactInfo').textContent = 'Working out the count…';
+  $('#exactInfo').textContent = blind ? 'Blind target: the count shows when you start.' : 'Working out the count…';
   let text = '';
   if (titles.every(Boolean) && (kinds?.length ?? true)) {
     const route = await cardsRoute(titles, r, kinds, backCount()).catch(() => null);
@@ -952,11 +983,11 @@ async function updateSetupPar() {
       if (token !== setupParToken) return;
       setup.exact = exact;
       text = !route ? 'No par to count exact clicks from' : exact ? `${text} · exactly ${n}` : `${text} · no way in exactly ${n}`;
-      $('#exactInfo').textContent = !route ? 'This pair has no par to count from.' : exact ? `This pair: par ${n - EXACT_EXTRA}, so exactly ${n} clicks.`
+      if (!blind) $('#exactInfo').textContent = !route ? 'This pair has no par to count from.' : exact ? `This pair: par ${n - EXACT_EXTRA}, so exactly ${n} clicks.`
         : `This pair can’t be done in exactly ${n} clicks.`;
     }
   }
-  if (token === setupParToken) { $('#setupPar').textContent = text; updatePlay(); }
+  if (token === setupParToken) { $('#setupPar').textContent = blind ? 'Par shows when you start' : text; updatePlay(); }
 }
 
 // A shortest route for the cards' titles, in cardKeys order, and Scavenger's kinds if it has them, under rules, with
@@ -964,11 +995,13 @@ async function updateSetupPar() {
 const cardsRoute = (titles, rules, kinds = null, back = 0) =>
   parRoute({ start: titles[0], vias: titles.slice(1, -1), goal: titles.at(-1), back, kinds, rules, content: contentInPlay(titles) });
 
-// Enables Start only for different articles on every card in use, with no lookup in flight.
+// Enables Start only for different articles on every card in use, with no lookup in flight. Under Blind target only
+// the start is shown, and Start picks the rest itself (pickHidden).
 function updatePlay() {
-  const cards = cardKeys().map(w => setup[w]);
+  const blind = isBlind(), cards = (blind ? ['start'] : cardKeys()).map(w => setup[w]);
   const full = cards.every(Boolean), same = full && new Set(cards.map(c => c.title)).size < cards.length;
-  $('#btnPlay').disabled = !full || same || setup.busy > 0 || (rules().includes('exact') && !setup.exact) || (huntMode() === 'kinds' && !setup.kinds?.length);
+  $('#btnPlay').disabled = !full || same || setup.busy > 0
+    || !blind && ((rules().includes('exact') && !setup.exact) || (huntMode() === 'kinds' && !setup.kinds?.length));
   if (same && setup.busy === 0) setStatus('The same article is on two cards. Pick a different one.', true);
 }
 
@@ -1009,10 +1042,11 @@ function syncVia() {
   $('#cardGoal').classList.toggle('via', !!hunt);   // labelled like the other finds
   $('#cardGoal').classList.toggle('hidden', hunt === 'kinds');
   $('#cardHunt').classList.toggle('hidden', hunt !== 'kinds');
-  $('#btnSwap').classList.toggle('hidden', hunt === 'kinds');   // nothing to swap the start with
+  $('#btnSwap').classList.toggle('hidden', hunt === 'kinds' || isBlind());   // nothing to swap the start with
   $('#reach').classList.toggle('hidden', !!hunt);
-  if (hunt === 'kinds' && !setup.kinds?.length) setKinds(rollKinds());
-  const missing = keys.filter(w => !setup[w]);
+  if (hunt === 'kinds' && !setup.kinds?.length && !isBlind()) setKinds(rollKinds());
+  // The cards with no article yet, the target too when Blind target has just been turned off. Hidden ones wait for Start.
+  const missing = setup.start && !isBlind() ? cardKeys().slice(1).filter(w => !setup[w]) : [];
   if (missing.length) reroll(missing);
   else updatePlay();
 }
@@ -1098,26 +1132,32 @@ async function rollOne(which, group, accept = () => true, titles = null) {
 }
 
 // which: a card, a list of them, or 'all' for every card in use. 'all' also drops checkpoints left over from a higher
-// count or from when the rule was on.
-async function reroll(which) {
+// count or from when the rule was on. Under Blind target the hidden cards are only dropped, and any reroll drops those
+// held for a fixed game, unless atStart (pickHidden) is picking them.
+async function reroll(which, atStart = false) {
+  const hidden = atStart ? [] : hiddenKeys();
   if (which === 'kinds') {
+    if (isBlind()) return;
     setKinds(rollKinds());
     setStatus(leaveDaily() ? LEFT_DAILY : '');
     return;
   }
-  const targets = which === 'all' ? cardKeys() : [which].flat();
+  if (isBlind() && !atStart) dropHidden();
+  const targets = (which === 'all' ? cardKeys() : [which].flat()).filter(w => !hidden.includes(w));
   if (which === 'all') for (const w of VIA_KEYS) if (!targets.includes(w)) setup[w] = null;
   if (which === 'all' && tripRelay()) { setup.back = rollBack(viaKeys().length); placeTarget(); }
   const tokens = Object.fromEntries(targets.map(w => [w, ++setup.rolls[w]]));
   const current = w => tokens[w] === setup.rolls[w];
   const left = leaveDaily();
+  if (!targets.length) { setStatus(left ? LEFT_DAILY : ''); return; }
   const plan = planGroups(targets);
   setStatus('Picking…');
   await withBusy(async () => {
     for (const w of targets) { setup[w] = null; renderCard(w); }
     // allSettled, so one card failing doesn't end the busy state while the other is still rolling. With a target par,
-    // the start and target roll after the rest: a start only if some target is at that par from it, then a target that is.
-    const par = targets.includes('goal') && reach() !== 'any' && REACHES[reach()].fits;
+    // the start and target roll after the rest: a start only if some target is at that par from it, then a target that is
+    // (under Blind target not until Start).
+    const par = (targets.includes('goal') || hidden.includes('goal') && targets.includes('start')) && reach() !== 'any' && REACHES[reach()].fits;
     const results = await Promise.allSettled(targets.filter(w => !par || (w !== 'start' && w !== 'goal')).map(async w => {
       const info = await rollOne(w, plan[w]);
       if (current(w)) { setup[w] = info; renderCard(w); }
@@ -1126,7 +1166,7 @@ async function reroll(which) {
     if (failed) throw failed.reason;
     if (par) {
       const graph = await linkGraph(!rules().includes('nonav')), dists = new Map();
-      const topic = POOL.has($('#topic').value) ? plan.goal : null, aims = candidates(topic, true);
+      const topic = POOL.has($('#topic').value) ? $('#topic').value : null, aims = candidates(topic, true);
       const from = t => dists.get(t) ?? dists.set(t, distancesFrom(graph, t)).get(t);
       // A target at the par from s, not from its topic (Chaos aside) unless that is the chosen one.
       const fits = (s, t) => par(from(s)[PAGE_IDS.get(t)] ?? -1) && (topic || mode() === 'chaos' || groupOf(t) !== groupOf(s));
@@ -1138,14 +1178,37 @@ async function reroll(which) {
         renderCard('start');
         if (!start) { setStatus(`No start found with a target at ${what} for this topic and difficulty.`, true); return; }
       }
-      if (!setup.start || !current('goal')) return;
-      setup.goal = await rollOne('goal', topic, undefined, aims.filter(t => fits(setup.start.title, t)));
-      renderCard('goal');
-      if (!setup.goal) { setStatus(`No target at ${what} from ${setup.start.title}. Reroll the start, or all.`, true); return; }
+      if (targets.includes('goal')) {
+        if (!setup.start || !current('goal')) return;
+        setup.goal = await rollOne('goal', topic, undefined, aims.filter(t => fits(setup.start.title, t)));
+        renderCard('goal');
+        if (!setup.goal) { setStatus(`No target at ${what} from ${setup.start.title}. Reroll the start, or all.`, true); return; }
+      }
     }
-    if (which === 'all' && huntMode() === 'kinds') setKinds(rollKinds());   // after the start, which they mustn't hold
+    if (which === 'all' && huntMode() === 'kinds' && !isBlind()) setKinds(rollKinds());   // after the start, which they mustn't hold
     if (targets.every(current)) setStatus(left ? LEFT_DAILY : '');
   });
+}
+
+// Under Blind target, Start (and Copy challenge link) first picks the hidden cards that aren't held, and for Exact
+// clicks a target with a route of exactly its count, which the setup screen otherwise waits for: a few tries, a lookup
+// each. False if the cards aren't all there, with the reason in the status line.
+async function pickHidden() {
+  if (huntMode() === 'kinds' && !setup.kinds?.length) setKinds(rollKinds());
+  for (let tries = 0; tries < 5; tries++) {
+    const missing = hiddenKeys().filter(w => !setup[w]);
+    if (missing.length) await reroll(missing, true);
+    const titles = cardKeys().map(w => setup[w]?.title);
+    if (!titles.every(Boolean)) return false;
+    if (new Set(titles).size < titles.length) { setStatus('The same article is on two cards. Reroll the start.', true); return false; }
+    if (!rules().includes('exact')) return true;
+    // The latest par run, which renderCard started, decides setup.exact.
+    for (let run; run !== setup.parRun;) await (run = setup.parRun);
+    if (setup.exact) return true;
+    setup.goal = null;
+  }
+  setStatus('No target came up that can be reached in exactly its count. Try again, or reroll the start.', true);
+  return false;
 }
 
 async function setCustom(which, raw) {
@@ -1155,6 +1218,7 @@ async function setCustom(which, raw) {
   await withBusy(async () => {
     const info = await pageInfo(text);
     if (!info) { setStatus('No article named “' + text + '” on minecraft.wiki.', true); return; }
+    if (isBlind()) dropHidden();   // a new start, so a game fixed beforehand isn't any more
     setup.rolls[which]++;
     setup[which] = info;
     const left = leaveDaily();
@@ -1422,6 +1486,8 @@ function renderObjective() {
     : [{ state: 'done', k: 'Start', name: game.start.title },
       ...game.vias.map((v, i) => ({ state: i < game.viaNext ? 'done' : i === game.viaNext ? 'now' : 'ahead', k: viaName(i + 1), name: v.title, goal: i + 1 === game.turn })),
       goal];
+  // Blind target: a stop ahead is shown once the one before it is reached, but for the start a round trip goes back to.
+  if (game.rules.includes('blind') && !game.hunt) for (const s of stops) if (s.state === 'ahead' && !(s === goal && game.roundTrip)) s.name = '?';
   const short = stops.length > ROUTE_FULL, full = s => [s.k, s.name, s.sub].filter(Boolean).join(': ');
   $('#hudRoute').innerHTML = stops.map((s, i) => (i && (!game.hunt || s.goal) ? '<span class="sep" aria-hidden="true">→</span>' : '') + (s.state === 'now'
     ? `<span class="chip now${s.goal ? ' target' : ''}"><img alt="" id="hudImg" class="hidden"><span class="k" id="hudLbl">${esc(s.k)}</span> <span class="n" id="hudGoal">${esc(s.name)}</span></span>`
@@ -2373,7 +2439,9 @@ $('#target').innerHTML = '<span class="lbl">Target</span>' +
 // The target's par, beside its topic, unless Scavenger is on (it has no target to roll).
 const reach = () => huntMode() ? 'any' : $('#reach').value;
 // A new topic or par rerolls the target, and in the pool modes the start too if it is from that topic.
-$('#target').addEventListener('change', () => reroll(mode() !== 'chaos' && groupOf(setup.start?.title) === $('#topic').value ? 'all' : 'goal'));
+// Under Blind target with a par, the start too, since it is only taken if a target is at that par from it.
+$('#target').addEventListener('change', () => reroll(mode() !== 'chaos' && groupOf(setup.start?.title) === $('#topic').value
+  || isBlind() && reach() !== 'any' ? 'all' : 'goal'));
 $('#content').innerHTML = '<span class="lbl">Content</span>' + WIKI_DATA.families.map(k =>
   `<label title="${esc(FAMILIES[k].help)}"><input type="checkbox" value="${k}"> ${esc(FAMILIES[k].label)}</label>`).join('');
 $('#spinoffs').innerHTML = '<span class="lbl">Spin-offs</span><label title="Every spin-off"><input type="checkbox" id="spinAll"> All</label>' +
@@ -2399,10 +2467,14 @@ for (const row of ['#content', '#spinoffs']) $(row).addEventListener('change', e
   syncAllSpinoffs();
   reroll('all');
 });
-// The game, a rule or the difficulty changing leaves a daily, but doesn't reroll.
+// The game, a rule or the difficulty changing leaves a daily, but doesn't reroll. Under Blind target, or just out of
+// it, it drops the cards after the start, so a game fixed beforehand (now an ordinary one) can't be shown by turning it off.
+// A card syncVia rolls leaves the daily itself, so its notice outlasts the roll.
 for (const row of ['#games', '.game-help', '#rules', '#level']) $(row).addEventListener('change', () => {
+  if (setup.blind || isBlind()) dropHidden();
+  setup.blind = isBlind();
+  updateLevelHelp(); syncVia(); [...VIA_KEYS, 'goal'].forEach(renderCard); renderKinds();
   if (leaveDaily()) setStatus(LEFT_DAILY);
-  updateLevelHelp(); syncVia(); [...VIA_KEYS, 'goal'].forEach(renderCard);
 });
 // The path sidebar can collapse to a small box over the article. The choice is remembered.
 let pathCollapsed = false;
@@ -2467,11 +2539,13 @@ $('#btnSwap').onclick = () => {
   keys.forEach(renderCard);
 };
 $('#btnDaily').onclick = () => loadDaily();
-$('#btnPlay').onclick = startGame;
+$('#btnPlay').onclick = async () => { if (!isBlind() || await pickHidden()) startGame(); };
+// A link has to carry the hidden cards, so under Blind target they are picked now and held unseen.
 $('#btnCopy').onclick = async () => {
+  if (isBlind() && !await pickHidden()) return;
   if (cardKeys().some(w => !setup[w]) || (huntMode() === 'kinds' && !setup.kinds?.length)) return;
   try { await navigator.clipboard.writeText(challengeLink()); setStatus('Challenge link copied.'); }
-  catch { setStatus(challengeLink()); }
+  catch { setStatus(isBlind() ? 'Couldn’t copy the link.' : challengeLink()); }   // it would show the hidden cards
 };
 $('#btnBack').onclick = goBack;
 $('#hudRoute').addEventListener('click', e => { if (e.target.closest('.chip.done')) $('#hudRoute').classList.toggle('open'); });

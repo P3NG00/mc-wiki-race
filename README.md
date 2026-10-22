@@ -26,7 +26,7 @@ Under the cards are the steps for changing the game:
   - **Exact clicks:** reach the target in exactly par + 2 clicks, never on the same page twice, so there's no Back. Getting there sooner loses, so you have to find a detour, and so does running out.
 - **2 · Extra rules**, in any mix:
   - **No Back:** the Back button is gone, so every click is final.
-  - **Blind target:** you only get the target's name, with no picture or description.
+  - **Blind target:** the target isn't even picked until you press Start (Copy challenge link picks it unseen, and the daily keeps it hidden), so the setup screen shows no target, par or Exact clicks count, and there's no Swap. Once the game starts you only get its name, with no picture or description. In a relay each checkpoint, and the target, only shows once you reach the stop before it, so you don't know where it ends; a scavenger hunt's kinds or articles all show when you start.
   - **Hot/cold:** after each click, a hint says whether you got closer to the target (🔥 warmer) or further away (❄️ colder), never how close.
   - **Six clicks:** reach the target in 6 clicks or fewer, Back included, or the game is over. Not with Exact clicks, which has its own count.
 - **3 · Articles and difficulty** is one line saying what's set. **Change** opens it:

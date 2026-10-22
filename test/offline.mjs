@@ -273,6 +273,69 @@ check('the Relay round trip is won, recorded with its split, par over the loop',
   && r.vias.join() === 'Creeper,Zombie' && r.back === 1 && r.par === ${tripPar})(store.get('mwr.history', [])[0])
   && document.querySelector('#modal').textContent.includes('Diamond → Creeper → Crafting → Zombie → Diamond')`), `par ${tripPar}`);
 await ev("closeModal(); toSetup()");
+// Blind target hides every card but the start until the game starts, and then each stop of a Relay until the one before
+// it is reached, here round a loop with the target between the checkpoints. The start a round trip goes back to stays named.
+const blindCards = "[...document.querySelectorAll('.pair .card')].filter(c => c.checkVisibility()).map(c => c.querySelector('.title').textContent + ': ' + c.querySelector('.desc').textContent).join(' | ')";
+const route = "[...document.querySelectorAll('#hudRoute .n')].map(n => n.textContent).join()";
+await open('#start=Diamond&via=Creeper&via=Zombie&target=Crafting&back=1&rules=checkpoint,roundtrip,blind');
+check('Blind target holds a link\'s checkpoints and target unseen until the start, saying when each shows', await ev(blindCards) === 'Diamond: About Diamond. | '
+  + 'Hidden: Blind target: picked and shown when you start. | Hidden: Blind target: picked and shown when you reach checkpoint 1. | Hidden: Blind target: picked and shown when you reach the target.', await ev(blindCards));
+await play();
+check('then the HUD names only the first checkpoint and the start', await ev(route) === 'Diamond,Creeper,?,?,Diamond', await ev(route));
+await ev("navigate('Creeper', null)");
+await until('game.path.length === 2 && !game.loading');
+check('reaching it shows the target', await ev(route) === 'Diamond,Creeper,Crafting,?,Diamond' && await ev(hud) === 'Target Crafting', await ev(route));
+await ev("navigate('Crafting', null)");
+await until('game.path.length === 3 && !game.loading');
+check('and the target the checkpoint of the way back', await ev(route) === 'Diamond,Creeper,Crafting,Zombie,Diamond', await ev(route));
+await ev("finish(false); closeModal(); toSetup()");
+await open('#start=Diamond&kind=Nether%20mobs&kind=Enchantments&kind=Potions&rules=scavenger,blind');
+check('Blind target hides Scavenger\'s kinds until the start', await ev("document.querySelector('#cardHunt .kinds').textContent.startsWith('3 hidden kinds')"));
+await play();
+check('then shows them all', await ev(route) === 'a mob found in the Nether,an enchantment,a potion', await ev(route));
+await ev("finish(false); closeModal(); toSetup()");
+// An ordinary roll under Blind target picks only the start: the rest wait for Start, with no Reroll, Swap or par to give
+// them away. Copy challenge link picks them and holds them unseen; any change drops them, turning the rule off included.
+await open('#rules=nonav,checkpoint,blind');
+check('Blind target leaves the hidden cards unpicked, with no Reroll, Swap or par', await ev(`!!setup.start && !setup.via0 && !setup.goal
+  && !document.querySelector('#cardGoal .actions').checkVisibility() && !document.querySelector('#btnSwap').checkVisibility()
+  && document.querySelector('#setupPar').textContent === 'Par shows when you start' && ${visibleCards} === setup.start.title + ',Hidden,Hidden'`), await ev(visibleCards));
+await play();
+check('Start picks them from different topics, showing the checkpoint only', await ev(`(cs => cs.every(Boolean) && new Set(cs.map(c => groupOf(c.title))).size === 3)([game.start, ...game.vias, game.goal])`)
+  && await ev(route) === await ev("[game.start.title, game.vias[0].title, '?'].join()"), await ev(route));
+await ev("finish(false); closeModal(); toSetup()");
+await ev("reroll('all')");
+await until(ready);
+await ev("document.querySelector('#btnCopy').click()");
+check('Copy challenge link picks them and holds them unseen', await until('!!setup.goal && setup.busy === 0') && await ev(`challengeLink().includes('&target=') && ${visibleCards}.endsWith(',Hidden,Hidden')`));
+await ev("window.held = [setup.via0, setup.goal]; document.querySelector('#rules input[value=blind]').click()");
+check('turning Blind target off drops them and rolls new ones to show', await until(ready)
+  && await ev(`!${visibleCards}.includes('Hidden') && !!setup.via0 && !!setup.goal && setup.via0 !== held[0] && setup.goal !== held[1]`), await ev(visibleCards));
+await ev("document.querySelector('#rules input[value=blind]').click()");
+check('and turning it on drops them again', await ev(`!setup.goal && !setup.via0 && ${visibleCards}.endsWith(',Hidden,Hidden')`));
+// Exact clicks under Blind target: the count waits for the game, and Start picks a target that can be done in it.
+await ev("document.querySelector('input[name=game][value=exact]').click()");
+check('Blind target hides Exact clicks\'s count', await until(ready) && await ev(`!setup.goal && document.querySelector('#exactInfo').textContent.startsWith('Blind target')`));
+await play();
+check('Start picks a target with a route of exactly par + 2', await ev(`!!game.exact && game.exact.at(-1) === game.goal.title && game.limit === game.exact.length - 1`)
+  && await until(`game.par !== null && game.limit === game.par + EXACT_EXTRA`), await ev('JSON.stringify([game.par, game.limit])'));
+await ev("finish(false); closeModal(); toSetup()");
+// A target topic and par under Blind target: the start is rolled with a target at that par, which Start then picks.
+await ev("document.querySelector('input[name=game][value=race]').click()");
+await ev("document.querySelector('#topic').value = 'blocks'; (s => { s.value = 'long'; s.dispatchEvent(new Event('change', { bubbles: true })); })(document.querySelector('#reach'))");
+await until(ready, 30000);
+await play();
+check('Start picks a target from the topic at the par chosen', await until('game.par !== null') && await ev("game.par >= 3 && game.goal.reach === 'long' && groupOf(game.goal.title) === 'blocks'"),
+  await ev("game.par + ' ' + game.goal.title"));
+await ev("finish(false); closeModal(); toSetup(); document.querySelector('#reach').value = 'any'; document.querySelector('#topic').value = 'any'");
+// A Blind target daily is held unseen, the same for everyone, and leaving it drops its cards.
+const blindDay = await ev("(() => { for (let d = new Date(today()); ; d.setDate(d.getDate() - 1)) { const s = d.toISOString().slice(0, 10); if (dailyRule(s) === 'blind') return s; } })()");
+await open('#daily=' + blindDay);
+check(`a Blind target daily (${blindDay}) holds its target unseen`, await ev(`setup.daily === '${blindDay}' && !!setup.goal && ${visibleCards}.endsWith(',Hidden')`), await ev(visibleCards));
+await ev("window.held = setup.goal; document.querySelector('#rules input[value=blind]').click()");
+check('turning Blind target off leaves it, saying so, and drops the target', await until(ready) && await ev(`setup.daily === null && !!setup.goal && setup.goal !== held
+  && document.querySelector('#setupStatus').textContent === LEFT_DAILY
+  && !${visibleCards}.includes('Hidden')`), await ev(visibleCards));
 // Swap goes round the same loop from the target. Of one checkpoint either side will do; of three, at least one each way.
 await open('#start=Diamond&via=Creeper&target=Crafting&rules=checkpoint,roundtrip');
 check('one checkpoint may come before the target', await until(ready) && await ev(`backCount() === 0 && ${visibleCards} === 'Diamond,Creeper,Crafting'`));

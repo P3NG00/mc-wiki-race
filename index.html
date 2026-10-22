@@ -166,7 +166,7 @@
   .card img.art { width: 220px; height: 220px; right: -28px; bottom: -28px; }
   .card .title { font-size: 19px; font-weight: 650; margin: 0; overflow-wrap: anywhere; }
   .card .desc { color: var(--muted); font-size: 13.5px; margin: 0;
-    display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; }
+    display: -webkit-box; -webkit-line-clamp: 4; line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; }
   .card .actions { margin-top: auto; display: flex; gap: 8px; flex-wrap: wrap; }
   .card input[type=text] { flex: 1; min-width: 0; padding: 6px 10px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--bg); }
   /* A narrow card (three side by side in a smaller window) puts the picture above the text and the input under the button. */
@@ -334,7 +334,7 @@
     .pair, .pair[data-vias] { grid-template-columns: 1fr; }
     /* Stacked, the cards stay short enough that Start game fits on a phone's first screen. */
     .card { min-height: 0; }
-    .card .desc { -webkit-line-clamp: 2; }
+    .card .desc { -webkit-line-clamp: 2; line-clamp: 2; }
     .daily-box { flex-wrap: nowrap; }
     .daily-box button { flex: none; }
     .arrow { justify-self: center; transform: rotate(90deg); }

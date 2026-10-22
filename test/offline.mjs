@@ -409,7 +409,7 @@ await ev("document.querySelector('input[name=game][value=exact]').click()");
 check('Blind target hides Exact clicks\'s count', await until(ready) && await ev(`!setup.goal && document.querySelector('#exactInfo').textContent.startsWith('Blind target')`));
 await play();
 check('Start picks a target with a route of exactly par + 2', await ev(`!!game.exact && game.exact.at(-1) === game.goal.title && game.limit === game.exact.length - 1`)
-  && await until(`game.par !== null && game.limit === game.par + EXACT_EXTRA`), await ev('JSON.stringify([game.par, game.limit])'));
+  && await until(`game.par !== null && game.limit === game.par + 2`), await ev('JSON.stringify([game.par, game.limit])'));
 await ev("finish(false); closeModal(); toSetup()");
 // A target topic and par under Blind target: the start is rolled with a target at that par, which Start then picks.
 await ev("document.querySelector('input[name=game][value=race]').click()");
@@ -511,6 +511,32 @@ await ev("closeModal(); toSetup()");
 check('the history marks the win as the pair\'s best, played today', await ev(`(tr => tr.querySelector('.res.won').textContent === '✓ ${n} clicks' && !!tr.querySelector('.best-tag')
   && tr.querySelector('.h-when').textContent === 'Today' && tr.querySelector('.h-route').textContent.startsWith('Diamond → Zombie'))(document.querySelector('#history tbody tr'))`),
   await ev("document.querySelector('#history tbody tr').textContent.replace(/\\s+/g, ' ').trim()"));
+// The count: a link's extra= sets it, and a challenge link carries it, so par + 4 needs a route of exactly that many and
+// is a game of its own for personal bests. Random rolls one of par + 1 to 5 with every roll of the cards.
+await open('#start=Diamond&target=Zombie&rules=exact&extra=4');
+check('a link\'s extra=4 makes the count par + 4, and the challenge link carries it', await until(ready) && await ev(`document.querySelector('#exactExtra').value === '4'
+  && setup.exact.length - 1 === ${exact.par + 4} && new Set(setup.exact).size === setup.exact.length && document.querySelector('#exactInfo').textContent === 'This pair: exactly ${exact.par + 4} clicks.'
+  && document.querySelector('#gameSum').textContent.startsWith('Exact clicks (par + 4)') && openLink(new URL(challengeLink()).hash.slice(3)).includes('&extra=4&')`),
+  await ev("setup.exact?.join(' → ')"));
+check('par + 4 and par + 2 are two games for personal bests', await ev(`(r => recordKey({ ...r, exact: ${exact.par + 4} }) !== recordKey({ ...r, exact: ${n} }))({ start: 'Diamond', goal: 'Zombie', rules: ['exact'] })`));
+// Under Blind target a link's number is held unseen like its cards: the strip and the line above them say Random.
+await open('#start=Diamond&target=Zombie&rules=exact,blind&extra=4');
+check('under Blind target a link\'s extra=4 is held unseen, and Start plays par + 4', await until('!!setup.exact') && await ev(`document.querySelector('#exactExtra').value === 'random'
+  && document.querySelector('#gameSum').textContent.startsWith('Exact clicks (par + random)') && document.querySelector('#exactInfo').textContent.startsWith('Blind target')
+  && document.querySelector('#cardGoal .title').textContent === 'Hidden'`) && await play() && await ev(`game.goal.title === 'Zombie' && game.limit === ${exact.par + 4}`),
+  await ev("JSON.stringify([document.querySelector('#exactExtra').value, game.limit])"));
+await ev("finish(false); closeModal(); toSetup()");
+await open('#start=Diamond&target=Zombie&rules=exact');
+await ev("(s => { s.value = 'random'; s.dispatchEvent(new Event('change', { bubbles: true })); })(document.querySelector('#exactExtra'))");
+const randomCounts = [];
+for (let i = 0; i < 8; i++) {
+  if (i) await ev("reroll('all')");
+  await until(ready);
+  randomCounts.push(JSON.parse(await ev(`(async () => JSON.stringify([setup.extra, setup.exact.length - 1 - (await cardsRoute(cardKeys().map(w => setup[w].title), rules())).length + 1]))()`)));
+}
+check('Random rolls a count of par + 1 to 5 with each roll, and says only the count', randomCounts.every(([x, over]) => x === over && x >= 1 && x <= 5)
+  && new Set(randomCounts.map(([x]) => x)).size > 1 && await ev("document.querySelector('#gameSum').textContent.startsWith('Exact clicks (par + random)')"),
+  JSON.stringify(randomCounts));
 await open('#start=Diamond&target=Zombie&rules=exact');
 await until(ready);
 await play();
@@ -846,22 +872,25 @@ const dailies = JSON.parse(await ev(`(async () => {
   for (let d = 1; d <= 31; d++) {
     const p = await dailyPair('2026-01-' + String(d).padStart(2, '0'));
     const rules = ['nonav', p.rule], route = await parRoute({ start: p.start.title, vias: p.vias.map(v => v.title), goal: p.goal?.title, kinds: p.kinds, rules });
-    const exact = p.rule === 'exact' && route && !!await exactRoute([p.start.title, p.goal.title], rules, route.length - 1 + EXACT_EXTRA, []);
-    out.push({ rule: p.rule, hunt: p.hunt, vias: p.vias.length, kinds: p.kinds?.length ?? 0, par: route ? route.length - 1 : null, exact });
+    const date = '2026-01-' + String(d).padStart(2, '0'), extra = p.rule === 'exact' ? dailyExtra(date) : null;
+    const exact = p.rule === 'exact' && route && !!await exactRoute([p.start.title, p.goal.title], rules, route.length - 1 + extra, []);
+    out.push({ rule: p.rule, hunt: p.hunt, vias: p.vias.length, kinds: p.kinds?.length ?? 0, par: route ? route.length - 1 : null, exact, extra });
   }
   return JSON.stringify(out);
 })()`));
-check('a month of dailies all have a route: Six clicks days par 4 or less, Checkpoint days one or two checkpoints, Round trip days there and back, Exact clicks days one of exactly par + 2, Scavenger days three kinds or three articles',
+check('a month of dailies all have a route: Six clicks days par 4 or less, Checkpoint days one or two checkpoints, Round trip days there and back, Exact clicks days one of exactly par + 2 to 4, Scavenger days three kinds or three articles',
   dailies.length === 31 && dailies.every(d => d.par >= (d.rule === 'roundtrip' ? 2 : 1) && (d.rule !== 'limit' || d.par <= 4)
-    && (d.rule === 'checkpoint' ? d.vias === 1 || d.vias === 2 : d.hunt === 'articles' ? d.vias === 2 : !d.vias) && (d.rule !== 'exact' || d.exact)
+    && (d.rule === 'checkpoint' ? d.vias === 1 || d.vias === 2 : d.hunt === 'articles' ? d.vias === 2 : !d.vias) && (d.rule !== 'exact' || d.exact && d.extra >= 2 && d.extra <= 4)
     && (d.hunt === 'kinds' ? d.kinds === 3 : !d.kinds)) && ['roundtrip', 'limit', 'exact', 'scavenger'].every(r => dailies.some(d => d.rule === r)),
-  dailies.map(d => `${d.rule}${d.hunt ? '/' + d.hunt : d.vias > 1 ? '×' + d.vias : ''}:${d.par}`).join(' '));
+  dailies.map(d => `${d.rule}${d.hunt ? '/' + d.hunt : d.vias > 1 ? '×' + d.vias : d.extra ? '+' + d.extra : ''}:${d.par}`).join(' '));
 // Exact clicks and Scavenger days load with their rule, ready to start.
-for (const [date, rules, cards, what] of [['2026-01-24', 'nonav,exact', 'start,goal', ': Exact clicks.'], ['2026-01-08', 'nonav,scavenger', 'start', ': Scavenger hunt, 3 kinds.'],
+const exactDay = await ev("`: Exact clicks, par + ${dailyExtra('2026-01-24')}.`");
+for (const [date, rules, cards, what] of [['2026-01-24', 'nonav,exact', 'start,goal', exactDay], ['2026-01-08', 'nonav,scavenger', 'start', ': Scavenger hunt, 3 kinds.'],
   ['2026-01-10', 'nonav,scavenger', 'start,via0,via1,goal', ': Scavenger hunt, 3 articles.']]) {
   await open('#daily=' + date);
   check(`the ${date} daily loads as${what.slice(1, -1)}`, await until(ready, 30000) && await ev(`rules().join() === '${rules}' && cardKeys().join() === '${cards}'
-    && document.querySelector('#setupStatus').textContent.includes('${what}') && (!rules().includes('exact') || !!setup.exact) && (huntMode() !== 'kinds' || setup.kinds.length === 3)`),
+    && document.querySelector('#setupStatus').textContent.includes('${what}') && (huntMode() !== 'kinds' || setup.kinds.length === 3)
+    && (!rules().includes('exact') || !!setup.exact && setup.extra === dailyExtra('${date}') && document.querySelector('#exactExtra').value === String(setup.extra))`),
     await ev("document.querySelector('#setupStatus').textContent"));
 }
 await ev("document.querySelector('input[name=level][value=hard]').click()");

@@ -484,6 +484,7 @@ const THEMES = [...new Set(['auto', 'light', 'dark', ...Array.from(document.quer
     <p id="gameHelp"></p>
     <label class="game-opt" data-game="relay">Checkpoints <select id="viaCount"></select></label>
     <label class="game-opt" data-game="scavenger">Find <select id="huntMode"></select></label>
+    <label class="game-opt" data-game="exact">Count <select id="exactExtra"></select></label>
     <span class="game-opt" data-game="exact" id="exactInfo"></span>
   </div>
 
@@ -636,7 +637,9 @@ function syncReach() {
 }
 const PAR_DRAWS = 400;     // titles to draw for one a roll accepts, before taking it that there is none
 const CLICK_LIMIT = 6;     // Six clicks rule: the game is lost once this many clicks haven't reached the target
-const EXACT_EXTRA = 2;     // Exact clicks rule: the target has to be reached in exactly par + this many clicks
+// Exact clicks rule: the target has to be reached in exactly par + one of these many clicks, picked in its strip (2 at
+// first) or at random. A daily picks one of DAILY_EXTRAS.
+const EXACT_EXTRAS = [1, 2, 3, 4, 5];
 const HUNT_SIZE = 3;       // Scavenger rule: how many articles, or kinds, to find
 
 // No hubs rule: every title that leads to a hub (the hubs, picked in tools/wikidata/config.json, and their redirects),
@@ -774,10 +777,11 @@ async function pageInfo(title) {
 // rolls: per-card token, so superseded rolls are dropped. daily: the date, while the cards hold that day's pair.
 // via0…via2: the checkpoints, in order, as many as the Checkpoint rule's count while it is on.
 const VIA_KEYS = ['via0', 'via1', 'via2'];
-// exact: Exact clicks's route for the cards (updateSetupPar). kinds: Scavenger's kinds, by category. back: in a Relay
+// exact: Exact clicks's route for the cards (updateSetupPar). extra: its clicks over par, the number picked or, for
+// Random, the one rolled with the cards (see setExtra). kinds: Scavenger's kinds, by category. back: in a Relay
 // with Round trip, how many of the checkpoints come after the target, on the way back (see syncVia). blind: whether
 // Blind target was on when the rules were last set, so turning it off drops the cards it held unseen (see hiddenKeys).
-const setup = { start: null, via0: null, via1: null, via2: null, goal: null, daily: null, busy: 0, exact: null, kinds: null, back: null, blind: false,
+const setup = { start: null, via0: null, via1: null, via2: null, goal: null, daily: null, busy: 0, exact: null, extra: null, kinds: null, back: null, blind: false,
   rolls: { start: 0, via0: 0, via1: 0, via2: 0, goal: 0 } };
 const viaCount = () => +$('#viaCount').value;
 // Scavenger's mode while it is on: 'articles' (the checkpoint cards and the target card hold them) or 'kinds'.
@@ -796,6 +800,14 @@ function rollBack(n) {
 const tripRelay = () => rules().includes('roundtrip') && rules().includes('checkpoint');
 // How many of the checkpoints come after the target, on the way back.
 const backCount = () => tripRelay() ? setup.back : 0;
+// Exact clicks's clicks over par: the strip's select (#exactExtra), a number or Random. n sets it first, to a number
+// (a daily or a link). Random rolls one now and with every roll of the cards (reroll), so the setup screen has a count to
+// find a route of before Start.
+const extraRandom = () => $('#exactExtra').value === 'random';
+function setExtra(n) {
+  if (n !== undefined) $('#exactExtra').value = n;
+  setup.extra = extraRandom() ? pick(EXACT_EXTRAS) : +$('#exactExtra').value;
+}
 // Under Blind target every card after the start, and Scavenger's kinds, is hidden: not picked until Start (pickHidden),
 // so the setup screen has nothing to give away, or held unseen when the game was fixed beforehand (the daily, a
 // challenge link). Any change drops them, so turning the rule off or swapping can't show them.
@@ -824,7 +836,7 @@ const poolLabel = () => $('input[name=mode]:checked').parentElement.textContent.
 // The line above the cards: the game (with its option), the extra rules, the articles and the difficulty.
 function updateGameSum() {
   const g = gameMode(), back = backCount(), detail = { relay: `${viaCount()} checkpoint${viaCount() > 1 ? 's' : ''}${back ? `, ${back} on the way back` : ''}`,
-    scavenger: `${HUNT_SIZE} ${$('#huntMode').value}` }[g];
+    scavenger: `${HUNT_SIZE} ${$('#huntMode').value}`, exact: `par + ${extraRandom() ? 'random' : setup.extra}` }[g];
   $('#gameSum').textContent = [GAMES[g].label + (detail ? ` (${detail})` : ''), ...extraLabels(rules()),
     poolLabel() + ' articles', LEVELS[level()].label].join(' · ');
 }
@@ -858,8 +870,8 @@ const GAMES = {
     help: `instead of one target, find ${HUNT_SIZE} things in any order: one of each of ${HUNT_SIZE} kinds, or ${HUNT_SIZE} articles.`,
     trip: { diagram: 'A → ✓ ✓ ✓ → A', blurb: `Find ${HUNT_SIZE} things, then home.`,
       help: `find ${HUNT_SIZE} things in any order: one of each of ${HUNT_SIZE} kinds, or ${HUNT_SIZE} articles. Then go back to the start, never through a page you passed while hunting.` } },
-  exact: { rule: 'exact', label: 'Exact clicks', diagram: 'A → → → → B', blurb: `Land on it in exactly par + ${EXACT_EXTRA}.`,
-    help: `reach the target in exactly par + ${EXACT_EXTRA} clicks, never on a page twice. Too soon loses too, so plan a detour.` },
+  exact: { rule: 'exact', label: 'Exact clicks', diagram: 'A → → → → B', blurb: `Land on it in exactly par + ${EXACT_EXTRAS[0]} to ${EXACT_EXTRAS.at(-1)}.`,
+    help: 'reach the target in exactly par + the clicks you pick, never on a page twice. Too soon loses too, so plan a detour.' },
 };
 const EXTRA_RULES = ['roundtrip', 'noback', 'blind', 'limit', 'distance'];
 // The extra rules among keys as labels, in their boxes' order.
@@ -936,8 +948,8 @@ function chain(r) {
   return r.finds ? [r.start, ...r.finds.toSorted(), ...home] : r.kinds ? [r.start, ...home]
     : [r.start, ...vias.slice(0, out), r.goal, ...vias.slice(out), ...home];
 }
-// With the rules, this keys personal bests.
-const recordKey = r => [...chain(r), ...(r.kinds ?? []).toSorted()].join('|');
+// With the rules, this keys personal bests. Exact clicks's count is part of the game: par + 2 and par + 4 are two games.
+const recordKey = r => [...chain(r), ...(r.kinds ?? []).toSorted(), ...r.exact ? ['exactly ' + r.exact] : []].join('|');
 // What a record was after: its target, or Scavenger's articles or kinds.
 const targetText = r => r.finds ? `${r.finds.join(', ')} (any order)` : r.kinds ? r.kinds.map(k => KINDS[k].label).join(', ') : r.goal;
 const routeText = r => r.goal === undefined ? [r.start, targetText(r), ...r.rules.includes('roundtrip') ? [r.start] : []].join(' → ') : chain(r).join(' → ');
@@ -996,7 +1008,7 @@ const rollKinds = () => firstKinds(shuffled(Object.keys(KINDS)), setup.start?.ti
 // Distance on: par says how far the target is, as Distance does. The first card rendered loads the link graph, so it is
 // ready by the time a game starts. setupParToken drops answers to older pairs.
 let setupParToken = 0;
-// With Exact clicks it also finds a route of exactly par + EXACT_EXTRA (setup.exact), which Start waits for.
+// With Exact clicks it also finds a route of exactly par + setup.extra (setup.exact), which Start waits for.
 // setup.parRun is the latest run, which pickHidden waits for.
 function updateSetupPar() { return setup.parRun = setupPar(); }
 async function setupPar() {
@@ -1010,11 +1022,11 @@ async function setupPar() {
     const route = await cardsRoute(titles, r, kinds, backCount()).catch(() => null);
     if (route) text = `Par ${route.length - 1}`;
     if (r.includes('exact')) {
-      const n = route && route.length - 1 + EXACT_EXTRA, exact = route && await exactRoute(titles, r, n).catch(() => null);
+      const extra = setup.extra, n = route && route.length - 1 + extra, exact = route && await exactRoute(titles, r, n).catch(() => null);
       if (token !== setupParToken) return;
       setup.exact = exact;
       text = !route ? 'No par to count exact clicks from' : exact ? `${text} · exactly ${n}` : `${text} · no way in exactly ${n}`;
-      if (!blind) $('#exactInfo').textContent = !route ? 'This pair has no par to count from.' : exact ? `This pair: ${shown ? `par ${n - EXACT_EXTRA}, so ` : ''}exactly ${n} clicks.`
+      if (!blind) $('#exactInfo').textContent = !route ? 'This pair has no par to count from.' : exact ? `This pair: ${shown ? `par ${n - extra} + ${extra}, so ` : ''}exactly ${n} clicks.`
         : `This pair can’t be done in exactly ${n} clicks.`;
     }
   }
@@ -1201,6 +1213,7 @@ async function reroll(which, atStart = false) {
   const current = w => tokens[w] === setup.rolls[w];
   const left = leaveDaily();
   if (!targets.length) { setStatus(left ? LEFT_DAILY : ''); return; }
+  if (extraRandom()) setExtra();
   let plan = planGroups(targets);
   setStatus('Picking…');
   await withBusy(async () => {
@@ -1377,13 +1390,17 @@ const DAILY_SIX_CLICKS_PAR = 4;
 const DAILY_CHECKPOINTS = [1, 2];
 // A Scavenger day hunts kinds or articles, ranked like the rest.
 const DAILY_HUNTS = ['kinds', 'articles'];
+// An Exact clicks day's clicks over par, ranked like the rest: none of the extremes the strip offers.
+const DAILY_EXTRAS = [2, 3, 4];
 const dailyRule = date => ranked(date, 'rule', DAILY_RULES)[0];
+const dailyExtra = date => ranked(date, 'extra', DAILY_EXTRAS)[0];
 // What a day's daily plays, in words, from its rule alone (no lookups): "Relay, 2 checkpoints", "Scavenger hunt, 3 kinds".
 function dailyText(date) {
   const rule = dailyRule(date);
   if (rule === 'nohubs') return 'Hard';
   if (rule === 'checkpoint') return (n => n > 1 ? `Relay, ${n} checkpoints` : 'Relay')(ranked(date, 'checkpoints', DAILY_CHECKPOINTS)[0]);
   if (rule === 'scavenger') return `Scavenger hunt, ${HUNT_SIZE} ${ranked(date, 'hunt', DAILY_HUNTS)[0]}`;
+  if (rule === 'exact') return `Exact clicks, par + ${dailyExtra(date)}`;
   return RULES[rule].label;
 }
 // The daily box at the top of the setup screen: today's game, and how you did if you have won it.
@@ -1423,7 +1440,7 @@ async function dailyPair(date) {
     first(salt, t => ARTICLES.get(t)?.body >= MIN_BACKLINKS && cards.every(c => groupOf(c.title) !== groupOf(t)), fits);
   const goal = await linked('target', [start], async t => {
     const p = await par({ start: start.title, goal: t });
-    return p >= 1 && (rule !== 'limit' || p <= DAILY_SIX_CLICKS_PAR) && (rule !== 'exact' || !!await exactRoute([start.title, t], rules, p + EXACT_EXTRA, []));
+    return p >= 1 && (rule !== 'limit' || p <= DAILY_SIX_CLICKS_PAR) && (rule !== 'exact' || !!await exactRoute([start.title, t], rules, p + dailyExtra(date), []));
   });
   // Each checkpoint goes after the ones before it, so the route has to go through all of them in order. Scavenger's
   // articles are the target and two more, in any order.
@@ -1446,6 +1463,7 @@ async function loadDaily(date = today()) {
     Object.assign(setup, { start, goal, daily: date }, setVias(vias));
     setRules(['nonav', rule]);
     if (hunt) $('#huntMode').value = hunt;
+    if (rule === 'exact') setExtra(dailyExtra(date));
     if (kinds) setKinds(kinds);
     setContent([]);   // the daily is its pair and rule only: no spin-off links
     syncVia();
@@ -1462,12 +1480,13 @@ function setVias(vias) {
 }
 
 // The checkpoints (or Scavenger's articles but the target card's) go in as one via= each, in order, with back= how many
-// of them come after the target in a Relay with Round trip, and Scavenger's kinds as one kind= each, in place of the target.
+// of them come after the target in a Relay with Round trip, Exact clicks's clicks over par as extra= (the number, Random's
+// too, never the count, which comes from par), and Scavenger's kinds as one kind= each, in place of the target.
 function challengeQuery() {
   const r = rules(), back = backCount();
   return `start=${encodeURIComponent(setup.start.title)}` + (huntMode() === 'kinds' ? setup.kinds.map(k => '&kind=' + encodeURIComponent(k)).join('')
     : `&target=${encodeURIComponent(setup.goal.title)}` + viaKeys().map(w => '&via=' + encodeURIComponent(setup[w].title)).join('')) +
-    (back ? `&back=${back}` : '') + (r.length ? '&rules=' + r.join(',') : '');
+    (back ? `&back=${back}` : '') + (r.includes('exact') ? `&extra=${setup.extra}` : '') + (r.length ? '&rules=' + r.join(',') : '');
 }
 const challengeLink = () => location.href.split('#')[0] + '#g=' + sealLink(challengeQuery());
 // The link to the game on the cards: a daily's is its day, since a sealed link holds the setup only and its game
@@ -2311,8 +2330,8 @@ async function startPars(topic) {
 // Exact clicks: a route of exactly n clicks from the first card to the last that is on no page twice, as titles, or null.
 // Whether there is one is NP-hard in general (it can be a longest-route question), so this searches depth first, only
 // through pages the target can still be reached from in the clicks left, the farthest first, since the detour has to
-// be somewhere, and gives up after EXACT_BUDGET pages. On the 2026-08 snapshot it found one of par + 2 for every one of
-// 447 pairs tried in Normal, Relaxed and Hard, in a few milliseconds.
+// be somewhere, and gives up after EXACT_BUDGET pages. On the 2026-08 snapshot it found one for every pool pair tried in
+// Normal, Relaxed and Hard, 150 each at par + 1 to 6 and 60 each at par + 8, 10, 15 and 20, in 18 ms at most.
 const EXACT_BUDGET = 20000;
 async function exactRoute(titles, rules, n, content = contentInPlay(titles)) {
   const [start, goal] = [titles[0], titles.at(-1)].map(t => PAGE_IDS.get(t));
@@ -2666,6 +2685,12 @@ $('#rules').innerHTML = EXTRA_RULES.map(k => `<label><input type="checkbox" clas
   <span><b>${esc(RULES[k].label)}</b><span class="note" data-desc="${k}">${esc(RULES[k].help)}</span></span></label>`).join('');
 $('#viaCount').innerHTML = VIA_KEYS.map((w, i) => `<option>${i + 1}</option>`).join('');
 $('#huntMode').innerHTML = `<option value="kinds">${HUNT_SIZE} kinds</option><option value="articles">${HUNT_SIZE} articles</option>`;
+$('#exactExtra').innerHTML = EXACT_EXTRAS.map(n => `<option value="${n}">par + ${n}</option>`).join('')
+  + '<option value="random">Random</option>';
+$('#exactExtra').title = `How many clicks over par. Random picks par + ${EXACT_EXTRAS[0]} to ${EXACT_EXTRAS.at(-1)} with each roll.`;
+setExtra(2);
+// On the select itself, so the count is set before the strip's change listener renders the cards.
+$('#exactExtra').addEventListener('change', () => setExtra());
 $('#vias').innerHTML = VIA_KEYS.map((w, i) => `
     <div class="via-slot hidden" id="slot-${w}">
       <div class="card via" id="card-${w}">
@@ -2846,6 +2871,13 @@ const cardsLoaded = () => !!setup.start && !!(huntMode() === 'kinds' ? setup.kin
   const kinds = h.getAll('kind').filter(k => isKey(KINDS, k)).slice(0, HUNT_SIZE), challenge = h.get('start') && (h.get('target') || kinds.length);
   if (challenge) setRules((h.get('rules') || '').split(','));
   else if (h.has('rules')) setRules(h.get('rules').split(','));
+  // Exact clicks's clicks over par, if it is one of the strip's numbers. Under Blind target a challenge's is held unseen,
+  // like its cards: the strip says Random, since the opener can't know it, and the next roll of the cards rolls a new one.
+  const extra = +h.get('extra');
+  if (EXACT_EXTRAS.includes(extra)) {
+    setExtra(challenge && rules().includes('blind') ? 'random' : extra);
+    setup.extra = extra;
+  }
   if (challenge) {
     setStatus('Loading challenge…');
     let missing = null;

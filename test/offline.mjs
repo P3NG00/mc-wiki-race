@@ -588,6 +588,16 @@ await open('#daily=2026-01-06');
 check('the daily is the same on every load', await ev(pairOf) === daily, daily);
 check('the daily is Normal with Checkpoint on 2026-01-06, its cards from different topics',
   await ev("rules().join() === 'nonav,checkpoint' && new Set(cardKeys().map(w => groupOf(setup[w].title))).size === cardKeys().length"), daily);
+// A daily link only plays a real day that has come, from a plain link or a sealed one; any other gives today's. A record
+// only keeps a real day.
+const dayLoaded = async hash => await open(hash) && await ev('setup.daily');
+const todayIs = await ev('today()'), tomorrow = await ev("(d => (d.setDate(d.getDate() + 1), d.toLocaleDateString('sv')))(new Date())");
+const loadedDays = [];
+for (const d of ['2024-02-29', tomorrow, '2999-01-01', '2026-02-31', '2025-02-29', '2026-13-01', '0050-01-01', '2026-1-02', 'x', '']) loadedDays.push(await dayLoaded('#daily=' + d));
+loadedDays.push(await dayLoaded('#daily'), await dayLoaded('#g=' + await ev(`sealLink('daily=${tomorrow}')`)));
+check('a daily link only plays a real day that has come', JSON.stringify(loadedDays) === JSON.stringify(['2024-02-29', ...Array(11).fill(todayIs)]), JSON.stringify(loadedDays));
+check('a record only keeps a real day', await ev(`(r => isRecord(r) && isRecord({ ...r, daily: '2026-01-06' }) && !isRecord({ ...r, daily: '2026-02-31' }) && !isRecord({ ...r, daily: 'x' }))
+  ({ start: 'Diamond', goal: 'Crafting', rules: [], won: true, clicks: 1, ms: 1, at: 1 })`));
 await open('#daily=2026-01-02');
 check('a Round trip daily (2026-01-02) is a Race there and back', await until(ready) && await ev(`rules().join() === 'nonav,roundtrip'
   && gameMode() === 'race' && cardKeys().join() === 'start,goal' && document.querySelector('#setupStatus').textContent.includes(': Round trip.')`), await ev(pairOf));

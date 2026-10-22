@@ -499,10 +499,6 @@ const pairOf = p => `[${p}.start, ...${p}.vias, ${p}.goal].map(c => c.title).joi
 const daily = await ev("cardKeys().map(w => setup[w].title).join(' -> ')");
 check('daily pair is deterministic', await ev(`dailyPair('2026-01-06').then(p => p.rule === 'checkpoint' && ${pairOf('p')})`) === daily &&
   await ev(`dailyPair('2026-01-05').then(p => p.rule === 'noback' && !p.vias.length && ${pairOf('p')} !== ${JSON.stringify(daily)})`), daily);
-// A #daily= date that is malformed, doesn't exist or hasn't come yet gives today's daily.
-const dates = await ev(`JSON.stringify(['2026-01-06', '2024-02-29', today(), '2026-02-31', '2025-02-29', '2026-13-01', '2999-01-01',
-  (d => (d.setDate(d.getDate() + 1), d.toLocaleDateString('sv')))(new Date()), '2026-1-02', 'x', null].map(dailyDate))`);
-check('a daily link only gives a real day that has come', dates === JSON.stringify(['2026-01-06', '2024-02-29', ...Array(9).fill(await ev('today()'))]), dates);
 await ev("document.querySelector('#btnPlay').click()");
 await until("game.path.length === 1 && !game.loading");
 await ev("document.querySelector('#btnGiveUp').click()");

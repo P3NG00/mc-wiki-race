@@ -656,7 +656,7 @@ const isTitles = v => Array.isArray(v) && v.length > 0 && v.every(t => typeof t 
 const isRecord = r => typeof r === 'object' && r !== null && typeof r.start === 'string' &&
   [typeof r.goal === 'string', isTitles(r.finds), isTitles(r.kinds) && r.kinds.every(k => isKey(KINDS, k))].filter(Boolean).length === 1 &&
   optional(r.vias, isTitles) && optional(r.back, b => Number.isInteger(b) && b > 0 && b <= (r.vias?.length ?? 0)) &&
-  optional(r.daily, v => typeof v === 'string') &&
+  optional(r.daily, realDate) &&   // not bounded by today: a clock or time zone change shouldn't drop a record
   optional(r.exact, Number.isInteger) &&
   optional(r.topic, v => isKey(TOPICS, v)) && optional(r.reach, v => isKey(REACHES, v)) && optional(r.par, Number.isInteger) &&
   optional(r.content, v => Array.isArray(v) && v.every(k => CONTENT.has(k))) &&
@@ -1243,12 +1243,14 @@ function today() {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
-// The date a #daily= link asks for, or today for one that is malformed, doesn't exist (2026-02-31) or hasn't come yet.
-function dailyDate(s) {
+// Whether s is a day that exists, as YYYY-MM-DD (not 2026-02-31). Date.UTC reads years 0 to 99 as 1900 to 1999, so
+// those don't come back the same either.
+function realDate(s) {
   const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s);
-  const real = m && new Date(Date.UTC(m[1], m[2] - 1, m[3])).toISOString().slice(0, 10) === s;
-  return real && s <= today() ? s : today();
+  return !!m && new Date(Date.UTC(m[1], m[2] - 1, m[3])).toISOString().slice(0, 10) === s;
 }
+// The date a #daily= link asks for, or today for one that is malformed, doesn't exist or hasn't come yet.
+const dailyDate = s => realDate(s) && s <= today() ? s : today();
 
 // items ordered by the hash of the date, a salt and the item: the day's ranking.
 const ranked = (date, salt, items) => items.map(t => [hash32(`${date}|${salt}|${t}`), t]).sort((a, b) => a[0] - b[0]).map(([, t]) => t);

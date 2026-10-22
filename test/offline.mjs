@@ -6,9 +6,10 @@
 import fs from 'node:fs';
 
 const [port, fileUrl] = process.argv.slice(2);
-// Spin-off namespace numbers, from wiki-data.js, so a page in one gets the ns the live API would give it.
+// Spin-off namespace numbers, from wiki-data.js, so a page in one gets the ns the live API would give it, and the hubs.
 const dataText = fs.readFileSync(new URL('../wiki-data.js', import.meta.url), 'utf8'), marker = 'const WIKI_DATA = ';
-const SPINOFFS = JSON.parse(dataText.slice(dataText.indexOf(marker) + marker.length, dataText.lastIndexOf(';'))).spinoffs;
+const { spinoffs: SPINOFFS, hubs } = JSON.parse(dataText.slice(dataText.indexOf(marker) + marker.length, dataText.lastIndexOf(';')));
+const HUBS = [...new Set(Object.values(hubs))];
 const nsOf = title => SPINOFFS[Object.keys(SPINOFFS).find(n => title.startsWith(n + ':'))] ?? 0;
 
 const ws = new WebSocket(`ws://127.0.0.1:${port}/session`);
@@ -27,9 +28,11 @@ function check(name, ok, extra = '') {
 // what the wiki would send.
 const escHtml = s => s.replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 // Every article is this one: a link in the text, links to a hub, to a redirect to a hub, to the target hub Crafting, to a
-// Tutorial and to a Dungeons page, and one link in a navbox. Bee Our Guest only links hubs, as on the wiki.
-const ARTICLE = title => title === 'Bee Our Guest'
-  ? '<div class="mw-parser-output"><p>An <a href="/w/Advancement">advancement</a> in <a href="/w/Java_Edition">Java Edition</a>.</p></div>' : `<div class="mw-parser-output"><p>${escHtml(title)}: <a href="/w/Diamond_Pickaxe">pickaxe</a> <a href="/w/Block">Block</a>
+// Tutorial and to a Dungeons page, and one link in a navbox. Hubs Only, which isn't in the snapshot, links only two hubs
+// (as Bee Our Guest does on the wiki), so on Hard nothing on it works.
+const HUBS_ONLY = 'Hubs Only';
+const ARTICLE = title => title === HUBS_ONLY
+  ? `<div class="mw-parser-output"><p>${HUBS.slice(0, 2).map(h => `<a href="/w/${encodeURIComponent(h.replace(/ /g, '_'))}">${escHtml(h)}</a>`).join(' and ')}.</p></div>` : `<div class="mw-parser-output"><p>${escHtml(title)}: <a href="/w/Diamond_Pickaxe">pickaxe</a> <a href="/w/Block">Block</a>
   <a href="/w/Blocks">Blocks</a> <a href="/w/Crafting">Crafting</a> <a href="/w/Tutorial:Mining">tutorial</a> <a href="/w/Dungeons:Creeper">dungeons</a></p>
   <table class="navbox"><tr><td><a href="/w/Creeper">Creeper</a></td></tr></table></div>`;
 // The live categories a parse reply gives, as the API writes them: Brand New Mob is only in the live wiki's Nether mobs,
@@ -97,7 +100,21 @@ const play = async () => {
 
 // Links by difficulty. A challenge link without rules is Relaxed: everything but other namespaces is live. No hubs alone
 // (from an older link) is Hard: hubs and redirects to them are dead, the target hub stays live, and so are navboxes' links.
-check('the data loads', await open('#start=Diamond&target=Crafting') && await ev("WIKI_DATA.snapshot.length === 10 && POOL.size === 5 && HUB_TITLES.get('Blocks') === 'Block'"));
+check('the data loads', await open('#start=Diamond&target=Crafting') && await ev("WIKI_DATA.snapshot.length === 10 && POOL.size === 5"));
+// What the checks below take from the snapshot by name. A new one that changes any of these fails here, by name, rather
+// than leaving a check further down passing without testing anything (Crafting no longer a hub would leave "the target hub
+// stays live" true of any link, and Blaze in no kind would leave "a start in a kind rolls them again" nothing to roll).
+const SNAPSHOT_FACTS = {
+  'Block and Crafting are hubs, Blocks a redirect to Block': "HUB_TITLES.get('Block') === 'Block' && HUB_TITLES.get('Crafting') === 'Crafting' && HUB_TITLES.get('Blocks') === 'Block'",
+  'the pages used are articles in it, not hubs': "['Diamond', 'Diamond Pickaxe', 'Zombie', 'Creeper', 'Bamboo', 'Ghast', 'Sharpness'].every(t => ARTICLES.has(t) && !spinoffOf(t) && !HUB_TITLES.has(t))",
+  'Minecraft Dungeons is an article, Dungeons:Creeper a Dungeons page': "ARTICLES.has('Minecraft Dungeons') && !spinoffOf('Minecraft Dungeons') && spinoffOf('Dungeons:Creeper') === 'Dungeons' && ARTICLES.has('Dungeons:Creeper')",
+  'Blaze is a hostile and a flying mob, Sharpness an enchantment, Potion of Swiftness a potion': "KIND_MEMBERS.get('Hostile mobs')?.has('Blaze') && KIND_MEMBERS.get('Flying mobs')?.has('Blaze') && KIND_MEMBERS.get('Enchantments')?.has('Sharpness') && KIND_MEMBERS.get('Potions')?.has('Potion of Swiftness')",
+  'Chicken is left out of Nether mobs': "KINDS['Nether mobs']?.exclude.includes('Chicken')",
+  'the made-up pages aren’t in it': `![${JSON.stringify(HUBS_ONLY)}, 'Brand New Mob'].some(t => ARTICLES.has(t))`,
+};
+const factsOff = [];
+for (const [fact, expr] of Object.entries(SNAPSHOT_FACTS)) if (await ev(expr) !== true) factsOff.push(fact);
+check('the snapshot still has what the checks lean on', !factsOff.length, factsOff.length ? 'changed: ' + factsOff.join('; ') : '');
 check('a challenge link without rules is Relaxed', await ev("level() === 'relaxed' && rules().length === 0"));
 await play();
 let links = await linkStates();
@@ -111,7 +128,8 @@ await play();
 check('the header shows par', await until("/^\\d+$/.test(document.querySelector('#hudPar').textContent)"), await ev("document.querySelector('#hudPar').textContent"));
 links = await linkStates();
 check('Hard: hubs, redirects to them and navboxes dead; the target hub and other links live',
-  links.Block === 'dead' && links.Blocks === 'dead' && links.Creeper === 'dead' && links.Crafting === 'live' && links.Diamond_Pickaxe === 'live', JSON.stringify(links));
+  links.Block === 'dead' && links.Blocks === 'dead' && links.Creeper === 'dead' && links.Crafting === 'live' && links.Diamond_Pickaxe === 'live'
+  && await ev("HUB_TITLES.get('Crafting') === 'Crafting'"), JSON.stringify(links));   // else Crafting live would test nothing
 await ev('finish(false)');
 const shortest = "[...document.querySelectorAll('#mBest li')].map(li => li.textContent).join(' → ')";
 check('the result shows par and a shortest route beside your path', await until(`/^Shortest route · par \\d+$/.test(document.querySelector('#mBestTitle').textContent)
@@ -137,7 +155,9 @@ const far = JSON.parse(await ev(`(async () => {
     const route = await parRoute({ start, goal: 'Crafting', rules: [] });
     if (route?.length >= 3) return JSON.stringify(route);
   }
+  return 'null';
 })()`));
+check('the snapshot has a start two or more clicks from Crafting', !!far);
 await open(`#start=${encodeURIComponent(far[0])}&target=Crafting&rules=hotcold`);
 await play();
 await ev(`navigate(${JSON.stringify(far[1])}, null)`);
@@ -149,6 +169,7 @@ await ev(`navigate(${JSON.stringify(far[0])}, null)`);
 check('Hot/cold: going back is colder', await until("game.path.at(-1).hint === 'colder' && !game.loading"), await ev('game.path.at(-1).hint'));
 // A dead end, a page with no route anywhere (no links outside navboxes, no navboxes), counts as farthest: colder.
 const deadEnd = await ev(`linkGraph(true).then(g => WIKI_DATA.articles.map(([t]) => t).find(t => !spinoffOf(t) && !g.links[PAGE_IDS.get(t)].length && !g.carries[PAGE_IDS.get(t)].length))`);
+check('the snapshot has a dead end', typeof deadEnd === 'string' && await ev(`PAGE_IDS.has(${JSON.stringify(deadEnd)})`), String(deadEnd));
 await ev(`navigate(${JSON.stringify(deadEnd)}, null)`);
 check('Hot/cold: walking into a dead end is colder', await until("game.path.at(-1).hint === 'colder' && !game.loading"), `${deadEnd}: ${await ev('game.path.at(-1).hint')}`);
 await ev("navigate('Brand New Mob', null)");
@@ -486,7 +507,7 @@ check('rolled kinds are three from three topics, none holding the start', rolled
 await open('#start=Diamond&kind=Hostile%20mobs&kind=Enchantments&kind=Potions&rules=scavenger');
 await until(ready);
 await ev("setCustom('start', 'Blaze')");
-check('a start in one of the kinds rolls them again', await until("setup.start?.title === 'Blaze' && setup.busy === 0") &&
+check('a start in one of the kinds rolls them again', await ev("KIND_MEMBERS.get('Hostile mobs').has('Blaze')") && await until("setup.start?.title === 'Blaze' && setup.busy === 0") &&
   await ev("setup.kinds.length === 3 && !setup.kinds.some(k => KIND_MEMBERS.get(k).has('Blaze'))"), await ev('setup.kinds.join()'));
 
 // Scavenger, articles: three Find cards joined by +, par the best order, any order wins, Hot/cold aims at the nearest.
@@ -499,8 +520,14 @@ const best = JSON.parse(await ev(`Promise.all(orders(['Ghast', 'Sharpness', 'Bam
   .then(rs => JSON.stringify([Math.min(...rs.map(r => r.length - 1)), document.querySelector('#setupPar').textContent]))`));
 check('its par is the best of the orders', await until(`document.querySelector('#setupPar').textContent === 'Par ${best[0]}'`), best.join(' / '));
 await play();
+// The expected hint, from the fewest clicks to each find on its own (Relaxed, as the link plays).
+const nearestFind = t => `Promise.all(['Ghast', 'Sharpness', 'Bamboo'].map(f => parRoute({ start: '${t}', goal: f, rules: [] })))
+  .then(rs => Math.min(...rs.map(r => r?.length ?? Infinity)))`;
+const [fromDiamond, fromCrafting] = [await ev(nearestFind('Diamond')), await ev(nearestFind('Crafting'))];
+const aimed = fromCrafting < fromDiamond ? 'warmer' : fromCrafting > fromDiamond ? 'colder' : 'same';
 await ev("navigate('Crafting', null)");
-check('Hot/cold aims at the nearest find', await until("game.path.length === 2 && !game.loading && !!game.path[1].hint"));
+check('Hot/cold aims at the nearest find', await until("game.path.length === 2 && !game.loading && !!game.path[1].hint") && await ev('game.path[1].hint') === aimed,
+  `${await ev('game.path[1].hint')}, expected ${aimed}: the nearest find ${fromDiamond - 1} clicks from Diamond, ${fromCrafting - 1} from Crafting`);
 for (const [i, t] of ['Sharpness', 'Bamboo', 'Ghast'].entries()) {
   await ev(`navigate(${JSON.stringify(t)}, null)`);
   await until(`game.path.length === ${i + 3} && !game.loading || !game.active`);
@@ -576,31 +603,45 @@ for (const m of ['popular', 'everyday', 'deep', 'chaos'])
   check(`${m} rolls keep to their pool`, rolls[m].ok, `targets' links outside navboxes ${Math.round(rolls[m].body)} on average; ${rolls[m].sample.join(', ')}`);
 check('Popular targets are better linked than Everyday\'s, Everyday\'s than Deep cuts\'', rolls.popular.body > rolls.everyday.body && rolls.everyday.body > rolls.deep.body);
 check('a target topic pins the target, and the start comes from another', rolls.mobs);
-// A card must join the wiki's web of links: Bee Our Guest only links hubs, so it can start a game on Normal but not on
-// Hard, a Dungeons story subpage links nowhere, and nothing links the way to a Dungeons decoration page.
+// A card must join the wiki's web of links. Its examples are found in the snapshot by their links alone, so a new one
+// can't turn a check into a pass on a page that has since changed: a page whose links all go to hubs (Bee Our Guest on
+// 2026-08's) can start a game on Normal but not on Hard, a page with no links can't start one, and a page nothing links
+// to can't be a target. The heart has to reach, and be reached from, almost all of the pool, or rolls would refuse most.
 const joins = JSON.parse(await ev(`(async () => {
+  const graph = await linkGraph(false), titles = WIKI_DATA.articles.map(([t]) => t), linked = new Set(graph.links.flat());
+  const pages = titles.map((t, i) => [t, i]).filter(([t]) => !spinoffOf(t) && !HUB_TITLES.has(t));
+  const find = test => pages.find(([, i]) => test(graph.links[i], i))?.[0] ?? null;
+  const examples = {
+    hubsOnly: find(vs => vs.length && vs.every(v => HUB_TITLES.has(titles[v]))), noLinks: find(vs => !vs.length), unlinked: find((vs, i) => !linked.has(i)),
+    known: POOL_TITLES.filter(t => t !== WEB_HEART && !HUB_TITLES.has(t)).reduce((a, b) => ARTICLES.get(b).body > ARTICLES.get(a).body ? b : a),
+  };
   setRules(['nonav', 'nohubs']);
-  const hard = (await joinsWeb('start'))('Bee Our Guest');
+  const hard = (await joinsWeb('start'))(examples.hubsOnly);
   setRules(['nonav']);
   const start = await joinsWeb('start'), goal = await joinsWeb('goal'), via = await joinsWeb('via0');
-  const ms = async () => { const t = performance.now(); (await joinsWeb('via0'))('Diamond'); return Math.round(performance.now() - t); };
+  const got = [hard, start(examples.hubsOnly), start(examples.noLinks), goal(examples.unlinked), goal(examples.known), via(examples.known), start('No such page')];
+  const from = distancesFrom(graph, WEB_HEART), to = distancesTo(graph, PAGE_IDS.get(WEB_HEART), routeUsable({ keep: [], rules: rules() }));
+  const web = POOL_TITLES.filter(t => from[PAGE_IDS.get(t)] >= 0 && to[PAGE_IDS.get(t)] >= 0).length / POOL_TITLES.length;
+  const ms = async () => { const t = performance.now(); (await joinsWeb('via0'))(examples.known); return Math.round(performance.now() - t); };
   const normal = await ms();
   setRules([]);
   const relaxed = await ms();
   setRules(['nonav']);
-  return JSON.stringify({ got: [hard, start('Bee Our Guest'), start('Dungeons:Story/Arch Haven'), goal('Dungeons:Mainland Decoration'),
-    goal('Diamond'), via('Diamond'), start('No such page')], normal, relaxed });
+  return JSON.stringify({ examples, got, web, normal, relaxed });
 })()`));
-check('a card needs a route to or from the heart of the wiki’s links', joins.got.join() === 'false,true,false,false,true,true,true',
+const missing = Object.keys(joins.examples).filter(k => !joins.examples[k]);
+check('the snapshot has a page of each kind the links check is tried on', !missing.length, missing.length ? `none found: ${missing.join(', ')}` : Object.values(joins.examples).join(', '));
+check('a card needs a route to or from the heart of the wiki’s links', !missing.length && joins.got.join() === 'false,true,false,false,true,true,true',
   `${joins.got.join()}; a checkpoint's check ${joins.normal} ms in Normal, ${joins.relaxed} ms in Relaxed`);
-// A page with no live link (Bee Our Guest on Hard, its links all hubs) gets a banner that stays until the next
-// navigation: go Back, or with no Back only give up. On Normal its links work.
+check(`the heart (${await ev('WEB_HEART')}) reaches, and is reached from, almost all of the pool`, joins.web >= 0.98, `${(joins.web * 100).toFixed(1)}% on Normal`);
+// A page with no live link (Hubs Only on Hard) gets a banner that stays until the next navigation: go Back, or with no
+// Back only give up. On Normal its links work.
 const stuck = `[game.stuck, ${toast}, document.querySelector('#toast').matches('.stay:not(.hidden)')].join('|')`;
 await open('#start=Diamond&target=Zombie&rules=nonav,nohubs');
 await until(ready);
 await play();
 check('a page with live links has no stuck banner', await ev(stuck) === 'false||false', await ev(stuck));
-await ev("navigate('Bee Our Guest', null)");
+await ev(`navigate('${HUBS_ONLY}', null)`);
 await until('game.path.length === 2 && !game.loading');
 check('a page with no live links says to go Back or give up, and the banner stays',
   await ev(stuck) === 'true|⛔ No live links on this page. Go Back, or give up.|true' && await ev("getComputedStyle(document.querySelector('#toast')).animationName === 'toast-in'"), await ev(stuck));
@@ -608,12 +649,12 @@ await ev('goBack()');
 await until('game.path.length === 3 && !game.loading');
 check('leaving it takes the banner away', await ev(stuck) === 'false|⛔ No live links on this page. Go Back, or give up.|false', await ev(stuck));
 await ev("finish(false); closeModal(); toSetup()");
-await open('#start=Bee%20Our%20Guest&target=Diamond&rules=nonav,nohubs');
+await open(`#start=${encodeURIComponent(HUBS_ONLY)}&target=Diamond&rules=nonav,nohubs`);
 await until(ready);
 await play();
 check('a start with no live links leaves only giving up', await ev(stuck) === 'true|⛔ No live links on this page, and no going Back: only giving up is left.|true', await ev(stuck));
 await ev("finish(false); closeModal(); toSetup()");
-await open('#start=Bee%20Our%20Guest&target=Diamond&rules=nonav');
+await open(`#start=${encodeURIComponent(HUBS_ONLY)}&target=Diamond&rules=nonav`);
 await until(ready);
 await play();
 check('on Normal its hub links work, so no banner', await ev(stuck) === 'false||false', await ev(stuck));

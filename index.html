@@ -320,6 +320,7 @@
   .result-game { display: flex; flex-wrap: wrap; gap: 4px 6px; align-items: center; }
   .result-game .note { margin: 0; }
   .tiles { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+  .tiles.untimed { grid-template-columns: repeat(2, minmax(0, 1fr)); }   /* clicks and par only */
   .tile { background: var(--bg); border-radius: var(--radius); padding: 8px 12px; }
   .tile .v { font-size: 24px; font-weight: 700; line-height: 1.15; }
   .tile .k { font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; }
@@ -424,6 +425,7 @@ const THEMES = [...new Set(['auto', 'light', 'dark', ...Array.from(document.quer
     <h1>MC Wiki Race</h1>
     <div class="head-opts">
       <label><input type="checkbox" id="soundToggle"> Sound</label>
+      <label title="A clock while you play, and your time in the result. Off records no time, for a relaxed game."><input type="checkbox" id="timerToggle"> Timer</label>
       <label>Theme <select id="themeSelect"></select></label>
     </div>
   </div>
@@ -540,7 +542,7 @@ const THEMES = [...new Set(['auto', 'light', 'dark', ...Array.from(document.quer
     </div>
     <div class="stat"><div class="v mono" id="hudClicks">0</div><div class="meter" id="hudMeter" aria-hidden="true"></div><div class="k" id="hudClicksK">Clicks</div></div>
     <div class="stat"><div class="v mono" id="hudPar">–</div><div class="k">Par</div></div>
-    <div class="stat"><div class="v mono" id="hudTime">0:00</div><div class="k">Time</div></div>
+    <div class="stat" id="hudTimeStat"><div class="v mono" id="hudTime">0:00</div><div class="k">Time</div></div>
     <div class="btns">
       <button id="btnSound" aria-label="Sound"></button>
       <button id="btnBack" title="Go back to the previous article (counts as a click)" aria-label="Back">←<span class="word"> Back</span></button>
@@ -668,7 +670,13 @@ const isRecord = r => typeof r === 'object' && r !== null && typeof r.start === 
   optional(r.topic, v => isKey(TOPICS, v)) && optional(r.reach, v => isKey(REACHES, v)) && optional(r.par, Number.isInteger) &&
   optional(r.content, v => Array.isArray(v) && v.every(k => CONTENT.has(k))) &&
   Array.isArray(r.rules) && r.rules.every(k => isKey(RULES, k)) && typeof r.won === 'boolean' &&
-  [r.clicks, r.ms, r.at].every(Number.isFinite);
+  optional(r.ms, Number.isFinite) &&   // none for a game played with the timer off
+  [r.clicks, r.at].every(Number.isFinite);
+// Whether won record a beats b: fewer clicks, then a faster time. A game with the timer off never wins on time.
+const beats = (a, b) => a.clicks < b.clicks || (a.clicks === b.clicks && (a.ms ?? Infinity) < (b.ms ?? Infinity));
+const clicksText = n => `${n} click${n === 1 ? '' : 's'}`;
+// A won record's clicks and, if timed, its time: "4 clicks in 1:23", or for the daily "4 clicks (1:23)".
+const wonText = (r, daily) => clicksText(r.clicks) + (r.ms === undefined ? '' : daily ? ` (${fmtTime(r.ms)})` : ' in ' + fmtTime(r.ms));
 const savedGames = () => { const h = store.get('mwr.history', []); return Array.isArray(h) ? h.filter(isRecord) : []; };
 
 // ---------------------------------------------------------------- API helpers
@@ -1304,7 +1312,7 @@ function renderDailyBox() {
   const date = today(), done = savedGames().find(r => r.daily === date && r.won);
   $('#dailyDate').textContent = shortDate(new Date());
   $('#dailyWhat').textContent = dailyText(date);
-  $('#dailyDone').textContent = done ? `· done in ${done.clicks} clicks (${fmtTime(done.ms)})` : '';
+  $('#dailyDone').textContent = done ? `· done in ${wonText(done, true)}` : '';
 }
 
 // A daily can always be done: its target, checkpoints and finds are only taken where the link graph has a route under
@@ -1364,7 +1372,7 @@ async function loadDaily(date = today()) {
     syncVia();
     keys.forEach(renderCard);
     const done = savedGames().find(r => r.daily === date && r.won);
-    setStatus(`Daily challenge for ${date}: ${dailyText(date)}.` + (done ? ` You did it in ${done.clicks} clicks (${fmtTime(done.ms)}).` : ' Press Start when ready.'));
+    setStatus(`Daily challenge for ${date}: ${dailyText(date)}.` + (done ? ` You did it in ${wonText(done, true)}.` : ' Press Start when ready.'));
   });
 }
 
@@ -1435,14 +1443,14 @@ function renderHistory() {
   const rows = savedGames(), best = new Map(), pair = r => recordKey(r) + '#' + r.rules.join();   // a personal best's key, as in finish
   for (const r of rows) {
     const b = best.get(pair(r));
-    if (r.won && (!b || r.clicks < b.clicks || (r.clicks === b.clicks && r.ms < b.ms))) best.set(pair(r), r);
+    if (r.won && (!b || beats(r, b))) best.set(pair(r), r);
   }
   $('#history').classList.toggle('hidden', rows.length === 0);
   $('#history tbody').innerHTML = rows.slice(0, 15).map(r => {
     const tags = [[GAMES[gameOf(r.rules)].label, 'game'], ...r.rules.filter(k => EXTRA_RULES.includes(k)).map(k => [RULES[k].label]),
       ...r.daily ? [[`Daily ${shortDate(new Date(r.daily + 'T00:00'))}`, 'daily']] : []];   // local midnight of that day
     const loss = lossOf(r), golf = r.won && !r.exact && r.par !== undefined ? golfScore(r.clicks, r.par) : null;
-    const result = r.won ? [`✓ ${r.clicks} click${r.clicks === 1 ? '' : 's'}`, 'won'] : loss ? [`✗ ${LOSSES[loss]}`, 'lost'] : ['Gave up', ''];
+    const result = r.won ? ['✓ ' + clicksText(r.clicks), 'won'] : loss ? [`✗ ${LOSSES[loss]}`, 'lost'] : ['Gave up', ''];
     // At par it's just "Par 2"; otherwise the golf name and what it means, then par.
     const detail = golf && golf.over === 0 && r.clicks > 1 ? `Par ${r.par}` : [golf && (golf.over ? `${golf.name} · ${golf.note}` : golf.name),
       r.exact && !r.won && `${r.clicks} of exactly ${r.exact}`, r.par !== undefined && `par ${r.par}`].filter(Boolean).join(' · ');
@@ -1451,7 +1459,7 @@ function renderHistory() {
       <td class="h-game"><span class="tags">${tags.map(([t, c]) => `<span class="tag${c ? ' ' + c : ''}">${esc(t)}</span>`).join('')}</span></td>
       <td class="h-route">${esc(routeText(r))}${settings ? `<div class="note">${esc(settings.replace(/, /g, ' · '))}</div>` : ''}</td>
       <td class="h-result"><span><span class="res ${result[1]}">${esc(result[0])}</span>${best.get(pair(r)) === r ? '<span class="best-tag">Best</span>' : ''}</span>${detail ? `<div class="note">${esc(detail)}</div>` : ''}</td>
-      <td class="h-time mono">${fmtTime(r.ms)}</td>
+      <td class="h-time mono">${r.ms === undefined ? '–' : fmtTime(r.ms)}</td>
       <td class="h-when">${esc(whenText(r.at))}</td>
     </tr>`;
   }).join('');
@@ -1477,6 +1485,7 @@ const game = {
                      // found, found (the title it was found on). game.goal is then null.
   path: [],          // every article visited, in order (includes back-navigation)
   stack: [],         // navigation stack for the Back button
+  timed: true,       // the Timer box at startGame: off hides the clock and records no time
   elapsed: 0,        // ms of reading time; time spent loading articles is not counted
   runningSince: 0,
   loading: false,
@@ -1618,13 +1627,14 @@ function startGame() {
   const vias = roundTrip && !hunt ? [...cps.slice(0, out), setup.goal, ...cps.slice(out)] : cps, goal = roundTrip ? setup.start : hunt ? null : setup.goal;
   const exact = r.includes('exact') ? setup.exact : null, limit = exact ? exact.length - 1 : r.includes('limit') ? CLICK_LIMIT : 0;
   Object.assign(game, { active: true, link: gameLink(), start: setup.start, goal, vias, viaNext: 0, roundTrip, turn: roundTrip && !hunt ? out + 1 : 0, hunt,
-    dead: new Set(), exact, limit, celebrate: false, stuck: false, daily: setup.daily, rules: r, content: contentInPlay(cards.map(c => c.title)), path: [],
+    dead: new Set(), exact, limit, celebrate: false, stuck: false, daily: setup.daily, rules: r, content: contentInPlay(cards.map(c => c.title)), timed: $('#timerToggle').checked, path: [],
     seen: new Map(), stack: [], elapsed: 0, runningSince: 0, loading: false, par: null });
   // Par shows in the header once it is known: at once when the setup screen has loaded the link graph.
   const parReady = game.parReady = cardsRoute(cards.map(c => c.title), r, kinds, back);
   parReady.then(route => { if (game.parReady === parReady) { game.par = route ? route.length - 1 : null; renderHud(); } }, () => {});
   $('#btnBack').classList.toggle('hidden', !canGoBack());
   $('#btnPeek').classList.toggle('hidden', game.rules.includes('blind'));
+  $('#hudTimeStat').classList.toggle('hidden', !game.timed);
   renderObjective();
   hideOverlay();
   hideToast();
@@ -1633,7 +1643,7 @@ function startGame() {
   $('#game').classList.remove('hidden');
   scrollRouteToNow();   // laid out only now
   clearInterval(game.timer);
-  game.timer = setInterval(() => { $('#hudTime').textContent = fmtTime(now()); }, 250);
+  if (game.timed) game.timer = setInterval(() => { $('#hudTime').textContent = fmtTime(now()); }, 250);
   addEventListener('beforeunload', guardLeaving);
   history.replaceState(null, '', location.pathname + location.search);
   navigate(game.start.title, null);
@@ -2408,10 +2418,10 @@ function finish(won, lost = null) {
     ...(game.daily && { daily: game.daily }),
     // The par the target was rolled at, unless a new start or difficulty has moved the game off it since.
     ...(target?.topic && { topic: target.topic }), ...(target?.reach && REACHES[target.reach].fits?.(game.par) !== false && { reach: target.reach }),
-    ...(game.content.length && { content: game.content }), ...(game.par !== null && { par: game.par }), ...(game.exact && { exact: game.limit }), rules: game.rules, won, ...(lost && { [lost]: true }), clicks: clicks(), ms, at: Date.now(), path: game.path.map(p => p.title) };
+    ...(game.content.length && { content: game.content }), ...(game.par !== null && { par: game.par }), ...(game.exact && { exact: game.limit }), rules: game.rules, won, ...(lost && { [lost]: true }), clicks: clicks(), ...(game.timed && { ms }), at: Date.now(), path: game.path.map(p => p.title) };
   const hist = savedGames();
   const best = hist.filter(r => r.won && recordKey(r) === recordKey(rec) && sameRules(r, rec))
-    .sort((a, b) => a.clicks - b.clicks || a.ms - b.ms)[0];
+    .reduce((b, r) => !b || beats(r, b) ? r : b, null);
   hist.unshift(rec);
   store.set('mwr.history', hist.slice(0, 50));
 
@@ -2421,9 +2431,9 @@ function finish(won, lost = null) {
   const pathHtml = game.path.map((p, i) => `<li><a href="${esc(wikiUrl(p.title))}" target="_blank" rel="noopener">${esc(p.title)}</a>` +
     [p.back && 'back', p.via && viaName(p.via).toLowerCase(), p.found && p.found.join(', '), i === last && (won || lost === 'tooSoon') && game.goal && goalWord,
       p.hint && HINTS[p.hint].icon].filter(Boolean).map(w => ` <span class="note">${esc(w)}</span>`).join('') + '</li>').join('');
-  const newBest = won && best && (rec.clicks < best.clicks || (rec.clicks === best.clicks && rec.ms < best.ms));
+  const newBest = won && best && beats(rec, best);
   const bestNote = !won || !best ? '' : newBest ? '<p class="best new">New personal best for this pair!</p>'
-    : `<p class="best note">Your best for this pair: ${best.clicks} clicks in ${fmtTime(best.ms)}.</p>`;
+    : `<p class="best note">Your best for this pair: ${wonText(best)}.</p>`;
   // The heading: the outcome, with a loss's reason under it. Exact clicks's column holds a route of its count.
   const title = won ? (game.hunt && !game.roundTrip ? '🎉 You found them all!' : '🎉 You made it!') : LOSSES[lost] ?? 'Game over';
   const reason = lost === 'tooSoon' ? `You reached ${target.title} on click ${rec.clicks}, but it had to be exactly ${game.limit}.`
@@ -2435,15 +2445,15 @@ function finish(won, lost = null) {
     ${reason ? `<p class="reason">${esc(reason)}</p>` : ''}
     <div class="result-game">${tags.map((t, i) => `<span class="tag${i ? '' : ' game'}">${esc(t)}</span>`).join('')}
       <p class="note">${rec.daily ? `Daily ${rec.daily}: ` : ''}${esc(route)}${otherSettings ? ' · ' + esc(otherSettings) : ''}</p></div>
-    <div class="tiles">
+    <div class="tiles${game.timed ? '' : ' untimed'}">
       <div class="tile"><div class="v mono">${won ? rec.clicks : game.exact ? `${rec.clicks} of ${game.limit}` : '—'}</div><div class="k">Clicks</div></div>
       <div class="tile"><div class="v mono" id="mPar">${rec.par ?? '…'}</div><div class="k">Par</div></div>
-      <div class="tile"><div class="v mono">${fmtTime(ms)}</div><div class="k">Time</div></div>
-      <div class="tile"><div class="v mono">${rec.clicks ? fmtTime(ms / rec.clicks) : '–'}</div><div class="k">Per click</div></div>
+      ${game.timed ? `<div class="tile"><div class="v mono">${fmtTime(ms)}</div><div class="k">Time</div></div>
+      <div class="tile"><div class="v mono">${rec.clicks ? fmtTime(ms / rec.clicks) : '–'}</div><div class="k">Per click</div></div>` : ''}
     </div>
     ${bestNote}
     <div class="routes">
-      <div><h3>Your path · ${rec.clicks} click${rec.clicks === 1 ? '' : 's'}</h3><ol>${pathHtml}</ol></div>
+      <div><h3>Your path · ${clicksText(rec.clicks)}</h3><ol>${pathHtml}</ol></div>
       <div><h3 id="mBestTitle">${game.exact ? `One way in exactly ${game.limit}` : 'Shortest route'}</h3>
         <ol id="mBest">${game.exact ? game.exact.map(t => `<li>${esc(t)}</li>`).join('') : ''}</ol>
         <p class="note" id="par">Working out par…</p></div>
@@ -2471,8 +2481,9 @@ function finish(won, lost = null) {
 // out, since it names the stops the link holds unseen.
 function shareText(rec, link) {
   const { tags, otherSettings } = resultLabels(rec);
-  const result = rec.won ? `${rec.clicks} click${rec.clicks === 1 ? '' : 's'} in ${fmtTime(rec.ms)}`
-    : `${LOSSES[lossOf(rec)] ?? 'Gave up'} after ${rec.exact ? `${rec.clicks} of ${rec.exact} clicks, ` : ''}${fmtTime(rec.ms)}`;
+  // A loss says how far it got: Exact clicks's count, the time, or with neither the clicks.
+  const time = rec.ms !== undefined && fmtTime(rec.ms), count = rec.exact ? `${rec.clicks} of ${rec.exact} clicks` : !time && clicksText(rec.clicks);
+  const result = rec.won ? wonText(rec) : `${LOSSES[lossOf(rec)] ?? 'Gave up'} after ${[count, time].filter(Boolean).join(', ')}`;
   const par = rec.par === undefined ? '' : ` · par ${rec.par}${rec.won && !rec.exact ? ': ' + golfText(golfScore(rec.clicks, rec.par)) : ''}`;
   return [`MC Wiki Race${rec.daily ? ` · Daily ${rec.daily}` : ''}`,
     [...tags, otherSettings].filter(Boolean).join(' · '),
@@ -2601,6 +2612,9 @@ function setSound(on) {
   $('#btnSound').setAttribute('aria-pressed', String(on));
 }
 setSound(soundOn);
+// The Timer box is read once, at startGame (game.timed), so a game is timed or not throughout.
+$('#timerToggle').checked = store.get('mwr.timer', true) !== false;
+$('#timerToggle').onchange = e => store.set('mwr.timer', e.target.checked);
 $('#soundToggle').onchange = e => { setSound(e.target.checked); play('click', 0); };
 $('#btnSound').onclick = () => { setSound(!soundOn); play('click', 0); };
 $('#themeSelect').innerHTML = THEMES.map(t => `<option value="${esc(t)}">${esc(THEME_LABELS[t] || t)}</option>`).join('');
@@ -2652,7 +2666,7 @@ $('#hudRoute').addEventListener('click', e => { if (e.target.closest('.chip.done
 $('#btnGiveUp').onclick = () => {
   if (!game.active) return;
   pauseClock();
-  openModal(`<h2>Give up?</h2><p>Your time is paused.</p>
+  openModal(`<h2>Give up?</h2>${game.timed ? '<p>Your time is paused.</p>' : ''}
     <div class="actions"><button id="gKeep">Keep going</button><button class="primary" id="gQuit">Give up</button></div>`);
   $('#gKeep').onclick = closeModal;
   $('#gQuit').onclick = () => { $('#modalBg').classList.add('hidden'); finish(false); };
@@ -2668,7 +2682,7 @@ $('#btnPeek').onclick = () => {
   if (hunting()) {
     openModal(`<h2>Find</h2><ul>${huntLeft().map(h => `<li><b>${esc(h.label)}</b>: ${esc(h.info ? h.info.desc || 'No description available.'
       : 'e.g. ' + kindExamples(h.kind).join(', '))}</li>`).join('')}</ul>
-      <p class="note">The clock keeps running while you peek.</p>
+      ${game.timed ? '<p class="note">The clock keeps running while you peek.</p>' : ''}
       <div class="actions"><button class="primary" id="pClose">Back to the hunt</button></div>`);
     $('#pClose').onclick = closeModal;
     return;
@@ -2676,7 +2690,7 @@ $('#btnPeek').onclick = () => {
   const g = objective();
   openModal(`<h2>${objectiveLabel()}: ${esc(g.title)}</h2>
     <div class="peek"><img alt="" class="hidden"><p>${esc(g.desc || 'No description available.')}</p></div>
-    <p class="note">The clock keeps running while you peek.</p>
+    ${game.timed ? '<p class="note">The clock keeps running while you peek.</p>' : ''}
     <div class="actions"><button class="primary" id="pClose">Back to the hunt</button></div>`);
   setImg($('.peek img'), g.img);
   $('#pClose').onclick = closeModal;

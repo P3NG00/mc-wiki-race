@@ -147,6 +147,19 @@ check('the record keeps par, and the history shows it', await ev("Number.isInteg
 check('golf names a win against par, saying what each means', await ev("[[1, 1], [2, 2], [3, 2], [4, 2], [5, 2], [9, 2], [1, 2], [1, 3]].map(([c, p]) => golfText(golfScore(c, p))).join('|')")
   === 'Hole in one! (par 1 in one click)|Par (even with par)|Bogey (1 over par)|Double bogey (2 over par)|Triple bogey (3 over par)|7 over par|Birdie (1 under par)|Eagle (2 under par)');
 await ev('closeModal(); toSetup()');
+// The Timer box, on by default: off, the header has no clock, the result and Share say nothing of time, the record has
+// none and the history shows a dash. A game without a time beats another only on clicks.
+check('the Timer box is on by default', await ev("$('#timerToggle').checked && store.get('mwr.timer', true) === true"));
+await ev("$('#timerToggle').click()");
+await play();
+check('with the Timer off the header has no clock', await ev("!game.timed && store.get('mwr.timer') === false && !$('#hudTimeStat').checkVisibility()"));
+await ev('finish(false)');
+check('and the result, Share and the record have no time', await ev(`(r => r.ms === undefined && isRecord(r) && $('.tiles.untimed').children.length === 2
+  && shareText(r, game.link).includes('\\n❌ Gave up after 0 clicks · par '))(savedGames()[0])`), await ev(shared));
+check('the history shows a dash for its time', await ev("closeModal(), toSetup(), $('#history tbody tr .h-time').textContent === '–'"));
+check('a game without a time beats another only on clicks', await ev(`(t => beats({ clicks: 2 }, { ...t, clicks: 3 }) && !beats({ clicks: 2 }, t)
+  && beats(t, { clicks: 2 }) && !beats({ clicks: 2 }, { clicks: 2 }))({ clicks: 2, ms: 9e9 })`));
+await ev("$('#timerToggle').click()");
 check('difficulty from a link\'s rules, and its words', await ev(`(() => {
   const got = [[], ['nonav'], ['nonav', 'nohubs'], ['noback', 'nonav']].map(r => (setRules(r), level() + ':' + rulesText(rules()))).join(' ');
   setRules([]);

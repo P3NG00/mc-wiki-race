@@ -14,7 +14,7 @@ The setup screen puts playing first. Top to bottom:
 
 - **📅 Daily challenge** shows today's game. **Play the daily** loads today's pair, which is the same for everyone on the same date. It always plays on Normal with one extra rule of the day (No Back, Blind target, a relay, Six clicks, a round trip, Exact clicks, a scavenger hunt, or Hard instead), it can always be done (on a Six clicks day in 4 clicks or fewer), and the result says it was the daily. `index.html#daily` opens it directly.
 - **Your game** says what's set.
-- **The cards:** **Reroll** any of them, or type your own article. **Par** is the fewest clicks the game can be done in, with the same difficulty, checkpoints and spin-offs. With the Distance rule on it shows beside Start and in the game's header; either way the result scores your win against it as golf does, with what each name means (Par, even with par; Bogey, 1 over par; Birdie, 1 under…), and shows your path beside one route that takes that many, with how many clicks each page was from the target and how many of your clicks got no closer, so you can see where you lost ground. Share's path has the same counts. It goes by the wiki's offline copy, so the result names that copy's date.
+- **The cards:** **Reroll** any of them, or type your own article. **Par** is the fewest clicks the game can be done in, with the same difficulty, checkpoints and spin-offs. It shows beside Start and in the game's header, and the result scores your win against it as golf does, with what each name means (Par, even with par; Bogey, 1 over par; Birdie, 1 under…), and shows your path beside one route that takes that many, with how many clicks each page was from the target and how many of your clicks got no closer, so you can see where you lost ground. Share's path has the same counts. It goes by the wiki's offline copy, so the result names that copy's date.
 
 Under the cards are the steps for changing the game:
 
@@ -27,7 +27,7 @@ Under the cards are the steps for changing the game:
 - **2 · Extra rules**, in any mix:
   - **No Back:** the Back button is gone, so every click is final.
   - **Blind target:** the target isn't even picked until you press Start (Copy challenge link picks it unseen, and the daily keeps it hidden), so the setup screen shows no target, par or Exact clicks count, and there's no Swap. Once the game starts you only get its name, with no picture or description. In a relay each checkpoint, and the target, only shows once you reach the stop before it, so you don't know where it ends; a scavenger hunt's kinds or articles all show when you start.
-  - **Distance:** shows par, and always how many clicks the target is from your page, by the shortest route.
+  - **Distance:** always shows how many clicks the target is from your page, by the shortest route.
   - **Six clicks:** reach the target in 6 clicks or fewer, Back included, or the game is over. Not with Exact clicks, which has its own count.
 - **3 · Articles and difficulty** is one line saying what's set. **Change** opens it:
   - **Articles** decide which come up. The start and target are always from different topics (blocks, items, mobs, biomes & structures, enchantments & effects), since two things from the same topic are usually one click apart. **Popular** is the best-known game content, the 30% most linked across the wiki; **Everyday** all of it, each topic equally likely; **Deep cuts** the least-known third of each topic; **Chaos** any article on the wiki.

@@ -134,15 +134,12 @@ check('Relaxed: hubs and navboxes live, other namespaces, version and list pages
   && links.Pocket_Edition_version_history === 'dead' && links.Closed_captions === 'dead' && await ev(leftOut, await frameCtx()), JSON.stringify(links));
 await open('#start=Diamond&target=Crafting&rules=nohubs');
 check('No hubs alone is Hard', await ev("level() === 'hard' && rules().join() === 'nohubs,nonav'"));
-// Golf: par is worked out beside Start once the link graph has loaded, but only shows with Distance on, as in the header
-// while playing.
-const setupParShown = "!document.querySelector('#setupPar').classList.contains('hidden')";
-check('the setup screen works out par but hides it without Distance', await until("/^Par \\d+$/.test(document.querySelector('#setupPar').textContent)") && !await ev(setupParShown),
+// Golf: par shows beside Start once the link graph has loaded, and in the header while playing.
+check('the setup screen shows par', await until("/^Par \\d+$/.test(document.querySelector('#setupPar').textContent)"),
   await ev("document.querySelector('#setupPar').textContent"));
-await ev("document.querySelector('input.rule[value=distance]').click()");
-check('and shows it with Distance', await until(setupParShown));
+await ev("document.querySelector('input.rule[value=distance]').click()");   // for Share's labels below
 await play();
-check('the header shows par with Distance', await until("/^\\d+$/.test(document.querySelector('#hudPar').textContent)") && await ev("!document.querySelector('#hudParStat').classList.contains('hidden')"),
+check('the header shows par', await until("/^\\d+$/.test(document.querySelector('#hudPar').textContent)") && await ev("!document.querySelector('#hudParStat').classList.contains('hidden')"),
   await ev("document.querySelector('#hudPar').textContent"));
 links = await linkStates();
 check('Hard: hubs, redirects to them, navboxes and left-out pages dead; the target hub and other links live',
@@ -237,8 +234,8 @@ await ev("finish(false); closeModal(); toSetup()");
 await open('#start=Diamond&target=Crafting');
 await play();
 await ev("navigate('Diamond Pickaxe', null)");
-check('without the rule every arrival is still measured, but not shown in play, nor par', await until("game.path.length === 2 && !game.loading && game.path.every(p => Number.isInteger(p.togo))") &&
-  await ev(`${hudHint}.classList.contains('hidden') && !document.querySelector('#pathList .note') && document.querySelector('#hudParStat').classList.contains('hidden')`));
+check('without the rule every arrival is still measured, but not shown in play, while par still is', await until("game.path.length === 2 && !game.loading && game.path.every(p => Number.isInteger(p.togo))") &&
+  await ev(`${hudHint}.classList.contains('hidden') && !document.querySelector('#pathList .note') && !document.querySelector('#hudParStat').classList.contains('hidden')`));
 await ev('finish(false)');
 check('and the result shows them', await until("document.querySelectorAll('#mPath .togo').length === 2"));
 await ev("closeModal(); toSetup()");
@@ -515,7 +512,7 @@ check('the history marks the win as the pair\'s best, played today', await ev(`(
 // is a game of its own for personal bests. Random rolls one of par + 1 to 5 with every roll of the cards.
 await open('#start=Diamond&target=Zombie&rules=exact&extra=4');
 check('a link\'s extra=4 makes the count par + 4, and the challenge link carries it', await until(ready) && await ev(`document.querySelector('#exactExtra').value === '4'
-  && setup.exact.length - 1 === ${exact.par + 4} && new Set(setup.exact).size === setup.exact.length && document.querySelector('#exactInfo').textContent === 'This pair: exactly ${exact.par + 4} clicks.'
+  && setup.exact.length - 1 === ${exact.par + 4} && new Set(setup.exact).size === setup.exact.length && document.querySelector('#exactInfo').textContent === 'This pair: par ${exact.par} + 4, so exactly ${exact.par + 4} clicks.'
   && document.querySelector('#gameSum').textContent.startsWith('Exact clicks (par + 4)') && openLink(new URL(challengeLink()).hash.slice(3)).includes('&extra=4&')`),
   await ev("setup.exact?.join(' → ')"));
 check('par + 4 and par + 2 are two games for personal bests', await ev(`(r => recordKey({ ...r, exact: ${exact.par + 4} }) !== recordKey({ ...r, exact: ${n} }))({ start: 'Diamond', goal: 'Zombie', rules: ['exact'] })`));

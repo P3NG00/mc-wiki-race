@@ -849,7 +849,7 @@ const RULES = {
   nohubs: { label: 'No hubs' },
   nonav: { label: 'No navboxes' },
   blind: { label: 'Blind target', help: 'The target is hidden until you start, then you only get its name. A Relay shows each stop once you reach the one before.' },
-  distance: { label: 'Distance', help: 'Shows par, and always how many clicks the target is from your page, by the shortest route.' },
+  distance: { label: 'Distance', help: 'Always shows how many clicks the target is from your page, by the shortest route.' },
   checkpoint: { label: 'Relay' },
   roundtrip: { label: 'Round trip', help: 'Then go back to the start, never through a page of the way there.' },
   scavenger: { label: 'Scavenger hunt' },
@@ -1004,9 +1004,8 @@ function firstKinds(order, start) {
 }
 const rollKinds = () => firstKinds(shuffled(Object.keys(KINDS)), setup.start?.title);
 
-// Par for the pair on the cards, under the difficulty, checkpoint and Content in play, beside Start, shown only with
-// Distance on: par says how far the target is, as Distance does. The first card rendered loads the link graph, so it is
-// ready by the time a game starts. setupParToken drops answers to older pairs.
+// Par for the pair on the cards, under the difficulty, checkpoint and Content in play, beside Start. The first card
+// rendered loads the link graph, so it is ready by the time a game starts. setupParToken drops answers to older pairs.
 let setupParToken = 0;
 // With Exact clicks it also finds a route of exactly par + setup.extra (setup.exact), which Start waits for.
 // setup.parRun is the latest run, which pickHidden waits for.
@@ -1014,7 +1013,7 @@ function updateSetupPar() { return setup.parRun = setupPar(); }
 async function setupPar() {
   const token = ++setupParToken, titles = cardKeys().map(w => setup[w]?.title), r = rules(), kinds = huntMode() === 'kinds' ? setup.kinds : null;
   // Under Blind target par and the count would say something about the hidden cards, so they wait for the game.
-  const blind = r.includes('blind'), shown = r.includes('distance');
+  const blind = r.includes('blind');
   setup.exact = null;
   $('#exactInfo').textContent = blind ? 'Blind target: the count shows when you start.' : 'Working out the count…';
   let text = '';
@@ -1026,13 +1025,12 @@ async function setupPar() {
       if (token !== setupParToken) return;
       setup.exact = exact;
       text = !route ? 'No par to count exact clicks from' : exact ? `${text} · exactly ${n}` : `${text} · no way in exactly ${n}`;
-      if (!blind) $('#exactInfo').textContent = !route ? 'This pair has no par to count from.' : exact ? `This pair: ${shown ? `par ${n - extra} + ${extra}, so ` : ''}exactly ${n} clicks.`
+      if (!blind) $('#exactInfo').textContent = !route ? 'This pair has no par to count from.' : exact ? `This pair: par ${n - extra} + ${extra}, so exactly ${n} clicks.`
         : `This pair can’t be done in exactly ${n} clicks.`;
     }
   }
   if (token === setupParToken) {
     $('#setupPar').textContent = blind ? 'Par shows when you start' : text;
-    $('#setupPar').classList.toggle('hidden', !shown);
     updatePlay();
   }
 }
@@ -1734,7 +1732,6 @@ function startGame() {
   $('#btnBack').classList.toggle('hidden', !canGoBack());
   $('#btnPeek').classList.toggle('hidden', game.rules.includes('blind'));
   $('#hudTimeStat').classList.toggle('hidden', !game.timed);
-  $('#hudParStat').classList.toggle('hidden', !game.rules.includes('distance'));   // see setupPar
   renderObjective();
   hideOverlay();
   hideToast();

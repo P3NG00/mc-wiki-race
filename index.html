@@ -612,12 +612,23 @@ const TOPICS = {
 // targets or the farthest: par 3 is 4% of targets in Normal and 17% in Hard, where six pairs are par 4, and in Relaxed
 // only a quarter of starts have one, and very few a mob (measured on the 2026-08 snapshot). So a start rolled with the
 // target is checked for one before its lookup (in each topic it may come from, in turn), by a search that tells par 1, 2
-// and further apart (see reroll), and the target may come from any topic but the start's unless one is chosen.
+// and further apart (see reroll), and the target may come from any topic but the start's unless one is chosen. A start
+// typed in with none gets a target at the par nearest to near instead.
 const REACHES = {
   any: { label: 'Any par' },
-  short: { label: 'Par 1', fits: p => p === 1 },
-  long: { label: 'Par 3+', fits: p => p >= 3 },
+  short: { label: 'Par 1', fits: p => p === 1, near: 1 },
+  long: { label: 'Par 3+', fits: p => p >= 3, near: 3 },
 };
+// The target pars a roll has found no pair at, by the settings that decide it, so their options are off while those
+// settings stay (syncReach, when the select is focused, so it is never stale when picked from).
+const noPair = new Set();
+const pairKey = r => [mode(), rules().join(), content().join(), $('#topic').value, r].join('|');
+function syncReach() {
+  for (const o of $('#reach').options) {
+    o.disabled = noPair.has(pairKey(o.value));
+    o.title = o.disabled ? `No start has a target at ${o.text.toLowerCase()} with these articles, topic and difficulty.` : '';
+  }
+}
 const PAR_DRAWS = 400;     // titles to draw for one a roll accepts, before taking it that there is none
 const CLICK_LIMIT = 6;     // Six clicks rule: the game is lost once this many clicks haven't reached the target
 const EXACT_EXTRA = 2;     // Exact clicks rule: the target has to be reached in exactly par + this many clicks
@@ -805,9 +816,10 @@ const MODE_HELP = {
 };
 function updateModeHelp() { $('#modeHelp').textContent = MODE_HELP[mode()]; }
 // The folded settings in one line: the pool, the difficulty, the target's topic and par, and any Content that is on.
+const poolLabel = () => $('input[name=mode]:checked').parentElement.textContent.trim();
 function updateSettingsSum() {
   const topic = $('#topic').value, par = $('#reach').value, hunt = huntMode(), extra = content();
-  const articles = $('input[name=mode]:checked').parentElement.textContent.trim() + ' articles';
+  const articles = poolLabel() + ' articles';
   $('#settingsSum').textContent = [articles, LEVELS[level()].label,
     hunt !== 'kinds' && (topic === 'any' ? 'any topic' : TOPICS[topic].label), !hunt && (par === 'any' ? 'any par' : REACHES[par].label),
     extra.length && 'with ' + extra.map(contentLabel).join(', ')].filter(Boolean).join(' · ');
@@ -1188,14 +1200,57 @@ async function reroll(which, atStart = false) {
   const current = w => tokens[w] === setup.rolls[w];
   const left = leaveDaily();
   if (!targets.length) { setStatus(left ? LEFT_DAILY : ''); return; }
-  const plan = planGroups(targets);
+  let plan = planGroups(targets);
   setStatus('Picking…');
   await withBusy(async () => {
     for (const w of targets) { setup[w] = null; renderCard(w); }
-    // allSettled, so one card failing doesn't end the busy state while the other is still rolling. With a target par,
-    // the start and target roll after the rest: a start only if some target is at that par from it, then a target that is
-    // (under Blind target not until Start).
-    const par = (targets.includes('goal') || hidden.includes('goal') && targets.includes('start')) && reach() !== 'any' && REACHES[reach()].fits;
+    // With a target par the start rolls first, only if some target is at that par from it, then the other cards in the
+    // topics it leaves, then a target at the par from it (under Blind target not until Start). notice: what the roll
+    // couldn't keep to, and why.
+    let par = (targets.includes('goal') || hidden.includes('goal') && targets.includes('start')) && reach() !== 'any'
+      && REACHES[reach()].fits, notice = '';
+    const graph = par && await linkGraph(!rules().includes('nonav')), topic = POOL.has($('#topic').value) ? $('#topic').value : null;
+    const aims = par && candidates(topic, true), what = par && REACHES[reach()].label.toLowerCase();
+    // Whether t may be start s's target: not from its topic (Chaos aside) unless that is the chosen one.
+    const apart = (s, t) => topic || mode() === 'chaos' || groupOf(t) !== groupOf(s);
+    if (par && targets.includes('start')) {
+      // Every topic no other card holds, in random order, since a whole topic can lack a start with a target at the par
+      // (in Popular on Relaxed only Enchantments & effects starts have one at par 3+). Checkpoints kept from before
+      // hold theirs; those rolled now go round the start's.
+      const taken = viaKeys().filter(w => !targets.includes(w)).map(w => groupOf(setup[w]?.title));
+      const groups = mode() === 'chaos' ? [null] : shuffled([...rollGroups(mode(), false).keys()].filter(g => g !== topic && !taken.includes(g)));
+      // Whether a start has a target at the par, telling only par 1, 2 and further apart: further is any page the web of
+      // links reaches, since the start has to join it too (rollOne checks that next). Searching only two clicks deep is
+      // five times quicker than the whole graph, which matters when a whole topic has no start that fits.
+      const web = distancesFrom(graph, WEB_HEART), near = new Map();
+      const fitsSome = s => {
+        const d = near.get(s) ?? near.set(s, distancesFrom(graph, s, 2)).get(s);
+        return aims.some(t => { const v = PAGE_IDS.get(t); return apart(s, t) && par(d[v] >= 0 ? d[v] : web[v] >= 0 ? 3 : -1); });
+      };
+      let start = null;
+      for (const g of groups) {
+        // Drawn at random, then from the rest of the topic, which the draws can miss when few fit (Chaos, the whole
+        // wiki, only by draws).
+        start = await rollOne('start', g, fitsSome)
+          ?? (g === null ? null : await rollOne('start', g, undefined, candidates(g, false).filter(s => !near.has(s) && fitsSome(s))));
+        if (start || !current('start')) break;
+      }
+      if (!current('start')) return;
+      if (start) {
+        setup.start = start;
+        renderCard('start');
+        plan = planGroups(targets.filter(w => w !== 'start'));
+      } else {
+        // No start has a target at the par with these settings, so the game rolls with any par and says why. Unless a
+        // kept checkpoint held a topic, or Chaos only drew, that is certain, so the option is off until they change.
+        if (!taken.length && mode() !== 'chaos') noPair.add(pairKey(reach()));
+        notice = `No ${poolLabel()} start has a ${topic ? TOPICS[topic].label + ' ' : ''}target at ${what} on ${LEVELS[level()].label}, so Target par is back to Any par.`;
+        $('#reach').value = 'any';
+        par = false;
+        updateSettingsSum();
+      }
+    }
+    // allSettled, so one card failing doesn't end the busy state while the other is still rolling.
     let unjoined = false;
     const results = await Promise.allSettled(targets.filter(w => !par || (w !== 'start' && w !== 'goal')).map(async w => {
       const info = await rollOne(w, plan[w]);
@@ -1203,52 +1258,25 @@ async function reroll(which, atStart = false) {
     }));
     const failed = results.find(r => r.status === 'rejected');
     if (failed) throw failed.reason;
-    if (par) {
-      const graph = await linkGraph(!rules().includes('nonav'));
-      const topic = POOL.has($('#topic').value) ? $('#topic').value : null, aims = candidates(topic, true);
-      // Whether t, p clicks from start s, may be its target: at the par, and not from its topic (Chaos aside) unless that
-      // is the chosen one.
-      const fits = (s, t, p) => par(p) && (topic || mode() === 'chaos' || groupOf(t) !== groupOf(s));
-      const what = REACHES[reach()].label.toLowerCase();
-      if (targets.includes('start')) {
-        // The planned group first, then the others no other card holds, in random order: a whole topic can lack a start
-        // with a target at the par (in Popular on Relaxed only Enchantments & effects starts have one at par 3+), and
-        // giving up on it would fail most rolls there.
-        const taken = [...viaKeys().map(w => groupOf(setup[w]?.title)), topic], groups = plan.start === null ? [null]
-          : [plan.start, ...shuffled([...rollGroups(mode(), false).keys()].filter(g => g !== plan.start && !taken.includes(g)))];
-        // Whether a start has a target at the par, telling only par 1, 2 and further apart: further is any page the web of
-        // links reaches, since the start has to join it too (rollOne checks that next). Searching only two clicks deep is
-        // five times quicker than the whole graph, which matters when a whole topic has no start that fits.
-        const web = distancesFrom(graph, WEB_HEART), near = new Map();
-        const fitsSome = s => {
-          const d = near.get(s) ?? near.set(s, distancesFrom(graph, s, 2)).get(s);
-          return aims.some(t => { const v = PAGE_IDS.get(t); return fits(s, t, d[v] >= 0 ? d[v] : web[v] >= 0 ? 3 : -1); });
-        };
-        let start = null;
-        for (const g of groups) {
-          // Drawn at random, then from the rest of the topic, which the draws can miss when few fit (Chaos, the whole
-          // wiki, only by draws).
-          start = await rollOne('start', g, fitsSome)
-            ?? (g === null ? null : await rollOne('start', g, undefined, candidates(g, false).filter(s => !near.has(s) && fitsSome(s))));
-          if (start || !current('start')) break;
-        }
-        if (!current('start')) return;
-        setup.start = start;
-        renderCard('start');
-        if (!start) { setStatus(`No start found with a target at ${what} for this pool, topic and difficulty.`, true); return; }
+    if (par && targets.includes('goal')) {
+      if (!setup.start || !current('goal')) return;
+      // Drawn by the start's whole search, since a start typed in hasn't been checked to join the web of links. One with
+      // no target at the par (typed in, or kept through another difficulty or Content) gets one at the nearest par it has.
+      const s = setup.start.title, dist = distancesFrom(graph, s), parOf = t => dist[PAGE_IDS.get(t)] ?? -1;
+      const reached = aims.filter(t => apart(s, t) && parOf(t) > 0);
+      let titles = reached.filter(t => par(parOf(t)));
+      if (!titles.length && reached.length) {
+        const off = t => Math.abs(parOf(t) - REACHES[reach()].near), least = Math.min(...reached.map(off));
+        titles = reached.filter(t => off(t) === least);
+        notice = `${s} has no target at ${what}, so this one is par ${parOf(titles[0])}.`;
       }
-      if (targets.includes('goal')) {
-        if (!setup.start || !current('goal')) return;
-        // Drawn by the start's whole search, since a start typed in hasn't been checked to join the web of links.
-        const s = setup.start.title, dist = distancesFrom(graph, s);
-        setup.goal = await rollOne('goal', topic, undefined, aims.filter(t => fits(s, t, dist[PAGE_IDS.get(t)] ?? -1)));
-        renderCard('goal');
-        if (!setup.goal) { setStatus(`No target at ${what} from ${setup.start.title}. Reroll the start, or all.`, true); return; }
-      }
+      setup.goal = await rollOne('goal', topic, undefined, titles);
+      renderCard('goal');
+      if (!setup.goal) { setStatus(`No target can be reached from ${s}. Reroll the start, or type another.`, true); return; }
     }
     if (which === 'all' && huntMode() === 'kinds' && !isBlind()) setKinds(rollKinds());   // after the start, which they mustn't hold
     if (unjoined) setStatus('No article came up with a way in and out on this difficulty. Reroll, or change the difficulty or Content.', true);
-    else if (targets.every(current)) setStatus(left ? LEFT_DAILY : '');
+    else if (targets.every(current)) setStatus([notice, left && LEFT_DAILY].filter(Boolean).join(' '));
   });
 }
 
@@ -1282,7 +1310,7 @@ async function setCustom(which, raw) {
     if (!info) { setStatus('No article named “' + text + '” on minecraft.wiki.', true); return; }
     if (isBlind()) dropHidden();   // a new start, so a game fixed beforehand isn't any more
     setup.rolls[which]++;
-    setup[which] = info;
+    setup[which] = Object.assign(info, { typed: true });   // kept when a target par is picked (see the #target listener)
     const left = leaveDaily();
     renderCard(which);
     setStatus([info.disambig && 'Heads up: “' + info.title + '” is a disambiguation page.', left && LEFT_DAILY].filter(Boolean).join(' '));
@@ -2575,10 +2603,12 @@ $('#target').innerHTML = '<span class="lbl">Target</span>' +
   ${Object.entries(REACHES).map(([k, r]) => `<option value="${k}">${esc(r.label)}</option>`).join('')}</select>`;
 // The target's par, beside its topic, unless Scavenger is on (it has no target to roll).
 const reach = () => huntMode() ? 'any' : $('#reach').value;
-// A new topic or par rerolls the target, and in the pool modes the start too if it is from that topic.
-// Under Blind target with a par, the start too, since it is only taken if a target is at that par from it.
+// A new topic or par rerolls the target, and in the pool modes the start too if it is from that topic. With a par, the
+// start too, since it is only taken if a target is at that par from it, unless it was typed in: that one is kept, and
+// gets a target at the nearest par it has if it has none at this one.
 $('#target').addEventListener('change', () => reroll(mode() !== 'chaos' && groupOf(setup.start?.title) === $('#topic').value
-  || isBlind() && reach() !== 'any' ? 'all' : 'goal'));
+  || reach() !== 'any' && !setup.start?.typed ? 'all' : 'goal'));
+$('#reach').addEventListener('focus', syncReach);
 $('#content').innerHTML = '<span class="lbl">Content</span>' + WIKI_DATA.families.map(k =>
   `<label title="${esc(FAMILIES[k].help)}"><input type="checkbox" value="${k}"> ${esc(FAMILIES[k].label)}</label>`).join('');
 $('#spinoffs').innerHTML = '<span class="lbl">Spin-offs</span><label title="Every spin-off"><input type="checkbox" id="spinAll"> All</label>' +

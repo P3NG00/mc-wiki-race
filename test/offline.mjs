@@ -607,34 +607,61 @@ for (const [level, value, ok] of [['normal', 'long', p => p >= 3], ['normal', 's
 }
 // A topic with no start at the par gives way to another: in Popular on Relaxed only Enchantments & effects starts have a
 // target at par 3+, so stopping at the planned topic gave up on four rolls in five.
-const pool = await ev("mode()");
+const pool = await ev("mode()"), status = "document.querySelector('#setupStatus').textContent";
 await ev("document.querySelector('input[name=mode][value=popular]').click(); document.querySelector('input[name=level][value=relaxed]').click()");
 await until(ready, 30000);
 await ev("document.querySelector('#reach').value = 'long'; document.querySelector('#topic').value = 'any'");
+const pairAtPar = `setup.start && setup.goal && $('#reach').value === 'long' ? cardsRoute([setup.start.title, setup.goal.title], rules().filter(k => k !== 'checkpoint'))
+  .then(r => setup.start.title + ' -> ' + setup.goal.title + ': par ' + (r.length - 1)) : ${status}`;
 const popularRolls = [];
 for (let i = 0; i < 5; i++) {
   await ev("reroll('all')");
   await until(ready, 30000);
-  popularRolls.push(await ev("setup.start && setup.goal ? setup.start.title + ' -> ' + setup.goal.title + ': par ' + document.querySelector('#setupPar').textContent : document.querySelector('#setupStatus').textContent"));
+  popularRolls.push(await ev(pairAtPar));
 }
-check('target par Par 3+ in Popular on Relaxed tries the other topics', popularRolls.every(r => / -> .*: par Par [3-9]$/.test(r)), popularRolls.join(' | '));
-await ev(`document.querySelector('input[name=mode][value=${pool}]').click()`);
+check('target par Par 3+ in Popular on Relaxed tries the other topics', popularRolls.every(r => / -> .*: par [3-9]$/.test(r)), popularRolls.join(' | '));
+// In a Relay the start rolls first and the checkpoints take the topics it leaves: rolled after them, three checkpoints
+// took the one topic with a start on most rolls.
+await ev("setRules(['checkpoint'])");
+await setCount(3);
 await until(ready, 30000);
-// A start typed in isn't checked to join the web of links, so its target comes from its whole search: from a dead end,
-// none is at the par, where the quicker search the rolled starts get would count every target the web reaches.
+await ev("document.querySelector('#reach').value = 'long'");
+const relayRolls = [];
+for (let i = 0; i < 5; i++) {
+  await ev("reroll('all')");
+  await until(ready, 30000);
+  relayRolls.push(await ev(pairAtPar) + (await ev("viaKeys().some(w => groupOf(setup[w]?.title) === groupOf(setup.start?.title))") ? ' (a checkpoint in its topic)' : ''));
+}
+check('and in a Relay of three, the checkpoints go round the start\'s topic', relayRolls.every(r => / -> .*: par [3-9]$/.test(r)), relayRolls.join(' | '));
+await ev("setRules([])");
+await until(ready, 30000);
+// Settings with no pair at all (in Popular on Normal no start has a Blocks target at par 3+) roll with any par instead,
+// saying why, and the option is off until they change.
+await ev("document.querySelector('input[name=level][value=normal]').click(); document.querySelector('#topic').value = 'blocks'; document.querySelector('#reach').value = 'long'");
+await ev("reroll('all')");
+const longOff = "(document.querySelector('#reach').dispatchEvent(new Event('focus')), document.querySelector('#reach option[value=long]').disabled)";
+check('settings with no pair at the par roll with any par, saying why, and the option is off', await until(ready, 30000)
+  && await ev(`${status} === 'No Popular start has a Blocks target at par 3+ on Normal, so Target par is back to Any par.' && $('#reach').value === 'any'
+    && groupOf(setup.goal.title) === 'blocks' && ${longOff}`), await ev(status));
+check('until the settings change', await ev(`(document.querySelector('#topic').value = 'world', !${longOff})`));
+// A start typed in is kept when a par is picked, and with no target at it (in Popular on Relaxed no start has a Mobs
+// target at par 3+) gets one at the nearest par it has.
+await ev("document.querySelector('input[name=level][value=relaxed]').click()");
+await ev("setCustom('start', 'Diamond')");
+await until("setup.start?.title === 'Diamond' && setup.busy === 0");
+await ev("document.querySelector('#topic').value = 'mobs'; document.querySelector('#reach').value = 'long'; document.querySelector('#target').dispatchEvent(new Event('change'))");
+const nearest = await until(ready, 30000) && await ev(`cardsRoute(['Diamond', setup.goal.title], rules()).then(r => r.length - 1)`);
+check('a typed-in start with no target at the par is kept, with one at the nearest par', await ev(`setup.start.title === 'Diamond' && groupOf(setup.goal.title) === 'mobs'
+  && ${status} === 'Diamond has no target at par 3+, so this one is par ${nearest}.'`) && nearest === 2, `${await ev(status)} (par ${nearest})`);
+// A start typed in isn't checked to join the web of links, so its target comes from its whole search: from a dead end
+// nothing can be reached, where the quicker search the rolled starts get would count every target the web reaches.
 await ev(`setCustom('start', ${JSON.stringify(deadEnd)})`);
 await until(`setup.start?.title === ${JSON.stringify(deadEnd)} && setup.busy === 0`);
 await ev("reroll('goal')");
-check('a typed-in start that reaches nothing gets no target at the par', await until(`setup.busy === 0 && document.querySelector('#setupStatus').textContent.startsWith('No target at par 3+ from ')`),
-  await ev("document.querySelector('#setupStatus').textContent"));
-// With no pairing at all (here a link graph where nothing is reachable), the roll gives up after trying every topic and
-// says so, quickly.
-await ev("window.realDistancesFrom = distancesFrom; distancesFrom = () => new Int32Array(WIKI_DATA.articles.length).fill(-1)");
-const t0 = Date.now();
-await ev("reroll('all')");
-check('a target par with no pairs gives up and says so', await until("setup.busy === 0 && document.querySelector('#setupStatus').textContent.startsWith('No start found with a target at par 3+')", 30000),
-  `${((Date.now() - t0) / 1000).toFixed(1)} s: ${await ev("document.querySelector('#setupStatus').textContent")}`);
-await ev("distancesFrom = realDistancesFrom");
+check('a typed-in start that reaches nothing says so', await until(`setup.busy === 0 && ${status}.startsWith('No target can be reached from ')`), await ev(status));
+await ev(`document.querySelector('input[name=mode][value=${pool}]').click()`);
+await until(ready, 30000);
+await ev("document.querySelector('#topic').value = 'any'; document.querySelector('#reach').value = 'long'");
 await ev("reroll('all')");
 await until(ready, 30000);
 await play();

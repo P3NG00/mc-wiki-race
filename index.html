@@ -458,6 +458,7 @@ const THEMES = [...new Set(['auto', 'light', 'dark', ...Array.from(document.quer
       </div>
       <img alt="" class="art hidden">
     </div>
+    <div class="arrow hidden" id="goalArrow">➜</div>
     <div class="card hunt hidden" id="cardHunt">
       <span class="tag">Find one of each</span>
       <ul class="kinds"></ul>
@@ -481,7 +482,6 @@ const THEMES = [...new Set(['auto', 'light', 'dark', ...Array.from(document.quer
     <p id="gameHelp"></p>
     <label class="game-opt" data-game="relay">Checkpoints <select id="viaCount"></select></label>
     <label class="game-opt" data-game="scavenger">Find <select id="huntMode"></select></label>
-    <label class="game-opt" data-game="roundtrip"><input type="checkbox" class="rule" value="noretrace"> <span><b>No retracing</b> <span class="note">· the way there is dead on the way back</span></span></label>
     <span class="game-opt" data-game="exact" id="exactInfo"></span>
     <button class="link to-cards hidden" id="btnToCards">↑ See your cards</button>
   </div>
@@ -655,7 +655,8 @@ const isTitles = v => Array.isArray(v) && v.length > 0 && v.every(t => typeof t 
 // A target, or Scavenger's articles (finds) or kinds: exactly one of them.
 const isRecord = r => typeof r === 'object' && r !== null && typeof r.start === 'string' &&
   [typeof r.goal === 'string', isTitles(r.finds), isTitles(r.kinds) && r.kinds.every(k => isKey(KINDS, k))].filter(Boolean).length === 1 &&
-  optional(r.vias, isTitles) && optional(r.daily, v => typeof v === 'string') &&
+  optional(r.vias, isTitles) && optional(r.back, b => Number.isInteger(b) && b > 0 && b <= (r.vias?.length ?? 0)) &&
+  optional(r.daily, v => typeof v === 'string') &&
   optional(r.exact, Number.isInteger) &&
   optional(r.topic, v => isKey(TOPICS, v)) && optional(r.reach, v => isKey(REACHES, v)) && optional(r.par, Number.isInteger) &&
   optional(r.content, v => Array.isArray(v) && v.every(k => CONTENT.has(k))) &&
@@ -743,15 +744,27 @@ async function pageInfo(title) {
 // rolls: per-card token, so superseded rolls are dropped. daily: the date, while the cards hold that day's pair.
 // via0…via2: the checkpoints, in order, as many as the Checkpoint rule's count while it is on.
 const VIA_KEYS = ['via0', 'via1', 'via2'];
-// exact: Exact clicks's route for the cards (updateSetupPar). kinds: Scavenger's kinds, by category.
-const setup = { start: null, via0: null, via1: null, via2: null, goal: null, daily: null, busy: 0, exact: null, kinds: null,
+// exact: Exact clicks's route for the cards (updateSetupPar). kinds: Scavenger's kinds, by category. back: in a Relay
+// with Round trip, how many of the checkpoints come after the target, on the way back (see syncVia).
+const setup = { start: null, via0: null, via1: null, via2: null, goal: null, daily: null, busy: 0, exact: null, kinds: null, back: null,
   rolls: { start: 0, via0: 0, via1: 0, via2: 0, goal: 0 } };
 const viaCount = () => +$('#viaCount').value;
 // Scavenger's mode while it is on: 'articles' (the checkpoint cards and the target card hold them) or 'kinds'.
 const huntMode = () => rules().includes('scavenger') ? $('#huntMode').value : null;
 const viaKeys = () => huntMode() === 'articles' ? VIA_KEYS.slice(0, HUNT_SIZE - 1) : rules().includes('checkpoint') ? VIA_KEYS.slice(0, viaCount()) : [];
-// The cards in use, in the order they are played. Scavenger's kinds are on a card of their own (setup.kinds).
+// The cards in use: the start, the checkpoints in the order they are played, and the target. Scavenger's kinds are on a
+// card of their own (setup.kinds).
 const cardKeys = () => huntMode() === 'kinds' ? ['start'] : ['start', ...viaKeys(), 'goal'];
+// A Relay with Round trip splits its checkpoints around the target: one goes either way, and of two or three at least
+// one each way. The split is rolled with the cards and an old one is kept if it still fits, else moved to the nearest.
+const backRange = n => n === 1 ? [0, 1] : [1, n - 1];
+function rollBack(n) {
+  const [lo, hi] = backRange(n);
+  return lo + Math.floor(Math.random() * (hi - lo + 1));
+}
+const tripRelay = () => rules().includes('roundtrip') && rules().includes('checkpoint');
+// How many of the checkpoints come after the target, on the way back.
+const backCount = () => tripRelay() ? setup.back : 0;
 
 function mode() { return $('input[name=mode]:checked').value; }
 
@@ -774,8 +787,8 @@ function updateSettingsSum() {
     hunt !== 'kinds' && (topic === 'any' ? 'any topic' : TOPICS[topic].label), !hunt && (par === 'any' ? 'any par' : REACHES[par].label),
     extra.length && 'with ' + extra.map(contentLabel).join(', ')].filter(Boolean).join(' · ');
   // The line above the cards: the game (with its option), the extra rules, the articles and the difficulty.
-  const g = gameMode(), detail = { relay: `${viaCount()} checkpoint${viaCount() > 1 ? 's' : ''}`, scavenger: `${HUNT_SIZE} ${$('#huntMode').value}`,
-    roundtrip: rules().includes('noretrace') && 'No retracing' }[g];
+  const g = gameMode(), back = backCount(), detail = { relay: `${viaCount()} checkpoint${viaCount() > 1 ? 's' : ''}${back ? `, ${back} on the way back` : ''}`,
+    scavenger: `${HUNT_SIZE} ${$('#huntMode').value}` }[g];
   $('#gameSum').textContent = [GAMES[g].label + (detail ? ` (${detail})` : ''), ...rules().filter(k => EXTRA_RULES.includes(k)).map(k => RULES[k].label),
     articles, LEVELS[level()].label].join(' · ');
 }
@@ -790,29 +803,33 @@ const RULES = {
   blind: { label: 'Blind target', help: 'You only get the target’s name: no picture or description.' },
   hotcold: { label: 'Hot/cold', help: 'After each click, a hint: warmer if you got closer to the target, colder if not.' },
   checkpoint: { label: 'Relay' },
-  roundtrip: { label: 'Round trip' },
-  noretrace: { label: 'No retracing' },
+  roundtrip: { label: 'Round trip', help: 'Then go back to the start, never through a page of the way there.' },
   scavenger: { label: 'Scavenger hunt' },
   limit: { label: 'Six clicks', help: `Reach the target in ${CLICK_LIMIT} clicks or fewer, or lose. Back counts.` },
   exact: { label: 'Exact clicks' },
 };
-// The game, one of the tiles: its rule (a Race has none), and what its tile and the strip under the tiles say. The games'
-// rules can't be played together, so the tiles pick one; the extra rules go with any game, Six clicks aside, which
-// Exact clicks has its own count in place of.
+// The game, one of the tiles: its rule (a Race has none), and what its tile and the strip under the tiles say, and with
+// Round trip on what they say then (trip). The games' rules can't be played together, so the tiles pick one; the extra
+// rules go with any game but Exact clicks, which plays without Six clicks and Round trip (OFF_IN_EXACT).
 const GAMES = {
-  race: { label: 'Race', diagram: 'A → B', blurb: 'Start to target. The classic.', help: 'get from the start to the target in as few clicks as you can.' },
+  race: { label: 'Race', diagram: 'A → B', blurb: 'Start to target. The classic.', help: 'get from the start to the target in as few clicks as you can.',
+    trip: { diagram: 'A ⇄ B', blurb: 'To the target and back.', help: 'get to the target, then back to the start, never through a page of the way there.' } },
   relay: { rule: 'checkpoint', label: 'Relay', diagram: 'A → 1 → 2 → B', blurb: 'Checkpoints on the way, in order.',
-    help: 'visit each checkpoint, in order, before the target counts.' },
-  roundtrip: { rule: 'roundtrip', label: 'Round trip', diagram: 'A ⇄ B', blurb: 'There and back again.',
-    help: 'reach the target, then find your way back to the start. Back can’t retrace the way you came.' },
+    help: 'visit each checkpoint, in order, before the target counts.',
+    trip: { diagram: 'A → 1 → B → 2 → A', blurb: 'Checkpoints there and back, in order.',
+      help: 'visit each checkpoint in order, there and back: some come before the target and the rest on the way back to the start, never through a page of the way there.' } },
   scavenger: { rule: 'scavenger', label: 'Scavenger hunt', diagram: 'A → ✓ ✓ ✓', blurb: `Find ${HUNT_SIZE} things, any order.`,
-    help: `instead of one target, find ${HUNT_SIZE} things in any order: one of each of ${HUNT_SIZE} kinds, or ${HUNT_SIZE} articles.` },
+    help: `instead of one target, find ${HUNT_SIZE} things in any order: one of each of ${HUNT_SIZE} kinds, or ${HUNT_SIZE} articles.`,
+    trip: { diagram: 'A → ✓ ✓ ✓ → A', blurb: `Find ${HUNT_SIZE} things, then home.`,
+      help: `find ${HUNT_SIZE} things in any order: one of each of ${HUNT_SIZE} kinds, or ${HUNT_SIZE} articles. Then go back to the start, never through a page you passed while hunting.` } },
   exact: { rule: 'exact', label: 'Exact clicks', diagram: 'A → → → → B', blurb: `Land on it in exactly par + ${EXACT_EXTRA}.`,
     help: `reach the target in exactly par + ${EXACT_EXTRA} clicks, never on a page twice. Too soon loses too, so plan a detour.` },
 };
-const EXTRA_RULES = ['noback', 'blind', 'hotcold', 'limit'];
+const EXTRA_RULES = ['roundtrip', 'noback', 'blind', 'hotcold', 'limit'];
+// The extra rules Exact clicks plays without, and why: it has its own count, and a round trip ends on a page already visited.
+const OFF_IN_EXACT = { limit: 'Off: Exact clicks has its own count.', roundtrip: 'Off: Exact clicks never visits a page twice.' };
 // The game a set of rules plays: a link made by hand with more than one game's rule plays the first of these.
-const gameOf = keys => ['exact', 'scavenger', 'roundtrip', 'relay'].find(g => keys.includes(GAMES[g].rule)) ?? 'race';
+const gameOf = keys => ['exact', 'scavenger', 'relay'].find(g => keys.includes(GAMES[g].rule)) ?? 'race';
 // Difficulty, as the rules it turns on. Navboxes decide how hard a game is far more than the pool does: with them almost any
 // sensible click gets closer (see tools/wikidata/RESEARCH.md), so Normal, the default, plays without them.
 const LEVELS = {
@@ -847,14 +864,14 @@ function setContent(keys) {
   syncAllSpinoffs();
 }
 
-// The rules in play, in RULES order: the difficulty's, the game's, and the ticked extra rules (input.rule), No retracing
-// only in a Round trip and Six clicks not with Exact clicks.
+// The rules in play, in RULES order: the difficulty's, the game's, and the ticked extra rules (input.rule), but those
+// Exact clicks plays without.
 function level() { return $('input[name=level]:checked').value; }
 function gameMode() { return $('input[name=game]:checked').value; }
 function rules() {
   const g = GAMES[gameMode()].rule, ticked = k => !!$(`input.rule[value=${k}]`)?.checked;
-  return Object.keys(RULES).filter(k => LEVELS[level()].rules.includes(k) || k === g || (k === 'noretrace' && g === 'roundtrip' && ticked(k))
-    || (EXTRA_RULES.includes(k) && ticked(k) && !(k === 'limit' && g === 'exact')));
+  return Object.keys(RULES).filter(k => LEVELS[level()].rules.includes(k) || k === g
+    || (EXTRA_RULES.includes(k) && ticked(k) && !(g === 'exact' && k in OFF_IN_EXACT)));
 }
 function setRules(keys) {
   $(`input[name=level][value=${levelOf(keys)}]`).checked = true;
@@ -873,15 +890,18 @@ const settingsText = r => [r.topic && r.topic !== 'any' && TOPICS[r.topic].label
   r.content && 'Content: ' + r.content.map(contentLabel).join(', '),
   rulesText(r.rules)].filter(Boolean).join(', ');
 const sameRules = (a, b) => a.rules.join() === b.rules.join();
-// A record's articles in the order they are played: start, checkpoints, target, and the start again on a round trip;
-// for Scavenger the start and its articles, in any order (sorted).
-const chain = r => r.finds ? [r.start, ...r.finds.toSorted()] : r.kinds ? [r.start]
-  : [r.start, ...(r.vias ?? []), r.goal, ...r.rules.includes('roundtrip') ? [r.start] : []];
+// A record's articles in the order they are played: start, checkpoints, target, the checkpoints of the way back (the
+// last back of them) and the start again on a round trip; for Scavenger the start and its articles, in any order (sorted).
+function chain(r) {
+  const home = r.rules.includes('roundtrip') ? [r.start] : [], vias = r.vias ?? [], out = vias.length - (r.back ?? 0);
+  return r.finds ? [r.start, ...r.finds.toSorted(), ...home] : r.kinds ? [r.start, ...home]
+    : [r.start, ...vias.slice(0, out), r.goal, ...vias.slice(out), ...home];
+}
 // With the rules, this keys personal bests.
 const recordKey = r => [...chain(r), ...(r.kinds ?? []).toSorted()].join('|');
 // What a record was after: its target, or Scavenger's articles or kinds.
 const targetText = r => r.finds ? `${r.finds.join(', ')} (any order)` : r.kinds ? r.kinds.map(k => KINDS[k].label).join(', ') : r.goal;
-const routeText = r => r.goal === undefined ? `${r.start} → ${targetText(r)}` : chain(r).join(' → ');
+const routeText = r => r.goal === undefined ? [r.start, targetText(r), ...r.rules.includes('roundtrip') ? [r.start] : []].join(' → ') : chain(r).join(' → ');
 
 function renderCard(which) {
   const card = $({ start: '#cardStart', goal: '#cardGoal' }[which] ?? '#card-' + which);
@@ -925,7 +945,7 @@ async function updateSetupPar() {
   $('#exactInfo').textContent = 'Working out the count…';
   let text = '';
   if (titles.every(Boolean) && (kinds?.length ?? true)) {
-    const route = await cardsRoute(titles, r, kinds).catch(() => null);
+    const route = await cardsRoute(titles, r, kinds, backCount()).catch(() => null);
     if (route) text = `Par ${route.length - 1}`;
     if (r.includes('exact')) {
       const n = route && route.length - 1 + EXACT_EXTRA, exact = route && await exactRoute(titles, r, n).catch(() => null);
@@ -939,9 +959,10 @@ async function updateSetupPar() {
   if (token === setupParToken) { $('#setupPar').textContent = text; updatePlay(); }
 }
 
-// A shortest route for the cards' titles, in cardKeys order, and Scavenger's kinds if it has them, under rules.
-const cardsRoute = (titles, rules, kinds = null) =>
-  parRoute({ start: titles[0], vias: titles.slice(1, -1), goal: titles.at(-1), kinds, rules, content: contentInPlay(titles) });
+// A shortest route for the cards' titles, in cardKeys order, and Scavenger's kinds if it has them, under rules, with
+// back of the checkpoints after the target.
+const cardsRoute = (titles, rules, kinds = null, back = 0) =>
+  parRoute({ start: titles[0], vias: titles.slice(1, -1), goal: titles.at(-1), back, kinds, rules, content: contentInPlay(titles) });
 
 // Enables Start only for different articles on every card in use, with no lookup in flight.
 function updatePlay() {
@@ -952,19 +973,30 @@ function updatePlay() {
 }
 
 // Shows a card for each checkpoint in use, and the count while the Checkpoint rule is on, and rolls the checkpoints
-// that have no article yet. They are numbered when there is more than one. A round trip shows No retracing beside it,
-// and the start as where it ends too.
+// that have no article yet. They are numbered when there is more than one. A round trip shows the start as where it
+// ends too, and in a Relay the target among the checkpoints, before those of the way back.
 function syncVia() {
   const keys = viaKeys(), roundTrip = rules().includes('roundtrip'), hunt = huntMode(), g = gameMode();
   $('.pair').dataset.vias = keys.length;
-  // The strip under the tiles: what the game is, and its own options.
-  $('#gameHelp').innerHTML = `<b>${esc(GAMES[g].label)}:</b> ${esc(GAMES[g].help)}`;
+  // The tiles and the strip under them say what each game is, as it is with the Round trip box ticked or not (Exact
+  // clicks has no trip: it plays without it).
+  const trip = $('input.rule[value=roundtrip]').checked;
+  for (const [k, def] of Object.entries(GAMES)) {
+    const says = { ...def, ...trip && def.trip }, tile = $(`#games input[value=${k}]`).parentElement;
+    $('.diagram', tile).textContent = says.diagram;
+    $('.note', tile).textContent = says.blurb;
+    if (k === g) $('#gameHelp').innerHTML = `<b>${esc(def.label)}:</b> ${esc(says.help)}`;
+  }
   document.querySelectorAll('.game-opt').forEach(el => el.classList.toggle('hidden', el.dataset.game !== g));
-  const six = $('input.rule[value=limit]');
-  six.disabled = g === 'exact';
-  $('#rules [data-desc=limit]').textContent = g === 'exact' ? 'Off: Exact clicks has its own count.' : RULES.limit.help;
-  updateSettingsSum();
-  $('#pairArrow').textContent = roundTrip ? '⇄' : '➜';
+  for (const [k, why] of Object.entries(OFF_IN_EXACT)) {
+    $(`input.rule[value=${k}]`).disabled = g === 'exact';
+    $(`#rules [data-desc=${k}]`).textContent = g === 'exact' ? why : RULES[k].help;
+  }
+  if (tripRelay()) {
+    const [lo, hi] = backRange(keys.length);
+    setup.back = setup.back === null ? rollBack(keys.length) : Math.min(Math.max(setup.back, lo), hi);
+  }
+  $('#pairArrow').textContent = roundTrip && (!keys.length || hunt) ? '⇄' : '➜';
   $('#cardStart .tag').textContent = roundTrip ? 'Start and finish' : 'Start';
   // Scavenger's articles are on the checkpoint cards and the target card, joined by + since they go in any order.
   VIA_KEYS.forEach((w, i) => {
@@ -972,6 +1004,7 @@ function syncVia() {
     $(`#card-${w} .tag`).textContent = hunt ? 'Find' : keys.length > 1 ? `Checkpoint ${i + 1}` : 'Checkpoint';
     $(`#slot-${w} .arrow`).textContent = hunt ? '+' : '➜';
   });
+  placeTarget();
   $('#cardGoal .tag').textContent = hunt ? 'Find' : 'Target';
   $('#cardGoal').classList.toggle('via', !!hunt);   // labelled like the other finds
   $('#cardGoal').classList.toggle('hidden', hunt === 'kinds');
@@ -982,6 +1015,17 @@ function syncVia() {
   const missing = keys.filter(w => !setup[w]);
   if (missing.length) reroll(missing);
   else updatePlay();
+}
+
+// Puts the target card in its place: before the first checkpoint of the way back, with an arrow of its own, and the last
+// card then has none. Also says the split in the line above the cards.
+function placeTarget() {
+  const keys = viaKeys(), back = backCount();
+  if (back) $('#slot-' + keys[keys.length - back]).before($('#cardGoal'), $('#goalArrow'));
+  else $('#vias').after($('#cardGoal'), $('#goalArrow'));
+  $('#goalArrow').classList.toggle('hidden', !back);
+  for (const w of VIA_KEYS) $(`#slot-${w} .arrow`).classList.toggle('hidden', !!back && w === keys.at(-1));
+  updateSettingsSum();
 }
 
 function setStatus(msg, isErr) {
@@ -1063,6 +1107,7 @@ async function reroll(which) {
   }
   const targets = which === 'all' ? cardKeys() : [which].flat();
   if (which === 'all') for (const w of VIA_KEYS) if (!targets.includes(w)) setup[w] = null;
+  if (which === 'all' && tripRelay()) { setup.back = rollBack(viaKeys().length); placeTarget(); }
   const tokens = Object.fromEntries(targets.map(w => [w, ++setup.rolls[w]]));
   const current = w => tokens[w] === setup.rolls[w];
   const left = leaveDaily();
@@ -1144,7 +1189,7 @@ function dailyDate(s) {
 // items ordered by the hash of the date, a salt and the item: the day's ranking.
 const ranked = (date, salt, items) => items.map(t => [hash32(`${date}|${salt}|${t}`), t]).sort((a, b) => a[0] - b[0]).map(([, t]) => t);
 // Every daily is Normal plus one of these. No hubs makes it Hard. A Six clicks day's pair has par DAILY_SIX_CLICKS_PAR or
-// less, which leaves two clicks for a wrong turn. A Round trip day goes without No retracing.
+// less, which leaves two clicks for a wrong turn.
 const DAILY_RULES = ['noback', 'blind', 'checkpoint', 'nohubs', 'limit', 'roundtrip', 'exact', 'scavenger'];
 const DAILY_SIX_CLICKS_PAR = 4;
 // A Checkpoint day has one or two checkpoints. Three would use every topic and make a long game for a daily.
@@ -1235,14 +1280,14 @@ function setVias(vias) {
   return Object.fromEntries(VIA_KEYS.map((w, i) => [w, vias[i] ?? null]));
 }
 
-// The checkpoints (or Scavenger's articles but the target card's) go in as one via= each, in order, and Scavenger's kinds
-// as one kind= each, in place of the target.
+// The checkpoints (or Scavenger's articles but the target card's) go in as one via= each, in order, with back= how many
+// of them come after the target in a Relay with Round trip, and Scavenger's kinds as one kind= each, in place of the target.
 function challengeLink() {
   const base = location.href.split('#')[0];
-  const r = rules();
+  const r = rules(), back = backCount();
   return `${base}#start=${encodeURIComponent(setup.start.title)}` + (huntMode() === 'kinds' ? setup.kinds.map(k => '&kind=' + encodeURIComponent(k)).join('')
     : `&target=${encodeURIComponent(setup.goal.title)}` + viaKeys().map(w => '&via=' + encodeURIComponent(setup[w].title)).join('')) +
-    (r.length ? '&rules=' + r.join(',') : '');
+    (back ? `&back=${back}` : '') + (r.length ? '&rules=' + r.join(',') : '');
 }
 
 // A day as "21 Oct" (with the year when it isn't this one), and a game's day as Today or Yesterday when it is.
@@ -1262,7 +1307,7 @@ function renderHistory() {
   }
   $('#history').classList.toggle('hidden', rows.length === 0);
   $('#history tbody').innerHTML = rows.slice(0, 15).map(r => {
-    const tags = [[GAMES[gameOf(r.rules)].label, 'game'], ...r.rules.filter(k => EXTRA_RULES.includes(k) || k === 'noretrace').map(k => [RULES[k].label]),
+    const tags = [[GAMES[gameOf(r.rules)].label, 'game'], ...r.rules.filter(k => EXTRA_RULES.includes(k)).map(k => [RULES[k].label]),
       ...r.daily ? [[`Daily ${shortDate(new Date(r.daily + 'T00:00'))}`, 'daily']] : []];   // local midnight of that day
     const loss = lossOf(r), golf = r.won && !r.exact && r.par !== undefined ? golfScore(r.clicks, r.par) : null;
     const result = r.won ? [`✓ ${r.clicks} click${r.clicks === 1 ? '' : 's'}`, 'won'] : loss ? [`✗ ${LOSSES[loss]}`, 'lost'] : ['Gave up', ''];
@@ -1272,7 +1317,7 @@ function renderHistory() {
     const settings = settingsText({ ...r, rules: r.rules.filter(k => LEVEL_RULES.includes(k)) });
     return `<tr>
       <td class="h-game"><span class="tags">${tags.map(([t, c]) => `<span class="tag${c ? ' ' + c : ''}">${esc(t)}</span>`).join('')}</span></td>
-      <td class="h-route">${esc(r.goal === undefined ? routeText(r) : chain(r).join(' → '))}${settings ? `<div class="note">${esc(settings.replace(/, /g, ' · '))}</div>` : ''}</td>
+      <td class="h-route">${esc(routeText(r))}${settings ? `<div class="note">${esc(settings.replace(/, /g, ' · '))}</div>` : ''}</td>
       <td class="h-result"><span><span class="res ${result[1]}">${esc(result[0])}</span>${best.get(pair(r)) === r ? '<span class="best-tag">Best</span>' : ''}</span>${detail ? `<div class="note">${esc(detail)}</div>` : ''}</td>
       <td class="h-time mono">${fmtTime(r.ms)}</td>
       <td class="h-when">${esc(whenText(r.at))}</td>
@@ -1288,9 +1333,11 @@ const game = {
   daily: null,       // the date, if this is that day's daily pair
   vias: [],          // the checkpoints (Checkpoint rule), to be reached in order before the target counts
   viaNext: 0,        // how many of them have been reached
-  roundTrip: false,  // Round trip: plays as the target for its one checkpoint and the start for its target
-  dead: null,        // titles visits have made dead links: with No retracing the way there once the target is reached,
-                     // with Exact clicks every page visited
+  roundTrip: false,  // Round trip: the target is one more checkpoint, where the game turns back, and the start the goal
+  turn: 0,           // a round trip's target, by its number among the vias (from 1); 0 for Scavenger's, which turns
+                     // back at the last find
+  dead: null,        // titles visits have made dead links: on a round trip the way there once it turns back, with
+                     // Exact clicks every page visited
   limit: 0,          // the clicks the game is lost after: Six clicks's, or Exact clicks's count
   exact: null,       // Exact clicks: a route of exactly that many clicks, shown with the result
   hunt: null,        // Scavenger: what to find, each { info } (an article) or { kind }, with its label and, once
@@ -1338,16 +1385,21 @@ function renderHud() {
 function scrollPathToEnd() { const pl = $('.path-list'); pl.scrollTop = pl.scrollHeight; pl.scrollLeft = pl.scrollWidth; markPathScroll(); }
 function markPathScroll() { const pl = $('.path-list'); pl.classList.toggle('scrolled', pl.scrollLeft > 0); }
 
-// What the player is heading for: the next checkpoint until all are reached, then the target.
-// Scavenger has none: see huntLeft.
-const objective = () => game.vias[game.viaNext] ?? game.goal;
-// A checkpoint's name by its number (from 1), numbered when there is more than one. A round trip's is its target.
-const viaName = n => game.roundTrip ? 'Target' : 'Checkpoint' + (game.vias.length > 1 ? ` ${n}` : '');
-const objectiveLabel = () => game.hunt ? 'Find' : objective() !== game.goal ? viaName(game.viaNext + 1) : game.roundTrip ? 'Back to' : 'Target';
-// Scavenger: what is still to find.
+// Scavenger: what is still to find, and whether there is any (after which a round trip heads home).
 const huntLeft = () => game.hunt.filter(h => !h.found);
-// The articles still to reach, which aren't marked as visited: the checkpoints left and the target, or Scavenger's.
-const ahead = () => game.hunt ? huntLeft().filter(h => h.info).map(h => h.info) : [...game.vias.slice(game.viaNext), game.goal];
+const hunting = () => !!game.hunt && huntLeft().length > 0;
+// What the player is heading for: the next checkpoint until all are reached, then the target (the start on a round
+// trip). Scavenger has none while hunting: see huntLeft.
+const objective = () => hunting() ? null : game.vias[game.viaNext] ?? game.goal;
+// How many checkpoints there are, a round trip's target aside, and a checkpoint's number among them by its number among
+// the vias (from 1).
+const checkpoints = () => game.vias.length - (game.turn ? 1 : 0);
+const checkpointNumber = n => game.turn && n > game.turn ? n - 1 : n;
+// A checkpoint's name by its number among the vias, numbered when there is more than one. A round trip's target is Target.
+const viaName = n => n === game.turn ? 'Target' : 'Checkpoint' + (checkpoints() > 1 ? ` ${checkpointNumber(n)}` : '');
+const objectiveLabel = () => hunting() ? 'Find' : objective() !== game.goal ? viaName(game.viaNext + 1) : game.roundTrip ? 'Back to' : 'Target';
+// The articles still to reach, which aren't marked as visited: Scavenger's left, the checkpoints left and the target.
+const ahead = () => [...game.hunt ? huntLeft().filter(h => h.info).map(h => h.info) : [], ...game.vias.slice(game.viaNext), game.goal].filter(Boolean);
 // Every article the game is after, which stay live under No hubs.
 const cardTitles = () => [game.goal, ...game.vias, ...(game.hunt ?? []).map(h => h.info)].filter(Boolean).map(c => c.title);
 // The header: the game and its rules as labels with how far along it is, and the route as chips, every stop done, now
@@ -1355,18 +1407,23 @@ const cardTitles = () => [game.goal, ...game.vias, ...(game.hunt ?? []).map(h =>
 // of more than ROUTE_FULL stops shrinks the stops done to their ✓; a click on one opens them all again, and the row scrolls.
 const ROUTE_FULL = 3;
 function renderObjective() {
-  const n = game.vias.length, left = game.hunt && huntLeft(), next = left ? left.length === 1 && left[0].info : objective();
-  const g = game.hunt ? 'scavenger' : game.exact ? 'exact' : game.roundTrip ? 'roundtrip' : n ? 'relay' : 'race';
-  const progress = left ? `Found ${game.hunt.length - left.length} of ${game.hunt.length}` : game.exact ? `Land on the target on click ${game.limit}, not before`
-    : game.roundTrip ? (game.viaNext ? 'On the way back' : 'On the way there') : n ? `${game.viaNext} of ${n} checkpoint${n > 1 ? 's' : ''} reached` : '';
-  $('#hudTags').innerHTML = [GAMES[g].label, ...game.rules.filter(k => EXTRA_RULES.includes(k) || k === 'noretrace').map(k => RULES[k].label)]
+  const n = checkpoints(), left = game.hunt && huntLeft(), next = hunting() ? left.length === 1 && left[0].info : objective();
+  const g = game.hunt ? 'scavenger' : game.exact ? 'exact' : n ? 'relay' : 'race';
+  // Checkpoints reached so far, a round trip's target aside, and whether a round trip has turned back.
+  const reached = game.viaNext - (game.turn && game.viaNext >= game.turn ? 1 : 0);
+  const home = game.roundTrip && !hunting() && (!game.turn || game.viaNext >= game.turn);
+  const progress = [left && `Found ${game.hunt.length - left.length} of ${game.hunt.length}`, game.exact && `Land on the target on click ${game.limit}, not before`,
+    n && `${reached} of ${n} checkpoint${n > 1 ? 's' : ''} reached`, game.roundTrip && (home ? 'On the way back' : 'On the way there')].filter(Boolean).join(' · ');
+  $('#hudTags').innerHTML = [GAMES[g].label, ...game.rules.filter(k => EXTRA_RULES.includes(k)).map(k => RULES[k].label)]
     .map((t, i) => `<span class="tag${i ? '' : ' game'}">${esc(t)}</span>`).join('') + (progress ? ` <span class="note">${esc(progress)}</span>` : '');
-  const stops = game.hunt ? game.hunt.map(h => ({ state: h.found ? 'done' : 'ahead', name: h.label, sub: h.kind && h.found }))
+  const goal = { state: objective() === game.goal ? 'now' : 'ahead', k: game.roundTrip ? 'Back to' : game.exact ? `Target · exactly ${game.limit}` : 'Target',
+    name: game.goal?.title, goal: true };
+  const stops = game.hunt ? [...game.hunt.map(h => ({ state: h.found ? 'done' : 'ahead', name: h.label, sub: h.kind && h.found })), ...game.roundTrip ? [goal] : []]
     : [{ state: 'done', k: 'Start', name: game.start.title },
-      ...game.vias.map((v, i) => ({ state: i < game.viaNext ? 'done' : i === game.viaNext ? 'now' : 'ahead', k: viaName(i + 1), name: v.title })),
-      { state: objective() === game.goal ? 'now' : 'ahead', k: game.roundTrip ? 'Back to' : game.exact ? `Target · exactly ${game.limit}` : 'Target', name: game.goal.title, goal: true }];
+      ...game.vias.map((v, i) => ({ state: i < game.viaNext ? 'done' : i === game.viaNext ? 'now' : 'ahead', k: viaName(i + 1), name: v.title, goal: i + 1 === game.turn })),
+      goal];
   const short = stops.length > ROUTE_FULL, full = s => [s.k, s.name, s.sub].filter(Boolean).join(': ');
-  $('#hudRoute').innerHTML = stops.map((s, i) => (i && !game.hunt ? '<span class="sep" aria-hidden="true">→</span>' : '') + (s.state === 'now'
+  $('#hudRoute').innerHTML = stops.map((s, i) => (i && (!game.hunt || s.goal) ? '<span class="sep" aria-hidden="true">→</span>' : '') + (s.state === 'now'
     ? `<span class="chip now${s.goal ? ' target' : ''}"><img alt="" id="hudImg" class="hidden"><span class="k" id="hudLbl">${esc(s.k)}</span> <span class="n" id="hudGoal">${esc(s.name)}</span></span>`
     : `<${s.state === 'done' ? `button class="chip done${short ? ' short' : ''}" title="${esc(full(s))}" aria-label="${esc('Done: ' + full(s))}"` : 'span class="chip ahead"'}>`
       + (s.k ? `<span class="k">${esc(s.k)}</span> ` : '') + `<span class="n">${esc(s.name)}</span>` + (s.sub ? ` <span class="sub">(${esc(s.sub)})</span>` : '')
@@ -1393,17 +1450,13 @@ function showToast(text, ms) {
 }
 // Scavenger's finds get one too: "✓ Found a Nether mob: Blaze (2 of 3)".
 function celebrateCheckpoint() {
-  const n = game.vias.length, entry = game.path.at(-1), stranded = entry.hint === 'stranded';
-  if (game.hunt) {
-    const got = game.hunt.length - huntLeft().length;
-    showToast(`✓ Found ${game.hunt[0].kind ? `${entry.found.join(' and ')}: ${entry.title}` : entry.title} (${got} of ${game.hunt.length})`, 3000);
-    $('.hud .goal').classList.add('reached');
-    play('checkpoint');
-    return;
-  }
-  const home = game.goal.title;
-  showToast(game.roundTrip ? stranded ? `✓ Target reached, but there’s no way back to ${home} that doesn’t retrace your steps.` : `✓ Target reached! Now head back to ${home}`
-    : `✓ Checkpoint ${n > 1 ? `${game.viaNext} of ${n} ` : ''}reached! Now find ${objective().title}`, stranded ? 6000 : 3000);
+  const n = checkpoints(), entry = game.path.at(-1), stranded = entry.hint === 'stranded', next = objective();
+  const what = game.hunt ? `Found ${game.hunt[0].kind ? `${entry.found.join(' and ')}: ${entry.title}` : entry.title} (${game.hunt.length - huntLeft().length} of ${game.hunt.length})`
+    : entry.via === game.turn ? 'Target reached' : `Checkpoint ${n > 1 ? `${checkpointNumber(entry.via)} of ${n} ` : ''}reached`;
+  // What comes next, or that the way on is cut off: on a round trip only giving up is left then (see turnBack).
+  const then = !next ? '' : stranded ? `, but there’s no way ${next === game.goal ? 'back' : 'on'} to ${next.title} that doesn’t retrace your steps.`
+    : `! Now ${next === game.goal && game.roundTrip ? 'head back to' : 'find'} ${next.title}`;
+  showToast(`✓ ${what}${then}`, stranded ? 6000 : 3000);
   $('.hud .goal').classList.add('reached');
   play('checkpoint');
 }
@@ -1418,17 +1471,19 @@ function hideOverlay() { $('#overlay').classList.add('hidden'); }
 const guardLeaving = e => { e.preventDefault(); e.returnValue = true; };
 
 function startGame() {
-  const r = rules(), roundTrip = r.includes('roundtrip'), cards = cardKeys().map(w => setup[w]), mode = huntMode();
+  const r = rules(), roundTrip = r.includes('roundtrip'), cards = cardKeys().map(w => setup[w]), mode = huntMode(), back = backCount();
   const kinds = mode === 'kinds' ? setup.kinds : null;
   const hunt = kinds ? kinds.map(k => ({ kind: k, label: KINDS[k].label })) : mode ? cards.slice(1).map(info => ({ info, label: info.title })) : null;
-  // A round trip plays as a checkpoint at the target, with the start as the goal.
-  const vias = roundTrip ? [setup.goal] : hunt ? [] : cards.slice(1, -1), goal = hunt ? null : roundTrip ? setup.start : setup.goal;
+  // A round trip plays its target as one more checkpoint, after those of the way there and before those of the way back,
+  // with the start as the goal. Scavenger's heads for the start once all is found.
+  const cps = hunt ? [] : cards.slice(1, -1), out = cps.length - back;
+  const vias = roundTrip && !hunt ? [...cps.slice(0, out), setup.goal, ...cps.slice(out)] : cps, goal = roundTrip ? setup.start : hunt ? null : setup.goal;
   const exact = r.includes('exact') ? setup.exact : null, limit = exact ? exact.length - 1 : r.includes('limit') ? CLICK_LIMIT : 0;
-  Object.assign(game, { active: true, start: setup.start, goal, vias, viaNext: 0, roundTrip, hunt, dead: new Set(), exact, limit, celebrate: false,
-    daily: setup.daily, rules: r, content: contentInPlay(cards.map(c => c.title)), path: [], seen: new Map(),
-    stack: [], elapsed: 0, runningSince: 0, loading: false, par: null });
+  Object.assign(game, { active: true, start: setup.start, goal, vias, viaNext: 0, roundTrip, turn: roundTrip && !hunt ? out + 1 : 0, hunt,
+    dead: new Set(), exact, limit, celebrate: false, daily: setup.daily, rules: r, content: contentInPlay(cards.map(c => c.title)), path: [],
+    seen: new Map(), stack: [], elapsed: 0, runningSince: 0, loading: false, par: null });
   // Par shows in the header once it is known: at once when the setup screen has loaded the link graph.
-  const parReady = game.parReady = cardsRoute(cards.map(c => c.title), r, kinds);
+  const parReady = game.parReady = cardsRoute(cards.map(c => c.title), r, kinds, back);
   parReady.then(route => { if (game.parReady === parReady) { game.par = route ? route.length - 1 : null; renderHud(); } }, () => {});
   $('#btnBack').classList.toggle('hidden', !canGoBack());
   $('#btnPeek').classList.toggle('hidden', game.rules.includes('blind'));
@@ -1486,20 +1541,20 @@ async function navigate(title, fragment, { back = false } = {}) {
   cacheParse([title, page.title], page);
   if (back) game.stack.pop(); else game.stack.push(page.title);
   const via = page.title === game.vias[game.viaNext]?.title ? ++game.viaNext : 0;   // the checkpoint's number, from 1
-  const finds = game.hunt && game.path.length ? huntFinds(page) : [];   // the start never counts
+  const finds = hunting() && game.path.length ? huntFinds(page) : [];   // the start never counts
   game.path.push({ title: page.title, back, ...(via && { via }), ...(finds.length && { found: finds.map(h => h.label) }) });
   for (const h of finds) h.found = page.title;
-  if (finds.length) { game.celebrate = true; renderObjective(); }
   game.seen.set(title, page.title).set(page.title, page.title);   // the link's title too, in case it was a redirect
   // With Exact clicks every page visited is dead, by every title that led to it, before Hot/cold looks; only the target
   // can still be arrived at, too soon.
   if (game.exact) game.dead = new Set([...game.seen].filter(([, t]) => t !== game.goal.title).map(([k]) => k));
-  if (via) { game.celebrate = true; renderObjective(); }
-  if (via && game.roundTrip) turnBack(game.path.at(-1));
+  if (via || finds.length) { game.celebrate = true; renderObjective(); }
+  // A round trip turns back at its target, or Scavenger's at the last find.
+  if (game.roundTrip && (via ? via === game.turn : finds.length && !hunting())) turnBack(game.path.at(-1));
   // Hot/cold, on every arrival but the first and the objective's own (a target or later checkpoint passed early gets one):
   // the hint goes onto the path and shows over the article once both are ready (showHint, here and in frameReady),
   // unless the player has moved on by then.
-  if (game.rules.includes('hotcold') && game.path.length > 1 && !via && (game.hunt ? !finds.length : page.title !== objective().title)) {
+  if (game.rules.includes('hotcold') && game.path.length > 1 && !via && !finds.length && page.title !== objective()?.title) {
     const entry = game.path.at(-1);
     hotColdHint(game.path.at(-2).title, entry.title).then(hint => {
       entry.hint = hint;
@@ -1517,7 +1572,7 @@ async function navigate(title, fragment, { back = false } = {}) {
   renderArticle(page, fragment, token, blocked, seen);
   setTimeout(() => frameReady(token), 15000);   // a stalled stylesheet must not leave Back and Give up disabled
   // Compare the post-redirect title, so following a redirect onto the target counts as arriving.
-  const arrived = game.hunt ? !huntLeft().length : page.title === game.goal.title && objective() === game.goal;
+  const arrived = game.goal ? page.title === game.goal.title && objective() === game.goal : !hunting();
   const won = arrived && (!game.exact || clicks() === game.limit);
   const lost = arrived && !won ? 'tooSoon' : !won && game.limit && clicks() >= game.limit ? 'outOfClicks' : null;
   if (won || lost) { game.loading = false; hideOverlay(); finish(won, lost); return; }
@@ -1900,20 +1955,25 @@ function shortestRoute(graph, from, to, usable) {
   return null;
 }
 
-// A shortest route for a game, through its checkpoint if it has one, going by the snapshot: navbox links count only in
-// Relaxed, hubs are dead in Hard (the target's and the checkpoint's aside, as in play), and a spin-off's pages only count
-// when it is on. Null if there is none, or if a card's page isn't in the snapshot.
-async function parRoute({ start, vias = [], goal, kinds = null, rules, content = [] }) {
+// A shortest route for a game, through its checkpoints if it has any (the last back of them after the target, on a round
+// trip's way back), going by the snapshot: navbox links count only in Relaxed, hubs are dead in Hard (the cards' aside,
+// as in play), and a spin-off's pages only count when it is on. Null if there is none, or if a card's page isn't in the
+// snapshot.
+async function parRoute({ start, vias = [], goal, back = 0, kinds = null, rules, content = [] }) {
   const graph = await linkGraph(!rules.includes('nonav')), usable = routeUsable({ keep: [start, ...vias, goal], rules, content });
-  if (kinds) return kindsRoute(graph, start, kinds, usable);
-  if (rules.includes('scavenger')) return huntRoute(graph, start, [...vias, goal], usable);
-  if (rules.includes('roundtrip')) return roundTripRoute(graph, start, goal, usable, rules.includes('noretrace'));
-  const stops = [start, ...vias, goal];
+  const home = rules.includes('roundtrip'), out = vias.length - back;
+  if (kinds) return kindsRoute(graph, start, kinds, usable, home);
+  if (rules.includes('scavenger')) return huntRoute(graph, start, [...vias, goal], usable, home);
+  const there = [start, ...vias.slice(0, out), goal];
+  return home ? roundTripRoute(graph, there, [goal, ...vias.slice(out), start], usable) : legsRoute(graph, there, usable);
+}
+// A shortest route through stops in order, each leg a shortest route, or null if a leg has none.
+function legsRoute(graph, stops, usable) {
   const legs = stops.slice(1).map((b, i) => shortestRoute(graph, stops[i], b, usable));
   return legs.every(Boolean) ? legs.reduce((route, leg) => route.concat(leg.slice(1))) : null;
 }
 // Which pages a route may go through, by page number: as in play, hubs are dead in Hard but the ones kept (the cards),
-// a spin-off's pages only count when it is on, and the titles to avoid (No retracing's) are dead.
+// a spin-off's pages only count when it is on, and the titles to avoid (a round trip's way there) are dead.
 function routeUsable({ keep, avoid = new Set(), rules, content = [] }) {
   const hubs = new Set(rules.includes('nohubs') ? HUB_TITLES.values() : []);
   return v => {
@@ -1997,23 +2057,30 @@ async function exactRoute(titles, rules, n, content = contentInPlay(titles)) {
 
 // Scavenger's articles: the shortest of the routes through them in each order, each leg a shortest route. Revisits are
 // allowed, so that is the fewest clicks: whatever order a route first reaches them in, each leg is at least as long.
+// home: a round trip, which goes back to the start from the last of them (roundTripRoute), so no longer exact. The
+// orders go shortest first by their legs (and the shortest way home), and stop at one that can't beat the best.
 const orders = items => items.length < 2 ? [items] : items.flatMap((x, i) => orders(items.toSpliced(i, 1)).map(rest => [x, ...rest]));
-function huntRoute(graph, start, finds, usable) {
+function huntRoute(graph, start, finds, usable, home = false) {
   const legs = new Map();   // each leg once, null (no route) included
   const leg = (a, b) => { const k = a + '|' + b; if (!legs.has(k)) legs.set(k, shortestRoute(graph, a, b, usable)); return legs.get(k); };
+  const tours = orders(finds).map(order => {
+    const stops = [start, ...order], route = [...stops.slice(1).map((b, i) => leg(stops[i], b)), ...home ? [leg(order.at(-1), start)] : []];
+    return route.every(Boolean) && { stops, route, bound: route.reduce((n, l) => n + l.length - 1, 0) };
+  }).filter(Boolean).sort((a, b) => a.bound - b.bound);
   let best = null;
-  for (const order of orders(finds)) {
-    const stops = [start, ...order], route = stops.slice(1).map((b, i) => leg(stops[i], b));
-    if (route.every(Boolean)) {
-      const joined = route.reduce((r, l) => r.concat(l.slice(1)));
-      if (!best || joined.length < best.length) best = joined;
-    }
+  for (const { stops, route, bound } of tours) {
+    if (best && bound >= best.length - 1) break;
+    const joined = home ? roundTripRoute(graph, stops, [stops.at(-1), start], usable) : route.reduce((r, l) => r.concat(l.slice(1)));
+    if (joined && (!best || joined.length < best.length)) best = joined;
   }
   return best;
 }
 // Scavenger's kinds: a shortest route through a page of each, found exactly by a breadth-first search over (page, the
-// kinds found so far). A page of several kinds finds them all, and the start finds none.
-function kindsRoute(graph, start, kinds, usable) {
+// kinds found so far). A page of several kinds finds them all, and the start finds none. home: a round trip, which goes
+// back to the start from the last find, never through a page of the hunt: the hunts are taken nearest first, each with
+// the shortest way back around it unless the shortest way back at all (toStart) can't beat the best, until a hunt can't
+// (the way back is a click at least) or after ROUND_TRIP_TRIES, so this is no longer exact.
+function kindsRoute(graph, start, kinds, usable, home = false) {
   const from = PAGE_IDS.get(start), bits = kinds.length, all = (1 << bits) - 1;
   if (from === undefined) return null;
   const finds = new Uint8Array(graph.links.length);
@@ -2021,39 +2088,51 @@ function kindsRoute(graph, start, kinds, usable) {
   // A state is page << bits | found; prev holds the state before it (-1 for the start, -2 for one not reached yet).
   const prev = new Int32Array(graph.links.length << bits).fill(-2), queue = [from << bits], opened = new Set();
   prev[queue[0]] = -1;
+  const toStart = home && distancesTo(graph, from, usable);
+  let best = null, tries = 0;
   for (let i = 0; i < queue.length; i++) {
     const s = queue[i], found = s & all;
     if (found === all) {
-      const route = [];
-      for (let t = s; t !== -1; t = prev[t]) route.unshift(WIKI_DATA.articles[t >> bits][0]);
-      return route;
+      const route = [], pages = new Set();
+      for (let t = s; t !== -1; t = prev[t]) { route.unshift(WIKI_DATA.articles[t >> bits][0]); pages.add(t >> bits); }
+      if (!home) return route;
+      if (best && route.length + 1 >= best.length) break;
+      if (toStart[s >> bits] < 0 || (best && route.length + toStart[s >> bits] >= best.length)) continue;
+      const way = shortestRoute(graph, route.at(-1), start, v => usable(v) && (v === from || !pages.has(v)));
+      if (way && (!best || route.length + way.length - 1 < best.length)) best = route.concat(way.slice(1));
+      if (++tries === ROUND_TRIP_TRIES) break;
+      continue;
     }
     const reach = v => { const t = v << bits | found | finds[v]; if (prev[t] === -2 && usable(v)) { prev[t] = s; queue.push(t); } };
     graph.links[s >> bits].forEach(reach);
     // A navbox is opened once for each set of kinds found, the first, nearest time.
     for (const b of graph.carries?.[s >> bits] ?? []) if (!opened.has(b << bits | found)) { opened.add(b << bits | found); graph.boxes[b].forEach(reach); }
   }
-  return null;
+  return best;
 }
 
-// A shortest round trip, there and back. With No retracing the way back may not go through a page of the way there.
-// The fewest clicks for that is a shortest loop through two given pages, which is NP-hard in general, so this tries the
-// shortest way there with the shortest way back around it and the other way about, then again with each page of the
-// first tries banned in turn, until it reaches the lower bound: the shortest way there plus the shortest way back. On the
-// 2026-08 snapshot it reached it in all of 600 Normal and Relaxed pairs tried, and in Hard in all but 2 of 295.
+// A shortest round trip: the way there through its stops (the start, checkpoints, the target) and the way back through
+// its own (the target, checkpoints, the start), never through a page of the way there but the stops still ahead, as in
+// play (see turnBack). The fewest clicks for that is a shortest loop through given pages, which is NP-hard in general,
+// so this tries the shortest way there with the shortest way back around it, and the shortest way back (off the way
+// there's checkpoints and target) with the way there around it, then again with each page of the first tries banned in
+// turn, until it reaches the lower bound: the shortest way there plus the shortest way back. On the 2026-08 snapshot it
+// reached it in all of 898 pairs tried in Normal, Relaxed and Hard, and all of 398 with a checkpoint each way.
 const ROUND_TRIP_TRIES = 40;
-function roundTripRoute(graph, a, b, usable, noRetrace) {
-  const there = shortestRoute(graph, a, b, usable), back = shortestRoute(graph, b, a, usable);
-  if (!there || !back) return null;
-  const join = (t, k) => t.concat(k.slice(1));
-  if (!noRetrace) return join(there, back);
-  const avoiding = route => (ids => v => usable(v) && !ids.has(v))(new Set(route.slice(1, -1).map(t => PAGE_IDS.get(t))));
-  const lowest = there.length + back.length - 1;
+function roundTripRoute(graph, there, back, usable) {
+  const t0 = legsRoute(graph, there, usable), k0 = legsRoute(graph, back, usable);
+  if (!t0 || !k0) return null;
+  const ids = titles => new Set(titles.map(t => PAGE_IDS.get(t)));
+  // usable, but not through pages, those in keep aside.
+  const off = (ok, pages, keep = new Set()) => v => ok(v) && (keep.has(v) || !pages.has(v));
+  const stops = ids([...there, ...back]), ahead = ids(back.slice(1)), passed = ids(there.slice(1));
+  const join = (t, k) => t.concat(k.slice(1)), lowest = t0.length + k0.length - 1;
   let best = null;
-  for (const ban of [[], ...there.slice(1, -1), ...back.slice(1, -1)].slice(0, ROUND_TRIP_TRIES)) {
-    const without = [a, ban, b].flat();   // avoiding() leaves out the ends
-    const t = shortestRoute(graph, a, b, avoiding(without)), k = t && shortestRoute(graph, b, a, avoiding(t));
-    const k2 = shortestRoute(graph, b, a, avoiding(without)), t2 = k2 && shortestRoute(graph, a, b, avoiding(k2));
+  const bans = [...t0.slice(1, -1), ...k0.slice(1, -1)].filter(t => !stops.has(PAGE_IDS.get(t)));
+  for (const ban of [null, ...bans].slice(0, ROUND_TRIP_TRIES)) {
+    const ok = ban ? off(usable, ids([ban])) : usable;
+    const t = legsRoute(graph, there, ok), k = t && legsRoute(graph, back, off(ok, ids(t.slice(1)), ahead));
+    const k2 = legsRoute(graph, back, off(ok, passed)), t2 = k2 && legsRoute(graph, there, off(ok, ids(k2.slice(1)), ahead));
     for (const route of [k && join(t, k), t2 && join(t2, k2)]) if (route && (!best || route.length < best.length)) best = route;
     if (best?.length === lowest) break;
   }
@@ -2073,22 +2152,23 @@ const HINTS = {
 async function hotColdHint(from, to) {
   if (!PAGE_IDS.has(from) || !PAGE_IDS.has(to)) return 'unknown';
   // Scavenger aims at the nearest of what is still to find.
-  const aim = game.hunt ? huntLeft().flatMap(h => h.info ? [h.info.title] : KINDS[h.kind].members) : objective().title;
+  const aim = hunting() ? huntLeft().flatMap(h => h.info ? [h.info.title] : KINDS[h.kind].members) : objective().title;
   const usable = routeUsable({ keep: cardTitles(), avoid: game.dead, rules: game.rules, content: game.content });
   const graph = await linkGraph(!game.rules.includes('nonav'));
   const [before, after] = [from, to].map(t => shortestRoute(graph, t, aim, usable)?.length ?? Infinity);
   return after < before ? 'warmer' : after > before ? 'colder' : 'same';
 }
-// Reaching a round trip's target turns the game around: Back starts again from here, so it can't walk the way there
-// backwards, and with No retracing every page of the way there (and every link title that led to one) goes dead. If the
-// snapshot has no way back around them, the arrival gets the stranded hint: only giving up is left.
+// Reaching a round trip's target (or Scavenger's last find) turns the game around: Back starts again from here, so it
+// can't walk the way there backwards, and every page of the way there (and every link title that led to one) goes dead,
+// but those still ahead: the checkpoints of the way back and the start. If the snapshot has no way on around them, the
+// arrival gets the stranded hint: only giving up is left.
 function turnBack(entry) {
   game.stack = [entry.title];
-  if (!game.rules.includes('noretrace')) return;
-  game.dead = new Set([...game.seen].filter(([, t]) => t !== game.goal.title).map(([k]) => k));
+  const left = ahead().map(c => c.title);
+  game.dead = new Set([...game.seen].filter(([, t]) => !left.includes(t)).map(([k]) => k));
   linkGraph(!game.rules.includes('nonav')).then(graph => {
-    const usable = routeUsable({ keep: [game.goal.title], avoid: game.dead, rules: game.rules, content: game.content });
-    if (PAGE_IDS.has(entry.title) && !shortestRoute(graph, entry.title, game.goal.title, usable)) {
+    const usable = routeUsable({ keep: cardTitles(), avoid: game.dead, rules: game.rules, content: game.content });
+    if (PAGE_IDS.has(entry.title) && !legsRoute(graph, [entry.title, ...left], usable)) {
       entry.hint = 'stranded';
       if (game.path.at(-1) === entry && game.active) { renderHud(); showHint(); }
     }
@@ -2167,11 +2247,13 @@ function finish(won, lost = null) {
   clearInterval(game.timer);
   renderHud();
   const ms = now();
-  // A round trip is recorded by its cards: its target and no checkpoints.
+  // A round trip is recorded by its cards: its target, its checkpoints and how many of them come after the target (back).
   // Scavenger is recorded by its articles (finds) or kinds.
-  const target = game.roundTrip ? game.vias[0] : game.goal, vias = game.roundTrip ? [] : game.vias;
+  const target = game.turn ? game.vias[game.turn - 1] : game.hunt ? null : game.goal, vias = game.vias.filter(v => v !== target);
+  const back = game.turn && game.vias.length - game.turn;
   const hunt = game.hunt && (game.hunt[0].kind ? { kinds: game.hunt.map(h => h.kind) } : { finds: game.hunt.map(h => h.info.title) });
-  const rec = { start: game.start.title, ...(target && { goal: target.title }), ...hunt, ...(vias.length && { vias: vias.map(v => v.title) }), ...(game.daily && { daily: game.daily }),
+  const rec = { start: game.start.title, ...(target && { goal: target.title }), ...hunt, ...(vias.length && { vias: vias.map(v => v.title) }), ...(back && { back }),
+    ...(game.daily && { daily: game.daily }),
     // The par the target was rolled at, unless a new start or difficulty has moved the game off it since.
     ...(target?.topic && { topic: target.topic }), ...(target?.reach && REACHES[target.reach].fits?.(game.par) !== false && { reach: target.reach }),
     ...(game.content.length && { content: game.content }), ...(game.par !== null && { par: game.par }), ...(game.exact && { exact: game.limit }), rules: game.rules, won, ...(lost && { [lost]: true }), clicks: clicks(), ms, at: Date.now(), path: game.path.map(p => p.title) };
@@ -2186,16 +2268,16 @@ function finish(won, lost = null) {
   // Your path, each page marked with what it was to the game: back, a checkpoint, a find, the target, Hot/cold's hint.
   const last = game.path.length - 1, goalWord = lost === 'tooSoon' ? 'too soon' : game.roundTrip ? 'back home' : 'target';
   const pathHtml = game.path.map((p, i) => `<li><a href="${esc(wikiUrl(p.title))}" target="_blank" rel="noopener">${esc(p.title)}</a>` +
-    [p.back && 'back', p.via && viaName(p.via).toLowerCase(), p.found && p.found.join(', '), i === last && (won || lost === 'tooSoon') && !game.hunt && goalWord,
+    [p.back && 'back', p.via && viaName(p.via).toLowerCase(), p.found && p.found.join(', '), i === last && (won || lost === 'tooSoon') && game.goal && goalWord,
       p.hint && HINTS[p.hint].icon].filter(Boolean).map(w => ` <span class="note">${esc(w)}</span>`).join('') + '</li>').join('');
   const newBest = won && best && (rec.clicks < best.clicks || (rec.clicks === best.clicks && rec.ms < best.ms));
   const bestNote = !won || !best ? '' : newBest ? '<p class="best new">New personal best for this pair!</p>'
     : `<p class="best note">Your best for this pair: ${best.clicks} clicks in ${fmtTime(best.ms)}.</p>`;
   // The heading: the outcome, with a loss's reason under it. Exact clicks's column holds a route of its count.
-  const title = won ? (game.hunt ? '🎉 You found them all!' : '🎉 You made it!') : LOSSES[lost] ?? 'Game over';
+  const title = won ? (game.hunt && !game.roundTrip ? '🎉 You found them all!' : '🎉 You made it!') : LOSSES[lost] ?? 'Game over';
   const reason = lost === 'tooSoon' ? `You reached ${target.title} on click ${rec.clicks}, but it had to be exactly ${game.limit}.`
-    : lost === 'outOfClicks' ? `All ${game.limit} clicks used, ${game.hunt ? 'with something still to find' : 'and no target yet'}.` : '';
-  const tags = [GAMES[gameOf(rec.rules)].label, ...rec.rules.filter(k => EXTRA_RULES.includes(k) || k === 'noretrace').map(k => RULES[k].label)];
+    : lost === 'outOfClicks' ? `All ${game.limit} clicks used, ${hunting() ? 'with something still to find' : game.roundTrip ? `and not back at ${game.goal.title} yet` : 'and no target yet'}.` : '';
+  const tags = [GAMES[gameOf(rec.rules)].label, ...rec.rules.filter(k => EXTRA_RULES.includes(k)).map(k => RULES[k].label)];
   const otherSettings = settingsText({ ...rec, rules: rec.rules.filter(k => LEVEL_RULES.includes(k)) });   // what the labels don't say
   play(newBest ? 'best' : won ? 'win' : lost ? 'lose' : 'giveUp');
   openModal(`<div class="result">
@@ -2371,10 +2453,16 @@ $('#btnSettings').onclick = () => {
   $('#btnSettings').textContent = open ? 'Done' : 'Change';
   $('#btnSettings').setAttribute('aria-expanded', String(open));
 };
-// Swap plays the whole chain backwards, checkpoints included.
+// Swap plays the whole chain backwards, checkpoints included. A round trip goes round the same loop from its target
+// instead: the start and target change places, and the checkpoints of the way back come first.
 $('#btnSwap').onclick = () => {
-  const keys = cardKeys(), cards = keys.map(w => setup[w]).reverse();
-  keys.forEach((w, i) => { setup[w] = cards[i]; });
+  const keys = cardKeys(), back = backCount(), cards = keys.map(w => setup[w]);
+  if (rules().includes('roundtrip') && !huntMode()) {
+    const vias = cards.slice(1, -1), out = vias.length - back;
+    [cards.at(-1), ...vias.slice(out), ...vias.slice(0, out), cards[0]].forEach((c, i) => { setup[keys[i]] = c; });
+    if (tripRelay()) setup.back = out;
+    placeTarget();
+  } else cards.reverse().forEach((c, i) => { setup[keys[i]] = c; });
   if (leaveDaily()) setStatus(LEFT_DAILY);
   keys.forEach(renderCard);
 };
@@ -2403,7 +2491,7 @@ $('#btnClearHistory').onclick = () => {
   $('#hClear').onclick = () => { store.set('mwr.history', []); renderHistory(); closeModal(); };
 };
 $('#btnPeek').onclick = () => {
-  if (game.hunt) {
+  if (hunting()) {
     openModal(`<h2>Find</h2><ul>${huntLeft().map(h => `<li><b>${esc(h.label)}</b>: ${esc(h.info ? h.info.desc || 'No description available.'
       : 'e.g. ' + kindExamples(h.kind).join(', '))}</li>`).join('')}</ul>
       <p class="note">The clock keeps running while you peek.</p>
@@ -2449,7 +2537,7 @@ const cardsLoaded = () => !!setup.start && !!(huntMode() === 'kinds' ? setup.kin
         $('#huntMode').value = 'kinds';
         setKinds(kinds);
       } else {
-        Object.assign(setup, { start: infos[0], goal: infos.at(-1) }, setVias(infos.slice(1, -1)));
+        Object.assign(setup, { start: infos[0], goal: infos.at(-1), back: +h.get('back') || 0 }, setVias(infos.slice(1, -1)));
         if (infos.length > 2) setRules([...rules(), rules().includes('scavenger') ? 'scavenger' : 'checkpoint']);
         if (rules().includes('scavenger')) $('#huntMode').value = 'articles';
       }

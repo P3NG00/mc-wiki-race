@@ -1204,10 +1204,11 @@ async function reroll(which, atStart = false) {
   setStatus('Picking…');
   await withBusy(async () => {
     for (const w of targets) { setup[w] = null; renderCard(w); }
-    // With a target par the start rolls first, only if some target is at that par from it, then the other cards in the
-    // topics it leaves, then a target at the par from it (under Blind target not until Start). notice: what the roll
-    // couldn't keep to, and why.
-    let par = (targets.includes('goal') || hidden.includes('goal') && targets.includes('start')) && reach() !== 'any'
+    // With a target par the start rolls first, only if some target is at that par from it (or the target kept, when only
+    // the start rolls), then the other cards in the topics it leaves, then a target at the par from it (under Blind
+    // target not until Start). notice: what the roll couldn't keep to, and why.
+    const kept = !targets.includes('goal') && !hidden.includes('goal') && PAGE_IDS.has(setup.goal?.title) && setup.goal;
+    let par = (targets.includes('goal') || targets.includes('start') && (hidden.includes('goal') || kept)) && reach() !== 'any'
       && REACHES[reach()].fits, notice = '';
     const graph = par && await linkGraph(!rules().includes('nonav')), topic = POOL.has($('#topic').value) ? $('#topic').value : null;
     const aims = par && candidates(topic, true), what = par && REACHES[reach()].label.toLowerCase();
@@ -1215,15 +1216,19 @@ async function reroll(which, atStart = false) {
     const apart = (s, t) => topic || mode() === 'chaos' || groupOf(t) !== groupOf(s);
     if (par && targets.includes('start')) {
       // Every topic no other card holds, in random order, since a whole topic can lack a start with a target at the par
-      // (in Popular on Relaxed only Enchantments & effects starts have one at par 3+). Checkpoints kept from before
-      // hold theirs; those rolled now go round the start's.
-      const taken = viaKeys().filter(w => !targets.includes(w)).map(w => groupOf(setup[w]?.title));
+      // (in Popular on Relaxed only Enchantments & effects starts have one at par 3+). Cards kept from before hold
+      // theirs; checkpoints rolled now go round the start's.
+      const taken = cardKeys().filter(w => w !== 'start' && !targets.includes(w)).map(w => groupOf(setup[w]?.title)).filter(Boolean);
       const groups = mode() === 'chaos' ? [null] : shuffled([...rollGroups(mode(), false).keys()].filter(g => g !== topic && !taken.includes(g)));
-      // Whether a start has a target at the par, telling only par 1, 2 and further apart: further is any page the web of
-      // links reaches, since the start has to join it too (rollOne checks that next). Searching only two clicks deep is
-      // five times quicker than the whole graph, which matters when a whole topic has no start that fits.
-      const web = distancesFrom(graph, WEB_HEART), near = new Map();
-      const fitsSome = s => {
+      // A target kept: every page's fewest clicks to it, by one search back from it.
+      const toKept = kept && distancesTo(graph, PAGE_IDS.get(kept.title),
+        routeUsable({ keep: [kept.title], rules: rules(), content: contentInPlay([kept.title]) }));
+      const keptPar = s => toKept[PAGE_IDS.get(s)] ?? -1;
+      // Otherwise whether a start has a target at the par, telling only par 1, 2 and further apart: further is any page
+      // the web of links reaches, since the start has to join it too (rollOne checks that next). Searching only two
+      // clicks deep is five times quicker than the whole graph, which matters when a whole topic has no start that fits.
+      const web = !kept && distancesFrom(graph, WEB_HEART), near = new Map();
+      const fitsSome = kept ? s => par(keptPar(s)) : s => {
         const d = near.get(s) ?? near.set(s, distancesFrom(graph, s, 2)).get(s);
         return aims.some(t => { const v = PAGE_IDS.get(t); return apart(s, t) && par(d[v] >= 0 ? d[v] : web[v] >= 0 ? 3 : -1); });
       };
@@ -1236,18 +1241,29 @@ async function reroll(which, atStart = false) {
         if (start || !current('start')) break;
       }
       if (!current('start')) return;
+      if (!start && kept) {
+        // None has the kept target at the par: a start at the nearest par to it instead.
+        const reached = groups.flatMap(g => candidates(g, false)).filter(s => keptPar(s) > 0);
+        const off = s => Math.abs(keptPar(s) - REACHES[reach()].near), least = Math.min(...reached.map(off));
+        start = await rollOne('start', null, undefined, reached.filter(s => off(s) === least));
+        if (!current('start')) return;
+        if (start) notice = `No ${poolLabel()} start has ${kept.title} at ${what}, so this one is par ${keptPar(start.title)}.`;
+      }
       if (start) {
         setup.start = start;
         renderCard('start');
         plan = planGroups(targets.filter(w => w !== 'start'));
       } else {
         // No start has a target at the par with these settings, so the game rolls with any par and says why. Unless a
-        // kept checkpoint held a topic, or Chaos only drew, that is certain, so the option is off until they change.
-        if (!taken.length && mode() !== 'chaos') noPair.add(pairKey(reach()));
-        notice = `No ${poolLabel()} start has a ${topic ? TOPICS[topic].label + ' ' : ''}target at ${what} on ${LEVELS[level()].label}, so Target par is back to Any par.`;
-        $('#reach').value = 'any';
+        // kept card held a topic, or Chaos only drew, that is certain, so the option is off until they change. (A kept
+        // target nothing reaches leaves the start rolled without a par.)
+        if (!kept) {
+          if (!taken.length && mode() !== 'chaos') noPair.add(pairKey(reach()));
+          notice = `No ${poolLabel()} start has a ${topic ? TOPICS[topic].label + ' ' : ''}target at ${what} on ${LEVELS[level()].label}, so Target par is back to Any par.`;
+          $('#reach').value = 'any';
+          updateSettingsSum();
+        }
         par = false;
-        updateSettingsSum();
       }
     }
     // allSettled, so one card failing doesn't end the busy state while the other is still rolling.

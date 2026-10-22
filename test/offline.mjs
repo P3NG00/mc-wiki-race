@@ -635,6 +635,20 @@ for (let i = 0; i < 5; i++) {
 check('and in a Relay of three, the checkpoints go round the start\'s topic', relayRolls.every(r => / -> .*: par [3-9]$/.test(r)), relayRolls.join(' | '));
 await ev("setRules([])");
 await until(ready, 30000);
+// Rerolling only the start keeps the target, with a start at the par from it, or at the nearest par if none has it (in
+// Popular on Relaxed no start has a mob 3 clicks away).
+await ev("document.querySelector('#reach').value = 'long'; reroll('all')");
+await until(ready, 30000);
+const keptGoal = await ev('setup.goal.title'), oldStart = await ev('setup.start.title');
+await ev("reroll('start')");
+check('rerolling only the start keeps the target at the par', await until(ready, 30000) && await ev(`setup.goal.title === ${JSON.stringify(keptGoal)}`)
+  && / -> .*: par [3-9]$/.test(await ev(pairAtPar)), `${oldStart} then ${await ev(pairAtPar)}`);
+await ev("setCustom('goal', 'Zombie')");
+await until("setup.goal?.title === 'Zombie' && setup.busy === 0");
+await ev("reroll('start')");
+const keptPar = await until(ready, 30000) && await ev("cardsRoute([setup.start.title, 'Zombie'], rules()).then(r => r.length - 1)");
+check('and with none at the par, one at the nearest par', await ev(`setup.goal.title === 'Zombie' && ${status} === 'No Popular start has Zombie at par 3+, so this one is par ${keptPar}.'`)
+  && keptPar === 2, `${await ev(status)} (par ${keptPar})`);
 // Settings with no pair at all (in Popular on Normal no start has a Blocks target at par 3+) roll with any par instead,
 // saying why, and the option is off until they change.
 await ev("document.querySelector('input[name=level][value=normal]').click(); document.querySelector('#topic').value = 'blocks'; document.querySelector('#reach').value = 'long'");

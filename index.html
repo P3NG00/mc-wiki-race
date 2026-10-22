@@ -622,6 +622,9 @@ const HUNT_SIZE = 3;       // Scavenger rule: how many articles, or kinds, to fi
 // No hubs rule: every title that leads to a hub (the hubs, picked in tools/wikidata/config.json, and their redirects),
 // mapped to the hub. Links to them are dead.
 const HUB_TITLES = new Map(Object.entries(WIKI_DATA.hubs));
+// The heart of the wiki's web of links, which every card must have a route to or from (see joinsWeb): the pool article
+// linked from the most articles outside navboxes that isn't a hub, so it is live in every difficulty (Lava).
+const WEB_HEART = POOL_TITLES.filter(t => !HUB_TITLES.has(t)).reduce((a, b) => ARTICLES.get(b).body > ARTICLES.get(a).body ? b : a);
 // Scavenger's kinds (wiki categories), from wiki-data.js: the name the game shows, topic, members and exclusions.
 const KINDS = WIKI_DATA.kinds;
 const KIND_MEMBERS = new Map(Object.entries(KINDS).map(([k, kind]) => [k, new Set(kind.members)]));
@@ -1118,10 +1121,11 @@ async function rollOne(which, group, accept = () => true, titles = null) {
   const linked = which !== 'start', draw = () => titles ? pick(titles) : candidate(group, linked);
   const others = () => cardKeys().filter(w => w !== which).map(w => setup[w]?.title);
   if (titles?.length === 0) return null;
+  const joined = await joinsWeb(which), ok = t => accept(t) && joined(t);
   for (let attempt = 0; attempt < 12; attempt++) {
     let title = draw();
-    for (let i = 0; !accept(title) && i < PAR_DRAWS; i++) title = draw();
-    if (!accept(title)) return null;
+    for (let i = 0; !ok(title) && i < PAR_DRAWS; i++) title = draw();
+    if (!ok(title)) return null;
     if (others().includes(title)) continue;
     const info = await pageInfo(title);
     // Check the other cards again after the await: they may be rolling at the same time. The target's topic and par go
@@ -1129,6 +1133,21 @@ async function rollOne(which, group, accept = () => true, titles = null) {
     if (info && !others().includes(info.title)) return Object.assign(info, which === 'goal' && { topic: $('#topic').value, reach: reach() });
   }
   throw new Error('Gave up finding a good article');
+}
+
+// Whether a page may take a card, by the snapshot under the setup's difficulty and Content: a start needs a route to
+// WEB_HEART, a target a route from it, and a checkpoint, or either end of a round trip, both, so the cards always have a
+// route between them. Otherwise Chaos rolls pages such as Bee Our Guest, whose only links are hubs (dead in Hard), or
+// a subpage that links nowhere. A page the snapshot lacks passes, and so does every page if the graph can't load.
+async function joinsWeb(which) {
+  const r = rules(), graph = await linkGraph(!r.includes('nonav')).catch(() => null), heart = PAGE_IDS.get(WEB_HEART);
+  if (!graph) return () => true;
+  const both = VIA_KEYS.includes(which) || r.includes('roundtrip'), out = both || which !== 'goal', into = both || which !== 'start';
+  return title => {
+    const page = PAGE_IDS.get(title);
+    return page === undefined || (!out || distancesFrom(graph, title)[heart] >= 0)
+      && (!into || distancesTo(graph, page, routeUsable({ keep: [title], rules: r, content: contentInPlay([title]) }))[heart] >= 0);
+  };
 }
 
 // which: a card, a list of them, or 'all' for every card in use. 'all' also drops checkpoints left over from a higher
@@ -1158,9 +1177,10 @@ async function reroll(which, atStart = false) {
     // the start and target roll after the rest: a start only if some target is at that par from it, then a target that is
     // (under Blind target not until Start).
     const par = (targets.includes('goal') || hidden.includes('goal') && targets.includes('start')) && reach() !== 'any' && REACHES[reach()].fits;
+    let unjoined = false;
     const results = await Promise.allSettled(targets.filter(w => !par || (w !== 'start' && w !== 'goal')).map(async w => {
       const info = await rollOne(w, plan[w]);
-      if (current(w)) { setup[w] = info; renderCard(w); }
+      if (current(w)) { setup[w] = info; renderCard(w); unjoined ||= !info; }   // nothing drawn joined the web of links
     }));
     const failed = results.find(r => r.status === 'rejected');
     if (failed) throw failed.reason;
@@ -1186,7 +1206,8 @@ async function reroll(which, atStart = false) {
       }
     }
     if (which === 'all' && huntMode() === 'kinds' && !isBlind()) setKinds(rollKinds());   // after the start, which they mustn't hold
-    if (targets.every(current)) setStatus(left ? LEFT_DAILY : '');
+    if (unjoined) setStatus('No article came up with a way in and out on this difficulty. Reroll, or change the difficulty or Content.', true);
+    else if (targets.every(current)) setStatus(left ? LEFT_DAILY : '');
   });
 }
 

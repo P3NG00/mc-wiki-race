@@ -575,6 +575,23 @@ for (const m of ['popular', 'everyday', 'deep', 'chaos'])
   check(`${m} rolls keep to their pool`, rolls[m].ok, `targets' links outside navboxes ${Math.round(rolls[m].body)} on average; ${rolls[m].sample.join(', ')}`);
 check('Popular targets are better linked than Everyday\'s, Everyday\'s than Deep cuts\'', rolls.popular.body > rolls.everyday.body && rolls.everyday.body > rolls.deep.body);
 check('a target topic pins the target, and the start comes from another', rolls.mobs);
+// A card must join the wiki's web of links: Bee Our Guest only links hubs, so it can start a game on Normal but not on
+// Hard, a Dungeons story subpage links nowhere, and nothing links the way to a Dungeons decoration page.
+const joins = JSON.parse(await ev(`(async () => {
+  setRules(['nonav', 'nohubs']);
+  const hard = (await joinsWeb('start'))('Bee Our Guest');
+  setRules(['nonav']);
+  const start = await joinsWeb('start'), goal = await joinsWeb('goal'), via = await joinsWeb('via0');
+  const ms = async () => { const t = performance.now(); (await joinsWeb('via0'))('Diamond'); return Math.round(performance.now() - t); };
+  const normal = await ms();
+  setRules([]);
+  const relaxed = await ms();
+  setRules(['nonav']);
+  return JSON.stringify({ got: [hard, start('Bee Our Guest'), start('Dungeons:Story/Arch Haven'), goal('Dungeons:Mainland Decoration'),
+    goal('Diamond'), via('Diamond'), start('No such page')], normal, relaxed });
+})()`));
+check('a card needs a route to or from the heart of the wiki’s links', joins.got.join() === 'false,true,false,false,true,true,true',
+  `${joins.got.join()}; a checkpoint's check ${joins.normal} ms in Normal, ${joins.relaxed} ms in Relaxed`);
 for (const m of ['popular', 'deep', 'chaos', 'everyday']) {
   await ev(`document.querySelector('input[value=${m}]').click()`);
   check(`rerolling in ${m} from the Pool row`, await until(ready), await ev("setup.start?.title + ' -> ' + setup.goal?.title"));

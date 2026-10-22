@@ -292,9 +292,11 @@
     box-shadow: var(--shadow); max-width: calc(100% - 32px); text-align: center; animation: toast 3s ease both;
   }
   @keyframes toast { from { opacity: 0; translate: 0 -12px; } 10%, 85% { opacity: 1; translate: 0; } to { opacity: 0; } }
+  .toast.stay { animation: toast-in .3s ease both; }   /* stays until the next navigation */
+  @keyframes toast-in { from { opacity: 0; translate: 0 -12px; } }
   .hud .goal.reached { animation: reached 1.2s ease-out; border-radius: var(--radius); }
   @keyframes reached { from { background: var(--accent-soft); box-shadow: 0 0 0 6px var(--accent-soft); } }
-  @media (prefers-reduced-motion: reduce) { .toast, .hud .goal.reached { animation: none; } }
+  @media (prefers-reduced-motion: reduce) { .toast, .toast.stay, .hud .goal.reached { animation: none; } }
 
   /* ---------- Modal ---------- */
   .modal-bg { position: fixed; inset: 0; background: rgba(0,0,0,.45); display: grid; place-items: center; padding: 16px; z-index: 10; }
@@ -1563,15 +1565,18 @@ function scrollRouteToNow() {
   if (now) route.scrollLeft = Math.min(now.offsetLeft, now.offsetLeft + now.offsetWidth - route.clientWidth);
 }
 
-// Called once the checkpoint's article has rendered, so the banner isn't hidden behind the loading overlay.
-// The 3 s matches the .toast animation; the timer also hides it when reduced motion turns the animation off.
-// A banner over the article, gone after ms or on the next navigation.
-function showToast(text, ms) {
+// A banner over the article, gone after ms (its animation runs as long, and the timer also hides it when reduced motion
+// turns the animation off), or with no ms only on the next navigation.
+function showToast(text, ms = null) {
   hideToast();
-  $('#toast').textContent = text;
-  $('#toast').classList.remove('hidden');
-  game.toastTimer = setTimeout(hideToast, ms);
+  const toast = $('#toast');
+  toast.textContent = text;
+  toast.classList.toggle('stay', ms === null);
+  toast.style.animationDuration = ms === null ? '' : ms + 'ms';
+  toast.classList.remove('hidden');
+  if (ms !== null) game.toastTimer = setTimeout(hideToast, ms);
 }
+// Called once the checkpoint's article has rendered, so the banner isn't hidden behind the loading overlay.
 // Scavenger's finds get one too: "✓ Found a Nether mob: Blaze (2 of 3)".
 function celebrateCheckpoint() {
   const n = checkpoints(), entry = game.path.at(-1), stranded = entry.hint === 'stranded', next = objective();
@@ -1580,7 +1585,7 @@ function celebrateCheckpoint() {
   // What comes next, or that the way on is cut off: on a round trip only giving up is left then (see turnBack).
   const then = !next ? '' : stranded ? `, but there’s no way ${next === game.goal ? 'back' : 'on'} to ${next.title} that doesn’t retrace your steps.`
     : `! Now ${next === game.goal && game.roundTrip ? 'head back to' : 'find'} ${next.title}`;
-  showToast(`✓ ${what}${then}`, stranded ? 6000 : 3000);
+  showToast(`✓ ${what}${then}${game.stuck ? ' ' + stuckText() : ''}`, game.stuck ? null : stranded ? 6000 : 3000);
   $('.hud .goal').classList.add('reached');
   play('checkpoint');
 }
@@ -1604,7 +1609,7 @@ function startGame() {
   const vias = roundTrip && !hunt ? [...cps.slice(0, out), setup.goal, ...cps.slice(out)] : cps, goal = roundTrip ? setup.start : hunt ? null : setup.goal;
   const exact = r.includes('exact') ? setup.exact : null, limit = exact ? exact.length - 1 : r.includes('limit') ? CLICK_LIMIT : 0;
   Object.assign(game, { active: true, start: setup.start, goal, vias, viaNext: 0, roundTrip, turn: roundTrip && !hunt ? out + 1 : 0, hunt,
-    dead: new Set(), exact, limit, celebrate: false, daily: setup.daily, rules: r, content: contentInPlay(cards.map(c => c.title)), path: [],
+    dead: new Set(), exact, limit, celebrate: false, stuck: false, daily: setup.daily, rules: r, content: contentInPlay(cards.map(c => c.title)), path: [],
     seen: new Map(), stack: [], elapsed: 0, runningSince: 0, loading: false, par: null });
   // Par shows in the header once it is known: at once when the setup screen has loaded the link graph.
   const parReady = game.parReady = cardsRoute(cards.map(c => c.title), r, kinds, back);
@@ -1704,14 +1709,17 @@ async function navigate(title, fragment, { back = false } = {}) {
 }
 
 // The frame posts 'ready' once its stylesheets have loaded and its links are wired up; only then does the clock resume.
-// It is sent from a separate <script>, so an error in the main frame script can't leave the game stuck loading.
-function frameReady(token) {
+// It is sent from a separate <script>, so an error in the main frame script can't leave the game stuck loading. live:
+// how many links on the article work, unknown (and no stuck banner) if that script failed or the frame timed out.
+function frameReady(token, live) {
   if (token !== game.navToken || !game.active || !game.loading) return;
   game.loading = false;
+  game.stuck = live === 0;
   hideOverlay();
   renderHud();
   resumeClock();
   if (game.celebrate) { game.celebrate = false; celebrateCheckpoint(); }
+  else if (game.stuck) showToast(stuckText());
   else showHint();
 }
 
@@ -1869,6 +1877,7 @@ function renderArticle(page, fragment, token, blocked = [], seen = []) {
       if (c?.seen) { a.classList.add('mwr-seen'); a.title = (a.title ? a.title + ' · ' : '') + 'already on your path'; }
       a.removeAttribute('target');
     }
+    window.mwrLive = document.querySelectorAll('.mwr-live').length;   // sent with ready, for the parent's stuck banner
     document.addEventListener('click', e => {
       const a = e.target.closest('a, area');
       if (!a) return;
@@ -2010,7 +2019,7 @@ ${WIKI_STYLES.map(h => `<link rel="stylesheet" href="${esc(h)}">`).join('\n')}
   <div id="bodyContent" class="vector-body"><div id="mw-content-text" class="mw-body-content mw-content-ltr">${page.text}</div></div>
 </div>
 <script>${frameScript}<\/script>
-<script>parent.postMessage({ mwr: 'ready', token: ${token} }, '*');<\/script>
+<script>parent.postMessage({ mwr: 'ready', token: ${token}, live: window.mwrLive }, '*');<\/script>
 </body></html>`;
   $('#frame').srcdoc = html;
 }
@@ -2019,7 +2028,7 @@ window.addEventListener('message', e => {
   if (e.source !== $('#frame').contentWindow || !e.data) return;
   if (e.data.mwr === 'nav') navigate(e.data.title, e.data.frag);
   if (e.data.mwr === 'dead' && game.active && !game.loading) play('dead');
-  if (e.data.mwr === 'ready') { syncFrameTheme(); frameReady(e.data.token); }
+  if (e.data.mwr === 'ready') { syncFrameTheme(); frameReady(e.data.token, e.data.live); }
   if (e.data.mwr === 'key' && e.data.key === 'Escape' && modalDismissable) closeModal();
 });
 
@@ -2307,11 +2316,17 @@ function huntFinds(page) {
     : KIND_MEMBERS.get(h.kind).has(page.title) || (live.has(h.kind) && !KINDS[h.kind].exclude.includes(page.title)));
 }
 
-// Shows the latest arrival's hint over the article, once both the hint and the article are ready.
+// Shows the latest arrival's hint over the article, once both the hint and the article are ready, unless the stuck
+// banner is there (the hint still goes on the path).
 function showHint() {
   const hint = game.path.at(-1)?.hint;
-  if (hint && game.active && !game.loading) showToast(HINTS[hint].text, hint === 'stranded' ? 6000 : 2000);
+  if (hint && game.active && !game.loading && !game.stuck) showToast(HINTS[hint].text, hint === 'stranded' ? 6000 : 2000);
 }
+// The stuck banner: no link on the article works. Rolls never give such a page (joinsWeb), but a custom article, a
+// challenge link or a live edit since the snapshot can, and No hubs, Exact clicks or a round trip's way back can leave
+// every link on a page dead.
+const stuckText = () => game.stack.length > 1 && canGoBack() ? '⛔ No live links on this page. Go Back, or give up.'
+  : '⛔ No live links on this page, and no going Back: only giving up is left.';
 
 // Golf: a win's clicks against par, as its golf name and what that means, for anyone who doesn't play golf. Below par is
 // only possible where the live wiki has a link the snapshot hasn't.

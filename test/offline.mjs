@@ -27,8 +27,9 @@ function check(name, ok, extra = '') {
 // what the wiki would send.
 const escHtml = s => s.replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 // Every article is this one: a link in the text, links to a hub, to a redirect to a hub, to the target hub Crafting, to a
-// Tutorial and to a Dungeons page, and one link in a navbox.
-const ARTICLE = title => `<div class="mw-parser-output"><p>${escHtml(title)}: <a href="/w/Diamond_Pickaxe">pickaxe</a> <a href="/w/Block">Block</a>
+// Tutorial and to a Dungeons page, and one link in a navbox. Bee Our Guest only links hubs, as on the wiki.
+const ARTICLE = title => title === 'Bee Our Guest'
+  ? '<div class="mw-parser-output"><p>An <a href="/w/Advancement">advancement</a> in <a href="/w/Java_Edition">Java Edition</a>.</p></div>' : `<div class="mw-parser-output"><p>${escHtml(title)}: <a href="/w/Diamond_Pickaxe">pickaxe</a> <a href="/w/Block">Block</a>
   <a href="/w/Blocks">Blocks</a> <a href="/w/Crafting">Crafting</a> <a href="/w/Tutorial:Mining">tutorial</a> <a href="/w/Dungeons:Creeper">dungeons</a></p>
   <table class="navbox"><tr><td><a href="/w/Creeper">Creeper</a></td></tr></table></div>`;
 // The live categories a parse reply gives, as the API writes them: Brand New Mob is only in the live wiki's Nether mobs,
@@ -592,6 +593,31 @@ const joins = JSON.parse(await ev(`(async () => {
 })()`));
 check('a card needs a route to or from the heart of the wiki’s links', joins.got.join() === 'false,true,false,false,true,true,true',
   `${joins.got.join()}; a checkpoint's check ${joins.normal} ms in Normal, ${joins.relaxed} ms in Relaxed`);
+// A page with no live link (Bee Our Guest on Hard, its links all hubs) gets a banner that stays until the next
+// navigation: go Back, or with no Back only give up. On Normal its links work.
+const stuck = `[game.stuck, ${toast}, document.querySelector('#toast').matches('.stay:not(.hidden)')].join('|')`;
+await open('#start=Diamond&target=Zombie&rules=nonav,nohubs');
+await until(ready);
+await play();
+check('a page with live links has no stuck banner', await ev(stuck) === 'false||false', await ev(stuck));
+await ev("navigate('Bee Our Guest', null)");
+await until('game.path.length === 2 && !game.loading');
+check('a page with no live links says to go Back or give up, and the banner stays',
+  await ev(stuck) === 'true|⛔ No live links on this page. Go Back, or give up.|true' && await ev("getComputedStyle(document.querySelector('#toast')).animationName === 'toast-in'"), await ev(stuck));
+await ev('goBack()');
+await until('game.path.length === 3 && !game.loading');
+check('leaving it takes the banner away', await ev(stuck) === 'false|⛔ No live links on this page. Go Back, or give up.|false', await ev(stuck));
+await ev("finish(false); closeModal(); toSetup()");
+await open('#start=Bee%20Our%20Guest&target=Diamond&rules=nonav,nohubs');
+await until(ready);
+await play();
+check('a start with no live links leaves only giving up', await ev(stuck) === 'true|⛔ No live links on this page, and no going Back: only giving up is left.|true', await ev(stuck));
+await ev("finish(false); closeModal(); toSetup()");
+await open('#start=Bee%20Our%20Guest&target=Diamond&rules=nonav');
+await until(ready);
+await play();
+check('on Normal its hub links work, so no banner', await ev(stuck) === 'false||false', await ev(stuck));
+await ev("finish(false); closeModal(); toSetup()");
 for (const m of ['popular', 'deep', 'chaos', 'everyday']) {
   await ev(`document.querySelector('input[value=${m}]').click()`);
   check(`rerolling in ${m} from the Pool row`, await until(ready), await ev("setup.start?.title + ' -> ' + setup.goal?.title"));

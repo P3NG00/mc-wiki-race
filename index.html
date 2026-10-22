@@ -817,7 +817,7 @@ const poolLabel = () => $('input[name=mode]:checked').parentElement.textContent.
 function updateGameSum() {
   const g = gameMode(), back = backCount(), detail = { relay: `${viaCount()} checkpoint${viaCount() > 1 ? 's' : ''}${back ? `, ${back} on the way back` : ''}`,
     scavenger: `${HUNT_SIZE} ${$('#huntMode').value}` }[g];
-  $('#gameSum').textContent = [GAMES[g].label + (detail ? ` (${detail})` : ''), ...rules().filter(k => EXTRA_RULES.includes(k)).map(k => RULES[k].label),
+  $('#gameSum').textContent = [GAMES[g].label + (detail ? ` (${detail})` : ''), ...extraLabels(rules()),
     poolLabel() + ' articles', LEVELS[level()].label].join(' · ');
 }
 
@@ -853,7 +853,9 @@ const GAMES = {
   exact: { rule: 'exact', label: 'Exact clicks', diagram: 'A → → → → B', blurb: `Land on it in exactly par + ${EXACT_EXTRA}.`,
     help: `reach the target in exactly par + ${EXACT_EXTRA} clicks, never on a page twice. Too soon loses too, so plan a detour.` },
 };
-const EXTRA_RULES = ['roundtrip', 'noback', 'blind', 'distance', 'limit'];
+const EXTRA_RULES = ['roundtrip', 'noback', 'blind', 'limit', 'distance'];
+// The extra rules among keys as labels, in their boxes' order.
+const extraLabels = keys => EXTRA_RULES.filter(k => keys.includes(k)).map(k => RULES[k].label);
 // The extra rules Exact clicks plays without, and why: it has its own count, and a round trip ends on a page already visited.
 const OFF_IN_EXACT = { limit: 'Off: Exact clicks has its own count.', roundtrip: 'Off: Exact clicks never visits a page twice.' };
 // The game a set of rules plays: a link made by hand with more than one game's rule plays the first of these.
@@ -1507,7 +1509,7 @@ function renderHistory() {
   }
   $('#history').classList.toggle('hidden', rows.length === 0);
   $('#history tbody').innerHTML = rows.slice(0, 15).map(r => {
-    const tags = [[GAMES[gameOf(r.rules)].label, 'game'], ...r.rules.filter(k => EXTRA_RULES.includes(k)).map(k => [RULES[k].label]),
+    const tags = [[GAMES[gameOf(r.rules)].label, 'game'], ...extraLabels(r.rules).map(t => [t]),
       ...r.daily ? [[`Daily ${shortDate(new Date(r.daily + 'T00:00'))}`, 'daily']] : []];   // local midnight of that day
     const loss = lossOf(r), golf = r.won && !r.exact && r.par !== undefined ? golfScore(r.clicks, r.par) : null;
     const result = r.won ? ['✓ ' + clicksText(r.clicks), 'won'] : loss ? [`✗ ${LOSSES[loss]}`, 'lost'] : ['Gave up', ''];
@@ -1617,7 +1619,7 @@ function renderObjective() {
   const home = game.roundTrip && !hunting() && (!game.turn || game.viaNext >= game.turn);
   const progress = [left && `Found ${game.hunt.length - left.length} of ${game.hunt.length}`, game.exact && `Land on the target on click ${game.limit}, not before`,
     n && `${reached} of ${n} checkpoint${n > 1 ? 's' : ''} reached`, game.roundTrip && (home ? 'On the way back' : 'On the way there')].filter(Boolean).join(' · ');
-  $('#hudTags').innerHTML = [GAMES[g].label, ...game.rules.filter(k => EXTRA_RULES.includes(k)).map(k => RULES[k].label)]
+  $('#hudTags').innerHTML = [GAMES[g].label, ...extraLabels(game.rules)]
     .map((t, i) => `<span class="tag${i ? '' : ' game'}">${esc(t)}</span>`).join('') + (progress ? ` <span class="note">${esc(progress)}</span>` : '');
   const goal = { state: objective() === game.goal ? 'now' : 'ahead', k: game.roundTrip ? 'Back to' : game.exact ? `Target · exactly ${game.limit}` : 'Target',
     name: game.goal?.title, goal: true };
@@ -2446,7 +2448,7 @@ const LOSSES = { outOfClicks: 'Out of clicks', tooSoon: 'Too soon' };
 const lossOf = r => Object.keys(LOSSES).find(k => r[k]);
 
 // A result's game and extra rules as labels, and the settings the labels don't say.
-const resultLabels = rec => ({ tags: [GAMES[gameOf(rec.rules)].label, ...rec.rules.filter(k => EXTRA_RULES.includes(k)).map(k => RULES[k].label)],
+const resultLabels = rec => ({ tags: [GAMES[gameOf(rec.rules)].label, ...extraLabels(rec.rules)],
   otherSettings: settingsText({ ...rec, rules: rec.rules.filter(k => LEVEL_RULES.includes(k)) }) });
 
 // lost: a LOSSES key, for a game lost rather than won or given up.

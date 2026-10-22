@@ -2141,23 +2141,33 @@ async function linkGraph(navboxes) {
   return { links: links.decoded, ...boxes.decoded };
 }
 
+// Whether a page is game content (it has a topic or a family), by page number. Version pages, data values and lists
+// link to most of the wiki, so they are on a shortest route for most pairs, though one through content alone is often
+// as short.
+const CONTENT_PAGES = WIKI_DATA.articles.map(([, , , topic, families]) => !!topic || families.length > 0);
 // One route with the fewest clicks from one page to another (or to the nearest of a list), as titles, or null if there
-// is none. usable(page): whether the route may go through a page.
+// is none. usable(page): whether the route may go through a page. Of the routes with the fewest clicks it takes one
+// through the fewest pages that aren't content, then the first by page number: each level of the search goes in that
+// order, so the first page to reach another (or to open a navbox) is the best one to come from.
 function shortestRoute(graph, from, to, usable) {
   const start = PAGE_IDS.get(from), goals = new Set([to].flat().map(t => PAGE_IDS.get(t)).filter(v => v !== undefined));
   if (start === undefined || !goals.size) return null;
-  const prev = new Map([[start, -1]]), opened = new Set(), queue = [start];
-  for (let i = 0; i < queue.length; i++) {
-    const u = queue[i];
-    if (goals.has(u)) {
+  const prev = new Map([[start, -1]]), off = new Map([[start, 0]]), opened = new Set();   // off: pages that aren't content so far
+  for (let level = [start]; level.length;) {
+    const found = level.filter(u => goals.has(u));
+    if (found.length) {
       const route = [];
-      for (let v = u; v !== -1; v = prev.get(v)) route.unshift(WIKI_DATA.articles[v][0]);
+      for (let v = found.reduce((a, b) => off.get(b) < off.get(a) ? b : a); v !== -1; v = prev.get(v)) route.unshift(WIKI_DATA.articles[v][0]);
       return route;
     }
-    const reach = v => { if (!prev.has(v) && usable(v)) { prev.set(v, u); queue.push(v); } };
-    graph.links[u].forEach(reach);
-    // A navbox links the same pages wherever it is, so it is only opened the first, nearest time.
-    for (const b of graph.carries?.[u] ?? []) if (!opened.has(b)) { opened.add(b); graph.boxes[b].forEach(reach); }
+    const next = [], through = u => off.get(u) + !CONTENT_PAGES[u];
+    for (const u of level.sort((a, b) => through(a) - through(b))) {
+      const reach = v => { if (!prev.has(v) && usable(v)) { prev.set(v, u); off.set(v, through(u)); next.push(v); } };
+      graph.links[u].forEach(reach);
+      // A navbox links the same pages wherever it is, so it is only opened the first, nearest time.
+      for (const b of graph.carries?.[u] ?? []) if (!opened.has(b)) { opened.add(b); graph.boxes[b].forEach(reach); }
+    }
+    level = next;
   }
   return null;
 }

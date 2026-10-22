@@ -867,19 +867,26 @@ await ev("finish(false); closeModal(); toSetup()");
 check('history entries with an unknown Content key are left out', await ev("(r => isRecord(r) && !isRecord({ ...r, content: ['Nope'] }))(savedGames()[0])"));
 
 // Par: routes go by the graph files and keep to the game's settings. Each step must be a link in the graph it was found
-// in, Relaxed's are never longer than Normal's nor Normal's than Hard's, Hard's avoid hubs but the target, a spin-off page
-// is only reachable with its spin-off on, and a checkpoint's route goes through it.
+// in, Relaxed's are never longer than Normal's nor Normal's than Hard's, Hard's avoid hubs but the target, Normal's only
+// goes through a page that isn't content when no route through content alone is as short, a spin-off page is only
+// reachable with its spin-off on, and a checkpoint's route goes through it.
 const par = JSON.parse(await ev(`(async () => {
   const relaxed = await linkGraph(true), id = t => PAGE_IDS.get(t);
   const linked = (g, a, b) => g.links[id(a)].includes(id(b)) || (g.carries?.[id(a)] ?? []).some(x => g.boxes[x].includes(id(b)));
   const follows = (g, route) => route.every((t, i) => i === 0 || linked(g, route[i - 1], t));
-  const hubs = new Set(HUB_TITLES.values()), bad = [];
+  const hubs = new Set(HUB_TITLES.values()), bad = [], offContent = [];
+  let throughContent = 0;
   for (let i = 0; i < 30; i++) {
     const start = pick(POOL_TITLES), goal = pick(POOL_TITLES);
     if (start === goal) continue;
     const [r, n, h] = await Promise.all([[], ['nonav'], ['nohubs', 'nonav']].map(rules => parRoute({ start, goal, rules })));
     if (!r || !n || !follows(relaxed, r) || !follows({ links: relaxed.links }, n) || r.length > n.length || (h && (h.length < n.length
       || h.slice(1).some(t => hubs.has(t) && t !== goal)))) bad.push(start + ' -> ' + goal);
+    const pure = n && shortestRoute({ links: relaxed.links }, start, goal, v => CONTENT_PAGES[v]);
+    if (pure?.length === n.length) {
+      throughContent++;
+      if (n.some(t => !CONTENT_PAGES[id(t)])) offContent.push(n.join(' → '));
+    }
   }
   const off = await parRoute({ start: 'Minecraft Dungeons', goal: 'Dungeons:Creeper', rules: ['nonav'] });
   const on = await parRoute({ start: 'Minecraft Dungeons', goal: 'Dungeons:Creeper', rules: ['nonav'], content: ['Dungeons'] });
@@ -903,13 +910,15 @@ const par = JSON.parse(await ev(`(async () => {
   const loop = await parRoute({ start: 'Diamond', vias: ['Creeper', 'Zombie'], goal: 'Bamboo', back: 1, rules: ['nonav', 'roundtrip'] });
   const kinds = ['Nether mobs', 'Enchantments', 'Potions'];
   const [hunt, huntHome] = await Promise.all([[], ['roundtrip']].map(r => parRoute({ start: 'Diamond', kinds, rules: ['nonav', 'scavenger', ...r] })));
-  return JSON.stringify({ bad, roundTrips, atBound, spinoff: off === null && on?.at(-1) === 'Dungeons:Creeper', via: via?.includes('Creeper') && via.at(-1) === 'Bamboo',
+  return JSON.stringify({ bad, offContent, throughContent, roundTrips, atBound, spinoff: off === null && on?.at(-1) === 'Dungeons:Creeper', via: via?.includes('Creeper') && via.at(-1) === 'Bamboo',
     relay: relay?.indexOf('Creeper') > 0 && relay.indexOf('Zombie') > relay.indexOf('Creeper') && relay.at(-1) === 'Bamboo',
     loop: loop?.indexOf('Creeper') > 0 && loop.indexOf('Bamboo') > loop.indexOf('Creeper') && loop.lastIndexOf('Zombie') > loop.indexOf('Bamboo') && loop.at(-1) === 'Diamond'
       && follows({ links: relaxed.links }, loop) && offWay(loop, loop.indexOf('Bamboo'), ['Zombie', 'Diamond']),
     kinds: !!hunt && huntHome?.at(-1) === 'Diamond' && huntHome.length > hunt.length && follows({ links: relaxed.links }, huntHome) });
 })()`));
 check('par routes follow the graph, Relaxed ≤ Normal ≤ Hard, Hard without hubs', par.bad.length === 0, par.bad.slice(0, 3).join(', '));
+check('par shows a route through content alone when one is as short', par.offContent.length === 0 && par.throughContent >= 10,
+  `${par.throughContent} of 30 had one; ${par.offContent.slice(0, 3).join(', ')}`);
 check('par reaches a spin-off page only with its spin-off on', par.spinoff);
 check('par goes through the checkpoint, and through two in order', par.via && par.relay);
 check('round trip par goes there and back, the way back off the way there', par.roundTrips.length === 0 && par.atBound >= 15, `${par.atBound} at the bound; ${par.roundTrips.join(', ')}`);

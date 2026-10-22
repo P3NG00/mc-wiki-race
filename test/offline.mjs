@@ -144,8 +144,8 @@ check('Share gives the game, the result, the path and the game\'s link', await e
 check('the record keeps par, and the history shows it', await ev("Number.isInteger(savedGames()[0].par)") && await until(
   "toSetup(), document.querySelector('#history tbody tr .h-result .note').textContent.endsWith('par ' + savedGames()[0].par)"),
   await ev("document.querySelector('#history tbody tr .h-result')?.textContent"));
-check('golf names a win against par, saying what each means', await ev("[[1, 1], [2, 2], [3, 2], [4, 2], [5, 2], [9, 2], [1, 2], [1, 3]].map(([c, p]) => golfText(golfScore(c, p))).join('|')")
-  === 'Hole in one! (par 1 in one click)|Par (even with par)|Bogey (1 over par)|Double bogey (2 over par)|Triple bogey (3 over par)|7 over par|Birdie (1 under par)|Eagle (2 under par)');
+check('golf names a win against par, saying what each means', await ev("[[1, 1], [2, 2], [3, 2], [4, 2], [5, 2], [9, 2], [1, 2], [1, 3], [1, 4], [1, 6]].map(([c, p]) => golfText(golfScore(c, p))).join('|')")
+  === 'Hole in one! (par 1 in one click)|Par (even with par)|Bogey (1 over par)|Double bogey (2 over par)|Triple bogey (3 over par)|7 over par|Birdie (1 under par)|Eagle (2 under par)|Albatross (3 under par)|5 under par');
 await ev('closeModal(); toSetup()');
 // The Timer box, on by default: off, the header has no clock, the result and Share say nothing of time, the record has
 // none and the history shows a dash. A game without a time beats another only on clicks.

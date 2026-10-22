@@ -54,6 +54,50 @@ const shot = async name => {
 
 // Challenge link → play → two clicks → win.
 await send('browsingContext.navigate', { context: ctx, url: fileUrl + '#start=Diamond&target=Diamond%20Pickaxe', wait: 'complete' });
+// What the checks below take from the live wiki by name, asked for here apart from the game. An edit that changes any of
+// these fails here, by name, so a check further down failing with it means picking another page, not a bug in the game.
+// Pages loaded by title must not have become redirects, since the checks compare the title the game shows.
+const liveOff = JSON.parse(await ev(`(async () => {
+  const titles = ['Diamond', 'Diamond Pickaxe', 'Pickaxe', 'Iron Pickaxe', 'Crafting', 'Beacon', 'Icons.png', 'Minecraft Dungeons',
+    'Dungeons:Creeper', 'Blaze Rod', 'Blaze', 'Zombified Piglin', 'Iron Ingot', 'Gold Ingot', 'Coal', 'Emerald', 'Redstone Dust', 'Oxygène',
+    'Gravelly Mountains+', 'How did we get here? (block)', 'Village & Pillage'];
+  // A request that fails leaves its pages null, which fails the facts about them.
+  const info = await api({ action: 'query', prop: 'info', titles: [...titles, 'de:Diamant'].join('|') }).then(d => d.query, () => null);
+  const doc = t => api({ action: 'parse', page: t, prop: 'text|categories', redirects: '1' }).then(({ parse: p }) =>
+    Object.assign(new DOMParser().parseFromString(p.text, 'text/html'), { cats: p.categories.map(c => c.category) }), () => null);
+  const [diamond, pickaxe, diamondPickaxe, ironIngot, beacon, icons, dungeons, creeper, blazeRod, blaze] = await Promise.all(
+    ['Diamond', 'Pickaxe', 'Diamond Pickaxe', 'Iron Ingot', 'Beacon', 'Icons.png', 'Minecraft Dungeons', 'Dungeons:Creeper', 'Blaze Rod', 'Blaze'].map(doc));
+  const zpDesc = await pageInfo('Zombified Piglin').then(i => i?.desc, () => null);
+  const hrefs = (d, sel = 'a[href^="/w/"]') => [...d.querySelectorAll(sel)].map(a => a.getAttribute('href'));
+  const linksTo = (d, t) => hrefs(d).some(h => h.split('#')[0] === '/w/' + t);
+  const textTitles = d => [...d.querySelectorAll('a[href^="/w/"]')].filter(a => !a.closest('.navbox'))
+    .map(a => decodeURIComponent(a.getAttribute('href').slice(3).split('#')[0]).replace(/_/g, ' '));
+  const facts = {
+    'the pages loaded by title are articles under those titles, de:Diamant an interwiki title': () => titles.every(t =>
+      (p => p && !p.missing && !p.redirect)(info.pages.find(p => p.title === t))) && info.interwiki?.some(i => i.title === 'de:Diamant'),
+    'Diamond links Pickaxe (plain), Diamond Pickaxe and Tutorial: pages, 100+ links in all, 50+ outside its navboxes': () =>
+      hrefs(diamond).includes('/w/Pickaxe') && linksTo(diamond, 'Diamond_Pickaxe') && hrefs(diamond).some(h => h.startsWith('/w/Tutorial:')) &&
+      hrefs(diamond).length > 100 && textTitles(diamond).filter(t => !t.includes(':')).length > 50 && !!diamond.querySelector('.navbox'),
+    'Diamond’s text links hubs, the Crafting hub and Pickaxe': () => (ts => ts.some(t => HUB_TITLES.has(t) && HUB_TITLES.get(t) !== 'Crafting') &&
+      ts.some(t => HUB_TITLES.get(t) === 'Crafting') && ts.includes('Pickaxe'))(textTitles(diamond)),
+    'Pickaxe links Diamond, Iron Pickaxe and Diamond Pickaxe, and Diamond Pickaxe links Pickaxe (plain)': () =>
+      ['Diamond', 'Iron_Pickaxe', 'Diamond_Pickaxe'].every(t => linksTo(pickaxe, t)) && hrefs(diamondPickaxe).includes('/w/Pickaxe'),
+    'Pickaxe has a crafting output slot of two or more items and infobox tabs of three or more panels': () =>
+      new Set([...pickaxe.querySelector('.mcui .invslot-large.animated').children].map(f => f.querySelector('a')?.title)).size > 1 &&
+      pickaxe.querySelectorAll('.infobox .tabber > .tabbertab[data-title]').length > 2,
+    'Iron Ingot has 50+ links': () => hrefs(ironIngot).length > 50,
+    'Beacon has a layered blueprint of three or more layers and a calculator': () =>
+      beacon.querySelectorAll('.layered-blueprint .layered-blueprint-layer').length > 2 &&
+      beacon.querySelectorAll('.layered-blueprint .layered-blueprint-tab').length > 1 && !!beacon.querySelector('.mcw-calc'),
+    'Icons.png has image-map links': () => hrefs(icons, 'area[href^="/w/"]').length > 0,
+    'Minecraft Dungeons and Dungeons:Creeper link Dungeons: pages': () => [dungeons, creeper].every(d => hrefs(d).some(h => h.startsWith('/w/Dungeons:'))),
+    'Blaze Rod links Blaze (plain), which the live wiki puts in Nether mobs': () => hrefs(blazeRod).includes('/w/Blaze') && blaze.cats.includes('Nether_mobs'),
+    'Zombified Piglin’s intro starts “Zombified piglins are”': () => zpDesc.startsWith('Zombified piglins are'),
+  };
+  return JSON.stringify(Object.keys(facts).filter(f => { try { return facts[f]() !== true; } catch { return true; } }));
+})()`));
+check('the live wiki still has what the checks lean on', !liveOff.length, liveOff.length ? 'changed: ' + liveOff.join('; ') : '');
+
 check('challenge pair loads', await until("!document.querySelector('#btnPlay').disabled"),
   await ev("setup.start?.title + ' -> ' + setup.goal?.title"));
 await shot('1-setup');
@@ -400,7 +444,7 @@ check('a challenge link can start on a spin-off page', await until("!document.qu
 await ev("document.querySelector('#btnPlay').click()");
 await until("game.path.length === 1 && !game.loading");
 check('a card in a spin-off turns its links on without the checkbox', await ev("JSON.stringify(game.content) === '[\"Dungeons\"]'") &&
-  (await dungeonsLinks()).every(l => l), await ev("JSON.stringify(game.content)"));
+  (links => links.length > 0 && links.every(l => l))(await dungeonsLinks()), await ev("JSON.stringify(game.content)"));
 await ev("finish(false); closeModal(); toSetup()");
 check('history entries with unknown Content are left out', await ev(`(r => isRecord(r) && !isRecord({ ...r, content: ['Nope'] }))(savedGames()[0])`));
 

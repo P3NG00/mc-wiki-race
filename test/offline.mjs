@@ -23,9 +23,12 @@ function check(name, ok, extra = '') {
   if (!ok) failures++;
 }
 
+// The wiki escapes a title in its HTML, so the made-up replies do too: the injection check below needs a page to be
+// what the wiki would send.
+const escHtml = s => s.replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 // Every article is this one: a link in the text, links to a hub, to a redirect to a hub, to the target hub Crafting, to a
 // Tutorial and to a Dungeons page, and one link in a navbox.
-const ARTICLE = title => `<div class="mw-parser-output"><p>${title}: <a href="/w/Diamond_Pickaxe">pickaxe</a> <a href="/w/Block">Block</a>
+const ARTICLE = title => `<div class="mw-parser-output"><p>${escHtml(title)}: <a href="/w/Diamond_Pickaxe">pickaxe</a> <a href="/w/Block">Block</a>
   <a href="/w/Blocks">Blocks</a> <a href="/w/Crafting">Crafting</a> <a href="/w/Tutorial:Mining">tutorial</a> <a href="/w/Dungeons:Creeper">dungeons</a></p>
   <table class="navbox"><tr><td><a href="/w/Creeper">Creeper</a></td></tr></table></div>`;
 // The live categories a parse reply gives, as the API writes them: Brand New Mob is only in the live wiki's Nether mobs,
@@ -42,11 +45,11 @@ function answer(request, url) {
   requests.set(kind, (requests.get(kind) || 0) + 1);
   if (p.get('action') === 'parse') {
     const t = p.get('page');
-    return reply(request, JSON.stringify({ parse: { title: t, displaytitle: t, text: ARTICLE(t),
+    return reply(request, JSON.stringify({ parse: { title: t, displaytitle: escHtml(t), text: ARTICLE(t),
       categories: (LIVE_CATEGORIES[t] ?? []).map(category => ({ sortkey: '', category })) } }));
   }
   if (p.get('action') === 'query' && p.has('titles')) {
-    return reply(request, JSON.stringify({ query: { pages: p.get('titles').split('|').map(t => ({ title: t, ns: nsOf(t), pageprops: {}, extract: `About ${t}.` })) } }));
+    return reply(request, JSON.stringify({ query: { pages: p.get('titles').split('|').map(t => t.startsWith('No such ') ? { title: t, missing: true } : { title: t, ns: nsOf(t), pageprops: {}, extract: `About ${t}.` }) } }));
   }
   return reply(request, JSON.stringify({ error: { code: 'offline', info: 'Not answered offline: ' + kind } }));
 }
@@ -149,7 +152,7 @@ await ev(`navigate(${JSON.stringify(deadEnd)}, null)`);
 check('Hot/cold: walking into a dead end is colder', await until("game.path.at(-1).hint === 'colder' && !game.loading"), `${deadEnd}: ${await ev('game.path.at(-1).hint')}`);
 await ev("navigate('Brand New Mob', null)");
 check('Hot/cold has no hint for a page the snapshot lacks', await until("game.path.at(-1).hint === 'unknown' && !game.loading"));
-check('the rule is in the game\'s rules and its challenge link', await ev("game.rules.includes('hotcold') && challengeLink().includes('hotcold')"));
+check('the rule is in the game\'s rules and its challenge link', await ev("game.rules.includes('hotcold') && openLink(new URL(challengeLink()).hash.slice(3)).includes('hotcold')"));
 await ev("finish(false); closeModal(); toSetup()");
 // With a checkpoint, the target reached before it isn't the objective yet, so it gets a hint too.
 await open('#start=Diamond&via=Creeper&target=Crafting&rules=hotcold');
@@ -173,7 +176,7 @@ const toast = "document.querySelector('#toast').textContent";
 await open('#start=Diamond&via=Creeper&via=Zombie&target=Crafting');
 check('a link with two checkpoints shows two numbered cards in order', await until(ready) && await ev(`viaCount() === 2 && document.querySelector('.pair').dataset.vias === '2'
   && ['via0', 'via1'].map(w => setup[w].title + ' ' + document.querySelector('#card-' + w + ' .tag').textContent).join() === 'Creeper Checkpoint 1,Zombie Checkpoint 2'
-  && document.querySelector('#slot-via2').classList.contains('hidden') && challengeLink().includes('&via=Creeper&via=Zombie&')`));
+  && document.querySelector('#slot-via2').classList.contains('hidden') && openLink(new URL(challengeLink()).hash.slice(3)).includes('&via=Creeper&via=Zombie&')`));
 await play();
 check('the HUD names the first checkpoint', await ev(hud) === 'Checkpoint 1 Creeper', await ev(hud));
 await ev("navigate('Zombie', null)");
@@ -222,7 +225,7 @@ await open('#start=Diamond&target=Zombie&rules=roundtrip');
 check('a round trip is a Race with the Round trip box, the start as the finish and ⇄', await until(ready) && await ev(`gameMode() === 'race' && rules().join() === 'roundtrip'
   && document.querySelector('input.rule[value=roundtrip]').checked && document.querySelector('#cardStart .tag').textContent === 'Start and finish'
   && document.querySelector('#pairArrow').textContent === '⇄' && document.querySelector('#games input[value=race]').parentElement.querySelector('.diagram').textContent === 'A ⇄ B'
-  && challengeLink().endsWith('&rules=roundtrip') && document.querySelector('#gameSum').textContent.startsWith('Race · Round trip')`), await ev("document.querySelector('#gameSum').textContent"));
+  && openLink(new URL(challengeLink()).hash.slice(3)).endsWith('&rules=roundtrip') && document.querySelector('#gameSum').textContent.startsWith('Race · Round trip')`), await ev("document.querySelector('#gameSum').textContent"));
 const rtPar = await ev("cardsRoute(['Diamond', 'Zombie'], rules()).then(r => r.length - 1)");
 check('setup par is the round trip\'s', await until(`document.querySelector('#setupPar').textContent === 'Par ${rtPar}'`), `par ${rtPar}`);
 await play();
@@ -250,7 +253,7 @@ check('a Relay round trip shows the target between the checkpoints', await until
   && backCount() === 1 && ${visibleCards} === 'Diamond,Creeper,Crafting,Zombie' && document.querySelector('#pairArrow').textContent === '➜'
   && document.querySelector('#goalArrow').checkVisibility() && !document.querySelector('#slot-via1 .arrow').checkVisibility()
   && document.querySelector('#gameHelp').textContent.includes('there and back') && document.querySelector('#gameSum').textContent.includes('2 checkpoints, 1 on the way back')
-  && challengeLink().includes('&via=Creeper&via=Zombie&back=1&rules=checkpoint,roundtrip')`), await ev(visibleCards));
+  && openLink(new URL(challengeLink()).hash.slice(3)).includes('&via=Creeper&via=Zombie&back=1&rules=checkpoint,roundtrip')`), await ev(visibleCards));
 const tripPar = await ev("cardsRoute(['Diamond', 'Creeper', 'Zombie', 'Crafting'], rules(), null, 1).then(r => r.length - 1)");
 await play();
 check('the HUD names the first checkpoint', await ev(hud) === 'Checkpoint 1 Creeper', await ev(hud));
@@ -307,7 +310,7 @@ await ev("finish(false); closeModal(); toSetup()");
 await ev("reroll('all')");
 await until(ready);
 await ev("document.querySelector('#btnCopy').click()");
-check('Copy challenge link picks them and holds them unseen', await until('!!setup.goal && setup.busy === 0') && await ev(`challengeLink().includes('&target=') && ${visibleCards}.endsWith(',Hidden,Hidden')`));
+check('Copy challenge link picks them and holds them unseen', await until('!!setup.goal && setup.busy === 0') && await ev(`openLink(new URL(challengeLink()).hash.slice(3)).includes('&target=') && ${visibleCards}.endsWith(',Hidden,Hidden')`));
 await ev("window.held = [setup.via0, setup.goal]; document.querySelector('#rules input[value=blind]').click()");
 check('turning Blind target off drops them and rolls new ones to show', await until(ready)
   && await ev(`!${visibleCards}.includes('Hidden') && !!setup.via0 && !!setup.goal && setup.via0 !== held[0] && setup.goal !== held[1]`), await ev(visibleCards));
@@ -444,7 +447,7 @@ await open('#start=Diamond&kind=Nether%20mobs&kind=Enchantments&kind=Potions&rul
 check('Scavenger: a kinds link puts its kinds on the hunt card in place of the target', await until(ready) && await ev(`huntMode() === 'kinds'
   && setup.kinds.join() === 'Nether mobs,Enchantments,Potions' && !document.querySelector('#cardHunt').classList.contains('hidden')
   && document.querySelector('#cardGoal').classList.contains('hidden') && document.querySelector('#cardHunt .kinds').textContent.includes('a mob found in the Nether')
-  && challengeLink().endsWith('#start=Diamond&kind=Nether%20mobs&kind=Enchantments&kind=Potions&rules=scavenger')`));
+  && openLink(new URL(challengeLink()).hash.slice(3)) === 'start=Diamond&kind=Nether%20mobs&kind=Enchantments&kind=Potions&rules=scavenger'`));
 const kindsPar = JSON.parse(await ev(`cardsRoute(['Diamond'], rules(), setup.kinds).then(r => JSON.stringify({ route: r,
   each: setup.kinds.every(k => r.slice(1).some(t => KIND_MEMBERS.get(k).has(t))) }))`));
 check('its par is a route through a member of each kind', kindsPar.each && await until(`document.querySelector('#setupPar').textContent === 'Par ${kindsPar.route.length - 1}'`),
@@ -489,8 +492,8 @@ check('a start in one of the kinds rolls them again', await until("setup.start?.
 await open('#start=Diamond&target=Bamboo&via=Ghast&via=Sharpness&rules=scavenger,hotcold');
 check('Scavenger: an articles link shows three Find cards joined by +', await until(ready) && await ev(`huntMode() === 'articles' && cardKeys().join() === 'start,via0,via1,goal'
   && ['#card-via0', '#card-via1', '#cardGoal'].every(c => document.querySelector(c + ' .tag').textContent === 'Find')
-  && document.querySelector('#slot-via0 .arrow').textContent === '+' && challengeLink().endsWith('&target=Bamboo&via=Ghast&via=Sharpness&rules=hotcold,scavenger')`),
-  await ev('challengeLink()'));
+  && document.querySelector('#slot-via0 .arrow').textContent === '+' && openLink(new URL(challengeLink()).hash.slice(3)).endsWith('&target=Bamboo&via=Ghast&via=Sharpness&rules=hotcold,scavenger')`),
+  await ev('openLink(new URL(challengeLink()).hash.slice(3))'));
 const best = JSON.parse(await ev(`Promise.all(orders(['Ghast', 'Sharpness', 'Bamboo']).map(o => parRoute({ start: 'Diamond', vias: o.slice(0, -1), goal: o.at(-1), rules: ['nonav'] })))
   .then(rs => JSON.stringify([Math.min(...rs.map(r => r.length - 1)), document.querySelector('#setupPar').textContent]))`));
 check('its par is the best of the orders', await until(`document.querySelector('#setupPar').textContent === 'Par ${best[0]}'`), best.join(' / '));
@@ -705,6 +708,53 @@ await ev('finish(false)');
 check('par names a card\'s page that isn\'t in the snapshot', await until("document.querySelector('#par')?.textContent.startsWith('“Brand New Mob” isn’t in the wiki')"),
   await ev("document.querySelector('#par')?.textContent"));
 await ev('closeModal(); toSetup()');
+
+// Challenge links are sealed: the URL holds none of the titles, two links to one game differ, and each opens to the same
+// game. A damaged or overlong blob rolls a random pair and says so. A made-up sealed link's missing article isn't named,
+// and a hand-made one's is, since its titles are in the URL.
+const cardsAndRules = "[setup.start?.title, setup.via0?.title, setup.goal?.title, rules().join()].join()";
+await open('#start=Diamond&via=Creeper&target=Crafting&rules=checkpoint,blind');
+const sealed = JSON.parse(await ev('JSON.stringify([challengeLink(), challengeLink()])')), sealedGame = await ev(cardsAndRules);
+check('a challenge link holds no title and differs each time', sealed.every(l => /#g=[\w-]+$/.test(l) && !/Diamond|Creeper|Crafting|blind/.test(l))
+  && sealed[0] !== sealed[1], sealed[0]);
+await open(new URL(sealed[0]).hash);
+check('a sealed link opens to its game, held unseen', sealedGame === 'Diamond,Creeper,Crafting,blind,checkpoint' && await ev(cardsAndRules) === sealedGame
+  && await ev(visibleCards) === 'Diamond,Hidden,Hidden', await ev(cardsAndRules));
+const damaged = "document.querySelector('#setupStatus').textContent.startsWith('The challenge link is damaged')";
+const flipped = sealed[0].slice(0, -8) + (sealed[0].at(-8) === 'A' ? 'B' : 'A') + sealed[0].slice(-7);
+check('a damaged link rolls a random pair and says so', await open(new URL(flipped).hash) && await until(damaged),
+  await ev("document.querySelector('#setupStatus').textContent"));
+check('an overlong blob is not opened', await open('#g=' + 'A'.repeat(9000)) && await until(damaged));
+await open('#g=' + await ev("sealLink('start=No%20such%20page%2C%20visit%20example.com&target=Diamond')"));
+check('a sealed link\'s missing article isn\'t named', await until("document.querySelector('#setupStatus').textContent.startsWith('One of the challenge link’s articles doesn’t exist')")
+  && !await ev("document.querySelector('#setupStatus').textContent.includes('example')"), await ev("document.querySelector('#setupStatus').textContent"));
+await open('#start=No%20such%20page&target=Diamond');
+check('a hand-made link\'s missing article is named', await until("document.querySelector('#setupStatus').textContent.startsWith('The challenge link’s article “No such page” doesn’t exist')"),
+  await ev("document.querySelector('#setupStatus').textContent"));
+
+// Injection: a link can carry any text, so a sealed one whose titles are markup and script, with junk rules, kinds and
+// back, is played through every place a title shows (cards, header, path, a frame link, the banner, the peek, the result,
+// the history). The made-up wiki takes the titles as real pages, which the live one never would, so it is the stricter
+// test. Nothing may run, add an element, or throw.
+const payloads = ['<img src=x onerror="window.pwned=1">', '"><svg onload="window.pwned=2">', '</script><script>window.pwned=3</script>'];
+const injected = "window.pwned === undefined && !document.querySelector('[onerror], [onload], svg')";
+await open('#g=' + await ev(`sealLink(${JSON.stringify(`start=${encodeURIComponent(payloads[0])}&via=${encodeURIComponent(payloads[1])}&target=${encodeURIComponent(payloads[2])}`
+  + `&start=Diamond&kind=${encodeURIComponent('<b>')}&back=1e999&rules=${encodeURIComponent('checkpoint,<img src=x onerror=window.pwned=4>,__proto__')}`)})`));
+check('a link of markup titles loads them as text, with its junk rules left out', await ev(`setup.start.title === ${JSON.stringify(payloads[0])}
+  && setup.goal.title === ${JSON.stringify(payloads[2])} && rules().join() === 'checkpoint' && ${injected}`), await ev('rules().join()'));
+await play();
+await ev(`document.querySelector('a[href="/w/Diamond_Pickaxe"]').click()`, await frameCtx());
+await until("game.path.length === 2 && !game.loading");
+await ev(`navigate(${JSON.stringify(payloads[1])}, null)`);
+await until("game.viaNext === 1 && !game.loading");
+await ev("document.querySelector('#btnPeek').click()");
+const peeked = await ev(injected);
+await ev(`closeModal(); navigate(${JSON.stringify(payloads[2])}, null)`);
+await until("!document.querySelector('#modalBg').classList.contains('hidden') && !!document.querySelector('.result')");
+const frameClean = await ev(injected, await frameCtx());
+await ev('closeModal(); toSetup()');
+check('markup titles run nothing anywhere a title shows', peeked === true && frameClean === true && await ev(injected)
+  && await ev(`document.querySelector('#history tbody').textContent.includes(${JSON.stringify(payloads[2])})`), JSON.stringify([peeked, frameClean]));
 
 check('only page info and articles are asked for', [...requests.keys()].every(k => k === 'query prop=pageprops|pageimages|extracts' || k === 'parse prop=text|displaytitle|categories'),
   JSON.stringify(Object.fromEntries(requests)));

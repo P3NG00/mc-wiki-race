@@ -188,7 +188,7 @@ check('Escape keeps the win modal open', await ev("!document.querySelector('#mod
 // No Back: the button is gone and goBack() does nothing. The rule goes into the challenge link and the result, and the
 // earlier 3-click win without rules must not count as this pair's best (2 clicks would otherwise be a new best).
 await ev("document.querySelector('#rules input[value=noback]').click()");
-check('challenge link carries rules', await ev("challengeLink().endsWith('&rules=noback')"), await ev('challengeLink()'));
+check('challenge link carries rules', await ev("openLink(new URL(challengeLink()).hash.slice(3)).endsWith('&rules=noback')"), await ev('openLink(new URL(challengeLink()).hash.slice(3))'));
 await ev("document.querySelector('#mSame').click()");
 await until("game.path.length === 1 && !game.loading");
 check('No Back hides Back', await ev("document.querySelector('#btnBack').classList.contains('hidden')"));
@@ -538,8 +538,8 @@ check('rerolling a card leaves the daily', await ev("setup.daily === null && doc
 await send('browsingContext.navigate', { context: ctx, url: 'about:blank', wait: 'complete' });
 await send('browsingContext.navigate', { context: ctx, url: fileUrl + '#start=Diamond&via=Pickaxe&target=Diamond%20Pickaxe&rules=checkpoint', wait: 'complete' });
 await until("!document.querySelector('#btnPlay').disabled");
-check('challenge link sets the checkpoint', await ev(`setup.via0?.title === 'Pickaxe' && rules().includes('checkpoint') && ${viaCard} && challengeLink().includes('&via=Pickaxe&')`),
-  await ev('challengeLink()'));
+check('challenge link sets the checkpoint', await ev(`setup.via0?.title === 'Pickaxe' && rules().includes('checkpoint') && ${viaCard} && openLink(new URL(challengeLink()).hash.slice(3)).includes('&via=Pickaxe&')`),
+  await ev('openLink(new URL(challengeLink()).hash.slice(3))'));
 await ev(`(h => { h.unshift({ start: 'Diamond', goal: 'Diamond Pickaxe', vias: ['Zombie'], rules: ['checkpoint'], won: true, clicks: 1, ms: 1000, at: Date.now(), path: [] });
   store.set('mwr.history', h); })(store.get('mwr.history', []))`);
 await ev("document.querySelector('#btnPlay').click()");
@@ -606,8 +606,8 @@ await ev("document.querySelector('#hClear').click()");
 check('Clear history empties it', await ev(`${histLen} === 0 && document.querySelector('#history').classList.contains('hidden') && document.querySelector('#modalBg').classList.contains('hidden')`),
   await ev(histLen));
 
-// Challenge links carry any title intact: ones with &, +, ?, %, =, /, :, quotes and accents survive challengeLink() and
-// the hash, and the frame reads the same title back from a link to it as wikiUrl writes one. The first three are real
+// Challenge links carry any title intact: ones with &, +, ?, %, =, /, :, quotes and accents survive challengeLink()'s
+// sealed blob, and the frame reads the same title back from a link to it as wikiUrl writes one. The first three are real
 // articles, loaded through a link as start, checkpoint and target.
 const tricky = ['Gravelly Mountains+', 'How did we get here? (block)', 'Village & Pillage', 'Oxygène',
   'Java Edition guides/Caves & Cliffs: Part I', '100% A=B; c+d', 'Steve\'s "quote"'];
@@ -616,7 +616,7 @@ const trip = JSON.parse(await ev(`(() => {
   const linkFor = (start, via, goal, r) =>
     (Object.assign(setup, { start: { title: start }, goal: { title: goal } }, setVias([{ title: via }])), setRules(r), challengeLink());
   const bad = ${JSON.stringify(tricky)}.filter(t => {
-    const h = new URLSearchParams(new URL(linkFor(t, t + ' via', t + ' goal', ['noback', 'checkpoint'])).hash.slice(1));
+    const h = new URLSearchParams(openLink(new URL(linkFor(t, t + ' via', t + ' goal', ['noback', 'checkpoint'])).hash.slice(3)));
     return h.get('start') !== t || h.get('via') !== t + ' via' || h.get('target') !== t + ' goal' || h.get('rules') !== rules().join();
   });
   const link = linkFor(...${JSON.stringify(tricky.slice(0, 3))}, ['checkpoint']);

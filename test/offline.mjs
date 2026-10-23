@@ -924,14 +924,15 @@ await open('#daily=2026-01-06');
 check('the daily is the same on every load', await ev(pairOf) === daily, daily);
 check('the daily is Normal with Checkpoint on 2026-01-06, its cards from different topics',
   await ev("rules().join() === 'nonav,checkpoint' && new Set(cardKeys().map(w => groupOf(setup[w].title))).size === cardKeys().length"), daily);
-// A daily link only plays a real day that has come, from a plain link or a sealed one; any other gives today's. A record
+// A daily link only plays a real day that has come; any other gives today's. A sealed link can't hold a daily. A record
 // only keeps a real day.
 const dayLoaded = async hash => await open(hash) && await ev('setup.daily');
 const todayIs = await ev('today()'), tomorrow = await ev("(d => (d.setDate(d.getDate() + 1), d.toLocaleDateString('sv')))(new Date())");
 const loadedDays = [];
 for (const d of ['2024-02-29', tomorrow, '2999-01-01', '2026-02-31', '2025-02-29', '2026-13-01', '0050-01-01', '2026-1-02', 'x', '']) loadedDays.push(await dayLoaded('#daily=' + d));
-loadedDays.push(await dayLoaded('#daily'), await dayLoaded('#g=' + await ev(`sealLink('daily=${tomorrow}')`)));
-check('a daily link only plays a real day that has come', JSON.stringify(loadedDays) === JSON.stringify(['2024-02-29', ...Array(11).fill(todayIs)]), JSON.stringify(loadedDays));
+loadedDays.push(await dayLoaded('#daily'));
+check('a daily link only plays a real day that has come', JSON.stringify(loadedDays) === JSON.stringify(['2024-02-29', ...Array(10).fill(todayIs)]), JSON.stringify(loadedDays));
+check('a sealed link holds no daily', await ev(`openLink(sealLink('daily=2026-01-06&start=Diamond&target=Crafting')) === 'start=Diamond&target=Crafting'`));
 check('a record only keeps a real day', await ev(`(r => isRecord(r) && isRecord({ ...r, daily: '2026-01-06' }) && !isRecord({ ...r, daily: '2026-02-31' }) && !isRecord({ ...r, daily: 'x' }))
   ({ start: 'Diamond', goal: 'Crafting', rules: [], won: true, clicks: 1, ms: 1, at: 1 })`));
 await open('#daily=2026-01-02');
@@ -1145,6 +1146,29 @@ const flipped = sealed[0].slice(0, -8) + (sealed[0].at(-8) === 'A' ? 'B' : 'A') 
 check('a damaged link rolls a random pair and says so', await open(new URL(flipped).hash) && await until(damaged),
   await ev("document.querySelector('#setupStatus').textContent"));
 check('an overlong blob is not opened', await open('#g=' + 'A'.repeat(9000)) && await until(damaged));
+// The key is in the page, so a made-up blob can pass its hash. Whatever its bytes, it opens to nothing or to a
+// challenge's keys only, with known rules, numbers for back and extra, and a title back as sealed: titles that try to
+// add keys, every first byte, runaway and unknown rule bits, every tag byte, UTF-8 cut short and random bytes.
+const madeUp = JSON.parse(await ev(`(() => {
+  const utf8 = s => [...new TextEncoder().encode(s)], keys = [...LINK_TITLES, 'back', 'extra', 'rules'], bad = [];
+  const tryBytes = (bytes, title) => {
+    const q = openLink(sealBytes(bytes)), h = new URLSearchParams(q ?? '');
+    if (![...h].every(([k, v]) => keys.includes(k) && (k !== 'rules' || v.split(',').every(r => isKey(RULES, r)))
+      && (k !== 'back' && k !== 'extra' || /^\\d+$/.test(v))) || title !== undefined && h.get('start') !== title) bad.push(q);
+  };
+  for (const t of ['&daily=2026-01-01', 'x&rules=__proto__', '=&=&', '%26daily%3D1', '?start=Evil&target=x', '<script>', '\\u2028\\0']) {
+    tryBytes([0, 0, 0xf8, ...utf8(t)], t);
+  }
+  for (let b = 0; b < 256; b++) tryBytes([b, 0, 0xf8, 65], 'A');
+  for (const m of [[255, 255, 255, 255, 255, 255, 127], [128], [255, 255, 255, 255, 255], [127, 255]]) tryBytes([0, ...m, 0xf8, 65]);
+  for (let t = 0xf8; t < 256; t++) tryBytes([0, 0, t, 65]);
+  tryBytes([0, 0, 0xf8, 0xe2, 0x82]);
+  const byte = () => Math.random() < 0.15 ? 0xf8 + (Math.random() * 8 | 0) : Math.random() * 256 | 0;
+  for (let n = 0; n < 20000; n++) tryBytes(Array.from({ length: 2 + Math.random() * 40 | 0 }, byte));
+  return JSON.stringify([bad.slice(0, 3), openLink(sealBytes([0, 0, 0xf8, ...utf8('&daily=2026-01-01')])), openLink(sealBytes([0, 0, 0xfc, 65]))]);
+})()`));
+check('a made-up blob with a good hash opens only to a challenge, its titles as sealed', !madeUp[0].length
+  && madeUp[1] === 'start=%26daily%3D2026-01-01' && madeUp[2] === null, JSON.stringify(madeUp));
 await open('#g=' + await ev("sealLink('start=No%20such%20page%2C%20visit%20example.com&target=Diamond')"));
 check('a sealed link\'s missing article isn\'t named', await until("document.querySelector('#setupStatus').textContent.startsWith('One of the challenge link’s articles doesn’t exist')")
   && !await ev("document.querySelector('#setupStatus').textContent.includes('example')"), await ev("document.querySelector('#setupStatus').textContent"));
@@ -1281,9 +1305,9 @@ await send('input.performActions', { context: ctx, actions: [{ type: 'wheel', id
 check('scrolling lets go', await until("!keep && !$('#setup').classList.contains('keeping')"));
 await ev('renderHistory()');
 
-// Injection: a link can carry any text, so a sealed one whose titles are markup and script, with junk rules, kinds and
-// back, is played through every place a title shows (cards, header, path, a frame link, the banner, the peek, the result,
-// the history). The made-up wiki takes the titles as real pages, which the live one never would, so it is the stricter
+// Injection: a link can carry any text, so a sealed one whose titles are markup and script, with a junk kind (sealing
+// leaves its junk rules and back out), is played through every place a title shows (cards, header, path, a frame link,
+// the banner, the peek, the result, the history). The made-up wiki takes the titles as real pages, which the live one never would, so it is the stricter
 // test. Nothing may run, add an element, or throw.
 const payloads = ['<img src=x onerror="window.pwned=1">', '"><svg onload="window.pwned=2">', '</script><script>window.pwned=3</script>'];
 const injected = "window.pwned === undefined && !document.querySelector('[onerror], [onload], svg')";

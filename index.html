@@ -950,7 +950,8 @@ function updateGameSum() {
 
 // Rules, stored with each result (personal bests only compare games with the same rules) and carried in challenge links.
 // No hubs and No navboxes are set by the difficulty (LEVELS), the games' rules by the game tiles (GAMES), and the extra
-// rules (EXTRA_RULES) are checkboxes, whose boxes show their help.
+// rules (EXTRA_RULES) are checkboxes, whose boxes show their help. A sealed link holds them by their place here, so a new
+// rule goes at the end.
 const RULES = {
   noback: { label: 'No Back', help: 'The Back button is gone: every click is final.' },
   nohubs: { label: 'No hubs' },
@@ -1703,14 +1704,18 @@ const gameLink = () => setup.daily ? location.href.split('#')[0] + '#daily=' + s
 const linkReady = () => cardKeys().every(w => setup[w]) && (huntMode() !== 'kinds' || setup.kinds?.length > 0);
 
 // A challenge link carries that query sealed in a blob, so the URL doesn't give the pair, or Blind target's hidden cards,
-// away at a glance. It hides them from a glance only: the key is in this file, so anyone can open one. That is why a
-// blob opens to the same query a hand-made #start=… link has, read by the same code with the same checks, and why it
-// holds the setup only (never a daily, par or result): a made-up blob can do nothing a plain link can't.
-// The blob is a random nonce (4 bytes), then the query's UTF-8 and its hash32 XORed with a keystream seeded by the key
-// and the nonce, in base64url. The nonce makes two links to one game look unrelated, and the hash finds a link a chat
-// app cut short or mangled.
-// LINK_MAX is the longest blob opened: five titles of MediaWiki's longest (255 bytes, percent-encoded) fit.
-const LINK_KEY = 0x6d777221, LINK_MAX = 8192;
+// away at a glance. It hides them from a glance only: the key is in this file, so anyone can open one. The blob holds
+// the setup only (never a daily, par or result), packed into bytes, and opens to a query built here of the keys a
+// challenge has, read by the same code with the same checks as a hand-made #start=… link: a made-up blob can do
+// nothing a plain link can't.
+// The packed setup is a byte of back= (times 8) and extra=, the rules as a bitmask over RULES' keys in 7-bit groups
+// (low first, the top bit saying another follows: Normal and Hard games take one), then each title in the query's order
+// as its UTF-8 after a byte naming its key (LINK_TITLES from 0xf8, a byte UTF-8 never uses), then the top 16 bits of
+// their hash32. It goes XORed with a keystream seeded by the key and a random nonce (2 bytes, ahead of it), in
+// base64url. The nonce makes two links to one game look unrelated, and the hash finds a link a chat app cut short or
+// mangled. Titles go as text, never as numbers from wiki-data.js, so a link opens the same after a snapshot update.
+// LINK_MAX is the longest blob opened: five titles of MediaWiki's longest (255 bytes) fit.
+const LINK_KEY = 0x6d777221, LINK_MAX = 2048, LINK_TITLES = ['start', 'target', 'via', 'kind'];
 // A seeded random number generator (0 to 1), for the sealed links' keystream and the background.
 const mulberry32 = seed => () => {
   let t = seed = seed + 0x6d2b79f5 | 0;
@@ -1723,20 +1728,44 @@ function linkStream(seed, bytes) {   // mulberry32, XORed into bytes in place
   for (let i = 0; i < bytes.length; i++) bytes[i] ^= next() * 2 ** 32 & 255;
   return bytes;
 }
-const u32 = n => [n >>> 24, n >>> 16 & 255, n >>> 8 & 255, n & 255];
+const linkHash = bytes => hash32(String.fromCharCode(...bytes)) >>> 16;
+// Keys other than a challenge's, rules not in RULES and numbers out of their range are left out.
 function sealLink(query) {
-  const nonce = Math.random() * 2 ** 32 >>> 0;
-  const body = linkStream(LINK_KEY ^ nonce, new Uint8Array([...new TextEncoder().encode(query), ...u32(hash32(query))]));
-  return btoa(String.fromCharCode(...u32(nonce), ...body)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  const h = new URLSearchParams(query), r = (h.get('rules') || '').split(','), back = +h.get('back'), extra = +h.get('extra');
+  const bytes = [(Number.isInteger(back) && back > 0 && back < 32 ? back * 8 : 0) + (EXACT_EXTRAS.includes(extra) ? extra : 0)];
+  let mask = Object.keys(RULES).reduce((m, k, i) => r.includes(k) ? m | 1 << i : m, 0);
+  for (; mask > 127; mask >>>= 7) bytes.push(mask & 127 | 128);
+  bytes.push(mask);
+  for (const [k, v] of h) if (LINK_TITLES.includes(k)) bytes.push(0xf8 + LINK_TITLES.indexOf(k), ...new TextEncoder().encode(v));
+  return sealBytes(bytes);
 }
-// The query, or null for a blob that is too long, isn't base64url, or whose hash doesn't match.
+// The packed bytes and their hash, behind a nonce and XORed, in base64url.
+function sealBytes(bytes) {
+  const nonce = Math.random() * 2 ** 16 >>> 0, hash = linkHash(bytes);
+  const body = linkStream(LINK_KEY ^ nonce, new Uint8Array([...bytes, hash >> 8, hash & 255]));
+  return btoa(String.fromCharCode(nonce >> 8, nonce & 255, ...body)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+// The query, in challengeQuery's order, or null for a blob that is too long, isn't base64url, fails its hash or doesn't
+// unpack.
 function openLink(blob) {
-  if (blob.length > LINK_MAX || !/^[\w-]{12,}$/.test(blob)) return null;
+  if (blob.length > LINK_MAX || !/^[\w-]{8,}$/.test(blob)) return null;
   try {
     const b = Uint8Array.from(atob(blob.replace(/-/g, '+').replace(/_/g, '/')), c => c.charCodeAt(0));
-    const body = linkStream(LINK_KEY ^ (b[0] << 24 | b[1] << 16 | b[2] << 8 | b[3]), b.slice(4));
-    const query = new TextDecoder('utf-8', { fatal: true }).decode(body.subarray(0, -4));
-    return u32(hash32(query)).every((x, i) => x === body[body.length - 4 + i]) ? query : null;
+    const body = linkStream(LINK_KEY ^ (b[0] << 8 | b[1]), b.slice(2)), bytes = body.subarray(0, -2);
+    if (bytes.length < 2 || linkHash(bytes) !== (body.at(-2) << 8 | body.at(-1))) return null;
+    let i = 1, mask = 0, shift = 0;
+    for (; bytes[i] > 127 && shift < 28; shift += 7) mask |= (bytes[i++] & 127) << shift;
+    mask |= bytes[i++] << shift;
+    const keys = [], text = new TextDecoder('utf-8', { fatal: true });
+    for (let end; i < bytes.length; i = end) {
+      const key = LINK_TITLES[bytes[i] - 0xf8];
+      if (!key) return null;
+      end = bytes.findIndex((x, j) => j > i && x >= 0xf8);
+      if (end < 0) end = bytes.length;
+      keys.push(key + '=' + encodeURIComponent(text.decode(bytes.subarray(i + 1, end))));
+    }
+    const back = bytes[0] >> 3, extra = bytes[0] & 7, rules = Object.keys(RULES).filter((k, n) => mask >>> n & 1);
+    return [...keys, back && 'back=' + back, extra && 'extra=' + extra, rules.length && 'rules=' + rules].filter(Boolean).join('&');
   } catch { return null; }
 }
 

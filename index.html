@@ -406,6 +406,9 @@
   .routes .note.worse { color: var(--target); }   /* a click that got no closer */
   .routes .path-sum { margin-top: 6px; color: var(--ink); }
   .routes .path-sum:empty { display: none; }
+  .routes .shortcut { margin-top: 8px; font-size: 13.5px; }
+  .routes .shortcut summary { cursor: pointer; color: var(--accent); width: fit-content; }
+  .routes .shortcut p { margin: 4px 0 0; }
   .result .actions { border-top: 1px solid var(--line); padding-top: 12px; }
   .note { color: var(--muted); font-size: 13px; }
 
@@ -2002,8 +2005,8 @@ async function navigate(title, fragment, { back = false } = {}) {
   if (game.roundTrip && (via ? via === game.turn : finds.length && !hunting())) turnBack(game.path.at(-1));
   // Every arrival is measured, for the result's path and for Distance's count in the header (renderHud).
   const entry = game.path.at(-1);
-  entry.measured = clicksToGo(entry.title).then(n => {
-    entry.togo = n;
+  entry.measured = clicksToGo(entry.title).then(({ togo, route }) => {
+    Object.assign(entry, { togo }, route?.length > 1 && { next: route[1], aim: route.at(-1) });
     if (game.path.at(-1) === entry && game.active) renderHud();
   }, () => {});
   $('#credit').innerHTML = `<a href="${esc(wikiUrl(page.title))}" target="_blank" rel="noopener">View on minecraft.wiki</a> · ` +
@@ -2913,15 +2916,37 @@ function roundTripRoute(graph, there, back, usable) {
 
 // The fewest clicks from an arrival to what is next (the objective, or the nearest of what Scavenger still has to find),
 // going by the link graph under the game's settings and around the pages dead as it arrives, which is why it is measured
-// then: null if there is no route, and undefined if the snapshot lacks the page, or what is next. The result's path shows
-// every arrival's, and Distance the latest's during play.
+// then: togo is null if there is no route, and undefined if the snapshot lacks the page, or what is next. The result's path
+// shows every arrival's, and Distance the latest's during play. With it comes the route, whose first click is the shortcut
+// the result can show (missedShortcut).
 async function clicksToGo(title) {
   const aim = hunting() ? huntLeft().flatMap(h => h.info ? [h.info.title] : KINDS[h.kind].members) : objective()?.title;
-  if (!aim) return 0;   // nothing is next: Scavenger's last find, with no way home to go
-  if (!PAGE_IDS.has(title) || ![aim].flat().some(t => PAGE_IDS.has(t))) return undefined;
+  if (!aim) return { togo: 0 };   // nothing is next: Scavenger's last find, with no way home to go
+  if (!PAGE_IDS.has(title) || ![aim].flat().some(t => PAGE_IDS.has(t))) return { togo: undefined };
   const usable = routeUsable({ keep: cardTitles(), avoid: game.dead, rules: game.rules, content: game.content });
   const route = shortestRoute(await linkGraph(!game.rules.includes('nonav')), title, aim, usable);
-  return route ? route.length - 1 : null;
+  return { togo: route ? route.length - 1 : null, route };
+}
+// Whether the click to path[i] got no closer to the same objective (not one reaching a checkpoint or a find, which changes
+// it), going by the counts measured; none do for Exact clicks, which has to take detours.
+const noCloser = (path, i, exact) => !exact && i > 0 && !path[i].via && !path[i].found
+  && Number.isInteger(path[i - 1].togo) && (path[i].togo === null || path[i].togo >= path[i - 1].togo);
+// The shortcut you missed, for the result: of the clicks that got no closer, the one whose detour took the most clicks
+// more than taking the page's own shortcut (its next, measured with its count) would have, until a page as close as that
+// was reached, or a checkpoint or find, or else to the end of the game. Only a detour of SHORTCUT_MIN or more is worth
+// showing, since a sideways step or two is how anyone plays, and none from the start or a checkpoint, whose way on the
+// shortest route beside it already shows. { from, next, aim, togo: next's count } or null.
+const SHORTCUT_MIN = 2;
+function missedShortcut(path, exact) {
+  let best = null, most = SHORTCUT_MIN - 1;
+  path.forEach((p, i) => {
+    const from = path[i - 1];
+    if (i < 2 || from.via || !noCloser(path, i, exact) || !from.next) return;
+    const j = path.findIndex((q, k) => k > i && (q.via || q.found || Number.isInteger(q.togo) && q.togo < from.togo));
+    const extra = j < 0 ? path.length - i : j - i + 1 - (from.togo - (path[j].via || path[j].found ? 0 : path[j].togo));
+    if (extra > most) { most = extra; best = { from: from.title, next: from.next, aim: from.aim, togo: from.togo - 1 }; }
+  });
+  return best;
 }
 // An arrival's count, as the paths and Share show it beside the page: none until it is measured, nor once nothing is next.
 const toGoText = p => !('togo' in p) || p.togo === 0 ? '' : p.togo === undefined ? '?' : p.togo === null ? 'no route' : `${p.togo} to go`;
@@ -3042,8 +3067,7 @@ function finish(won, lost = null) {
   // every arrival is measured (clicksToGo), how many clicks it was from what was next, marked worse where a click got no
   // closer to the same objective, but for Exact clicks, which has to take detours.
   const path = game.path, last = path.length - 1, goalWord = lost === 'tooSoon' ? 'too soon' : game.roundTrip ? 'back home' : 'target';
-  const exact = !!game.exact, worse = (p, i) => !exact && i > 0 && !p.via && !p.found
-    && Number.isInteger(path[i - 1].togo) && (p.togo === null || p.togo >= path[i - 1].togo);
+  const exact = !!game.exact, worse = (p, i) => noCloser(path, i, exact);
   const pathHtml = () => path.map((p, i) => `<li><a href="${esc(wikiUrl(p.title))}" target="_blank" rel="noopener">${esc(p.title)}</a>` +
     [p.back && 'back', p.via && viaName(p.via).toLowerCase(), p.found && p.found.join(', '), i === last && (won || lost === 'tooSoon') && game.goal && goalWord,
       p.stranded && '⛔'].filter(Boolean).map(w => ` <span class="note">${esc(w)}</span>`).join('') +
@@ -3071,7 +3095,8 @@ function finish(won, lost = null) {
     ${bestNote}
     <div class="routes">
       <div><h3>Your path · ${clicksText(rec.clicks)}</h3><p class="note path-sum" id="mPathSum"></p><ol id="mPath">${pathHtml()}</ol>
-        <p class="note hidden" id="mPathNote">Beside each page, the fewest clicks from it to what was next.${exact ? '' : ' In red, a click that got no closer.'}</p></div>
+        <p class="note hidden" id="mPathNote">Beside each page, the fewest clicks from it to what was next.${exact ? '' : ' In red, a click that got no closer.'}</p>
+        <details class="shortcut hidden" id="mShortcut"><summary>Show a shortcut you missed</summary><p id="mShortcutText"></p></details></div>
       <div><h3 id="mBestTitle">${game.exact ? `One way in exactly ${game.limit}` : 'Shortest route'}</h3>
         <ol id="mBest">${game.exact ? game.exact.map(t => `<li>${esc(t)}</li>`).join('') : ''}</ol>
         <p class="note" id="par">Working out par…</p></div>
@@ -3094,6 +3119,11 @@ function finish(won, lost = null) {
     const n = path.filter(worse).length, all = path.every(p => p.togo !== undefined);
     $('#mPathSum').textContent = !measured || exact || !rec.clicks ? '' : n ? `${n} of your ${clicksText(rec.clicks)} got no closer.`
       : all ? 'Every click got closer.' : '';
+    // Folded away, so it is there for whoever wants it rather than one more mark against the game; never in Share.
+    const s = missedShortcut(path, exact);
+    $('#mShortcut').classList.toggle('hidden', !s);
+    if (s) $('#mShortcutText').innerHTML = s.togo ? `From <b>${esc(s.from)}</b>, <b>${esc(s.next)}</b> was ${clicksText(s.togo)} from <b>${esc(s.aim)}</b>.`
+      : `<b>${esc(s.from)}</b> linked straight to <b>${esc(s.next)}</b>.`;
   });
   // Share's text is made on the click, since showPar may only have rec.par by then.
   const copy = async (id, text) => {

@@ -228,6 +228,11 @@ check('the result shows each page\'s count, and the clicks that got no closer in
   await ev(`${hudHint}.classList.contains('hidden') && !document.querySelector('#mPathNote').classList.contains('hidden')`), await ev(counts));
 check('and how many got no closer, in a line', await ev("document.querySelector('#mPathSum').textContent === '2 of your 4 clicks got no closer.'"),
   await ev("document.querySelector('#mPathSum').textContent"));
+// The shortcut missed: going back from the second page, a click that never got closer again, folded away until asked for.
+const shortcut = "(s => [s.classList.contains('hidden'), s.open, document.querySelector('#mShortcutText').textContent])(document.querySelector('#mShortcut'))";
+const shortcutText = await ev(`(p => p.togo > 1 ? \`From ${far[1]}, \${p.next} was \${clicksText(p.togo - 1)} from Crafting.\` : \`${far[1]} linked straight to \${p.next}.\`)(game.path[1])`);
+check('the result has the shortcut the costliest detour missed, folded away', await ev(`JSON.stringify(${shortcut})`) === JSON.stringify([false, false, shortcutText]),
+  await ev(`JSON.stringify(${shortcut})`));
 const sharedPath = "shareText(savedGames()[0], game.link, game.path).split('\\n').find(l => l.startsWith('My path: '))";
 check('Share gives each page\'s count on the path', await ev(sharedPath)
   === `My path: ${far[0]} (${farPar} to go) → ${far[1]} (${farPar - 1} to go) → ${far[0]} (${farPar} to go) → ${deadEnd} (no route) → Brand New Mob (?)`, await ev(sharedPath));
@@ -254,8 +259,20 @@ await play();
 await ev(`navigate(${JSON.stringify(far[1])}, null)`);
 await until('game.path.length === 2 && !game.loading');
 await ev('finish(false)');
-check('a path where every click got closer says so', await until("document.querySelector('#mPathSum').textContent === 'Every click got closer.'"),
-  await ev("document.querySelector('#mPathSum').textContent"));
+check('a path where every click got closer says so, with no shortcut', await until("document.querySelector('#mPathSum').textContent === 'Every click got closer.'")
+  && await ev("document.querySelector('#mShortcut').classList.contains('hidden')"), await ev("document.querySelector('#mPathSum').textContent"));
+// Which detour's shortcut shows: the one that took the most clicks more than the shortcut would have, from two up, a
+// checkpoint reached counting as getting there, none from the start or a checkpoint, and none for Exact clicks.
+check('the shortcut is the costliest detour of two clicks or more, a checkpoint ending one, not from the start', await ev(`(() => {
+  const at = (title, togo, more) => ({ title, togo, next: title + '+', aim: 'T', ...more }), names = (path, exact) => missedShortcut(path, exact)?.from ?? null;
+  const sideways = [at('A', 3), at('B', 3), at('C', 2), at('D', 1), at('T', 0)];
+  const long = [at('A', 3), at('B', 2), at('C', 2), at('D', 3), at('E', 1), at('T', 0)];
+  const viaEnds = [at('A', 2), at('B', 2), at('V', 4, { via: 1 }), at('X', 3), at('Y', 4), at('Z', 5), at('W', 4)];
+  const s = missedShortcut(long);
+  return names(sideways) === null && s.from === 'B' && s.next === 'B+' && s.togo === 1 && names(long, true) === null
+    && names(viaEnds) === 'X' && names([at('A', 1), at('B', 2), at('C', 3)]) === null && names([at('S', 2), at('A', 1), at('B', 2), at('C', 3)]) === 'A'
+    && names([at('S', 2), at('V', 1, { via: 1 }), at('B', 2), at('C', 3)]) === null;
+})()`));
 await ev("closeModal(); toSetup()");
 
 // Relay: two checkpoints from a challenge link, reached in order. One reached early doesn't count, the banner and the HUD

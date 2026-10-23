@@ -47,6 +47,7 @@ PAGES = {
                    '<a href="Tutorial%3AMining">tutorial</a>, <a href="#Obtaining">same page</a>, '
                    '<a href="https://example.com/">external</a>, <a class="new" href="Nope">red link</a>, '
                    '<a href="Diamond">itself</a>, <a href="Village_%26_Pillage">encoded</a>, <a href="Village_&amp;_Pillage">escaped</a></p>'
+                   '<div class="mw-heading mw-heading2"><h2 id="Obtaining">Obtaining</h2></div>'
                    '<map><area href="Breaking" shape="rect"></map>' + NAVBOX, ['Items'], ['Pages with sound tables']),
     'Diamond Pickaxe': (0, '<a href="Diamond">diamond</a> <a href="Block">block</a>', ['Items', 'Tools']),
     'Creeper': (0, '<a href="Diamond">diamond</a> <a href="Dungeons%3ACreeper">in Dungeons</a> <a href="1.0">a version</a>',
@@ -142,6 +143,9 @@ with tempfile.TemporaryDirectory() as tmp:
     check('links outside navboxes, image maps included, the page header left out',
           d['body'] == ['Breaking', 'Diamond', 'Diamond Pickaxe', 'Iron ingot', 'Tutorial:Mining', 'Village & Pillage'], d['body'])
     check('links in navboxes, nested tables included', d['nav'] == ['Block', 'Creeper', 'Diamond Pickaxe'], d['nav'])
+    check('links above the first heading, outside navboxes, or the whole page with no heading',
+          d['lead'] == ['Diamond', 'Diamond Pickaxe', 'Iron ingot', 'Tutorial:Mining', 'Village & Pillage']
+          and snap.pages['Iron Ingot']['lead'] == ['Diamond'], (d['lead'], snap.pages['Iron Ingot']['lead']))
     check('visible categories only', d['cats'] == ['Items'], d['cats'])
     check('namespaces from body classes, not from colons in titles', snap.namespaces == {14: 'Category', 10000: 'Dungeons', 10010: 'Tutorial'},
           snap.namespaces)
@@ -239,7 +243,7 @@ with tempfile.TemporaryDirectory() as tmp:
         f.write(render(data))
     check('rendering is stable and reads back', render(build(Snapshot(again), CONFIG)[0]) == render(data) and read_data(out) == data)
 
-    links, boxes, carries = graph(snap, data)
+    links, boxes, carries, lead = graph(snap, data)
     number = {r[0]: n for n, r in enumerate(data['articles'])}
     names = lambda ids: [data['articles'][n][0] for n in ids]
     check('the graph: links outside navboxes by page number, through redirects, other namespaces left out',
@@ -247,10 +251,12 @@ with tempfile.TemporaryDirectory() as tmp:
     check('the graph: a navbox two pages carry is stored once, with both',
           carries[number['Charcoal']] == carries[number['Iron Ingot']] and [names(boxes[b]) for b in carries[number['Charcoal']]] == [['Charcoal', 'Iron Ingot']]
           and [names(boxes[b]) for b in carries[number['Diamond']]] == [['Block', 'Creeper', 'Diamond', 'Diamond Pickaxe']], [names(b) for b in boxes])
-    graph_files = render_graph(data, links, boxes, carries)
+    check('the graph: links above the first heading by page number', names(lead[number['Diamond']]) == ['Diamond Pickaxe', 'Iron Ingot', 'Village & Pillage'],
+          names(lead[number['Diamond']]))
+    graph_files = render_graph(data, links, boxes, carries, lead)
     check('the graph files are stable and carry the snapshot\'s sha256', render_graph(data, *graph(Snapshot(again), data)) == graph_files
           and all(f'"sha256": "{data["sha256"]}"' in text for text in graph_files) and 'const WIKI_LINKS = {' in graph_files[0]
-          and 'const WIKI_NAVBOXES = {' in graph_files[1])
+          and 'const WIKI_NAVBOXES = {' in graph_files[1] and 'const WIKI_LEAD = {' in graph_files[2])
 
     newer = copy.deepcopy(data)
     newer['snapshot'] = '2026-11-21'

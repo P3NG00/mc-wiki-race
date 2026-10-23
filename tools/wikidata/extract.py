@@ -3,9 +3,11 @@
     .venv/bin/python -I tools/wikidata/extract.py minecraft.wiki_en_all_2026-08.zim [-o snapshot.jsonl.gz]
 
 The first line is {"meta": …} (the ZIM's file name, sha256, date and scraper) with "namespaces" (number to name, from
-the pages' body classes). Then {"page": title, "ns", "cats", "body", "boxes"} for every page, where body is the titles
-it links to outside navbox tables and boxes its navboxes, each the titles it links to. A navbox shows the page it is on as
-plain text, so that title is added back: every copy of a navbox then has the same titles, and build.py stores each once.
+the pages' body classes). Then {"page": title, "ns", "cats", "body", "lead", "boxes"} for every page, where body is the
+titles it links to outside navbox tables, lead those of them above its first heading (the intro, its infobox and
+hatnotes: the whole page if it has no heading), for Top links only, and boxes its navboxes, each the titles it links to. A
+navbox shows the page it is on as plain text, so that title is added back: every copy of a navbox then has the same
+titles, and build.py stores each once.
 Then {"redirect": title, "to": title} for every redirect. Titles are in display form (spaces, no fragment). build.py and
 report.py read this file, so the ZIM is only scanned once, which takes about a minute.
 """
@@ -22,6 +24,8 @@ TOKEN = re.compile(r'<(/?)(table|a|area)\b([^>]*)>')
 CLASS = re.compile(r'\bclass="([^"]*)"')
 HREF = re.compile(r'\bhref="([^"]*)"')
 CATEGORY = re.compile(r'\btitle="Category:([^"]+)"')
+# A section heading: MediaWiki wraps each in div.mw-heading; a bare h2 to h6 counts too. The game's frame finds the same.
+HEADING = re.compile(r'<div class="mw-heading\b|<h[2-6]\b')
 
 
 def link_title(href, page):
@@ -35,12 +39,15 @@ def link_title(href, page):
 
 
 def page_links(doc, page):
-    """Titles linked outside navbox tables, and each navbox (an outermost .navbox table, nested tables included) as the
-    titles it links to plus the page's own. From the parser output only, not the page's header or footer."""
+    """Titles linked outside navbox tables, those of them above the first heading, and each navbox (an outermost .navbox
+    table, nested tables included) as the titles it links to plus the page's own. From the parser output only, not the
+    page's header or footer."""
     start = doc.find('mw-parser-output')
     end = doc.find('id="catlinks"')
     region = doc[max(start, 0):end if end >= 0 else len(doc)]
-    body, boxes, tables = set(), [], []   # tables: for each open table, whether it or one around it is a navbox
+    heading = HEADING.search(region)
+    lead_end = heading.start() if heading else len(region)
+    body, lead, boxes, tables = set(), set(), [], []   # tables: for each open table, whether it or one around it is a navbox
     for m in TOKEN.finditer(region):
         close, tag, attrs = m.groups()
         if tag == 'table':
@@ -62,8 +69,13 @@ def page_links(doc, page):
             continue
         title = link_title(href.group(1), page)
         if title:
-            (boxes[-1] if tables and tables[-1] else body).add(title)
-    return body, boxes
+            if tables and tables[-1]:
+                boxes[-1].add(title)
+            else:
+                body.add(title)
+                if m.start() < lead_end:
+                    lead.add(title)
+    return body, lead, boxes
 
 
 def page_categories(doc):
@@ -112,8 +124,8 @@ def extract(zim_path, out_path):
         ns = int(ns.group(1))
         if ns:
             namespaces.setdefault(ns, title.split(':')[0])
-        body, boxes = page_links(doc, entry.path)
-        pages.append({'page': title, 'ns': ns, 'cats': page_categories(doc), 'body': sorted(body),
+        body, lead, boxes = page_links(doc, entry.path)
+        pages.append({'page': title, 'ns': ns, 'cats': page_categories(doc), 'body': sorted(body), 'lead': sorted(lead),
                       'boxes': sorted(sorted(b) for b in boxes)})
     pages.sort(key=lambda p: p['page'])
     redirects.sort(key=lambda r: r['redirect'])

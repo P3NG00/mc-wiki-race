@@ -958,6 +958,7 @@ const RULES = {
   nohubs: { label: 'No hubs' },
   nonav: { label: 'No navboxes' },
   blind: { label: 'Blind target', help: 'The target is hidden until you start, then you only get its name. A Relay shows each stop once you reach the one before.' },
+  lead: { label: 'Top links only', help: 'Only the links above an article’s first heading work: its opening text, infobox and the notes at the top. Routes get much longer.' },
   distance: { label: 'Distance', help: 'Always shows how many clicks your next stop is from your page, by the shortest route: the target, a checkpoint, the nearest find or the start on the way back.' },
   checkpoint: { label: 'Relay' },
   roundtrip: { label: 'Round trip', help: 'Then go back to the start, never through a page of the way there.' },
@@ -967,7 +968,7 @@ const RULES = {
 };
 // The game, one of the tiles: its rule (a Race has none), and what its tile and the strip under the tiles say, and with
 // Round trip on what they say then (trip). The games' rules can't be played together, so the tiles pick one; the extra
-// rules go with any game but Exact clicks, which plays without Six clicks and Round trip (OFF_IN_EXACT).
+// rules go with any game, but a few rules play without some of them (OFF_WITH).
 const GAMES = {
   race: { label: 'Race', diagram: 'A → B', blurb: 'Start to target. The classic.', help: 'get from the start to the target in as few clicks as you can.',
     trip: { diagram: 'A ⇄ B', blurb: 'To the target and back.', help: 'get to the target, then back to the start, never through a page of the way there.' } },
@@ -982,11 +983,17 @@ const GAMES = {
   exact: { rule: 'exact', label: 'Exact clicks', diagram: 'A → → → → B', blurb: `Land on it in exactly par + ${EXACT_EXTRAS[0]} to ${EXACT_EXTRAS.at(-1)}.`,
     help: 'reach the target in exactly par + the clicks you pick, never on a page twice. Too soon loses too, so plan a detour.' },
 };
-const EXTRA_RULES = ['roundtrip', 'noback', 'blind', 'limit', 'distance'];
+const EXTRA_RULES = ['roundtrip', 'noback', 'blind', 'lead', 'limit', 'distance'];
 // The extra rules among keys as labels, in their boxes' order.
 const extraLabels = keys => EXTRA_RULES.filter(k => keys.includes(k)).map(k => RULES[k].label);
-// The extra rules Exact clicks plays without, and why: it has its own count, and a round trip ends on a page already visited.
-const OFF_IN_EXACT = { limit: 'Off: Exact clicks has its own count.', roundtrip: 'Off: Exact clicks never visits a page twice.' };
+// The extra rules some rules play without, and why: Exact clicks has its own count and never visits a page twice (a round
+// trip ends on a page already visited), and under Top links only par is often more than six clicks.
+const OFF_WITH = {
+  limit: [['exact', 'Off: Exact clicks has its own count.'], ['lead', 'Off: with Top links only, routes are often longer than six clicks.']],
+  roundtrip: [['exact', 'Off: Exact clicks never visits a page twice.']],
+};
+// Why rule k is off with the rules on (the game's and the ticked extra rules), or undefined.
+const offWhy = (k, on) => OFF_WITH[k]?.find(([r]) => on.includes(r))?.[1];
 // The game a set of rules plays: a link made by hand with more than one game's rule plays the first of these.
 const gameOf = keys => ['exact', 'scavenger', 'relay'].find(g => keys.includes(GAMES[g].rule)) ?? 'race';
 // Difficulty, as the rules it turns on. Navboxes decide how hard a game is far more than the pool does: with them almost any
@@ -1024,13 +1031,14 @@ function setContent(keys) {
 }
 
 // The rules in play, in RULES order: the difficulty's, the game's, and the ticked extra rules (input.rule), but those
-// Exact clicks plays without.
+// another of them plays without (offWhy).
 function level() { return $('input[name=level]:checked').value; }
 function gameMode() { return $('input[name=game]:checked').value; }
+// The game's rule and the ticked extra rules, whether or not they are off.
+const chosenRules = () => [GAMES[gameMode()].rule, ...EXTRA_RULES.filter(k => $(`input.rule[value=${k}]`)?.checked)];
 function rules() {
-  const g = GAMES[gameMode()].rule, ticked = k => !!$(`input.rule[value=${k}]`)?.checked;
-  return Object.keys(RULES).filter(k => LEVELS[level()].rules.includes(k) || k === g
-    || (EXTRA_RULES.includes(k) && ticked(k) && !(g === 'exact' && k in OFF_IN_EXACT)));
+  const on = chosenRules();
+  return Object.keys(RULES).filter(k => LEVELS[level()].rules.includes(k) || (on.includes(k) && !offWhy(k, on)));
 }
 function setRules(keys) {
   $(`input[name=level][value=${levelOf(keys)}]`).checked = true;
@@ -1139,8 +1147,10 @@ async function setupPar() {
     $('#setupPar').classList.toggle('working', !blind);
     await painted();
     if (token !== setupParToken) return;
-    route = await cardsRoute(titles, r, kinds, back).catch(() => null);
-    if (route) text = `Par ${route.length - 1}`;
+    route = await cardsRoute(titles, r, kinds, back).catch(() => undefined);   // undefined: the link graph didn't load
+    // No route between pages the offline copy has: Start stays, since a live edit may have made one. A page newer than
+    // the copy, or no graph, leaves par blank.
+    text = route ? `Par ${route.length - 1}` : route === null && titles.every(t => PAGE_IDS.has(t)) ? 'No route with these rules' : '';
     if (r.includes('exact')) {
       const n = route && route.length - 1 + extra, exact = route && await exactRoute(titles, r, n).catch(() => null);
       if (token !== setupParToken) return;
@@ -1190,9 +1200,10 @@ function syncVia() {
     if (k === g) $('#gameHelp').innerHTML = `<b>${esc(def.label)}:</b> ${esc(says.help)}`;
   }
   document.querySelectorAll('.game-opt').forEach(el => el.classList.toggle('hidden', el.dataset.game !== g));
-  for (const [k, why] of Object.entries(OFF_IN_EXACT)) {
-    $(`input.rule[value=${k}]`).disabled = g === 'exact';
-    $(`#rules [data-desc=${k}]`).textContent = g === 'exact' ? why : RULES[k].help;
+  for (const k of Object.keys(OFF_WITH)) {
+    const why = offWhy(k, chosenRules());
+    $(`input.rule[value=${k}]`).disabled = !!why;
+    $(`#rules [data-desc=${k}]`).textContent = why ?? RULES[k].help;
   }
   if (tripRelay()) {
     const [lo, hi] = backRange(keys.length);
@@ -1308,7 +1319,7 @@ async function rollOne(which, group, accept = () => true, titles = null) {
 // route between them. Otherwise Chaos rolls pages such as Bee Our Guest, whose only links are hubs (dead in Hard), or
 // a subpage that links nowhere. A page the snapshot lacks passes, and so does every page if the graph can't load.
 async function joinsWeb(which) {
-  const r = rules(), graph = await linkGraph(!r.includes('nonav')).catch(() => null), heart = PAGE_IDS.get(WEB_HEART);
+  const r = rules(), graph = await linkGraph(r).catch(() => null), heart = PAGE_IDS.get(WEB_HEART);
   if (!graph) return () => true;
   const both = VIA_KEYS.includes(which) || r.includes('roundtrip'), out = both || which !== 'goal', into = both || which !== 'start';
   return title => {
@@ -1351,7 +1362,7 @@ async function reroll(which, atStart = false) {
     const kept = !targets.includes('goal') && !hidden.includes('goal') && PAGE_IDS.has(setup.goal?.title) && setup.goal;
     let par = (targets.includes('goal') || targets.includes('start') && (hidden.includes('goal') || kept)) && reach() !== 'any'
       && REACHES[reach()].fits, notice = '';
-    const graph = par && await linkGraph(!rules().includes('nonav')), topic = POOL.has($('#topic').value) ? $('#topic').value : null;
+    const graph = par && await linkGraph(rules()), topic = POOL.has($('#topic').value) ? $('#topic').value : null;
     const aims = par && candidates(topic, true), what = par && REACHES[reach()].label.toLowerCase();
     // Whether t may be start s's target: not from its topic (Chaos aside) unless that is the chosen one.
     const apart = (s, t) => topic || mode() === 'chaos' || groupOf(t) !== groupOf(s);
@@ -2150,7 +2161,7 @@ function syncFrameTheme() { $('#frame').contentWindow?.postMessage({ mwr: 'theme
 // blocked: titles whose links are dead for this game (No hubs). seen: titles visited this game, whose links are marked.
 function renderArticle(page, fragment, token, blocked = [], seen = []) {
   const dark = themeIsDark();
-  const noNav = game.rules.includes('nonav');
+  const noNav = game.rules.includes('nonav'), lead = game.rules.includes('lead');
   // The article renders in a sandboxed iframe (opaque origin): the wiki's own CSS applies untouched,
   // <base> resolves its relative image/CSS URLs, and the inline script reports clicks via postMessage.
   // Values go into the script as JSON with < escaped: a link fragment that opens an HTML comment and then a script tag
@@ -2165,6 +2176,11 @@ function renderArticle(page, fragment, token, blocked = [], seen = []) {
     const LEFT_OUT = new Set(${LEFT_OUT_JSON});
     const SEEN = new Set(${js(seen)});
     const NO_NAV = ${noNav};
+    // Top links only: the article's first section heading, below which every link is dead (a page with none is all top),
+    // as tools/wikidata/extract.py finds it. The live wiki's table of contents, which the ZIM lacks, has a heading of its
+    // own above the first section. Navboxes are dead too, even on a page with no heading.
+    const FIRST_HEADING = ${lead} && document.querySelector('.mw-parser-output :is(.mw-heading, h2, h3, h4, h5, h6):not(.toc *, #toc *)');
+    const belowTop = a => ${lead} && (!!a.closest('.navbox') || !!FIRST_HEADING && !!(FIRST_HEADING.compareDocumentPosition(a) & Node.DOCUMENT_POSITION_FOLLOWING));
     function classify(a) {
       if (NO_NAV && a.closest('.navbox')) return null;   // hidden too; this keeps them dead whatever the CSS does
       const href = a.getAttribute('href') || '';
@@ -2182,6 +2198,7 @@ function renderArticle(page, fragment, token, blocked = [], seen = []) {
       t = t.charAt(0).toUpperCase() + t.slice(1);   // as MediaWiki does, so titles match the blocked and seen lists
       if (LEFT_OUT.has(t)) return { kind: 'blocked', why: 'a version or list page' };
       if (BLOCKED.has(t)) return { kind: 'blocked', why: 'No hubs' };
+      if (belowTop(a)) return { kind: 'blocked', why: 'Top links only' };
       return { kind: 'article', title: t, frag, seen: SEEN.has(t) };
     }
     // What folds (see the folding boxes below) to what opens it, for a link to a section inside.
@@ -2544,6 +2561,27 @@ function renderArticle(page, fragment, token, blocked = [], seen = []) {
       const el = e.target.closest(TIPPED);
       if (el && !el.contains(e.relatedTarget)) hideTip();
     });
+    // Top links only: the rest of the article, from the first heading on, has no live links, so it folds away under a bar
+    // that clears the infobox (whose links are above the heading, so live), with a button to read it anyway. At each
+    // level from the heading up to the parser output, what follows goes, and so does the live wiki's table of contents,
+    // which only lists what is folded. Last, after the scripts that measure or build what is inside, and as a folding
+    // box, so a link to a section in it (FRAG, an anchor) opens it first.
+    if (FIRST_HEADING) {
+      const bar = document.createElement('div'), show = document.createElement('button');
+      bar.className = 'mwr-fold';
+      bar.append('Top links only: the rest of the article has no live links ', show);
+      show.type = 'button';
+      const flip = open => { document.body.classList.toggle('mwr-show-below', open); show.textContent = open ? 'Hide it' : 'Show it'; };
+      flip(false);
+      show.addEventListener('click', () => flip(!document.body.classList.contains('mwr-show-below')));
+      FIRST_HEADING.before(bar);
+      for (let n = FIRST_HEADING, first = true; n && !n.matches('.mw-parser-output'); n = n.parentElement, first = false)
+        for (let s = first ? n : n.nextElementSibling; s; s = s.nextElementSibling) {
+          s.classList.add('mwr-below');
+          unfolders.set(s, () => flip(true));
+        }
+      document.querySelectorAll('.mw-parser-output :is(.toc, #toc)').forEach(toc => toc.classList.add('mwr-below'));
+    }
     scrollToId(FRAG);
   `;
 
@@ -2591,6 +2629,12 @@ ${WIKI_STYLES.map(h => `<link rel="stylesheet" href="${esc(h)}">`).join('\n')}
   body.wgl-theme-dark a.mwr-seen:has(img) { outline-color: #a99cf0; }
   .mwr-live:focus-visible { outline: 2px solid currentColor; outline-offset: 1px; }
   img.mwr-broken { display: inline-block; overflow: hidden; color: transparent; }
+  /* Top links only: where the live links end, over the first heading and under the infobox, and the rest folded away. */
+  .mwr-fold { clear: both; margin: 20px 0 4px; padding-top: 8px; border-top: 2px dashed color-mix(in srgb, currentColor 55%, transparent);
+    font: 600 12px/1.4 system-ui, sans-serif; letter-spacing: .05em; text-transform: uppercase; }
+  .mwr-fold button { margin-left: 8px; padding: 2px 10px; font: inherit; letter-spacing: 0; text-transform: none; cursor: pointer;
+    color: inherit; background: transparent; border: 1px solid currentColor; border-radius: 6px; }
+  body:not(.mwr-show-below) .mwr-below { display: none !important; }
   /* What a folded .collapsible hides, from the wiki's styles, which only hide it once the wiki's script has run
      (.client-js). The frame script does that script's job. */
   .collapsible.collapsed > tr:not(:first-child), .collapsible.collapsed > tbody > tr:not(:first-child),
@@ -2647,11 +2691,13 @@ function loadGraphFile(file, read) {
   }));
   return graphFiles.get(file);
 }
-// The graph a game is played on: links outside navboxes, and the navboxes too when they are on (Relaxed).
-async function linkGraph(navboxes) {
-  const links = await loadGraphFile('wiki-links.js', () => WIKI_LINKS);
+// The graph a game is played on under its rules: the links above each page's first heading for Top links only, or else
+// the links outside navboxes, and the navboxes too when they are on (Relaxed).
+async function linkGraph(rules) {
+  const [file, read] = rules.includes('lead') ? ['wiki-lead.js', () => WIKI_LEAD] : ['wiki-links.js', () => WIKI_LINKS];
+  const links = await loadGraphFile(file, read);
   links.decoded ??= links.links.map(decodeIds);
-  if (!navboxes) return { links: links.decoded };
+  if (rules.includes('lead') || rules.includes('nonav')) return { links: links.decoded };
   const boxes = await loadGraphFile('wiki-navboxes.js', () => WIKI_NAVBOXES);
   boxes.decoded ??= { boxes: boxes.navboxes.map(decodeIds), carries: boxes.carries.map(decodeIds) };
   return { links: links.decoded, ...boxes.decoded };
@@ -2693,7 +2739,7 @@ function shortestRoute(graph, from, to, usable) {
 // as in play), and a spin-off's pages only count when it is on. Null if there is none, or if a card's page isn't in the
 // snapshot.
 async function parRoute({ start, vias = [], goal, back = 0, kinds = null, rules, content = [] }) {
-  const graph = await linkGraph(!rules.includes('nonav')), usable = routeUsable({ keep: [start, ...vias, goal], rules, content });
+  const graph = await linkGraph(rules), usable = routeUsable({ keep: [start, ...vias, goal], rules, content });
   const home = rules.includes('roundtrip'), out = vias.length - back;
   if (kinds) return kindsRoute(graph, start, kinds, usable, home);
   if (rules.includes('scavenger')) return huntRoute(graph, start, [...vias, goal], usable, home);
@@ -2770,7 +2816,7 @@ async function startPars(topic) {
   const key = pairKey(''), r = rules(), usable = routeUsable({ keep: [], rules: r, content: contentInPlay([]) });
   const aims = candidates(topic, true), starts = candidates(null, false), group = topic || mode() === 'chaos' ? null : groupOf;
   if (startParsCache.has(key)) return startParsCache.get(key);
-  const graph = await linkGraph(!r.includes('nonav')), n = graph.links.length, W = Math.ceil(aims.length / 32);
+  const graph = await linkGraph(r), n = graph.links.length, W = Math.ceil(aims.length / 32);
   const set = (bits, at, i) => { bits[at + (i >> 5)] |= 1 << (i & 31); };
   const own = new Uint32Array(n * W), web = distancesFrom(graph, WEB_HEART, usable), far = new Uint32Array(W), groups = new Map();
   aims.forEach((t, i) => {
@@ -2810,7 +2856,7 @@ const EXACT_BUDGET = 20000;
 async function exactRoute(titles, rules, n, content = contentInPlay(titles)) {
   const [start, goal] = [titles[0], titles.at(-1)].map(t => PAGE_IDS.get(t));
   if (start === undefined || goal === undefined) return null;
-  const graph = await linkGraph(!rules.includes('nonav'));
+  const graph = await linkGraph(rules);
   const dist = distancesTo(graph, goal, routeUsable({ keep: titles, rules, content }));
   const out = u => new Set([...graph.links[u], ...(graph.carries?.[u] ?? []).flatMap(b => graph.boxes[b])]);
   const path = [start], on = new Set(path);
@@ -2924,7 +2970,7 @@ async function clicksToGo(title) {
   if (!aim) return { togo: 0 };   // nothing is next: Scavenger's last find, with no way home to go
   if (!PAGE_IDS.has(title) || ![aim].flat().some(t => PAGE_IDS.has(t))) return { togo: undefined };
   const usable = routeUsable({ keep: cardTitles(), avoid: game.dead, rules: game.rules, content: game.content });
-  const route = shortestRoute(await linkGraph(!game.rules.includes('nonav')), title, aim, usable);
+  const route = shortestRoute(await linkGraph(game.rules), title, aim, usable);
   return { togo: route ? route.length - 1 : null, route };
 }
 // Whether the click to path[i] got no closer to the same objective (not one reaching a checkpoint or a find, which changes
@@ -2959,7 +3005,7 @@ function turnBack(entry) {
   game.stack = [entry.title];
   const left = ahead().map(c => c.title);
   game.dead = new Set([...game.seen].filter(([, t]) => !left.includes(t)).map(([k]) => k));
-  linkGraph(!game.rules.includes('nonav')).then(graph => {
+  linkGraph(game.rules).then(graph => {
     const usable = routeUsable({ keep: cardTitles(), avoid: game.dead, rules: game.rules, content: game.content });
     if (PAGE_IDS.has(entry.title) && !legsRoute(graph, [entry.title, ...left], usable)) {
       entry.stranded = true;
@@ -3553,8 +3599,8 @@ function bgMarker([x, y], col, text, t, a) {
   ctx.lineWidth = 4; ctx.strokeStyle = bgRgba(c.bg, .8 * a); ctx.strokeText(text, tx, y - r - 7);
   ctx.fillStyle = bgRgba(col, a); ctx.fillText(text, tx, y - r - 7);
 }
-// The graph par goes by under the setup's difficulty, and the links outside navboxes, which the sky and facts use.
-const bgGraph = () => linkGraph(!rules().includes('nonav'));
+// The graph par goes by under the setup's rules (the sky and facts use the links outside navboxes).
+const bgGraph = () => linkGraph(rules());
 // Marks the cards in use: called by setupPar whenever par is worked out again, so on every change of the cards, rules,
 // difficulty or Content. setup.route is its route.
 async function bgPair() {
@@ -3629,7 +3675,7 @@ async function bgSample() {
   if (bg.sampled.has(lvl) || bg.sampling || bgStyle() === 'off') return;
   bg.sampling = true;
   try {
-    const graph = await linkGraph(!LEVELS[lvl].rules.includes('nonav')), usable = routeUsable({ keep: [], rules: LEVELS[lvl].rules, content: [] });
+    const graph = await linkGraph(LEVELS[lvl].rules), usable = routeUsable({ keep: [], rules: LEVELS[lvl].rules, content: [] });
     const rand = mulberry32(hash32(lvl)), ids = POOL_TITLES.map(t => PAGE_IDS.get(t)), sum = { n: 0, total: 0, two: 0, far: [null, null, -1] };
     for (let i = 0; i < 40; i++) {
       await new Promise(r => (window.requestIdleCallback ?? setTimeout)(r));
@@ -3907,7 +3953,7 @@ bgTheme();
 bgFacts(null);
 bgNextFact();
 // The sky, and the facts that need the links, once the link graph is in (the cards' par loads it too).
-linkGraph(false).then(({ links }) => {
+linkGraph(['nonav']).then(({ links }) => {
   bg.links = links;
   bgFacts(links);
   bgDraw();   // which makes the sky, if it shows

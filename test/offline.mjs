@@ -28,7 +28,9 @@ function check(name, ok, extra = '') {
 // what the wiki would send.
 const escHtml = s => s.replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 // Every article is this one: a link in the text, links to a hub, to a redirect to a hub, to the target hub Crafting, to a
-// Tutorial and to a Dungeons page, to a version page, to a redirect to one and to a list page, and one link in a navbox.
+// Tutorial and to a Dungeons page, to a version page, to a redirect to one and to a list page, a table of contents as the
+// live wiki has (with a heading of its own) and a link after it, then a section heading with a link under it, and one link
+// in a navbox.
 // Hubs Only, which isn't in the snapshot, links only two hubs (as Bee Our Guest does on the wiki), so on Hard nothing on
 // it works.
 const HUBS_ONLY = 'Hubs Only';
@@ -37,6 +39,9 @@ const ARTICLE = title => title === HUBS_ONLY
   <a href="/w/Blocks">Blocks</a> <a href="/w/Crafting">Crafting</a> <a href="/w/Tutorial:Mining">tutorial</a> <a href="/w/Dungeons:Creeper">dungeons</a>
   <a href="/w/Java_Edition_version_history">versions</a> <a href="/w/Pocket_Edition_version_history">old versions</a>
   <a href="/w/Closed_captions">captions</a></p>
+  <div id="toc" class="toc"><div class="toctitle"><h2 id="mw-toc-heading">Contents</h2></div><ul><li><a href="#Uses">Uses</a></li></ul></div>
+  <p><a href="/w/Gold_Ingot">gold</a></p>
+  <div class="mw-heading mw-heading2"><h2 id="Uses">Uses</h2></div><p><a href="/w/Iron_Ingot">iron</a></p>
   <table class="navbox"><tr><td><a href="/w/Creeper">Creeper</a></td></tr></table></div>`;
 // The live categories a parse reply gives, as the API writes them: Brand New Mob is only in the live wiki's Nether mobs,
 // and Chicken is in it too but excluded from the kind.
@@ -212,7 +217,7 @@ check('Distance: a step along a shortest route is a click closer, in the header 
 await ev(`navigate(${JSON.stringify(far[0])}, null)`);
 check('Distance: going back is a click further', await until(`game.path.at(-1).togo === ${farPar} && !game.loading`), await ev('game.path.at(-1).togo'));
 // A dead end, a page with no route anywhere (no links outside navboxes, no navboxes), has no route.
-const deadEnd = await ev(`linkGraph(true).then(g => WIKI_DATA.articles.map(([t]) => t).find(t => !spinoffOf(t) && !g.links[PAGE_IDS.get(t)].length && !g.carries[PAGE_IDS.get(t)].length))`);
+const deadEnd = await ev(`linkGraph([]).then(g => WIKI_DATA.articles.map(([t]) => t).find(t => !spinoffOf(t) && !g.links[PAGE_IDS.get(t)].length && !g.carries[PAGE_IDS.get(t)].length))`);
 check('the snapshot has a dead end', typeof deadEnd === 'string' && await ev(`PAGE_IDS.has(${JSON.stringify(deadEnd)})`), String(deadEnd));
 await ev(`navigate(${JSON.stringify(deadEnd)}, null)`);
 check('Distance: a dead end has no route', await until(`game.path.at(-1).togo === null && !game.loading`) && await ev(`${hudHint}.textContent === 'No route from here'`),
@@ -496,7 +501,7 @@ await ev("finish(false); closeModal(); toSetup()");
 // rules it can't be played with, and they untick it.
 await open('#start=Diamond&target=Zombie&rules=exact');
 const exact = JSON.parse(await ev(`(async () => {
-  const par = (await cardsRoute(['Diamond', 'Zombie'], rules())).length - 1, g = await linkGraph(true), id = t => PAGE_IDS.get(t);
+  const par = (await cardsRoute(['Diamond', 'Zombie'], rules())).length - 1, g = await linkGraph([]), id = t => PAGE_IDS.get(t);
   const step = (a, b) => g.links[id(a)].includes(id(b)) || g.carries[id(a)].some(x => g.boxes[x].includes(id(b)));
   return JSON.stringify({ par, route: setup.exact, ok: !!setup.exact && setup.exact.length - 1 === par + 2 && new Set(setup.exact).size === setup.exact.length
     && setup.exact[0] === 'Diamond' && setup.exact.at(-1) === 'Zombie' && setup.exact.every((t, i) => i === 0 || step(setup.exact[i - 1], t)) });
@@ -579,6 +584,51 @@ await ev("document.querySelector('input[name=game][value=relay]').click()");
 check('another game takes them back', await until(ready) && await ev("rules().join() === 'checkpoint,roundtrip,limit' && !document.querySelector('input.rule[value=limit]').disabled"));
 check('a link with several games plays Exact clicks only', await ev("(setRules(['checkpoint', 'roundtrip', 'exact', 'limit']), rules().join()) === 'exact' && gameMode() === 'exact'"));
 await ev("setRules([])");
+
+// Top links only: Six clicks is off with it, its graph is the links above each page's first heading, and in the article
+// the links below the first heading and in navboxes are dead, with a line where the live ones end.
+const withRules = keys => `(setRules(${JSON.stringify(keys)}), syncVia(), rules().join())`;
+check('Top links only greys out Six clicks and says why, and Exact clicks still gives its own reason', await ev(`${withRules(['lead', 'limit'])} === 'lead'
+  && $('input.rule[value=limit]').disabled && $('[data-desc=limit]').textContent.startsWith('Off: with Top links only')
+  && ${withRules(['exact', 'lead', 'limit'])} === 'lead,exact' && $('[data-desc=limit]').textContent.startsWith('Off: Exact clicks')
+  && ${withRules(['limit'])} === 'limit' && !$('input.rule[value=limit]').disabled`));
+await ev("setRules([]); syncVia()");
+check('its graph is the links above the first heading, a part of the links outside navboxes', await ev(`Promise.all([linkGraph(['lead']), linkGraph(['nonav'])]).then(([lead, body]) => {
+  const d = PAGE_IDS.get('Diamond'), names = ids => ids.map(i => WIKI_DATA.articles[i][0]);
+  return graphFiles.has('wiki-lead.js') && names(lead.links[d]).includes('Armor') && lead.links[d].length < body.links[d].length
+    && lead.links.every((ids, i) => ids.every(v => body.links[i].includes(v)));
+})`));
+await open('#start=Diamond&target=Crafting&rules=nonav,lead');
+check('par goes by it', await until("/^Par \\d+$/.test(document.querySelector('#setupPar').textContent)") && await ev(`parRoute({ start: 'Diamond', goal: 'Crafting', rules: ['nonav', 'lead'] })
+  .then(r => r.length - 1 === +document.querySelector('#setupPar').textContent.slice(4))`), await ev("document.querySelector('#setupPar').textContent"));
+await play();
+links = await linkStates();
+check('links above the first section heading are live, the contents\' heading aside, those below it dead, with a line over it', links.Diamond_Pickaxe === 'live'
+  && links.Gold_Ingot === 'live' && links.Iron_Ingot === 'dead' && await ev(`document.querySelector('a[href="/w/Iron_Ingot"]').title === 'Off limits: Top links only'
+    && document.querySelector('.mw-heading').previousElementSibling.className === 'mwr-fold' && document.querySelectorAll('.mwr-fold').length === 1`, await frameCtx()), JSON.stringify(links));
+const shown = "[...document.querySelectorAll('#toc, .mw-heading, a[href=\"/w/Iron_Ingot\"]')].map(e => e.checkVisibility()).join() + '|' + document.querySelector('.mwr-fold button').textContent";
+check('the rest of the article and the table of contents are folded away under the line, Show opens them and Hide folds them again', await ev(`(() => {
+  const before = ${shown};
+  document.querySelector('.mwr-fold button').click();
+  const open = ${shown};
+  document.querySelector('.mwr-fold button').click();
+  return [before, open, ${shown}].join(' / ');
+})()`, await frameCtx()) === 'false,false,false|Show it / true,true,true|Hide it / false,false,false|Show it', await ev(shown, await frameCtx()));
+check('a link to a section in it opens it', await ev(`(document.querySelector('a[href="#Uses"]').click(), document.querySelector('#Uses').checkVisibility())`, await frameCtx()));
+await ev("finish(false); closeModal(); toSetup()");
+await open('#start=Diamond&target=Crafting&rules=lead');
+await play();
+links = await linkStates();
+check('in Relaxed its navbox links are dead too', links.Creeper === 'dead' && links.Block === 'live' && links.Iron_Ingot === 'dead', JSON.stringify(links));
+await ev("finish(false); closeModal(); toSetup()");
+// About one pool target in nine has no route under it; such a pair says so where par goes.
+const unreached = await ev(`(async () => { for (const t of POOL_TITLES) if (t !== 'Diamond' && !await parRoute({ start: 'Diamond', goal: t, rules: ['nonav', 'lead'] })) return t; })()`);
+await open(`#start=Diamond&target=${encodeURIComponent(unreached)}&rules=nonav,lead`);
+check('a pair with no route under it says so', await until("document.querySelector('#setupPar').textContent === 'No route with these rules'")
+  && await ev("!document.querySelector('#btnPlay').disabled"), `${unreached}: ${await ev("document.querySelector('#setupPar').textContent")}`);
+await open('#rules=nonav,lead');
+check('a roll with it has a route', await until(ready) && await until("/^Par \\d+$/.test(document.querySelector('#setupPar').textContent)"),
+  await ev("document.querySelector('#setupPar').textContent"));
 
 // Scavenger, kinds: a link's kinds go on the hunt card, par is a route through a member of each, and a find ticks its
 // kind: a snapshot member, or a page the live wiki puts in the category less the kind's exclusions (Chicken). Finding
@@ -683,7 +733,7 @@ const parsOff = JSON.parse(await ev(`(async () => {
   const off = [];
   for (const level of ['relaxed', 'hard']) {
     document.querySelector('input[name=level][value=' + level + ']').click();
-    const pars = await startPars(null), graph = await linkGraph(level === 'relaxed'), web = distancesFrom(graph, WEB_HEART);
+    const pars = await startPars(null), graph = await linkGraph(LEVELS[level].rules), web = distancesFrom(graph, WEB_HEART);
     for (let i = 0; i < 25; i++) {
       const s = pick(candidates(null, false)), d = distancesFrom(graph, s);
       let m = 0;
@@ -812,7 +862,7 @@ check('a target topic pins the target, and the start comes from another', rolls.
 // 2026-08's) can start a game on Normal but not on Hard, a page with no links can't start one, and a page nothing links
 // to can't be a target. The heart has to reach, and be reached from, almost all of the pool, or rolls would refuse most.
 const joins = JSON.parse(await ev(`(async () => {
-  const graph = await linkGraph(false), titles = WIKI_DATA.articles.map(([t]) => t), linked = new Set(graph.links.flat());
+  const graph = await linkGraph(['nonav']), titles = WIKI_DATA.articles.map(([t]) => t), linked = new Set(graph.links.flat());
   const pages = titles.map((t, i) => [t, i]).filter(([t]) => !spinoffOf(t) && !HUB_TITLES.has(t));
   const find = test => pages.find(([, i]) => test(graph.links[i], i))?.[0] ?? null;
   const examples = {
@@ -1021,7 +1071,7 @@ check('history entries with an unknown Content key are left out', await ev("(r =
 // goes through a page that isn't content when no route through content alone is as short, a spin-off page is only
 // reachable with its spin-off on, and a checkpoint's route goes through it.
 const par = JSON.parse(await ev(`(async () => {
-  const relaxed = await linkGraph(true), id = t => PAGE_IDS.get(t);
+  const relaxed = await linkGraph([]), id = t => PAGE_IDS.get(t);
   const linked = (g, a, b) => g.links[id(a)].includes(id(b)) || (g.carries?.[id(a)] ?? []).some(x => g.boxes[x].includes(id(b)));
   const follows = (g, route) => route.every((t, i) => i === 0 || linked(g, route[i - 1], t));
   const hubs = new Set(HUB_TITLES.values()), bad = [], offContent = [];
@@ -1136,7 +1186,7 @@ check('a change in the Background box leaves it on', await ev("bgSet.roll && bgS
 await ev("$('#btnRerollAll').click()");
 check('a change on the page turns it off, saved, and the cards are marked', await until(`${ready} && !bgSet.roll && store.get('mwr.background').roll === false
   && bg.pair?.stops[0].label === 'Start · ' + setup.start.title && bg.pair.stops[1].label === 'Target · ' + setup.goal.title`), await ev('JSON.stringify(bg.pair?.stops)'));
-check('the wave counts clicks from the start as par does', await until("!!bg.pair?.wave") && await ev(`linkGraph(!rules().includes('nonav')).then(g => (d => bg.pair.wave.dist.every((x, i) => x === d[i]))(distancesFrom(g, setup.start.title)))`));
+check('the wave counts clicks from the start as par does', await until("!!bg.pair?.wave") && await ev(`linkGraph(rules()).then(g => (d => bg.pair.wave.dist.every((x, i) => x === d[i]))(distancesFrom(g, setup.start.title)))`));
 check('the route only shows as a spoiler', await ev('bg.pair.route === null') && await ev("$('#bgRoute').click(), true")
   && await until("JSON.stringify(bg.pair?.route) === JSON.stringify(setup.route.map(t => PAGE_IDS.get(t)))"));
 await ev("document.querySelector('#rules input[value=blind]').click()");

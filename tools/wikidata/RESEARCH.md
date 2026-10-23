@@ -72,6 +72,18 @@ Taken in October 2026 from these findings:
 - **Pages left out:** the non-content pages leave the pool, plus three list pages no category marks (Block variant, Drinks, Removed blocks). Variants and Gameplay become the Content toggles Variants and Mechanics, off by default.
 - **Difficulty:** No navboxes and No hubs became a difficulty setting (Relaxed with navboxes, Normal without, Hard without navboxes or hubs), with Normal as the default. Every daily plays on Normal plus one rule, No hubs making it Hard.
 
+## Top links only (lead links)
+
+Measured in October 2026 on the same snapshot, with a one-off script over the ZIM (not kept): each page's links above its first section heading, three ways, against the Normal graph. Pairs as in the game: a start from the pool and a target from another topic linked from at least 5 articles outside navboxes, 600 per pool and difficulty.
+
+- **What the top holds:** of pool articles' links above the first heading, 62% are in the infobox, 31% in the opening text and 7% in hatnotes. A median pool article has 13 such links (71 outside navboxes), 4 in its text.
+- **Text alone doesn't play:** with only the opening paragraphs and lists, 35% of Everyday pairs have no route in Normal and 46% in Hard, and most of the rest take 6 clicks or more; the first paragraph alone is worse (43% and 55%). 696 of the 1,019 targets are linked from the text of fewer than 5 articles.
+- **The whole top does:** every pool start joins the web of links, and 905 targets can be reached in Normal (894 in Hard); the other 114 or so are linked from no page's top that leads anywhere. Among the pairs rolls allow, par in Normal is 2 for 2%, 3 for 18%, 4 for 36%, 5 for 29%, 6 for 10% and 7 or more for 4% (Hard: 3%, 12%, 29%, 34%, 14%, 8%), against Normal's 85% at par 2 with every link outside navboxes. The median good first clicks fall to 2 (1 in Hard). Popular plays shorter (mostly 3 to 4), Deep cuts longer.
+- **Routes go through infobox rows:** the pages most often on a shortest route are those infoboxes link to, such as Renewable resource, Explosion (blast resistance), Durability, Breaking, Entity and Sulfur Cube (in 152 block infoboxes), each on 5–15% of routes.
+- **Hatnotes barely matter:** leaving them out keeps the numbers within a few points and reaches 849 targets.
+
+Decided: the rule keeps the whole top (opening text, infobox, hatnotes, the whole page when it has no heading, never a navbox), named Top links only, with Six clicks off under it since par is often more than six, and not a daily rule until it has been played.
+
 ## Open questions
 
 - How fast the live wiki drifts from the snapshot, measured with a few API requests.

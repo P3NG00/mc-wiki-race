@@ -812,6 +812,22 @@ check('only real records are shown', await ev("document.querySelectorAll('#histo
   `rows=${await ev("document.querySelectorAll('#history tbody tr').length")}`);
 await ev("localStorage.removeItem('mwr.history')");
 
+// Top links only on a real article: the live wiki has a table of contents (with a heading of its own) that the ZIM lacks,
+// so the dashed line has to go over the first section heading, outside it, and every live link has to come before it.
+await send('browsingContext.navigate', { context: ctx, url: 'about:blank', wait: 'complete' });
+await send('browsingContext.navigate', { context: ctx, url: fileUrl + '#start=Diamond&target=Ghast&rules=nonav,lead', wait: 'complete' });
+await until("!document.querySelector('#btnPlay').disabled && setup.busy === 0");
+await ev("document.querySelector('#btnPlay').click()");
+const leadOk = `(() => {
+  const folds = document.querySelectorAll('.mwr-fold'), fold = folds[0], live = [...document.querySelectorAll('.mwr-live')];
+  return folds.length === 1 && fold.nextElementSibling.matches('.mw-heading, h2') && !fold.nextElementSibling.checkVisibility() && !fold.closest('.toc, #toc') && live.length > 3
+    && live.every(a => fold.compareDocumentPosition(a) & Node.DOCUMENT_POSITION_PRECEDING)
+    && [...document.querySelectorAll('.mw-parser-output a.mwr-dead')].some(a => a.title === 'Off limits: Top links only');
+})()`;
+check('Top links only: on a real article the line is over the first section heading, outside the contents, with the rest folded away and every live link above it',
+  await until('game.active && !game.loading') && await until(leadOk, 15000, await frameCtx()), await ev("document.querySelectorAll('.mwr-live').length + ' live'", await frameCtx()));
+await ev('finish(false); closeModal(); toSetup()');
+
 // Leaving the page during a game asks first, and after the game it doesn't. Browsers only ask once the page has had a
 // real click or key press, so Start is pressed with a real click. BiDi accepts the "Leave page?" dialog by default and
 // reports it as browsingContext.userPromptOpened.

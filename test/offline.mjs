@@ -902,6 +902,68 @@ for (const [date, rules, cards, what] of [['2026-01-24', 'nonav,exact', 'start,g
 await ev("document.querySelector('input[name=level][value=hard]').click()");
 check('another difficulty leaves the daily', await ev("setup.daily === null && document.querySelector('#setupStatus').textContent === LEFT_DAILY"));
 
+// The daily streak and stats, from mwr.dailies: only days won on their day make a streak, which lasts until today's is
+// due, and anything finish wouldn't write is left out.
+const ago = k => `(d => (d.setDate(d.getDate() - ${k}), dateKey(d)))(new Date())`;
+await ev(`(() => {
+  const win = { won: true, onDay: true, clicks: 3, ms: 60000 }, all = {};
+  for (const k of [1, 2, 3, 5, 6, 7, 8, 9]) all[${ago('k')}] = win;
+  all[${ago(4)}] = { won: true, onDay: false, clicks: 5 };
+  all[${ago(10)}] = { won: false, onDay: false };
+  Object.assign(all, { x: win, '2026-02-31': win, [${ago(11)}]: { won: false, onDay: true }, [${ago(12)}]: { won: true, onDay: true } });
+  localStorage.setItem('mwr.dailies', JSON.stringify(all));
+})()`);
+await open('');
+check('a streak counts days won on their day up to yesterday, with the best run and every day played', await ev(`(s => s.now === 3 && s.best === 5 && !s.today
+  && Object.keys(savedDailies()).length === 10)(dailyStreaks(savedDailies()))`), await ev('JSON.stringify(dailyStreaks(savedDailies()))'));
+check('the daily box says the streak, the best and the days won', await ev("document.querySelector('#dailyStats').textContent")
+  === '🔥 3-day streak, play today to keep it · Best 5 · Won 9 of 10 days', await ev("document.querySelector('#dailyStats').textContent"));
+// A daily's games keep the day's best win, and only a win on its day counts.
+check('finishing a daily keeps its best win and joins the streak only when won on its day', await ev(`(() => {
+  const day = today(), rec = (won, clicks, ms) => ({ daily: day, won, clicks, ms });
+  saveDaily(rec(false, 2, 1000), true);
+  const lost = savedDailies()[day];
+  saveDaily(rec(true, 4, 9000), false);
+  const later = dailyStreaks(savedDailies()).now;
+  saveDaily(rec(true, 4, 5000), true); saveDaily(rec(true, 5, 1000), true); saveDaily(rec(false, 1, 1), true);
+  const d = savedDailies()[day], s = dailyStreaks(savedDailies());
+  return !lost.won && !lost.onDay && later === 3 && d.won && d.onDay && d.clicks === 4 && d.ms === 5000 && s.now === 4 && s.today;
+})()`), await ev('JSON.stringify(savedDailies()[today()])'));
+check('a loss after a win keeps the win, and a missed day ends a streak', await ev(`(() => {
+  saveDaily({ daily: ${ago(1)}, won: false, clicks: 1, ms: 1 }, true);
+  const a = { [${ago(3)}]: { won: true, onDay: true, clicks: 1 } }, b = { [${ago(2)}]: { won: true, onDay: true, clicks: 1 } };
+  return dailyStreaks(savedDailies()).now === 4 && dailyStreaks(a).now === 0 && dailyStreaks(a).best === 1 && dailyStatsText(a) === 'Streak over · Best 1 · Won 1 of 1 day'
+    && dailyStreaks(b).now === 0 && dailyStatsText({}) === '';
+})()`));
+// A daily played to the end is recorded for its day, a loss as played.
+await ev("localStorage.removeItem('mwr.dailies')");
+await open('#daily');
+await play();
+await ev("finish(false); closeModal(); toSetup()");
+check('giving up a daily keeps its day as played', await ev("JSON.stringify(savedDailies()) === JSON.stringify({ [today()]: { won: false, onDay: false } })"), await ev("JSON.stringify(savedDailies())"));
+check('the daily box counts it', await ev("document.querySelector('#dailyStats').textContent === 'Won 0 of 1 day'"), await ev("document.querySelector('#dailyStats').textContent"));
+// Past dailies: this month, today marked, later days off, back to DAILY_FIRST's month and no further, a day loading its daily.
+await ev(`localStorage.setItem('mwr.dailies', JSON.stringify({ [${ago(1)}]: { won: true, onDay: true, clicks: 2 }, [today()]: { won: false, onDay: false } }))`);
+await ev("document.querySelector('#btnPastDailies').click()");
+const calOk = `(() => { const c = document.querySelector('#modal .cal'), b = [...c.querySelectorAll('button')], t = c.querySelector('.today');
+  return !document.querySelector('#modalBg').classList.contains('hidden') && t?.dataset.day === today() && t.classList.contains('played')
+    && b.every(x => x.disabled === (x.dataset.day > today() || x.dataset.day < DAILY_FIRST)) && b.length === new Date(+today().slice(0, 4), +today().slice(5, 7), 0).getDate()
+    && (y => !y || y.classList.contains('streak') || y.dataset.day.slice(0, 7) !== today().slice(0, 7))(c.querySelector('[data-day="' + ${ago(1)} + '"]'))
+    && document.querySelector('#calNext').disabled && t.title.includes(dailyText(today())); })()`;
+check('Past dailies opens on this month, today marked, the days to come off', await ev(calOk), await ev("document.querySelector('#modal').textContent"));
+check('it goes back to the first daily\'s month and no further', await ev(`(() => {
+  for (let i = 0; i < 240 && !document.querySelector('#calPrev').disabled; i++) document.querySelector('#calPrev').click();
+  return [...document.querySelectorAll('#modal .cal button')].every(b => b.dataset.day.startsWith(DAILY_FIRST.slice(0, 7)) && b.disabled === (b.dataset.day < DAILY_FIRST || b.dataset.day > today()))
+    && document.querySelector('#calNext').disabled === (DAILY_FIRST.slice(0, 7) === today().slice(0, 7));
+})()`));
+await ev("document.querySelector('#modal .cal button:not(:disabled)').click()");
+check('a day loads its daily', await until("setup.daily !== null && setup.daily < today() && document.querySelector('#modalBg').classList.contains('hidden')") && await until(ready)
+  && await ev("document.querySelector('#setupStatus').textContent.startsWith('Daily challenge for ' + setup.daily)"), await ev('setup.daily'));
+check('Clear history empties the dailies too', await ev(`(() => {
+  document.querySelector('#btnClearHistory').click(); document.querySelector('#hClear').click();
+  return localStorage.getItem('mwr.dailies') === '{}' && document.querySelector('#dailyStats').textContent === '';
+})()`));
+
 // Content and Spin-offs. A spin-off's links work when it is on, or when a card's page is in it.
 await open('#start=Minecraft%20Dungeons&target=Diamond');
 check('Everyday rolls Dungeons pages only with Dungeons on', await ev(`(() => {

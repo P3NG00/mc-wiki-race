@@ -125,6 +125,20 @@
   .game-settings { margin-top: 36px; padding-top: 24px; border-top: 1px solid var(--line); }
   .kicker, .step { font-size: 12px; font-weight: 700; letter-spacing: .07em; text-transform: uppercase; color: var(--muted); }
   .daily-box .kicker { display: block; }
+  .daily-stats { display: block; margin-top: 2px; }
+  .daily-stats button.link { font-size: 13px; }
+  #dailyStats:not(:empty) { margin-right: 10px; }
+  /* Past dailies: a month of days, marked won on its day (in the streak), won later, or played and not won. */
+  .cal-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 4px 0 8px; }
+  .cal { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; margin-bottom: 10px; }
+  .cal .wd { text-align: center; font-size: 12px; color: var(--muted); }
+  .cal button { padding: 8px 0; font-variant-numeric: tabular-nums; }
+  .cal .streak, .cal-key .streak { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+  .cal .won, .cal-key .won { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); }
+  .cal .played, .cal-key .played { background: var(--warm-soft); border-color: var(--warm-soft); color: var(--warm); }
+  .cal .today { font-weight: 700; box-shadow: inset 0 0 0 2px var(--ink); }
+  .cal-key { display: flex; flex-wrap: wrap; gap: 4px 14px; align-items: center; }
+  .cal-key i { display: inline-block; width: 12px; height: 12px; margin-right: 5px; vertical-align: -1px; border: 1px solid; border-radius: 3px; }
   .step { margin: 0 0 10px; }
   .step .note { text-transform: none; letter-spacing: 0; font-weight: 400; }
   .games { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }   /* two across on a phone */
@@ -512,7 +526,8 @@ const THEMES = [...new Set(['auto', 'light', 'dark', ...Array.from(document.quer
   <noscript><div class="noscript"><p><strong>This game needs JavaScript.</strong> It fetches articles from minecraft.wiki as you play, so turn JavaScript on for this page and reload it.</p></div></noscript>
 
   <div class="daily-box">
-    <div><span class="kicker">Daily challenge · <span id="dailyDate"></span></span><b id="dailyWhat"></b> <span class="note" id="dailyDone"></span></div>
+    <div><span class="kicker">Daily challenge · <span id="dailyDate"></span></span><b id="dailyWhat"></b> <span class="note" id="dailyDone"></span>
+      <span class="daily-stats note"><span id="dailyStats"></span><button class="link" id="btnPastDailies">Past dailies</button></span></div>
     <button id="btnDaily" title="Today’s pair: the same for everyone">📅 Play the daily</button>
   </div>
 
@@ -1476,10 +1491,9 @@ function hash32(s) {
   return (h ^ h >>> 16) >>> 0;
 }
 
-function today() {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-}
+// A local day as YYYY-MM-DD.
+const dateKey = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+const today = () => dateKey(new Date());
 // Whether s is a day that exists, as YYYY-MM-DD (not 2026-02-31). Date.UTC reads years 0 to 99 as 1900 to 1999, so
 // those don't come back the same either.
 function realDate(s) {
@@ -1512,12 +1526,84 @@ function dailyText(date) {
   if (rule === 'exact') return `Exact clicks, par + ${dailyExtra(date)}`;
   return RULES[rule].label;
 }
-// The daily box at the top of the setup screen: today's game, and how you did if you have won it.
+// Each day's daily as played, by date (mwr.dailies), kept apart from the history, which holds only the last 50 games:
+// whether it was won, whether on its own day (onDay: only those make a streak, so a past day played from the calendar
+// catches up without mending one), and its best win's clicks and time. A loss or giving up keeps the day as played.
+// Read like the history: anything finish() wouldn't write is left out.
+const isDaily = (date, d) => realDate(date) && typeof d === 'object' && d !== null && typeof d.won === 'boolean' && typeof d.onDay === 'boolean' &&
+  (d.won ? Number.isFinite(d.clicks) && optional(d.ms, Number.isFinite) : !d.onDay && d.clicks === undefined && d.ms === undefined);
+function savedDailies() {
+  const all = store.get('mwr.dailies', {});
+  return typeof all === 'object' && all !== null && !Array.isArray(all) ? Object.fromEntries(Object.entries(all).filter(([date, d]) => isDaily(date, d))) : {};
+}
+// rec: a daily's record from finish; onDay: whether the game started on its day.
+function saveDaily(rec, onDay) {
+  const all = savedDailies(), was = all[rec.daily], best = rec.won && (!was?.won || beats(rec, was)) ? rec : was?.won ? was : null;
+  all[rec.daily] = { won: !!best, onDay: !!was?.onDay || rec.won && onDay, ...(best && { clicks: best.clicks, ...(best.ms !== undefined && { ms: best.ms }) }) };
+  store.set('mwr.dailies', all);
+}
+// A date's day number, to count days in a row. The date is already the player's local day, so UTC just counts it.
+const dayNumber = date => Date.UTC(+date.slice(0, 4), date.slice(5, 7) - 1, +date.slice(8)) / 864e5;
+// The streak: the days in a row won on their day, up to today, or up to yesterday while today's isn't won yet (today),
+// and the longest run there has been.
+function dailyStreaks(all) {
+  const days = Object.keys(all).filter(d => all[d].onDay).map(dayNumber).sort((a, b) => a - b), t = dayNumber(today()), last = days.at(-1);
+  let run = 0, best = 0;
+  days.forEach((n, i) => { run = i && n === days[i - 1] + 1 ? run + 1 : 1; best = Math.max(best, run); });
+  return { now: last === t || last === t - 1 ? run : 0, best, today: last === t };
+}
+// The stats line under the daily: "🔥 3-day streak · Best 7 · Won 12 of 14 days", nothing before a daily is played.
+function dailyStatsText(all) {
+  const days = Object.values(all), s = dailyStreaks(all);
+  if (!days.length) return '';
+  return [s.now ? `🔥 ${s.now}-day streak${s.today ? '' : ', play today to keep it'}` : s.best && 'Streak over',
+    s.best > s.now && `Best ${s.best}`, `Won ${days.filter(d => d.won).length} of ${days.length} day${days.length === 1 ? '' : 's'}`].filter(Boolean).join(' · ');
+}
+// The daily box at the top of the setup screen: today's game, how you did if you have won it, and the stats line.
 function renderDailyBox() {
-  const date = today(), done = savedGames().find(r => r.daily === date && r.won);
+  const date = today(), all = savedDailies(), done = all[date]?.won ? all[date] : null;
   $('#dailyDate').textContent = shortDate(new Date());
   $('#dailyWhat').textContent = dailyText(date);
   $('#dailyDone').textContent = done ? `· done in ${wonText(done, true)}` : '';
+  $('#dailyStats').textContent = dailyStatsText(all);
+}
+
+// The first day Past dailies offers, to be set to the release day. Only the calendar stops there: a #daily= link plays
+// any day that has come.
+const DAILY_FIRST = '2026-10-01';
+// Past dailies: a month (YYYY-MM) of days from DAILY_FIRST to today, each loading its daily, marked won on its day (in
+// the streak), won later, or played and not won. The week starts on the locale's first day, Monday where it can't tell.
+function openCalendar(month = today().slice(0, 7)) {
+  const all = savedDailies(), now = today(), [y, m] = month.split('-').map(Number);
+  let first = 1;
+  try { const l = new Intl.Locale(navigator.language); first = (l.getWeekInfo?.() ?? l.weekInfo)?.firstDay ?? 1; } catch { /* Monday */ }
+  const weekdays = [...Array(7)].map((_, i) => new Date(2024, 0, 7 + (first + i) % 7).toLocaleDateString(undefined, { weekday: 'narrow' }));   // 7 Jan 2024 was a Sunday
+  const blanks = (new Date(y, m - 1, 1).getDay() - first % 7 + 7) % 7;
+  const day = d => {
+    const date = `${month}-${String(d).padStart(2, '0')}`, r = all[date], off = date > now || date < DAILY_FIRST;
+    const what = new Date(y, m - 1, d).toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' }) + (off ? '' : `: ${dailyText(date)}` +
+      (r ? (r.won ? ` · ✓ ${wonText(r, true)}${r.onDay ? '' : ', won later'}` : ' · not won') : ''));
+    const cls = [r?.onDay ? 'streak' : r?.won ? 'won' : r && 'played', date === now && 'today'].filter(Boolean).join(' ');
+    return `<button data-day="${date}"${cls ? ` class="${cls}"` : ''} title="${esc(what)}" aria-label="${esc(what)}"${off ? ' disabled' : ''}>${d}</button>`;
+  };
+  const shift = n => dateKey(new Date(y, m - 1 + n, 1)).slice(0, 7);
+  openModal(`<h2>Past dailies</h2>
+    <p class="note">Play any day’s daily since ${esc(shortDate(new Date(DAILY_FIRST + 'T00:00')))}. Only one won on its own day counts toward a streak.</p>
+    <div class="cal-head"><button id="calPrev" aria-label="Previous month"${shift(-1) < DAILY_FIRST.slice(0, 7) ? ' disabled' : ''}>‹</button>
+      <b>${esc(new Date(y, m - 1, 1).toLocaleDateString(undefined, { month: 'long', year: 'numeric' }))}</b>
+      <button id="calNext" aria-label="Next month"${shift(1) > now.slice(0, 7) ? ' disabled' : ''}>›</button></div>
+    <div class="cal">${weekdays.map(w => `<span class="wd">${esc(w)}</span>`).join('')}${'<span></span>'.repeat(blanks)}${[...Array(new Date(y, m, 0).getDate())].map((_, i) => day(i + 1)).join('')}</div>
+    <p class="note cal-key"><span><i class="streak"></i>Won on the day</span><span><i class="won"></i>Won later</span><span><i class="played"></i>Not won</span></p>
+    <div class="actions"><button id="calClose">Close</button></div>`);
+  // The dialog is drawn again, so focus goes back to the arrow clicked, or the other one at the end of the months.
+  const go = (n, id) => { openCalendar(shift(n)); ($(id).disabled ? $(id === '#calPrev' ? '#calNext' : '#calPrev') : $(id)).focus(); };
+  $('#calPrev').onclick = () => go(-1, '#calPrev');
+  $('#calNext').onclick = () => go(1, '#calNext');
+  $('#calClose').onclick = closeModal;
+  $('#modal .cal').onclick = e => {
+    const b = e.target.closest('button[data-day]');
+    if (b) { closeModal(); loadDaily(b.dataset.day); }
+  };
 }
 
 // A daily can always be done: its target, checkpoints and finds are only taken where the link graph has a route under
@@ -1577,7 +1663,7 @@ async function loadDaily(date = today()) {
     setContent([]);   // the daily is its pair and rule only: no spin-off links
     syncVia();
     keys.forEach(renderCard);
-    const done = savedGames().find(r => r.daily === date && r.won);
+    const day = savedDailies()[date], done = day?.won ? day : null;
     setStatus(`Daily challenge for ${date}: ${dailyText(date)}.` + (done ? ` You did it in ${wonText(done, true)}.` : ' Press Start when ready.'));
   });
 }
@@ -1683,6 +1769,7 @@ const game = {
   start: null, goal: null,
   rules: [],         // rule keys in play, read from the checkboxes at start
   daily: null,       // the date, if this is that day's daily pair
+  onDay: false,      // whether that daily started on its own day, which a streak needs
   link: '',          // a link that plays this game (gameLink), made at the start
   vias: [],          // the checkpoints (Checkpoint rule), to be reached in order before the target counts
   viaNext: 0,        // how many of them have been reached
@@ -1840,7 +1927,7 @@ function startGame() {
   const vias = roundTrip && !hunt ? [...cps.slice(0, out), setup.goal, ...cps.slice(out)] : cps, goal = roundTrip ? setup.start : hunt ? null : setup.goal;
   const exact = r.includes('exact') ? setup.exact : null, limit = exact ? exact.length - 1 : r.includes('limit') ? CLICK_LIMIT : 0;
   Object.assign(game, { active: true, link: gameLink(), start: setup.start, goal, vias, viaNext: 0, roundTrip, turn: roundTrip && !hunt ? out + 1 : 0, hunt,
-    dead: new Set(), exact, limit, celebrate: false, stuck: false, daily: setup.daily, rules: r, content: contentInPlay(cards.map(c => c.title)), timed: $('#timerToggle').checked, path: [],
+    dead: new Set(), exact, limit, celebrate: false, stuck: false, daily: setup.daily, onDay: setup.daily === today(), rules: r, content: contentInPlay(cards.map(c => c.title)), timed: $('#timerToggle').checked, path: [],
     seen: new Map(), stack: [], elapsed: 0, runningSince: 0, loading: false, par: null });
   // Par shows in the header once it is known: at once when the setup screen has loaded the link graph.
   const parReady = game.parReady = cardsRoute(cards.map(c => c.title), r, kinds, back);
@@ -2948,6 +3035,7 @@ function finish(won, lost = null) {
     .reduce((b, r) => !b || beats(r, b) ? r : b, null);
   hist.unshift(rec);
   store.set('mwr.history', hist.slice(0, 50));
+  if (game.daily) saveDaily(rec, game.onDay);
 
   const route = routeText(rec);
   // Your path, each page marked with what it was to the game (back, a checkpoint, a find, the target, stranded) and, once
@@ -3883,6 +3971,7 @@ $('#btnSwap').onclick = () => {
   keys.forEach(renderCard);
 };
 $('#btnDaily').onclick = () => loadDaily();
+$('#btnPastDailies').onclick = () => openCalendar();
 $('#btnPlay').onclick = async () => { if (!isBlind() || await pickHidden()) startGame(); };
 // A link has to carry the hidden cards, so under Blind target they are picked now and held unseen.
 $('#btnCopy').onclick = async () => {
@@ -3915,10 +4004,10 @@ $('#btnGiveUp').onclick = () => {
 };
 $('#btnClearHistory').onclick = () => {
   const n = savedGames().length;
-  openModal(`<h2>Clear history?</h2><p>This deletes ${n === 1 ? 'the 1 recorded game' : `all ${n} recorded games`}, personal bests and dailies included. It can’t be undone.</p>
+  openModal(`<h2>Clear history?</h2><p>This deletes ${n === 1 ? 'the 1 recorded game' : `all ${n} recorded games`}, personal bests, dailies and the daily streak included. It can’t be undone.</p>
     <div class="actions"><button id="hKeep">Cancel</button><button class="primary" id="hClear">Clear history</button></div>`);
   $('#hKeep').onclick = closeModal;
-  $('#hClear').onclick = () => { store.set('mwr.history', []); renderHistory(); closeModal(); };
+  $('#hClear').onclick = () => { store.set('mwr.history', []); store.set('mwr.dailies', {}); renderHistory(); closeModal(); };
 };
 $('#btnPeek').onclick = () => {
   if (hunting()) {

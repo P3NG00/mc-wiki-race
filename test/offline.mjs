@@ -1030,6 +1030,49 @@ for (let i = 0; i < 8; i++) {
 }
 check('Random game sets the settings at random and fills the cards they use', randoms.every(Boolean) && new Set(randoms).size > 4, randoms.join(' ; '));
 
+// The background: its settings and their defaults, Roll by itself turning off at a change on the page but not in its
+// own box, the cards marked with the route only as a spoiler and nothing past the start under Blind target, the facts
+// line, Off, play, reduce motion, and Auto's map at a phone's width.
+await ev("localStorage.removeItem('mwr.background')");
+await open('#start=Diamond&target=Crafting');
+check('the background is on by default: Auto, Roll by itself, the rest off, and its box says so', await ev(`JSON.stringify(bgSet) === '{"style":"auto","wave":false,"route":false,"roll":true,"still":false}'
+  && $('#bgStyle').value === 'auto' && $('#bgRoll').checked && !$('#bgWave').checked && !$('#bgRoute').checked && !$('#bgStill').checked`), await ev('JSON.stringify(bgSet)'));
+check('Auto is the constellation on a wide screen, drawn with the facts line shown', await ev("bgStyle() === 'constellation' && !$('#bgCanvas').hidden && !$('#bgFacts').hidden")
+  && await until("!!bg.sky && bg.sky.nodes.length === WIKI_DATA.topics.length * 64"));
+check('the sky is laid out the same every time', await ev("JSON.stringify(buildSky(bg.links).nodes.map(n => [n.x, n.y])) === JSON.stringify(bg.sky.nodes.map(n => [n.x, n.y]))"));
+check('the facts line starts with the snapshot\'s pages, and gets how far apart articles are on the difficulty', await ev(`bg.facts[0].includes(fmtCount(WIKI_DATA.articles.length)) && bg.facts[0].includes(WIKI_DATA.snapshot)`)
+  && await until("bg.sampled.has(level()) && bg.facts.some(f => f.startsWith('On ' + LEVELS[level()].label))", 30000), await ev('bg.facts.at(-1)'));
+check('Roll by itself marks pairs of its own', await until("!!bg.pair && bg.pair.stops.length === 2 && !bg.pair.stops[0].label.startsWith('Start')"), await ev('JSON.stringify(bg.pair?.stops)'));
+await ev("$('#bgWave').click()");
+check('a change in the Background box leaves it on', await ev("bgSet.roll && bgSet.wave && store.get('mwr.background').wave === true"));
+await ev("$('#btnRerollAll').click()");
+check('a change on the page turns it off, saved, and the cards are marked', await until(`${ready} && !bgSet.roll && store.get('mwr.background').roll === false
+  && bg.pair?.stops[0].label === 'Start · ' + setup.start.title && bg.pair.stops[1].label === 'Target · ' + setup.goal.title`), await ev('JSON.stringify(bg.pair?.stops)'));
+check('the wave counts clicks from the start as par does', await until("!!bg.pair?.wave") && await ev(`linkGraph(!rules().includes('nonav')).then(g => (d => bg.pair.wave.dist.every((x, i) => x === d[i]))(distancesFrom(g, setup.start.title)))`));
+check('the route only shows as a spoiler', await ev('bg.pair.route === null') && await ev("$('#bgRoute').click(), true")
+  && await until("JSON.stringify(bg.pair?.route) === JSON.stringify(setup.route.map(t => PAGE_IDS.get(t)))"));
+await ev("document.querySelector('#rules input[value=blind]').click()");
+check('under Blind target only the start is marked, with no route, and the facts leave the target out', await until("bg.pair?.stops.length === 1 && bg.pair.stops[0].start && bg.pair.route === null && !!bg.pair.wave")
+  && await until("bg.pairFacts.length === 2"), await ev('JSON.stringify(bg.pairFacts)'));
+await ev("document.querySelector('#rules input[value=blind]').click()");
+await until(ready);
+await ev("localStorage.setItem('mwr.background', JSON.stringify({ style: 'redstone', wave: true, route: false, roll: false, still: true, junk: 1 }))");
+await open('#start=Diamond&target=Crafting');
+check('the settings load on a visit, and the box shows them', await ev(`JSON.stringify(bgSet) === '{"style":"redstone","wave":true,"route":false,"roll":false,"still":true}'
+  && $('#bgStyle').value === 'redstone' && $('#bgWave').checked && !$('#bgRoll').checked && $('#bgStill').checked`), await ev('JSON.stringify(bgSet)'));
+check('reduce motion draws a still frame: no animation, the wave already passed', await until("!!bg.pair?.wave && !!bg.grid") && await ev("bg.raf === 0 && waveLight(bg.pair.wave, PAGE_IDS.get('Crafting'), 0) !== null"));
+await play();
+check('the background hides while you play', await ev("$('#bgCanvas').hidden && !bgLive()"));
+await ev('toSetup()');
+check('and comes back on the setup screen', await ev("!$('#bgCanvas').hidden && bgLive()"));
+await ev("$('#bgStyle').value = 'off', $('#bgStyle').dispatchEvent(new Event('change'))");
+check('Off hides the background and the facts line', await ev("$('#bgCanvas').hidden && $('#bgFacts').hidden && store.get('mwr.background').style === 'off'"));
+await ev("bgSetting('style', 'auto'), bgSetting('still', false)");
+await send('browsingContext.setViewport', { context: ctx, viewport: { width: 390, height: 844 } });
+check('Auto is the redstone map at a phone\'s width', await until("bgStyle() === 'redstone' && bg.W <= 390 && bg.grid?.W === bg.W"), await ev('JSON.stringify([bgStyle(), bg.W, bg.grid?.W])'));
+await send('browsingContext.setViewport', { context: ctx, viewport: null });
+check('and the constellation again on a wide screen', await until("bgStyle() === 'constellation'"));
+
 // Injection: a link can carry any text, so a sealed one whose titles are markup and script, with junk rules, kinds and
 // back, is played through every place a title shows (cards, header, path, a frame link, the banner, the peek, the result,
 // the history). The made-up wiki takes the titles as real pages, which the live one never would, so it is the stricter

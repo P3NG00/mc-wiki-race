@@ -36,6 +36,9 @@
     --radius-lg: 12px;    /* cards, tables, dialogs */
     --radius-pill: 999px; /* mode chips */
     --art-opacity: .13;   /* the large faded picture behind the setup cards and the path */
+    /* The background behind the setup screen: each topic's colour, the wave's, and how strong it all is. */
+    --viz-blocks: #a0612c; --viz-items: #c49000; --viz-mobs: #3f9a35; --viz-world: #2a7cc4; --viz-magic: #9446cf;
+    --viz-redstone: #d42515; --viz-opacity: .45;
     color-scheme: light;  /* also decides whether the article uses the wiki's light or dark theme */
   }
   /* Auto is no data-theme attribute, so an explicit theme (light, dark or one added by the host page) gets only its own rule. */
@@ -47,6 +50,8 @@
       --warm: #f5b183; --warm-soft: #3a2616;
       --shadow: 0 1px 2px rgba(0,0,0,.4), 0 4px 16px rgba(0,0,0,.3);
       --art-opacity: .17;
+      --viz-blocks: #d08a4c; --viz-items: #e8c040; --viz-mobs: #62c257; --viz-world: #52a6ec; --viz-magic: #b77cf0;
+      --viz-redstone: #ff3b26; --viz-opacity: .55;
       color-scheme: dark;
     }
   }
@@ -57,6 +62,8 @@
     --warm: #f5b183; --warm-soft: #3a2616;
     --shadow: 0 1px 2px rgba(0,0,0,.4), 0 4px 16px rgba(0,0,0,.3);
     --art-opacity: .17;
+    --viz-blocks: #d08a4c; --viz-items: #e8c040; --viz-mobs: #62c257; --viz-world: #52a6ec; --viz-magic: #b77cf0;
+    --viz-redstone: #ff3b26; --viz-opacity: .55;
     color-scheme: dark;
   }
   * { box-sizing: border-box; }
@@ -92,7 +99,8 @@
   #setup .sub, .mode-help, .noscript { max-width: 760px; }   /* the cards use the width, prose keeps a readable line */
   .setup-head { display: flex; justify-content: space-between; align-items: baseline; gap: 4px 16px; flex-wrap: wrap; }
   #setup h1 { font-size: 28px; margin: 0 0 4px; letter-spacing: -.01em; }
-  .head-opts { display: flex; gap: 16px; align-items: baseline; color: var(--muted); font-size: 13.5px; }
+  .head-opts { display: flex; flex-wrap: wrap; gap: 6px 16px; align-items: baseline; color: var(--muted); font-size: 13.5px; }
+  .head-opts > * { white-space: nowrap; }
   .head-opts select { margin-left: 4px; padding: 3px 6px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--panel); }
   #setup .sub { color: var(--muted); margin: 0 0 24px; }
   .modes { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; }
@@ -202,6 +210,29 @@
   .site-foot { margin-top: 36px; padding-top: 12px; border-top: 1px solid var(--line); color: var(--muted); font-size: 13px; }
   .site-foot p { margin: 0 0 4px; }
   .site-foot a { color: var(--accent); }
+  /* The background (see the Background section of the script): the picture, its settings box and the facts line. */
+  #bgCanvas { position: fixed; inset: 0; width: 100%; height: 100%; z-index: -1; pointer-events: none; }
+  .bg-opts { position: relative; }
+  .bg-opts summary { cursor: pointer; list-style: none; }
+  .bg-opts summary::-webkit-details-marker { display: none; }
+  .bg-opts summary::after { content: ' ▾'; }
+  .bg-opts[open] summary::after { content: ' ▴'; }
+  .bg-panel {
+    position: absolute; right: 0; top: calc(100% + 6px); z-index: 20; display: grid; gap: 8px; width: max-content;
+    max-width: calc(100vw - 32px); padding: 12px 14px; background: var(--panel); color: var(--ink);
+    border: 1px solid var(--line); border-radius: var(--radius-lg); box-shadow: var(--shadow);
+  }
+  @media (max-width: 720px) {   /* on a phone the box opens in the page, the whole width */
+    .bg-opts[open] { flex-basis: 100%; }
+    .bg-panel { position: static; width: auto; margin-top: 8px; white-space: normal; }
+  }
+  .bg-facts { margin: 28px 0 0; color: var(--muted); font-size: 13.5px; min-height: 1.45em; transition: opacity .5s; }
+  .bg-facts b { color: var(--ink); font-weight: 600; }
+  .bg-facts.out { opacity: 0; }
+  /* Text straight on the background keeps a halo of the page's colour, so the picture never cuts into it. */
+  #setup :is(.setup-head, .sub, .your-game, .step, .setup-par, .status, .history-head, .bg-facts, .site-foot) {
+    text-shadow: 0 0 3px var(--bg), 0 0 6px var(--bg), 0 0 10px var(--bg);
+  }
 
   /* ---------- Game screen ---------- */
   #game { display: grid; grid-template-rows: auto 1fr; height: 100%; height: 100dvh; }   /* dvh: not under a phone browser's toolbars */
@@ -417,6 +448,8 @@ const THEMES = [...new Set(['auto', 'light', 'dark', ...Array.from(document.quer
 }
 </script>
 
+<canvas id="bgCanvas" aria-hidden="true" hidden></canvas>
+
 <!-- ======================= SETUP ======================= -->
 <section id="setup">
   <div class="setup-head">
@@ -425,6 +458,21 @@ const THEMES = [...new Set(['auto', 'light', 'dark', ...Array.from(document.quer
       <label><input type="checkbox" id="soundToggle"> Sound</label>
       <label title="A clock while you play, and your time in the result. Off records no time, for a relaxed game."><input type="checkbox" id="timerToggle"> Timer</label>
       <label>Theme <select id="themeSelect"></select></label>
+      <details class="bg-opts" id="bgOpts">
+        <summary>Background</summary>
+        <div class="bg-panel">
+          <label>Show <select id="bgStyle">
+            <option value="auto">Auto: constellation, redstone map on phones</option>
+            <option value="constellation">Constellation</option>
+            <option value="redstone">Redstone map</option>
+            <option value="off">Off</option>
+          </select></label>
+          <label title="Light up every page by how many clicks it is from the start."><input type="checkbox" id="bgWave"> Wave from the start</label>
+          <label title="Draw the shortest route between the cards: it gives the game away."><input type="checkbox" id="bgRoute"> Show the route (spoiler)</label>
+          <label title="Show pairs of its own until you change anything on the page, then follow your cards."><input type="checkbox" id="bgRoll"> Roll by itself</label>
+          <label><input type="checkbox" id="bgStill"> Reduce motion</label>
+        </div>
+      </details>
     </div>
   </div>
   <p class="sub">Get from the start article to the target using only the links inside articles. Fewest clicks and fastest time win.</p>
@@ -514,6 +562,8 @@ const THEMES = [...new Set(['auto', 'light', 'dark', ...Array.from(document.quer
     <div class="history-head"><h2>Recent games</h2><button class="link" id="btnClearHistory">Clear history</button></div>
     <div class="history-wrap"><table><thead><tr><th>Game</th><th>Route</th><th>Result</th><th>Time</th><th>When</th></tr></thead><tbody></tbody></table></div>
   </div>
+
+  <p class="bg-facts" id="bgFacts" hidden></p>
 
   <footer class="site-foot">
     <p>Made and run by <a href="https://BryantF.xyz">BryantF.xyz</a> · Contact: <a href="mailto:BryantF.xyz+mcwikirace@gmail.com">BryantF.xyz+mcwikirace@gmail.com</a></p>
@@ -782,7 +832,8 @@ const VIA_KEYS = ['via0', 'via1', 'via2'];
 // Random, the one rolled with the cards (see setExtra). kinds: Scavenger's kinds, by category. back: in a Relay
 // with Round trip, how many of the checkpoints come after the target, on the way back (see syncVia). blind: whether
 // Blind target was on when the rules were last set, so turning it off drops the cards it held unseen (see hiddenKeys).
-const setup = { start: null, via0: null, via1: null, via2: null, goal: null, daily: null, busy: 0, exact: null, extra: null, kinds: null, back: null, blind: false,
+// route: the cards' par route, for the background (none under Blind target).
+const setup = { start: null, via0: null, via1: null, via2: null, goal: null, daily: null, busy: 0, exact: null, extra: null, kinds: null, back: null, blind: false, route: null,
   rolls: { start: 0, via0: 0, via1: 0, via2: 0, goal: 0 } };
 const viaCount = () => +$('#viaCount').value;
 // Scavenger's mode while it is on: 'articles' (the checkpoint cards and the target card hold them) or 'kinds'.
@@ -958,8 +1009,9 @@ const routeText = r => r.goal === undefined ? [r.start, targetText(r), ...r.rule
 const shareRouteText = r => !r.rules.includes('blind') ? routeText(r)
   : (r.goal === undefined ? [r.start, '?', ...r.rules.includes('roundtrip') ? [r.start] : []] : chain(r).map(t => t === r.start ? t : '?')).join(' → ');
 
+const cardBox = which => $({ start: '#cardStart', goal: '#cardGoal' }[which] ?? '#card-' + which);
 function renderCard(which) {
-  const card = $({ start: '#cardStart', goal: '#cardGoal' }[which] ?? '#card-' + which);
+  const card = cardBox(which);
   const info = setup[which];
   const blind = which !== 'start' && isBlind();
   $('.title', card).textContent = blind ? 'Hidden' : info ? info.title : '…';
@@ -1017,9 +1069,9 @@ async function setupPar() {
   const blind = r.includes('blind');
   setup.exact = null;
   $('#exactInfo').textContent = blind ? 'Blind target: the count shows when you start.' : 'Working out the count…';
-  let text = '';
+  let text = '', route = null;
   if (titles.every(Boolean) && (kinds?.length ?? true)) {
-    const route = await cardsRoute(titles, r, kinds, backCount()).catch(() => null);
+    route = await cardsRoute(titles, r, kinds, backCount()).catch(() => null);
     if (route) text = `Par ${route.length - 1}`;
     if (r.includes('exact')) {
       const extra = setup.extra, n = route && route.length - 1 + extra, exact = route && await exactRoute(titles, r, n).catch(() => null);
@@ -1033,6 +1085,8 @@ async function setupPar() {
   if (token === setupParToken) {
     $('#setupPar').textContent = blind ? 'Par shows when you start' : text;
     updatePlay();
+    setup.route = blind ? null : route;
+    bgPair();
   }
 }
 
@@ -1501,13 +1555,16 @@ const gameLink = () => setup.daily ? location.href.split('#')[0] + '#daily=' + s
 // app cut short or mangled.
 // LINK_MAX is the longest blob opened: five titles of MediaWiki's longest (255 bytes, percent-encoded) fit.
 const LINK_KEY = 0x6d777221, LINK_MAX = 8192;
+// A seeded random number generator (0 to 1), for the sealed links' keystream and the background.
+const mulberry32 = seed => () => {
+  let t = seed = seed + 0x6d2b79f5 | 0;
+  t = Math.imul(t ^ t >>> 15, t | 1);
+  t ^= t + Math.imul(t ^ t >>> 7, t | 61);
+  return ((t ^ t >>> 14) >>> 0) / 2 ** 32;
+};
 function linkStream(seed, bytes) {   // mulberry32, XORed into bytes in place
-  for (let i = 0; i < bytes.length; i++) {
-    let t = seed = seed + 0x6d2b79f5 | 0;
-    t = Math.imul(t ^ t >>> 15, t | 1);
-    t ^= t + Math.imul(t ^ t >>> 7, t | 61);
-    bytes[i] ^= (t ^ t >>> 14) & 255;
-  }
+  const next = mulberry32(seed);
+  for (let i = 0; i < bytes.length; i++) bytes[i] ^= next() * 2 ** 32 & 255;
   return bytes;
 }
 const u32 = n => [n >>> 24, n >>> 16 & 255, n >>> 8 & 255, n & 255];
@@ -1738,6 +1795,7 @@ function startGame() {
   hideToast();
   $('#credit').textContent = '';
   $('#setup').classList.add('hidden');
+  bgShow(false);
   $('#game').classList.remove('hidden');
   scrollRouteToNow();   // laid out only now
   clearInterval(game.timer);
@@ -1928,6 +1986,7 @@ function setTheme(t) {
   else document.documentElement.dataset.theme = t;
   store.set('mwr.theme', t);
   syncFrameTheme();
+  bgTheme();
 }
 
 // The article uses the wiki's light or dark theme, matching the game theme's color-scheme.
@@ -2927,7 +2986,525 @@ function toSetup() {
   $('#frame').srcdoc = '';
   $('#game').classList.add('hidden');
   $('#setup').classList.remove('hidden');
+  bgShow(true);
   renderHistory();
+}
+
+// ---------------------------------------------------------------- Background
+// Behind the setup screen (#bgCanvas), one of two pictures of the wiki: the constellation, the best-linked articles of
+// each topic as a cluster of stars joined by their links, along which pulses play games of their own, or the redstone
+// map, every article but the subpages and spin-off pages as a block of a map, in patches of its topic. Auto is the
+// constellation, and the map at a phone's width, where the clusters would be cramped. Roll by itself shows pairs of its
+// own until anything on the setup screen changes; otherwise the cards in use are marked. Wave from the start lights
+// every page by its clicks from the start, as par counts them: a flash as it arrives and a glow that weakens with each
+// click, like a redstone signal. Show the route draws the setup's par route. Under Blind target only the start is
+// marked: no target, route or reaching it. The facts line (#bgFacts) above the footer cycles facts about the wiki and
+// the cards. All of it comes from wiki-data.js and the link graph, which the setup screen loads for par anyway.
+// Reduce motion (or the system's setting) draws still frames. The settings are mwr.background.
+const BG_STYLES = ['auto', 'constellation', 'redstone', 'off'];
+const bgSet = { style: 'auto', wave: false, route: false, roll: true, still: false };
+const BG_BOXES = { wave: '#bgWave', route: '#bgRoute', roll: '#bgRoll', still: '#bgStill' };   // the box's checkboxes
+{
+  const saved = store.get('mwr.background', null);
+  if (saved && typeof saved === 'object') {
+    if (BG_STYLES.includes(saved.style)) bgSet.style = saved.style;
+    for (const k of Object.keys(BG_BOXES)) if (typeof saved[k] === 'boolean') bgSet[k] = saved[k];
+  }
+}
+const BG_PHONE = matchMedia('(max-width: 720px)'), BG_CALM = matchMedia('(prefers-reduced-motion: reduce)');
+const bgStyle = () => bgSet.style === 'auto' ? (BG_PHONE.matches ? 'redstone' : 'constellation') : bgSet.style;
+const bgStill = () => bgSet.still || BG_CALM.matches;
+const bgCanvas = $('#bgCanvas'), bgCtx = bgCanvas.getContext('2d');
+// shown: whether the setup screen is. pair: what is marked (bgPair). sky and grid: the two pictures, made when first
+// needed (skyWait: the sky's is under way). colors: from the theme (bgTheme). links: the link graph's, once it is in.
+// linkFacts and sampled: the facts counted from it, sampled per difficulty (sampling: under way).
+const bg = { shown: true, W: 0, H: 0, dpr: 1, raf: 0, last: 0, colors: null, sky: null, skyWait: false, grid: null, pulses: [], nextPulse: 0,
+  pair: null, pairToken: 0, nextRoll: 0, links: null, linkFacts: null, facts: [], pairFacts: [], factsToken: 0, factTurn: 0, factTimer: 0,
+  fadeTimer: 0, sampled: new Map(), sampling: false };
+const bgNow = () => performance.now();
+const BG_MAX_LINKS = Math.log1p(Math.max(...WIKI_DATA.articles.map(r => r[1])));
+const bgWeight = page => Math.log1p(WIKI_DATA.articles[page][1]) / BG_MAX_LINKS;   // 0 to 1, by how many articles link to it
+
+// The theme's colours: --viz-<topic> for each topic, --viz-redstone for the wave, --viz-opacity for how strong it all is.
+// Each is read back from a pixel painted with it, since a colour outside sRGB (oklch(), color()…) keeps its own notation.
+const BG_PROBE = Object.assign(document.createElement('canvas'), { width: 1, height: 1 }).getContext('2d', { willReadFrequently: true });
+function bgTheme() {
+  const cs = getComputedStyle(document.documentElement), probe = BG_PROBE;
+  const rgb = name => {
+    probe.fillStyle = '#888'; probe.fillStyle = cs.getPropertyValue(name).trim() || '#888';
+    probe.clearRect(0, 0, 1, 1); probe.fillRect(0, 0, 1, 1);
+    return [...probe.getImageData(0, 0, 1, 1).data.subarray(0, 3)];
+  };
+  const c = { dark: themeIsDark(), bg: rgb('--bg'), ink: rgb('--ink'), muted: rgb('--muted'), accent: rgb('--accent'), target: rgb('--target'),
+    red: rgb('--viz-redstone'), topic: WIKI_DATA.topics.map(k => rgb('--viz-' + k)),
+    strength: parseFloat(cs.getPropertyValue('--viz-opacity')) || .5, font: cs.getPropertyValue('--font').trim() || 'sans-serif' };
+  c.other = bgMix(c.bg, c.muted, .7);
+  c.family = bgMix(c.muted, c.target, .35);
+  bg.colors = c;
+  bg.grid = null;   // its blocks are coloured once
+  bgDraw();
+}
+const bgMix = (a, b, t) => [0, 1, 2].map(k => a[k] + (b[k] - a[k]) * t);
+const bgRgba = (c, a = 1) => `rgba(${c[0] | 0},${c[1] | 0},${c[2] | 0},${a})`;
+
+// ---- The constellation: the 64 best-linked pool articles of each topic, each joined to the three it links with (either
+// way) that share the most links with it, so a line mostly joins pages about the same thing. Each topic is laid out on
+// its own (Fruchterman-Reingold, seeded, so the sky is the same on every visit) into a disc, the discs around the
+// screen; the links between topics cross it. Made from the links outside navboxes, in an idle moment.
+const SKY_DISCS = { blocks: [.19, .28], items: [.81, .28], mobs: [.8, .76], world: [.2, .74], magic: [.5, .52] };
+function buildSky(links) {   // links: each page's, outside navboxes
+  const rand = mulberry32(0x736b79), nodes = [];
+  for (const [k, titles] of POOL) {
+    for (const t of titles.slice().sort((a, b) => ARTICLES.get(b).links - ARTICLES.get(a).links).slice(0, 64)) {
+      const page = PAGE_IDS.get(t), h = hash32(t);
+      nodes.push({ page, topic: WIKI_DATA.topics.indexOf(k), r: 1.6 + 4.2 * bgWeight(page) ** 2, phase: h % 1000 / 150, speed: .00012 + (h >>> 10) % 1000 * 1.8e-7 });
+    }
+  }
+  const at = new Map(nodes.map((n, i) => [n.page, i])), outs = nodes.map(n => new Set(links[n.page])), ins = nodes.map(() => []);
+  nodes.forEach((n, i) => { for (const v of outs[i]) if (at.has(v)) ins[at.get(v)].push(i); });
+  const shared = (a, b) => { let k = 0; for (const x of outs[a]) if (outs[b].has(x)) k++; return k / (outs[a].size + outs[b].size - k || 1); };
+  const edges = new Map();
+  nodes.forEach((n, i) => {
+    const near = new Set([...[...outs[i]].filter(v => at.has(v)).map(v => at.get(v)), ...ins[i]]);
+    near.delete(i);
+    [...near].map(j => [j, shared(i, j)]).sort((a, b) => b[1] - a[1] || a[0] - b[0]).slice(0, 3)
+      .forEach(([j]) => edges.set(Math.min(i, j) * nodes.length + Math.max(i, j), [Math.min(i, j), Math.max(i, j)]));
+  });
+  const lines = [...edges.values()], ahead = nodes.map(() => []);   // ahead: the stars each star links to, for pulses
+  for (const [a, b] of lines) { if (outs[a].has(nodes[b].page)) ahead[a].push(b); if (outs[b].has(nodes[a].page)) ahead[b].push(a); }
+  WIKI_DATA.topics.forEach((k, ti) => {
+    const m = nodes.flatMap((n, i) => n.topic === ti ? [i] : []), x = new Float64Array(nodes.length), y = new Float64Array(nodes.length);
+    const own = new Set(m), mine = lines.filter(([a, b]) => own.has(a) && own.has(b)), k2 = 1 / m.length, spring = Math.sqrt(k2);
+    for (const i of m) { x[i] = rand() - .5; y[i] = rand() - .5; }
+    for (let it = 0, temp = .1; it < 400; it++, temp *= .99) {
+      const fx = new Float64Array(nodes.length), fy = new Float64Array(nodes.length);
+      for (let p = 0; p < m.length; p++) for (let q = p + 1; q < m.length; q++) {
+        const i = m[p], j = m[q], dx = x[i] - x[j], dy = y[i] - y[j], f = k2 / (dx * dx + dy * dy + 1e-6);
+        fx[i] += dx * f; fy[i] += dy * f; fx[j] -= dx * f; fy[j] -= dy * f;
+      }
+      for (const [i, j] of mine) {
+        const dx = x[i] - x[j], dy = y[i] - y[j], f = Math.hypot(dx, dy) / spring;
+        fx[i] -= dx * f; fy[i] -= dy * f; fx[j] += dx * f; fy[j] += dy * f;
+      }
+      for (const i of m) {
+        fx[i] -= x[i] * 2; fy[i] -= y[i] * 2;
+        const len = Math.hypot(fx[i], fy[i]) || 1, s = Math.min(len, temp) / len;
+        x[i] += fx[i] * s; y[i] += fy[i] * s;
+      }
+    }
+    const far = Math.max(...m.map(i => Math.hypot(x[i], y[i]))) || 1, [cx, cy] = SKY_DISCS[k] ?? [.5, .5];
+    for (const i of m) Object.assign(nodes[i], { x: cx + x[i] / far * .24, y: cy + y[i] / far * .3 });
+  });
+  return { nodes, lines, ahead, at, labelled: nodes.map((n, i) => i).sort((a, b) => nodes[b].r - nodes[a].r).slice(0, 14) };
+}
+// Where a star is on the screen, drifting a little. Upright, the sky turns a quarter.
+function skyPlace(x, y) {
+  const { W, H } = bg, mx = Math.min(70, W * .06), my = Math.min(60, H * .06), [u, v] = H > W * 1.1 ? [y, x] : [x, y];
+  return [mx + u * (W - 2 * mx), my + v * (H - 2 * my)];
+}
+function skyStar(n, t) {
+  const [x, y] = skyPlace(n.x, n.y), a = bgStill() ? 0 : 7;
+  return [x + a * Math.sin(t * n.speed + n.phase), y + a * Math.cos(t * n.speed * 1.3 + n.phase * 2)];
+}
+// A page that isn't a star sits among the stars it links to (or the middle, if none).
+function skySpot(page) {
+  const { nodes, at } = bg.sky, near = (bg.links?.[page] ?? []).filter(v => at.has(v)).slice(0, 5), h = hash32(WIKI_DATA.articles[page][0]);
+  if (!near.length) return [.5, .5];
+  const avg = k => near.reduce((s, v) => s + nodes[at.get(v)][k], 0) / near.length;
+  return [avg('x') + (h % 100 - 50) / 1200, avg('y') + ((h >>> 8) % 100 - 50) / 1200];
+}
+// A pulse plays a game along the links: from a random star to one at least three clicks away.
+function skyPulse(t) {
+  const { nodes, ahead } = bg.sky;
+  for (let tries = 0; tries < 20; tries++) {
+    const a = Math.floor(Math.random() * nodes.length), prev = new Map([[a, -1]]), far = [];
+    for (let level = [a], d = 0; level.length && d < 7; d++) {
+      const next = [];
+      for (const u of level) for (const v of ahead[u]) if (!prev.has(v)) { prev.set(v, u); next.push(v); if (d >= 2) far.push(v); }
+      level = next;
+    }
+    if (!far.length) continue;
+    const path = [];
+    for (let v = pick(far); v !== -1; v = prev.get(v)) path.unshift(v);
+    bg.pulses.push({ path, start: t, hop: 520 });
+    return;
+  }
+}
+function drawSky(t) {
+  const { nodes, lines, labelled } = bg.sky, c = bg.colors, s = c.strength, ctx = bgCtx, P = nodes.map(n => skyStar(n, t));
+  // a faint nebula behind each topic's cluster
+  WIKI_DATA.topics.forEach((k, ti) => {
+    const m = nodes.flatMap((n, i) => n.topic === ti ? [i] : []);
+    if (!m.length) return;
+    const cx = m.reduce((a, i) => a + P[i][0], 0) / m.length, cy = m.reduce((a, i) => a + P[i][1], 0) / m.length;
+    const rad = Math.sqrt(m.reduce((a, i) => a + (P[i][0] - cx) ** 2 + (P[i][1] - cy) ** 2, 0) / m.length) * 1.5 || 1;
+    const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, rad);
+    g.addColorStop(0, bgRgba(c.topic[ti], .1 * s));
+    g.addColorStop(1, bgRgba(c.topic[ti], 0));
+    ctx.fillStyle = g;
+    ctx.fillRect(cx - rad, cy - rad, 2 * rad, 2 * rad);
+  });
+  ctx.lineWidth = 1;
+  ctx.strokeStyle = bgRgba(c.ink, (c.dark ? .08 : .12) * s);
+  ctx.beginPath();
+  for (const [a, b] of lines) { ctx.moveTo(...P[a]); ctx.lineTo(...P[b]); }
+  ctx.stroke();
+  WIKI_DATA.topics.forEach((k, ti) => {
+    ctx.fillStyle = bgRgba(c.topic[ti], (c.dark ? .6 : .75) * s);
+    ctx.beginPath();
+    nodes.forEach((n, i) => { if (n.topic === ti) { ctx.moveTo(P[i][0] + n.r, P[i][1]); ctx.arc(...P[i], n.r, 0, 7); } });
+    ctx.fill();
+  });
+  const wave = bg.pair?.wave;
+  if (wave) nodes.forEach((n, i) => {
+    const l = waveLight(wave, n.page, t);
+    if (!l) return;
+    ctx.fillStyle = bgRgba(c.red, Math.min(1, l.glow + l.flash) * s);
+    ctx.beginPath(); ctx.arc(...P[i], n.r + 1 + 6 * l.flash, 0, 7); ctx.fill();
+  });
+  // the best-linked stars' names, but where they would overlap
+  ctx.font = `11px ${c.font}`; ctx.textAlign = 'center'; ctx.fillStyle = bgRgba(c.muted, .35 * s);
+  const taken = [];
+  for (const i of labelled) {
+    const text = WIKI_DATA.articles[nodes[i].page][0], w = ctx.measureText(text).width, x = P[i][0] - w / 2, y = P[i][1] - nodes[i].r - 5;
+    if (taken.some(([tx, ty, tw]) => x < tx + tw + 6 && tx < x + w + 6 && Math.abs(y - ty) < 14)) continue;
+    taken.push([x, y, w]);
+    ctx.fillText(text, P[i][0], y);
+  }
+  if (!bgStill() && t > bg.nextPulse && bg.pulses.length < 2) { skyPulse(t); bg.nextPulse = t + 2600 + Math.random() * 2000; }
+  bg.pulses = bg.pulses.filter(p => t - p.start < p.hop * (p.path.length + 3));
+  ctx.font = `12px ${c.font}`;
+  for (const p of bg.pulses) {
+    const k = (t - p.start) / p.hop, hop = Math.min(Math.floor(k), p.path.length - 1), f = Math.min(1, k - hop);
+    const fade = Math.max(0, Math.min(1, p.path.length + 2.5 - k)), a = P[p.path[0]], b = P[p.path.at(-1)];
+    ctx.strokeStyle = bgRgba(c.accent, .5 * fade * s); ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(...a);
+    for (let j = 1; j <= hop; j++) ctx.lineTo(...P[p.path[j]]);
+    let head = P[p.path[hop]];
+    if (hop < p.path.length - 1) {
+      const u = P[p.path[hop]], v = P[p.path[hop + 1]];
+      head = [u[0] + (v[0] - u[0]) * f, u[1] + (v[1] - u[1]) * f];
+      ctx.lineTo(...head);
+    }
+    ctx.stroke();
+    ctx.fillStyle = bgRgba(c.accent, .9 * fade * s); ctx.beginPath(); ctx.arc(...head, 3.2, 0, 7); ctx.fill();
+    ctx.fillStyle = bgRgba(c.ink, .45 * fade * s);
+    ctx.fillText(WIKI_DATA.articles[nodes[p.path[0]].page][0], a[0], a[1] + nodes[p.path[0]].r + 14);
+    if (k >= p.path.length - 1) ctx.fillText(WIKI_DATA.articles[nodes[p.path.at(-1)].page][0], b[0], b[1] + nodes[p.path.at(-1)].r + 14);
+  }
+  drawPair(t, page => bg.sky.at.has(page) ? P[bg.sky.at.get(page)] : skyPlace(...skySpot(page)));
+}
+
+// ---- The redstone map: every article but the subpages and spin-off pages, one block each, laid along a Gilbert curve
+// (a Hilbert curve for any rectangle) in patches of about 40 of a group (each topic, the Content families together,
+// and the rest), the patches of every group spread along the curve, so the map is a patchwork like a world's biomes.
+// A block is brighter the more articles link to it.
+function* gilbert(x, y, ax, ay, bx, by) {
+  const w = Math.abs(ax + ay), h = Math.abs(bx + by), dax = Math.sign(ax), day = Math.sign(ay), dbx = Math.sign(bx), dby = Math.sign(by);
+  if (h === 1) { for (let i = 0; i < w; i++, x += dax, y += day) yield [x, y]; return; }
+  if (w === 1) { for (let i = 0; i < h; i++, x += dbx, y += dby) yield [x, y]; return; }
+  let ax2 = Math.floor(ax / 2), ay2 = Math.floor(ay / 2), bx2 = Math.floor(bx / 2), by2 = Math.floor(by / 2);
+  const w2 = Math.abs(ax2 + ay2), h2 = Math.abs(bx2 + by2);
+  if (2 * w > 3 * h) {
+    if (w2 % 2 && w > 2) { ax2 += dax; ay2 += day; }
+    yield* gilbert(x, y, ax2, ay2, bx, by);
+    yield* gilbert(x + ax2, y + ay2, ax - ax2, ay - ay2, bx, by);
+  } else {
+    if (h2 % 2 && h > 2) { bx2 += dbx; by2 += dby; }
+    yield* gilbert(x, y, bx2, by2, ax2, ay2);
+    yield* gilbert(x + bx2, y + by2, ax, ay, bx - bx2, by - by2);
+    yield* gilbert(x + (ax - dax) + (bx2 - dbx), y + (ay - day) + (by2 - dby), -bx2, -by2, -(ax - ax2), -(ay - ay2));
+  }
+}
+const MAP_TOPICS = WIKI_DATA.topics.length;   // groups: each topic, then the Content families, then the rest
+const mapGroup = page => { const [, , , topic, fams] = WIKI_DATA.articles[page]; return topic ? WIKI_DATA.topics.indexOf(topic) : fams.length ? MAP_TOPICS : MAP_TOPICS + 1; };
+const MAP_PAGES = (() => {
+  const groups = new Map();
+  WIKI_DATA.articles.forEach(([t], page) => {
+    if (PAGE_SPINOFFS[page] || t.includes('/')) return;
+    const g = mapGroup(page);
+    if (!groups.has(g)) groups.set(g, []);
+    groups.get(g).push(page);
+  });
+  const patches = [];
+  for (const [g, pages] of groups) {
+    pages.sort((a, b) => hash32(String(a)) - hash32(String(b)));   // well and little linked pages mixed
+    const n = Math.ceil(pages.length / 40);
+    for (let j = 0; j < n; j++) patches.push({ at: (j + .3 + .04 * ((g * 7 + j * 13) % 10)) / n, pages: pages.slice(j * 40, (j + 1) * 40) });
+  }
+  return patches.sort((a, b) => a.at - b.at).flatMap(p => p.pages);
+})();
+function buildGrid() {
+  const { W, H, colors: c } = bg, n = MAP_PAGES.length, cols = Math.ceil(Math.sqrt(n * W / H)), rows = Math.ceil(n / cols);
+  const curve = [...cols >= rows ? gilbert(0, 0, cols, 0, 0, rows) : gilbert(0, 0, 0, rows, cols, 0)];
+  const cell = new Map(), base = new Uint8ClampedArray(cols * rows * 4);
+  const empty = bgMix(c.bg, c.dark ? [0, 0, 0] : c.ink, .04);
+  for (let k = 0; k < cols * rows; k++) base.set([...empty, 255], k * 4);
+  MAP_PAGES.forEach((page, k) => {   // spread over the whole curve, so the few empty cells are scattered
+    const [x, y] = curve[Math.floor(k * curve.length / n)], g = mapGroup(page);
+    cell.set(page, y * cols + x);
+    const col = g < MAP_TOPICS ? c.topic[g] : g === MAP_TOPICS ? c.family : c.other;
+    base.set([...bgMix(c.bg, col, (g < MAP_TOPICS ? .3 : .16) + .55 * bgWeight(page)), 255], (y * cols + x) * 4);
+  });
+  const img = document.createElement('canvas');
+  Object.assign(img, { width: cols, height: rows });
+  return { cols, rows, cell, base, img, ictx: img.getContext('2d'), data: new ImageData(cols, rows), W, H };
+}
+function drawGrid(t) {
+  if (!bg.grid || bg.grid.W !== bg.W || bg.grid.H !== bg.H) bg.grid = buildGrid();
+  const { cols, rows, cell, base, img, ictx, data } = bg.grid, { W, H, colors: c } = bg, px = data.data, ctx = bgCtx, wave = bg.pair?.wave;
+  px.set(base);
+  if (wave) for (const page of wave.order) {
+    const l = waveLight(wave, page, t), k = cell.get(page);
+    if (!l) break;
+    if (k === undefined) continue;
+    const toward = Math.min(1, l.glow + l.flash * .9);   // in place, as it runs for every page lit, every frame
+    for (let ch = 0; ch < 3; ch++) {
+      const red = c.red[ch] + (WAVE_HOT[ch] - c.red[ch]) * l.flash * .5;
+      px[k * 4 + ch] += (red - px[k * 4 + ch]) * toward;
+    }
+  }
+  ictx.putImageData(data, 0, 0);
+  ctx.globalAlpha = c.strength;
+  ctx.imageSmoothingEnabled = false;
+  ctx.drawImage(img, 0, 0, W, H);
+  ctx.globalAlpha = 1;
+  const cw = W / cols, ch = H / rows;
+  if (cw >= 5) {   // the seams between blocks
+    ctx.strokeStyle = bgRgba(c.bg, .55); ctx.lineWidth = 1; ctx.beginPath();
+    for (let x = 1; x < cols; x++) { ctx.moveTo(Math.round(x * cw) + .5, 0); ctx.lineTo(Math.round(x * cw) + .5, H); }
+    for (let y = 1; y < rows; y++) { ctx.moveTo(0, Math.round(y * ch) + .5); ctx.lineTo(W, Math.round(y * ch) + .5); }
+    ctx.stroke();
+  }
+  drawPair(t, page => { const k = cell.get(page); return k === undefined ? null : [(k % cols + .5) * cw, (Math.floor(k / cols) + .5) * ch]; });
+}
+
+// ---- The wave: a page lights at its clicks from the start, spread a little within each click so it ripples.
+const WAVE_CLICK = 1700, WAVE_SPREAD = 1400, WAVE_FLASH = 1600, WAVE_HOT = [255, 220, 180];   // HOT: the flash's colour
+function makeWave(dist, start) {
+  const when = new Float64Array(dist.length).fill(Infinity), order = [];
+  dist.forEach((d, p) => { if (d >= 0) { when[p] = start + (d ? (d - .5) * WAVE_CLICK + hash32(String(p)) % 1000 / 1000 * WAVE_SPREAD : 0); order.push(p); } });
+  order.sort((a, b) => when[a] - when[b]);
+  return { dist, when, order, end: order.length ? when[order.at(-1)] : start };
+}
+// How a page shows the wave at t: null before it arrives, else a flash fading over WAVE_FLASH and a glow by its clicks.
+// With motion reduced the wave has always already passed.
+function waveLight(wave, page, t) {
+  const d = wave.dist[page];
+  if (d < 0 || (!bgStill() && t < wave.when[page])) return null;
+  return { glow: d === 0 ? .9 : [0, .3, .12, .06][Math.min(3, d)], flash: bgStill() ? 0 : Math.max(0, 1 - (t - wave.when[page]) / WAVE_FLASH) ** 2 };
+}
+
+// ---- What is marked: the cards in use, or with Roll by itself a pair of its own every so often.
+function drawPair(t, spot) {
+  const pair = bg.pair, c = bg.colors, ctx = bgCtx;
+  if (!pair) return;
+  if (pair.route) {
+    const pts = pair.route.map(spot).filter(Boolean);
+    ctx.strokeStyle = bgRgba(c.accent, .7 * c.strength); ctx.lineWidth = 2.5;
+    ctx.setLineDash([6, 5]); ctx.lineDashOffset = bgStill() ? 0 : -t / 40;
+    ctx.beginPath(); pts.forEach((p, i) => i ? ctx.lineTo(...p) : ctx.moveTo(...p)); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle = bgRgba(c.accent, .8 * c.strength);
+    for (const p of pts.slice(1, -1)) { ctx.beginPath(); ctx.arc(...p, 3, 0, 7); ctx.fill(); }
+  }
+  for (const stop of pair.stops) {
+    const p = spot(stop.page);
+    if (!p) continue;
+    // a stop after the start shows faint until the wave reaches it
+    const reached = !pair.wave || stop.start || waveLight(pair.wave, stop.page, t);
+    bgMarker(p, stop.start ? c.accent : c.target, stop.label, t, reached ? 1 : .45);
+  }
+}
+function bgMarker([x, y], col, text, t, a) {
+  const ctx = bgCtx, c = bg.colors, r = 7 + (bgStill() ? 0 : 1.5 * Math.sin(t / 400));
+  ctx.font = `600 12px ${c.font}`; ctx.textAlign = 'center';
+  const half = ctx.measureText(text).width / 2 + 6, tx = Math.min(bg.W - half, Math.max(half, x));
+  ctx.strokeStyle = bgRgba(col, .85 * a); ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(x, y, r, 0, 7); ctx.stroke();
+  ctx.fillStyle = bgRgba(col, .9 * a); ctx.beginPath(); ctx.arc(x, y, 3, 0, 7); ctx.fill();
+  ctx.lineWidth = 4; ctx.strokeStyle = bgRgba(c.bg, .8 * a); ctx.strokeText(text, tx, y - r - 7);
+  ctx.fillStyle = bgRgba(col, a); ctx.fillText(text, tx, y - r - 7);
+}
+// The graph par goes by under the setup's difficulty, and the links outside navboxes, which the sky and facts use.
+const bgGraph = () => linkGraph(!rules().includes('nonav'));
+// Marks the cards in use: called by setupPar whenever par is worked out again, so on every change of the cards, rules,
+// difficulty or Content. setup.route is its route.
+async function bgPair() {
+  bgFacts(bg.links);   // the difficulty may have changed
+  bgSample();
+  if (bgSet.roll && !bgStill()) return bgPairFacts();   // a pair of its own is marked; the line still talks about the cards
+  const token = ++bg.pairToken;
+  const blind = isBlind(), keys = blind ? ['start'] : cardKeys(), cards = keys.map(w => [w, setup[w]]).filter(([, info]) => info && PAGE_IDS.has(info.title));
+  const stops = cards.map(([w, info]) => ({ page: PAGE_IDS.get(info.title), start: w === 'start', label: `${$('.tag', cardBox(w)).textContent} · ${info.title}` }));
+  const route = !blind && bgSet.route && setup.route ? setup.route.filter(t => PAGE_IDS.has(t)).map(t => PAGE_IDS.get(t)) : null;
+  let wave = null;
+  if (bgSet.wave && setup.start && PAGE_IDS.has(setup.start.title)) {
+    const graph = await bgGraph().catch(() => null);
+    if (token !== bg.pairToken) return;
+    if (graph) wave = makeWave(distancesFrom(graph, setup.start.title), bgNow() + 300);
+  }
+  bg.pair = { stops, route, wave };
+  bgPairFacts();
+  bgDraw();
+}
+// Roll by itself: a pool pair at least two clicks apart (navboxes too, on Relaxed), with its route and wave as the
+// settings say, both through the same pages.
+async function bgRoll() {
+  const token = ++bg.pairToken, graph = await bgGraph().catch(() => null);
+  if (token !== bg.pairToken) return;
+  let a, b, dist;
+  const usable = routeUsable({ keep: [], rules: rules(), content: contentInPlay([]) });
+  for (let tries = 0; graph && !b && tries < 20; tries++) {
+    a = pick(POOL_TITLES); dist = distancesFrom(graph, a, usable);
+    b = pick(POOL_TITLES.filter(t => dist[PAGE_IDS.get(t)] >= 2));
+  }
+  if (!b) { bg.nextRoll = bgNow() + 5000; return; }
+  const route = bgSet.route && shortestRoute(graph, a, b, usable);
+  bg.pair = { stops: [{ page: PAGE_IDS.get(a), start: true, label: a }, { page: PAGE_IDS.get(b), start: false, label: b }],
+    route: route ? route.map(t => PAGE_IDS.get(t)) : null, wave: bgSet.wave ? makeWave(dist, bgNow() + 300) : null };
+  bg.nextRoll = bgNow() + Math.max(9000, (bg.pair.wave?.end ?? 0) - bgNow() + 6000);
+}
+
+// ---- The facts line: the wiki's facts, taking turns with the cards' once they are known.
+const fmtCount = n => n.toLocaleString('en-US');
+function bgFacts(links) {
+  const A = WIKI_DATA.articles, most = score => { let best = 0; for (let i = 1; i < A.length; i++) if (score(i) > score(best)) best = i; return best; };
+  const top = most(i => A[i][1]), facts = [
+    `<b>${fmtCount(A.length)}</b> pages in the wiki’s offline copy from ${esc(WIKI_DATA.snapshot)}`,
+    `The most linked page is <b>${esc(A[top][0])}</b>, linked from ${fmtCount(A[top][1])} articles`,
+  ];
+  for (const [k, titles] of POOL) {
+    const best = titles.reduce((a, b) => ARTICLES.get(b).links > ARTICLES.get(a).links ? b : a);
+    facts.push(`${esc(TOPICS[k].label)}: ${fmtCount(titles.length)} articles, and <b>${esc(best)}</b> is linked from the most`);
+  }
+  if (links && !bg.linkFacts) {   // counted once
+    const to = new Uint8Array(A.length);
+    links.forEach(vs => vs.forEach(v => { to[v] = 1; }));
+    const linking = most(i => links[i].length);
+    bg.linkFacts = [`<b>${fmtCount(links.reduce((n, vs) => n + vs.length, 0))}</b> links between those pages, outside the navboxes`,
+      `<b>${esc(A[linking][0])}</b> links to ${fmtCount(links[linking].length)} pages, more than any other`,
+      `${fmtCount(to.length - to.reduce((n, x) => n + x, 0))} pages have no link to them outside a navbox`];
+  }
+  if (links) facts.push(...bg.linkFacts);
+  const s = bg.sampled.get(level());
+  if (s) facts.push(`On ${LEVELS[level()].label}, two random articles are <b>${s.avg.toFixed(1)}</b> clicks apart on average`,
+    `On ${LEVELS[level()].label}, ${s.within2}% of article pairs are 2 clicks or fewer apart`,
+    `On ${LEVELS[level()].label}, the farthest pair in a sample: <b>${esc(s.far[0])}</b> → <b>${esc(s.far[1])}</b>, ${clicksText(s.far[2])}`);
+  bg.facts = facts;
+}
+// How far apart the pool's articles are on the setup's difficulty, from 40 seeded starts to every pool article, a start
+// in each idle moment so the setup screen never waits for it. Kept per difficulty.
+async function bgSample() {
+  const lvl = level();
+  if (bg.sampled.has(lvl) || bg.sampling || bgStyle() === 'off') return;
+  bg.sampling = true;
+  try {
+    const graph = await linkGraph(!LEVELS[lvl].rules.includes('nonav')), usable = routeUsable({ keep: [], rules: LEVELS[lvl].rules, content: [] });
+    const rand = mulberry32(hash32(lvl)), ids = POOL_TITLES.map(t => PAGE_IDS.get(t)), sum = { n: 0, total: 0, two: 0, far: [null, null, -1] };
+    for (let i = 0; i < 40; i++) {
+      await new Promise(r => (window.requestIdleCallback ?? setTimeout)(r));
+      const from = POOL_TITLES[Math.floor(rand() * ids.length)], dist = distancesFrom(graph, from, usable);
+      ids.forEach((v, j) => {
+        const d = dist[v];
+        if (d <= 0) return;
+        sum.n++; sum.total += d; if (d <= 2) sum.two++;
+        if (d > sum.far[2]) sum.far = [from, POOL_TITLES[j], d];
+      });
+    }
+    bg.sampled.set(lvl, { avg: sum.total / sum.n, within2: Math.round(100 * sum.two / sum.n), far: sum.far });
+    bgFacts(graph.links);
+  } catch { return; /* the graph didn't load: the line keeps the facts it has */ } finally { bg.sampling = false; }
+  if (level() !== lvl) bgSample();   // the difficulty changed meanwhile
+}
+// The cards' facts: the start's links and how many pages are a click or two from it, and the target's links (not under
+// Blind target, which keeps it unseen).
+// factsToken drops answers to older calls, which may have been made before Blind target was ticked.
+async function bgPairFacts() {
+  const token = ++bg.factsToken, start = setup.start?.title, goal = !isBlind() && huntMode() !== 'kinds' ? setup.goal?.title : null;
+  bg.pairFacts = [];
+  const graph = start && PAGE_IDS.has(start) ? await bgGraph().catch(() => null) : null;
+  if (token !== bg.factsToken) return;
+  if (graph) {
+    const page = PAGE_IDS.get(start), dist = distancesFrom(graph, start), count = d => dist.reduce((n, x) => n + (x === d), 0);
+    bg.pairFacts = [`<b>${esc(start)}</b> links to ${fmtCount(graph.links[page].length)} pages and is linked from ${fmtCount(WIKI_DATA.articles[page][1])} articles`,
+      `${fmtCount(count(1))} pages are 1 click from <b>${esc(start)}</b>, and ${fmtCount(count(2))} more are 2 clicks away`];
+    if (goal && PAGE_IDS.has(goal)) bg.pairFacts.push(`<b>${esc(goal)}</b> is linked from ${fmtCount(WIKI_DATA.articles[PAGE_IDS.get(goal)][1])} articles`);
+  }
+  bg.factTurn = 0;
+  bgNextFact();   // also when the start has no facts, so the line never keeps the last start's
+}
+// The next fact, every 7 seconds; the cards' and the wiki's take turns. With motion reduced it doesn't change by itself.
+function bgNextFact() {
+  clearTimeout(bg.factTimer); clearTimeout(bg.fadeTimer);
+  const el = $('#bgFacts'), all = bg.facts, mine = bg.pairFacts, turn = bg.factTurn++;
+  if (!all.length) return;
+  const html = !mine.length ? all[turn % all.length] : turn % 2 ? all[(turn >> 1) % all.length] : mine[(turn >> 1) % mine.length];
+  if (bgStill()) { el.innerHTML = html; el.classList.remove('out'); }
+  else {
+    el.classList.add('out');
+    bg.fadeTimer = setTimeout(() => { el.innerHTML = html; el.classList.remove('out'); }, el.innerHTML ? 500 : 0);
+    bg.factTimer = setTimeout(bgNextFact, 7000);
+  }
+}
+
+// ---- Drawing, about 30 times a second while the setup screen shows and the page is in view; once a change when still.
+function bgSize() {
+  bg.dpr = Math.min(2, devicePixelRatio || 1);
+  bg.W = bgCanvas.clientWidth; bg.H = bgCanvas.clientHeight;
+  bgCanvas.width = Math.round(bg.W * bg.dpr); bgCanvas.height = Math.round(bg.H * bg.dpr);
+}
+function bgFrame() {
+  bg.raf = 0;
+  const t = bgNow();
+  if (t - bg.last >= 32) {
+    bg.last = t;
+    if (bgSet.roll && !bgStill() && t > bg.nextRoll) { bg.nextRoll = Infinity; bgRoll(); }
+    bgPaint(t);
+  }
+  bgSchedule();
+}
+const bgLive = () => bg.shown && bgStyle() !== 'off' && !document.hidden;
+const bgSchedule = () => { if (!bg.raf && bgLive() && !bgStill()) bg.raf = requestAnimationFrame(bgFrame); };
+function bgPaint(t) {
+  const style = bgStyle();
+  bgCtx.setTransform(bg.dpr, 0, 0, bg.dpr, 0, 0);
+  bgCtx.clearRect(0, 0, bg.W, bg.H);
+  if (!bg.W || !bg.H || !bg.colors) return;
+  if (style === 'redstone') drawGrid(t);
+  else if (style === 'constellation' && bg.sky) drawSky(t);
+}
+// Shows or hides the background and the facts line for the settings, and draws.
+function bgDraw() {
+  if (!bg.colors) return;
+  const style = bgStyle(), off = style === 'off';
+  bgCanvas.hidden = off || !bg.shown;
+  $('#bgFacts').hidden = off;
+  if (!bgLive()) return;
+  // The sky is made in an idle moment the first time it shows once the links are in, not for the map or Off.
+  if (style === 'constellation' && !bg.sky && bg.links && !bg.skyWait) {
+    bg.skyWait = true;
+    (window.requestIdleCallback ?? setTimeout)(() => { bg.sky = buildSky(bg.links); bgDraw(); });
+  }
+  if (bgCanvas.clientWidth !== bg.W || bgCanvas.clientHeight !== bg.H) bgSize();
+  if (bgStill()) bgPaint(bgNow()); else bgSchedule();
+}
+// startGame and toSetup: the background only runs behind the setup screen.
+function bgShow(on) {
+  bg.shown = on;
+  bgDraw();
+}
+// The Background box's controls, from the settings.
+function bgControls() {
+  $('#bgStyle').value = bgSet.style;
+  for (const [k, sel] of Object.entries(BG_BOXES)) $(sel).checked = bgSet[k];
+}
+function bgSetting(k, v) {
+  bgSet[k] = v;
+  store.set('mwr.background', bgSet);
+  bgControls();
+  bg.nextRoll = 0;
+  bgPair();
+  bgDraw();
 }
 
 // ---------------------------------------------------------------- Modal
@@ -3054,7 +3631,32 @@ $('#btnSound').onclick = () => { setSound(!soundOn); play('click', 0); };
 $('#themeSelect').innerHTML = THEMES.map(t => `<option value="${esc(t)}">${esc(THEME_LABELS[t] || t)}</option>`).join('');
 $('#themeSelect').value = document.documentElement.dataset.theme || 'auto';
 $('#themeSelect').onchange = e => setTheme(e.target.value);
-matchMedia('(prefers-color-scheme: dark)').addEventListener('change', syncFrameTheme);
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => { syncFrameTheme(); bgTheme(); });
+// The Background box (see the Background section). Any change on the setup screen outside it turns Roll by itself off,
+// and it stays off (saved) until it is ticked again.
+bgControls();
+$('#bgStyle').onchange = e => bgSetting('style', e.target.value);
+for (const [k, sel] of Object.entries(BG_BOXES)) $(sel).onchange = e => bgSetting(k, e.target.checked);
+for (const type of ['click', 'change', 'input']) $('#setup').addEventListener(type, e => {
+  if (!bgSet.roll || $('#bgOpts').contains(e.target) || (type === 'click' && !e.target.closest('button, a, input, select'))) return;
+  bgSetting('roll', false);
+}, true);
+document.addEventListener('click', e => { if (!$('#bgOpts').contains(e.target)) $('#bgOpts').open = false; });
+document.addEventListener('keydown', e => { if (e.key === 'Escape') $('#bgOpts').open = false; });
+addEventListener('resize', bgDraw);
+BG_PHONE.addEventListener('change', bgDraw);
+BG_CALM.addEventListener('change', () => { bgDraw(); bgNextFact(); });
+document.addEventListener('visibilitychange', bgDraw);
+bgTheme();
+bgFacts(null);
+bgNextFact();
+// The sky, and the facts that need the links, once the link graph is in (the cards' par loads it too).
+linkGraph(false).then(({ links }) => {
+  bg.links = links;
+  bgFacts(links);
+  bgDraw();   // which makes the sky, if it shows
+  bgSample();
+}, () => {});
 document.querySelectorAll('input[name=mode]').forEach(r => r.addEventListener('change', () => { updateModeHelp(); syncContentToMode(); reroll('all'); }));
 document.querySelectorAll('[data-reroll]').forEach(b => b.addEventListener('click', () => reroll(b.dataset.reroll)));
 document.querySelectorAll('[data-custom]').forEach(inp => {
@@ -3062,7 +3664,8 @@ document.querySelectorAll('[data-custom]').forEach(inp => {
 });
 $('#btnRerollAll').onclick = () => reroll('all');
 // Random game: every setting under the cards at random, each on its own (every box a coin flip, every choice as likely as
-// the others), then new cards. Sound, Timer and Theme are the player's, so they stay.
+// the others), then new cards. Sound, Timer, Theme and Background are the player's, so they stay (though the click turns
+// Roll by itself off, as any change on the setup screen does).
 function randomGame() {
   const coin = () => Math.random() < 0.5;
   setRules([...LEVELS[pick(Object.keys(LEVELS))].rules, GAMES[pick(Object.keys(GAMES))].rule, ...EXTRA_RULES.filter(coin)].filter(Boolean));

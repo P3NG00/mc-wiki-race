@@ -600,7 +600,8 @@ const THEMES = [...new Set(['auto', 'light', 'dark', ...Array.from(document.quer
   <button class="bg-view-btn" id="btnBgView" aria-pressed="false" hidden></button>
 
   <footer class="site-foot">
-    <p>Made and run by <a href="https://BryantF.xyz">BryantF.xyz</a> · Contact: <a href="mailto:BryantF.xyz+mcwikirace@gmail.com">BryantF.xyz+mcwikirace@gmail.com</a></p>
+    <p>Made and run by <a href="https://BryantF.xyz">BryantF.xyz</a> · Contact: <a href="mailto:BryantF.xyz+mcwikirace@gmail.com">BryantF.xyz+mcwikirace@gmail.com</a> · Discord: <a href="https://discord.com/users/784846796618727494">p3ng00</a></p>
+    <p>Found a bug or have an idea? <a id="feedbackMail" href="mailto:BryantF.xyz+mcwikirace@gmail.com?subject=MC%20Wiki%20Race%20feedback">Email it</a> or <a href="https://github.com/P3NG00/mc-wiki-race/issues/new">open an issue on GitHub</a>.</p>
     <p><a href="https://github.com/P3NG00/mc-wiki-race">Source on GitHub</a> · MIT License</p>
     <p>Articles and images are from <a href="https://minecraft.wiki">minecraft.wiki</a>. Article text is licensed under <a href="https://creativecommons.org/licenses/by-nc-sa/3.0/">CC BY-NC-SA 3.0</a> unless noted otherwise on the wiki.</p>
     <p id="wikiCopy">Which articles come up, and par, go by the wiki’s <a href="https://minecraft.wiki/w/Minecraft_Wiki:Offline_use">offline copy</a> from <span id="wikiCopyDate"></span>.</p>
@@ -1600,6 +1601,8 @@ const challengeLink = () => location.href.split('#')[0] + '#g=' + sealLink(chall
 // The link to the game on the cards: a daily's is its day, since a sealed link holds the setup only and its game
 // wouldn't count as the daily.
 const gameLink = () => setup.daily ? location.href.split('#')[0] + '#daily=' + setup.daily : challengeLink();
+// Whether the cards hold everything a challenge link names: every card, or Scavenger's kinds.
+const linkReady = () => cardKeys().every(w => setup[w]) && (huntMode() !== 'kinds' || setup.kinds?.length > 0);
 
 // A challenge link carries that query sealed in a blob, so the URL doesn't give the pair, or Blind target's hidden cards,
 // away at a glance. It hides them from a glance only: the key is in this file, so anyone can open one. That is why a
@@ -3884,10 +3887,21 @@ $('#btnPlay').onclick = async () => { if (!isBlind() || await pickHidden()) star
 // A link has to carry the hidden cards, so under Blind target they are picked now and held unseen.
 $('#btnCopy').onclick = async () => {
   if (isBlind() && !await pickHidden()) return;
-  if (cardKeys().some(w => !setup[w]) || (huntMode() === 'kinds' && !setup.kinds?.length)) return;
+  if (!linkReady()) return;
   const link = gameLink();
   try { await navigator.clipboard.writeText(link); setStatus('Challenge link copied.'); }
   catch { setStatus(link); }
+};
+// The footer's email link opens a mail filled in with what a report needs: the game on the cards, the last game played
+// and its route, the offline copy's date and the browser. Copied or opened some other way, it has the subject only.
+$('#feedbackMail').onclick = e => {
+  const r = savedGames()[0];
+  const details = [linkReady() && `Game on the cards: ${gameLink()}`,
+    r && `Last game: ${routeText(r)} (${r.won ? clicksText(r.clicks) : lossOf(r) ? LOSSES[lossOf(r)] : 'gave up'}; rules: ${r.rules.join(', ') || 'none'})`,
+    isTitles(r?.path) && `Its route: ${r.path.join(' → ')}`,
+    `Wiki copy: ${WIKI_DATA.snapshot}`, `Browser: ${navigator.userAgent}`].filter(Boolean);
+  e.currentTarget.href = e.currentTarget.href.split('&')[0] + '&body=' +
+    encodeURIComponent(`What happened, or your idea:\r\n\r\n\r\n--\r\n${details.join('\r\n')}\r\n`);
 };
 $('#btnBack').onclick = goBack;
 $('#hudRoute').addEventListener('click', e => { if (e.target.closest('.chip.done')) $('#hudRoute').classList.toggle('open'); });

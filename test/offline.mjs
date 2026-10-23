@@ -106,6 +106,15 @@ const play = async () => {
 // and so are navboxes' links.
 check('the data loads', await open('#start=Diamond&target=Crafting') && await ev("WIKI_DATA.snapshot.length === 10 && POOL.size === 5"));
 check('the footer names the offline copy\'s date and links where it comes from', await ev(`$('#wikiCopyDate').textContent === WIKI_DATA.snapshot && $('#wikiCopy a').href === 'https://minecraft.wiki/w/Minecraft_Wiki:Offline_use'`));
+// The report link fills the mail in when clicked (the navigation is stopped, so no mail app opens).
+check('the footer\'s report link fills a mail in with the game on the cards and the offline copy\'s date', await ev(`(() => {
+  const a = $('#feedbackMail');
+  a.addEventListener('click', e => e.preventDefault(), { once: true });
+  a.click();
+  const body = decodeURIComponent(a.href.split('&body=')[1] ?? '');
+  return a.href.startsWith('mailto:BryantF.xyz+mcwikirace@gmail.com?subject=MC%20Wiki%20Race%20feedback&body=') &&
+    body.includes('Game on the cards: ' + location.href.split('#')[0] + '#g=') && body.includes('Wiki copy: ' + WIKI_DATA.snapshot);
+})()`));
 // What the checks below take from the snapshot by name. A new one that changes any of these fails here, by name, rather
 // than leaving a check further down passing without testing anything (Crafting no longer a hub would leave "the target hub
 // stays live" true of any link, and Blaze in no kind would leave "a start in a kind rolls them again" nothing to roll).

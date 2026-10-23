@@ -1243,6 +1243,16 @@ check('a touch doesn\'t move the stars', await ev('!bg.cursor.in'));
 await move(star[1] + 12, star[2] + 8);
 check('the stars near the cursor make way, and the nearest is named', await until(`bg.sky.nodes[${star[0]}].lit > .5 && Math.hypot(bg.sky.nodes[${star[0]}].lx, bg.sky.nodes[${star[0]}].ly) > 5`),
   await ev(`JSON.stringify(bg.sky.nodes[${star[0]}])`));
+// A star has one name at a time: hovering a card's star names it only by its marker, over a couple of frames.
+const card = JSON.parse(await ev(`JSON.stringify((P => (bg.pair?.stops ?? []).map(st => bg.sky.at.get(st.page)).filter(i => i !== undefined)
+  .map(i => [i, ...P[i]]).find(([, x, y]) => x > 20 && x < innerWidth - 20 && y > 40 && y < innerHeight - 20))(bg.sky.nodes.map(n => skyStar(n, bgNow()))) ?? null)`));
+if (card) await move(card[1] + 6, card[2] + 4);
+const cardNames = card && await until(`bg.sky.nodes[${card[0]}].lit > .5`) && JSON.parse(await ev(`new Promise(done => {
+  const name = WIKI_DATA.articles[bg.sky.nodes[${card[0]}].page][0], seen = [], fill = bgCtx.fillText;
+  bgCtx.fillText = function (text, ...a) { if (text === name || text.endsWith(' · ' + name)) seen.push(text); return fill.call(this, text, ...a); };
+  setTimeout(() => { delete bgCtx.fillText; done(JSON.stringify(seen)); }, 300);
+})`));
+check('hovering a card\'s star leaves its marker\'s label its only name', !!cardNames?.length && cardNames.every(t => t.includes(' · ')), JSON.stringify(cardNames));
 await ev("document.dispatchEvent(new PointerEvent('pointerout', { relatedTarget: null })), true");
 check('leaving the window puts them back', await until(`bg.glow < .02 && bg.sky.nodes[${star[0]}].lit < .02 && Math.hypot(bg.sky.nodes[${star[0]}].lx, bg.sky.nodes[${star[0]}].ly) < 1`));
 await ev("bgSetting('style', 'redstone'), bgSetting('wave', false)");   // no wave lighting the blocks meanwhile

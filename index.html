@@ -3412,22 +3412,37 @@ function drawSky(t) {
     ctx.fillStyle = bgRgba(c.red, Math.min(1, l.glow + l.flash) * s);
     ctx.beginPath(); ctx.arc(...P[i], n.r + 1 + 6 * l.flash, 0, 7); ctx.fill();
   });
-  // the best-linked stars' names, but where they would overlap
-  ctx.font = `11px ${c.font}`; ctx.textAlign = 'center'; ctx.fillStyle = bgRgba(c.muted, .35 * s);
-  const taken = [];
+  // One name a star, in the place above it: a marker's (drawPair), else the cursor's (bgNamed), else a pulse's at its
+  // ends, else the best-linked stars' plain labels, which keep clear of the markers' and pulses' names too.
+  const name = i => WIKI_DATA.articles[nodes[i].page][0], spot = page => bg.sky.at.has(page) ? P[bg.sky.at.get(page)] : skyPlace(...skySpot(page));
+  const stops = bg.pair?.stops ?? [], marked = new Set(stops.flatMap(st => bg.sky.at.has(st.page) ? [bg.sky.at.get(st.page)] : []));
+  if (!bgStill() && t > bg.nextPulse && bg.pulses.length < 2) { skyPulse(t); bg.nextPulse = t + 2600 + Math.random() * 2000; }
+  bg.pulses = bg.pulses.filter(p => t - p.start < p.hop * (p.path.length + 3));
+  const ends = new Map();   // star: how strongly a pulse names it
+  for (const p of bg.pulses) {
+    const k = (t - p.start) / p.hop, fade = Math.max(0, Math.min(1, p.path.length + 2.5 - k));
+    for (const i of k >= p.path.length - 1 ? [p.path[0], p.path.at(-1)] : [p.path[0]])
+      if (!marked.has(i) && nodes[i].lit < .02) ends.set(i, Math.max(ends.get(i) ?? 0, fade));
+  }
+  const taken = [], take = (x, y, w) => taken.push([x - w / 2, y, w]);   // [left, baseline, width]
+  ctx.textAlign = 'center';
+  ctx.font = `600 12px ${c.font}`;
+  for (const st of stops) { const p = spot(st.page), w = ctx.measureText(st.label).width; if (p) take(bgLabelX(p[0], w), p[1] - 14, w); }
+  ctx.font = `12px ${c.font}`;
+  for (const i of ends.keys()) take(P[i][0], P[i][1] - nodes[i].r - 5, ctx.measureText(name(i)).width);
+  ctx.font = `11px ${c.font}`; ctx.fillStyle = bgRgba(c.muted, .35 * s);
   for (const i of labelled) {
-    const text = WIKI_DATA.articles[nodes[i].page][0], w = ctx.measureText(text).width, x = P[i][0] - w / 2, y = P[i][1] - nodes[i].r - 5;
+    if (marked.has(i) || ends.has(i)) continue;
+    const text = name(i), w = ctx.measureText(text).width, x = P[i][0] - w / 2, y = P[i][1] - nodes[i].r - 5;
     if (taken.some(([tx, ty, tw]) => x < tx + tw + 6 && tx < x + w + 6 && Math.abs(y - ty) < 14)) continue;
     taken.push([x, y, w]);
     if (nodes[i].lit < .02) ctx.fillText(text, P[i][0], y);   // else named under the cursor (bgNamed), not twice
   }
-  bgNamed(P);
-  if (!bgStill() && t > bg.nextPulse && bg.pulses.length < 2) { skyPulse(t); bg.nextPulse = t + 2600 + Math.random() * 2000; }
-  bg.pulses = bg.pulses.filter(p => t - p.start < p.hop * (p.path.length + 3));
+  bgNamed(P, marked);
   ctx.font = `12px ${c.font}`;
   for (const p of bg.pulses) {
     const k = (t - p.start) / p.hop, hop = Math.min(Math.floor(k), p.path.length - 1), f = Math.min(1, k - hop);
-    const fade = Math.max(0, Math.min(1, p.path.length + 2.5 - k)), a = P[p.path[0]], b = P[p.path.at(-1)];
+    const fade = Math.max(0, Math.min(1, p.path.length + 2.5 - k)), a = P[p.path[0]];
     ctx.strokeStyle = bgRgba(c.accent, .5 * fade * s); ctx.lineWidth = 2;
     ctx.beginPath(); ctx.moveTo(...a);
     for (let j = 1; j <= hop; j++) ctx.lineTo(...P[p.path[j]]);
@@ -3439,11 +3454,9 @@ function drawSky(t) {
     }
     ctx.stroke();
     ctx.fillStyle = bgRgba(c.accent, .9 * fade * s); ctx.beginPath(); ctx.arc(...head, 3.2, 0, 7); ctx.fill();
-    ctx.fillStyle = bgRgba(c.ink, .45 * fade * s);
-    ctx.fillText(WIKI_DATA.articles[nodes[p.path[0]].page][0], a[0], a[1] + nodes[p.path[0]].r + 14);
-    if (k >= p.path.length - 1) ctx.fillText(WIKI_DATA.articles[nodes[p.path.at(-1)].page][0], b[0], b[1] + nodes[p.path.at(-1)].r + 14);
   }
-  drawPair(t, page => bg.sky.at.has(page) ? P[bg.sky.at.get(page)] : skyPlace(...skySpot(page)));
+  for (const [i, a] of ends) { ctx.fillStyle = bgRgba(c.ink, .45 * a * s); ctx.fillText(name(i), P[i][0], P[i][1] - nodes[i].r - 5); }
+  drawPair(t, spot);
 }
 
 // ---- The redstone map: every article but the subpages and spin-off pages, one block each, laid along a Gilbert curve
@@ -3555,7 +3568,7 @@ function bgLens(P) {   // P: the stars on the screen, pushed in place
     P[i][0] += n.lx; P[i][1] += n.ly;
   });
 }
-function bgNamed(P) {
+function bgNamed(P, marked) {   // marked: the stars with a marker, which names them instead
   const { nodes, touching } = bg.sky, c = bg.colors, ctx = bgCtx, { x, y } = bg.cursor;
   let near = -1, best = 60;   // the nearest star within 60 px
   if (bg.glow > .01) P.forEach(([px, py], i) => { const d = Math.hypot(px - x, py - y); if (d < best) { best = d; near = i; } });
@@ -3569,6 +3582,7 @@ function bgNamed(P) {
     ctx.stroke();
     ctx.fillStyle = bgRgba(col, .35 * n.lit); ctx.beginPath(); ctx.arc(sx, sy, n.r + 5 * n.lit, 0, 7); ctx.fill();
     ctx.fillStyle = bgRgba(col, .9 * n.lit); ctx.beginPath(); ctx.arc(sx, sy, n.r, 0, 7); ctx.fill();
+    if (marked.has(i)) return;
     ctx.font = `600 12px ${c.font}`; ctx.textAlign = 'center';
     ctx.lineWidth = 4; ctx.strokeStyle = bgRgba(c.bg, .8 * n.lit); ctx.strokeText(text, sx, sy - n.r - 8);
     ctx.fillStyle = bgRgba(c.ink, .85 * n.lit); ctx.fillText(text, sx, sy - n.r - 8);
@@ -3612,10 +3626,12 @@ function drawPair(t, spot) {
     bgMarker(p, stop.start ? c.accent : c.target, stop.label, t, reached ? 1 : .45);
   }
 }
+// Where a marker's label of width w goes over x: centred on it, but kept on the screen.
+const bgLabelX = (x, w) => Math.min(bg.W - w / 2 - 6, Math.max(w / 2 + 6, x));
 function bgMarker([x, y], col, text, t, a) {
   const ctx = bgCtx, c = bg.colors, r = 7 + (bgStill() ? 0 : 1.5 * Math.sin(t / 400));
   ctx.font = `600 12px ${c.font}`; ctx.textAlign = 'center';
-  const half = ctx.measureText(text).width / 2 + 6, tx = Math.min(bg.W - half, Math.max(half, x));
+  const tx = bgLabelX(x, ctx.measureText(text).width);
   ctx.strokeStyle = bgRgba(col, .85 * a); ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(x, y, r, 0, 7); ctx.stroke();
   ctx.fillStyle = bgRgba(col, .9 * a); ctx.beginPath(); ctx.arc(x, y, 3, 0, 7); ctx.fill();
   ctx.lineWidth = 4; ctx.strokeStyle = bgRgba(c.bg, .8 * a); ctx.strokeText(text, tx, y - r - 7);

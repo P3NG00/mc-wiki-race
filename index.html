@@ -185,6 +185,20 @@
   .setup-par { font-weight: 600; }
   .setup-par:empty { display: none; }
   .status.err { color: var(--target); }
+  /* Busy: a roll or lookup (#setup.busy), and par being worked out. A spinner turns by the status line, on each card
+     being rolled and by par, and an emptied card's title pulses over a line saying so. Spinning and pulsing animate
+     transform and opacity, which keep going while a search holds the page up. */
+  #setup.busy { cursor: progress; }
+  #setup.busy .status:not(.err, :empty) { color: var(--ink); font-weight: 600; }
+  :is(#setup.busy .status:not(.err, :empty), .setup-par.working)::before, #setup.busy .card.empty .tag::after {
+    content: ''; display: inline-block; width: 11px; height: 11px; vertical-align: -1px; margin-inline-end: 7px;
+    border: 2px solid var(--line); border-top-color: var(--accent); border-radius: 50%; animation: spin .8s linear infinite;
+  }
+  #setup.busy .card.empty .tag::after { margin-inline: 8px 0; border-top-color: currentColor; }
+  .setup-par.working { color: var(--muted); }
+  #setup.busy .card.empty .title { animation: pulse .9s ease-in-out infinite alternate; }
+  #setup.busy .card.empty .desc::before { content: 'Picking an article…'; }
+  @keyframes pulse { to { opacity: .25; } }
   .history { margin-top: 36px; }
   .history-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 8px; }
   .history-head button.link { font-size: 13px; }
@@ -337,7 +351,11 @@
   @keyframes toast-in { from { opacity: 0; translate: 0 -12px; } }
   .hud .goal.reached { animation: reached 1.2s ease-out; border-radius: var(--radius); }
   @keyframes reached { from { background: var(--accent-soft); box-shadow: 0 0 0 6px var(--accent-soft); } }
-  @media (prefers-reduced-motion: reduce) { .toast, .toast.stay, .hud .goal.reached { animation: none; } }
+  @media (prefers-reduced-motion: reduce) {
+    .toast, .toast.stay, .hud .goal.reached, #setup.busy .card.empty .title { animation: none; }
+    /* the selectors above, so as specific */
+    :is(#setup.busy .status:not(.err, :empty), .setup-par.working)::before, #setup.busy .card.empty .tag::after { animation-duration: 3s; }
+  }
 
   /* ---------- Modal ---------- */
   .modal-bg { position: fixed; inset: 0; background: rgba(0,0,0,.45); display: grid; place-items: center; padding: 16px; z-index: 10; }
@@ -737,6 +755,9 @@ const LICENSE_URL = 'https://creativecommons.org/licenses/by-nc-sa/3.0/';
 const wikiUrl = title => `${WIKI}/w/${encodeURIComponent(title.replace(/ /g, '_')).replace(/%2F/g, '/').replace(/%3A/g, ':')}`;
 const pick = arr => arr[Math.floor(Math.random() * arr.length)];
 const shuffled = arr => arr.map(x => [Math.random(), x]).sort((a, b) => a[0] - b[0]).map(([, x]) => x);
+// Resolves once the page has been drawn, so what a click changed shows before a search that holds the page up (once the
+// link graph is in, waiting for it doesn't let the page be drawn). A hidden tab draws no frames, so a timeout resolves it.
+const painted = () => new Promise(r => { requestAnimationFrame(() => setTimeout(r)); setTimeout(r, 200); });
 
 const store = {
   get(k, d) { try { const v = localStorage.getItem(k); return v == null ? d : JSON.parse(v); } catch { return d; } },
@@ -1033,6 +1054,7 @@ function renderCard(which) {
   const blind = which !== 'start' && isBlind();
   // A card emptied for a roll keeps its height until its article is in, so what is under it stays where it is.
   card.style.minHeight = info || blind ? '' : card.offsetHeight + 'px';
+  card.classList.toggle('empty', !info && !blind);   // shown as rolling while the setup screen is busy
   $('.title', card).textContent = blind ? 'Hidden' : info ? info.title : '…';
   $('.desc', card).textContent = blind ? `Blind target: picked and shown ${shownWhen(which)}.` : !info ? '' : info.desc || 'No description available.';
   $('.actions', card).classList.toggle('hidden', blind);
@@ -1084,16 +1106,24 @@ let setupParToken = 0;
 function updateSetupPar() { return setup.parRun = setupPar(); }
 async function setupPar() {
   const token = ++setupParToken, titles = cardKeys().map(w => setup[w]?.title), r = rules(), kinds = huntMode() === 'kinds' ? setup.kinds : null;
+  const back = backCount(), extra = setup.extra;
   // Under Blind target par and the count would say something about the hidden cards, so they wait for the game.
   const blind = r.includes('blind');
   setup.exact = null;
   $('#exactInfo').textContent = blind ? 'Blind target: the count shows when you start.' : 'Working out the count…';
   let text = '', route = null;
   if (titles.every(Boolean) && (kinds?.length ?? true)) {
-    route = await cardsRoute(titles, r, kinds, backCount()).catch(() => null);
+    // The search can hold the page up for a moment (a round trip's or Scavenger's most), so the page is drawn first,
+    // saying par is being worked out, and of the runs started meanwhile (a change of rules renders every card) only the
+    // last one searches.
+    $('#setupPar').textContent = blind ? 'Par shows when you start' : 'Par …';
+    $('#setupPar').classList.toggle('working', !blind);
+    await painted();
+    if (token !== setupParToken) return;
+    route = await cardsRoute(titles, r, kinds, back).catch(() => null);
     if (route) text = `Par ${route.length - 1}`;
     if (r.includes('exact')) {
-      const extra = setup.extra, n = route && route.length - 1 + extra, exact = route && await exactRoute(titles, r, n).catch(() => null);
+      const n = route && route.length - 1 + extra, exact = route && await exactRoute(titles, r, n).catch(() => null);
       if (token !== setupParToken) return;
       setup.exact = exact;
       text = !route ? 'No par to count exact clicks from' : exact ? `${text} · exactly ${n}` : `${text} · no way in exactly ${n}`;
@@ -1103,6 +1133,7 @@ async function setupPar() {
   }
   if (token === setupParToken) {
     $('#setupPar').textContent = blind ? 'Par shows when you start' : text;
+    $('#setupPar').classList.remove('working');
     updatePlay();
     setup.route = blind ? null : route;
     bgPair();
@@ -1195,12 +1226,14 @@ function leaveDaily() {
   return was;
 }
 
+// #setup.busy shows it: a spinner by the status line and on the cards being rolled.
 async function withBusy(fn) {
   setup.busy++;
+  $('#setup').classList.add('busy');
   updatePlay();
   try { return await fn(); }
   catch (e) { setStatus('Network error: ' + e.message.replace(/\.$/, '') + '. Check your connection and try again.', true); }
-  finally { setup.busy--; updatePlay(); }
+  finally { setup.busy--; $('#setup').classList.toggle('busy', setup.busy > 0); updatePlay(); }
 }
 
 // A group for each card to roll, different from every other card's, so the start and target never share a topic: its
@@ -1290,6 +1323,9 @@ async function reroll(which, atStart = false) {
   setStatus('Picking…');
   await withBusy(async () => {
     for (const w of targets) { setup[w] = null; renderCard(w); }
+    // The emptied cards show before the searches below, which can hold the page up.
+    await painted();
+    if (!targets.some(current)) return;
     // With a target par the start rolls first, only if some target is at that par from it (or the target kept, when only
     // the start rolls), then the other cards in the topics it leaves, then a target at the par from it (under Blind
     // target not until Start). notice: what the roll couldn't keep to, and why.

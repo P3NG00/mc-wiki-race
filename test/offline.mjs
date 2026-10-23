@@ -98,7 +98,7 @@ const linkStates = async () => JSON.parse(await ev(`JSON.stringify(Object.fromEn
   [a.getAttribute('href').slice(3), a.classList.contains('mwr-live') ? 'live' : 'dead'])))`, await frameCtx()));
 const play = async () => {
   await ev("document.querySelector('#btnPlay').click()");
-  return until('game.path.length === 1 && !game.loading');
+  return until('game.active && game.path.length === 1 && !game.loading');
 };
 
 // Links by difficulty. A challenge link without rules is Relaxed: everything but other namespaces and the left-out pages
@@ -647,7 +647,7 @@ for (const [level, value, ok, content = []] of [['normal', 'p1', p => p === 1], 
   await ev("reroll('all')");
   const got = await until(ready, 30000) && JSON.parse(await ev(`cardsRoute([setup.start.title, setup.goal.title], rules()).then(r =>
     JSON.stringify({ par: r && r.length - 1, reach: setup.goal.reach, pair: setup.start.title + ' -> ' + setup.goal.title }))`));
-  check(`target par ${REACH_LABEL[value]} in ${level}: the target is at that par`, got && ok(got.par) && got.reach === value && await ev(`document.querySelector('#setupPar').textContent === 'Par ${got?.par}'`),
+  check(`target par ${REACH_LABEL[value]} in ${level}: the target is at that par`, got && ok(got.par) && got.reach === value && await until(`document.querySelector('#setupPar').textContent === 'Par ${got?.par}'`),
     got ? `${got.pair}: par ${got.par}` : await ev("document.querySelector('#setupStatus').textContent"));
 }
 await ev('setContent([])');

@@ -251,7 +251,7 @@ check('Escape keeps the win modal open', await ev("!document.querySelector('#mod
 await ev("document.querySelector('#rules input[value=noback]').click()");
 check('challenge link carries rules', await ev("openLink(new URL(challengeLink()).hash.slice(3)).endsWith('&rules=noback')"), await ev('openLink(new URL(challengeLink()).hash.slice(3))'));
 await ev("document.querySelector('#mSame').click()");
-await until("game.path.length === 1 && !game.loading");
+await until("game.active && game.path.length === 1 && !game.loading");
 check('No Back hides Back', await ev("document.querySelector('#btnBack').classList.contains('hidden')"));
 f = await frameCtx();
 await ev("[...document.querySelectorAll('a.mwr-live')].find(a => a.getAttribute('href') === '/w/Pickaxe').click()", f);
@@ -272,7 +272,7 @@ await ev("document.querySelector('#rules input[value=noback]').click()");
 // Pickaxe and Back alternate, so every article after the first comes from the parse cache.
 await ev("document.querySelector('#rules input[value=limit]').click()");
 await ev("document.querySelector('#mSame').click()");
-await until("game.path.length === 1 && !game.loading");
+await until("game.active && game.path.length === 1 && !game.loading");
 check('Six clicks shows the limit', await ev("document.querySelector('#hudClicks').textContent === '0' && document.querySelector('#hudClicksK').textContent === 'of 6' && document.querySelectorAll('#hudMeter i').length === 6"),
   await ev("document.querySelector('.hud .stat').textContent"));
 for (let i = 1; i <= 6; i++) {
@@ -338,7 +338,7 @@ check('Mobs topic target', await until("!document.querySelector('#btnPlay').disa
   await ev("ARTICLES.get(setup.goal.title)?.topic === 'mobs'"), await ev("setup.goal.title"));
 // The result keeps the target's topic, and shows it.
 await ev("document.querySelector('#btnPlay').click()");
-await until("game.path.length === 1 && !game.loading");
+await until("game.active && game.path.length === 1 && !game.loading");
 await ev("document.querySelector('#btnGiveUp').click()");
 await ev("document.querySelector('#gQuit').click()");
 const rolled = await ev("(([r]) => r.topic)(store.get('mwr.history', []))");
@@ -389,7 +389,7 @@ check('the Rules row leaves the difficulty\'s rules to the Difficulty row, Norma
 check('settings text names the difficulty unless it is Normal',
   await ev("[[], ['nonav'], ['nohubs', 'nonav', 'blind']].map(rulesText).join('|')") === 'Relaxed||Hard, Blind target');
 await ev("document.querySelector('#btnPlay').click()");
-await until("game.path.length === 1 && !game.loading");
+await until("game.active && game.path.length === 1 && !game.loading");
 await sleep(1000);
 f = await frameCtx();
 const areas = JSON.parse(await ev("JSON.stringify({ all: document.querySelectorAll('area').length, live: document.querySelectorAll('area.mwr-live').length })", f));
@@ -400,7 +400,7 @@ await send('browsingContext.navigate', { context: ctx, url: 'about:blank', wait:
 await send('browsingContext.navigate', { context: ctx, url: fileUrl + '#start=Beacon&target=Diamond', wait: 'complete' });
 await until("!document.querySelector('#btnPlay').disabled");
 await ev("document.querySelector('#btnPlay').click()");
-await until("game.path.length === 1 && !game.loading");
+await until("game.active && game.path.length === 1 && !game.loading");
 f = await frameCtx();
 // The wiki fades layers in and out over 200 ms, so each state is waited for. Beacon's starts on its top layer, all shown.
 const layers = "[...document.querySelector('.layered-blueprint').querySelectorAll('.layered-blueprint-layer')].map(l => getComputedStyle(l).visibility[0]).join('')";
@@ -432,7 +432,7 @@ await send('browsingContext.navigate', { context: ctx, url: 'about:blank', wait:
 await send('browsingContext.navigate', { context: ctx, url: fileUrl + '#start=Bastion%20Remnant&target=Diamond', wait: 'complete' });
 await until("!document.querySelector('#btnPlay').disabled");
 await ev("document.querySelector('#btnPlay').click()");
-await until("game.path.length === 1 && !game.loading");
+await until("game.active && game.path.length === 1 && !game.loading");
 f = await frameCtx();
 await ev("window.mwrPart = [...document.querySelectorAll('table.wikitable.collapsible.collapsed')].find(t => t.querySelector('tr + tr .mwr-live'))", f);
 const folds = `JSON.stringify({
@@ -480,13 +480,13 @@ await until("!document.querySelector('#btnPlay').disabled");
 // Links to Dungeons pages, but its version pages, which are left out.
 const dungeonsLinks = async () => JSON.parse(await ev("JSON.stringify([...document.querySelectorAll('a[href^=\"/w/Dungeons:\"]')].filter(a => a.title !== 'Off limits: a version or list page').map(a => a.classList.contains('mwr-live')))", await frameCtx()));
 await ev("document.querySelector('#btnPlay').click()");
-await until("game.path.length === 1 && !game.loading");
+await until("game.active && game.path.length === 1 && !game.loading");
 const offLinks = await dungeonsLinks();
 check('links into a spin-off that is off are dead', offLinks.length > 0 && offLinks.every(l => !l), `${offLinks.length} links`);
 await ev("finish(false)");
 await ev("closeModal(); toSetup(); document.querySelector('#spinoffs input[value=Dungeons]').checked = true");
 await ev("document.querySelector('#btnPlay').click()");
-await until("game.path.length === 1 && !game.loading");
+await until("game.active && game.path.length === 1 && !game.loading");
 const onLinks = await dungeonsLinks();
 check('links into a spin-off that is on work', onLinks.length > 0 && onLinks.every(l => l), `${onLinks.length} links`);
 await ev("finish(false)");
@@ -497,7 +497,7 @@ await send('browsingContext.navigate', { context: ctx, url: fileUrl + '#start=Du
 check('a challenge link can start on a spin-off page', await until("!document.querySelector('#btnPlay').disabled && setup.start?.title === 'Dungeons:Creeper'"),
   await ev("setup.start?.title"));
 await ev("document.querySelector('#btnPlay').click()");
-await until("game.path.length === 1 && !game.loading");
+await until("game.active && game.path.length === 1 && !game.loading");
 check('a card in a spin-off turns its links on without the checkbox', await ev("JSON.stringify(game.content) === '[\"Dungeons\"]'") &&
   (links => links.length > 0 && links.every(l => l))(await dungeonsLinks()), await ev("JSON.stringify(game.content)"));
 await ev("finish(false); closeModal(); toSetup()");
@@ -515,7 +515,7 @@ check('Blind target hides the link\'s target, held unseen, and par', await ev(bl
 await ev("document.querySelector('#btnPlay').click()");
 check('a collapsed path stays collapsed after a reload', await ev("document.querySelector('.main').classList.contains('collapsed') && document.querySelector('#btnPath').getAttribute('aria-expanded') === 'false'"));
 await ev("document.querySelector('#btnPath').click()");
-check('No hubs game loads', await until("game.path.length === 1 && !game.loading"));
+check('No hubs game loads', await until("game.active && game.path.length === 1 && !game.loading"));
 check('Blind target names the target once the game starts, but hides the HUD and path pictures and peek', await ev("document.querySelector('#hudGoal').textContent === 'Crafting' && document.querySelector('#hudImg').classList.contains('hidden') && document.querySelector('#pathArt').classList.contains('hidden') && document.querySelector('#btnPeek').classList.contains('hidden')"));
 check('hub redirects are known', await ev("HUB_TITLES.get('Blocks') === 'Block' && HUB_TITLES.get('Mining') === 'Breaking'"));
 f = await frameCtx();
@@ -536,7 +536,7 @@ await send('browsingContext.navigate', { context: ctx, url: 'about:blank', wait:
 await send('browsingContext.navigate', { context: ctx, url: fileUrl + '#start=Diamond&target=Diamond%20Pickaxe&rules=nonav', wait: 'complete' });
 await until("!document.querySelector('#btnPlay').disabled");
 await ev("document.querySelector('#btnPlay').click()");
-await until("game.path.length === 1 && !game.loading");
+await until("game.active && game.path.length === 1 && !game.loading");
 f = await frameCtx();
 const nav = JSON.parse(await ev(`JSON.stringify({ boxes: document.querySelectorAll('.navbox').length,
   shown: [...document.querySelectorAll('.navbox, #Navigation')].filter(e => e.checkVisibility()).length,
@@ -601,7 +601,7 @@ const daily = await ev("cardKeys().map(w => setup[w].title).join(' -> ')");
 check('daily pair is deterministic', await ev(`dailyPair('2026-01-06').then(p => p.rule === 'checkpoint' && ${pairOf('p')})`) === daily &&
   await ev(`dailyPair('2026-01-05').then(p => p.rule === 'noback' && !p.vias.length && ${pairOf('p')} !== ${JSON.stringify(daily)})`), daily);
 await ev("document.querySelector('#btnPlay').click()");
-await until("game.path.length === 1 && !game.loading");
+await until("game.active && game.path.length === 1 && !game.loading");
 await ev("document.querySelector('#btnGiveUp').click()");
 await ev("document.querySelector('#gQuit').click()");
 check('daily result is recorded', await ev("(r => r.daily === '2026-01-06' && r.vias.join() === setup.via0.title && r.rules.join() === 'nonav,checkpoint')(store.get('mwr.history', [])[0]) && document.querySelector('#modal').textContent.includes('Daily 2026-01-06')"));
@@ -640,7 +640,7 @@ check('challenge link sets the checkpoint', await ev(`setup.via0?.title === 'Pic
 await ev(`(h => { h.unshift({ start: 'Diamond', goal: 'Diamond Pickaxe', vias: ['Zombie'], rules: ['checkpoint'], won: true, clicks: 1, ms: 1000, at: Date.now(), path: [] });
   store.set('mwr.history', h); })(store.get('mwr.history', []))`);
 await ev("document.querySelector('#btnPlay').click()");
-await until("game.path.length === 1 && !game.loading");
+await until("game.active && game.path.length === 1 && !game.loading");
 const hudLbl = "document.querySelector('#hudLbl').textContent + ' ' + document.querySelector('#hudGoal').textContent";
 check('HUD shows the checkpoint first', await ev(hudLbl) === 'Checkpoint Pickaxe', await ev(hudLbl));
 check('the path picture is the checkpoint', await ev("document.querySelector('#pathArt').src === game.vias[0].img && !!game.vias[0].img"));
@@ -670,7 +670,7 @@ await send('browsingContext.navigate', { context: ctx, url: 'about:blank', wait:
 await send('browsingContext.navigate', { context: ctx, url: fileUrl + '#start=Blaze%20Rod&kind=Nether%20mobs&kind=Enchantments&kind=Potions&rules=scavenger', wait: 'complete' });
 await until("!document.querySelector('#btnPlay').disabled", 60000);
 await ev("document.querySelector('#btnPlay').click()");
-await until("game.path.length === 1 && !game.loading", 60000);
+await until("game.active && game.path.length === 1 && !game.loading", 60000);
 f = await frameCtx();
 await ev("[...document.querySelectorAll('a.mwr-live')].find(a => a.getAttribute('href') === '/w/Blaze').click()", f);
 check('Scavenger: the article comes with its live categories, and a member of a kind is a find', await until("game.path.length === 2 && !game.loading", 60000) &&
@@ -729,7 +729,7 @@ const loaded = "[setup.start?.title, setup.via0?.title, setup.goal?.title].join(
 check('a challenge link with awkward titles loads them unchanged', await until("!document.querySelector('#btnPlay').disabled") &&
   await ev(loaded) === tricky.slice(0, 3).join(' | '), await ev(loaded));
 await ev("document.querySelector('#btnPlay').click()");
-await until("game.path.length === 1 && !game.loading");
+await until("game.active && game.path.length === 1 && !game.loading");
 const hrefs = await ev(`JSON.stringify(${JSON.stringify(tricky)}.map(t => wikiUrl(t).slice(WIKI.length)))`);
 const read = await ev(`JSON.stringify(${hrefs}.map(h => { const a = document.createElement('a'); a.setAttribute('href', h); return classify(a)?.title; }))`, await frameCtx());
 check('the frame reads awkward titles back from their links', read === JSON.stringify(tricky), read);
@@ -764,7 +764,7 @@ check('Cancel on a start article that failed returns to setup', startFailed &&
   await ev("!document.querySelector('#setup').classList.contains('hidden') && !game.active"), await ev(overlayText));
 fault = null;
 await ev("document.querySelector('#btnPlay').click()");
-await until("game.path.length === 1 && !game.loading");
+await until("game.active && game.path.length === 1 && !game.loading");
 for (const [kind, reply, title, message] of [
   ['a network error', null, 'Iron Ingot', 'NetworkError'],
   ['HTTP 500', [500, 'oops'], 'Gold Ingot', 'HTTP 500'],
@@ -827,7 +827,7 @@ const leaveAfter = async giveUp => {
   await send('input.performActions', { context: ctx, actions: [{ type: 'pointer', id: 'mouse', actions: [
     { type: 'pointerMove', x: 0, y: 0, origin: { type: 'element', element: { sharedId: play } } }, { type: 'pointerDown', button: 0 }, { type: 'pointerUp', button: 0 }] }] });
   await send('input.releaseActions', { context: ctx });
-  await until("game.path.length === 1 && !game.loading");
+  await until("game.active && game.path.length === 1 && !game.loading");
   if (giveUp) await ev("document.querySelector('#btnGiveUp').click(), document.querySelector('#gQuit').click()");
   prompts = [];
   await send('browsingContext.navigate', { context: ctx, url: 'about:blank', wait: 'complete' });
@@ -865,7 +865,7 @@ const playPair = async () => {
   await send('browsingContext.navigate', { context: ctx, url: fileUrl + '#start=Diamond&target=Oxyg%C3%A8ne', wait: 'complete' });
   await until("!document.querySelector('#btnPlay').disabled");
   await ev("document.querySelector('#btnPlay').click()");
-  await until("game.path.length === 1 && !game.loading");
+  await until("game.active && game.path.length === 1 && !game.loading");
 };
 const clickLink = async () => ev(`(ls => !!ls.length && (ls[Math.floor(${rand()} * ls.length)].click(), true))(document.querySelectorAll('.mwr-live'))`,
   await frameCtx());

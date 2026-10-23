@@ -90,6 +90,4 @@ See `CLAUDE.md` and `docs/` for how the game works internally.
 
 [MIT](LICENSE). Article content shown in the game comes from [minecraft.wiki](https://minecraft.wiki), is licensed under [CC BY-NC-SA 3.0](https://creativecommons.org/licenses/by-nc-sa/3.0/) unless noted otherwise on the wiki, and is not covered by this license. Neither are `wiki-data.js`, `wiki-links.js` and `wiki-navboxes.js`, whose titles, categories and links come from the wiki's offline copy under the same license. The game credits the wiki in the footer and with a link to each article it shows.
 
-MC Wiki Race is not an official Minecraft product, and is not approved by or associated with Mojang or Microsoft. Contact: [BryantF.xyz+mcwikirace@gmail.com](mailto:BryantF.xyz+mcwikirace@gmail.com).
-
-Not an official Minecraft product. Not affiliated with or endorsed by Mojang Studios, Microsoft, Minecraft or minecraft.wiki.
+MC Wiki Race is not an official Minecraft product, and is not approved by or associated with Mojang, Microsoft or minecraft.wiki. Contact: [BryantF.xyz+mcwikirace@gmail.com](mailto:BryantF.xyz+mcwikirace@gmail.com).

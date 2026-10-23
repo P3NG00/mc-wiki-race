@@ -404,8 +404,6 @@
   .routes ol { margin: 6px 0 4px; }
   .routes .note { margin: 0; }
   .routes .note.worse { color: var(--target); }   /* a click that got no closer */
-  .routes .path-sum { margin-top: 6px; color: var(--ink); }
-  .routes .path-sum:empty { display: none; }
   .routes .shortcut { margin-top: 8px; font-size: 13.5px; }
   .routes .shortcut summary { cursor: pointer; color: var(--accent); width: fit-content; }
   .routes .shortcut p { margin: 4px 0 0; }
@@ -3140,7 +3138,7 @@ function finish(won, lost = null) {
     </div>
     ${bestNote}
     <div class="routes">
-      <div><h3>Your path · ${clicksText(rec.clicks)}</h3><p class="note path-sum" id="mPathSum"></p><ol id="mPath">${pathHtml()}</ol>
+      <div><h3>Your path · ${clicksText(rec.clicks)}</h3><ol id="mPath">${pathHtml()}</ol>
         <p class="note hidden" id="mPathNote">Beside each page, the fewest clicks from it to what was next.${exact ? '' : ' In red, a click that got no closer.'}</p>
         <details class="shortcut hidden" id="mShortcut"><summary>Show a shortcut you missed</summary><p id="mShortcutText"></p></details></div>
       <div><h3 id="mBestTitle">${game.exact ? `One way in exactly ${game.limit}` : 'Shortest route'}</h3>
@@ -3160,11 +3158,6 @@ function finish(won, lost = null) {
     ol.innerHTML = pathHtml();
     const measured = path.some(p => 'togo' in p);   // none if the link graph couldn't load
     $('#mPathNote').classList.toggle('hidden', !measured);
-    // How many clicks got no closer, in a line, but for Exact clicks, which has to take detours. Every one got closer only
-    // if every page could be measured: one the snapshot lacks can't be told.
-    const n = path.filter(worse).length, all = path.every(p => p.togo !== undefined);
-    $('#mPathSum').textContent = !measured || exact || !rec.clicks ? '' : n ? `${n} of your ${clicksText(rec.clicks)} got no closer.`
-      : all ? 'Every click got closer.' : '';
     // Folded away, so it is there for whoever wants it rather than one more mark against the game; never in Share.
     const s = missedShortcut(path, exact);
     $('#mShortcut').classList.toggle('hidden', !s);

@@ -231,8 +231,6 @@ const counts = "JSON.stringify([...document.querySelectorAll('#mPath li')].map(l
 const expected = JSON.stringify([[`${farPar} to go`, ''], [`${farPar - 1} to go`, ''], [`${farPar} to go`, 'worse'], ['no route', 'worse'], ['?', '']]);
 check('the result shows each page\'s count, and the clicks that got no closer in red', await until(`${counts} === ${JSON.stringify(expected)}`) &&
   await ev(`${hudHint}.classList.contains('hidden') && !document.querySelector('#mPathNote').classList.contains('hidden')`), await ev(counts));
-check('and how many got no closer, in a line', await ev("document.querySelector('#mPathSum').textContent === '2 of your 4 clicks got no closer.'"),
-  await ev("document.querySelector('#mPathSum').textContent"));
 // The shortcut missed: going back from the second page, a click that never got closer again, folded away until asked for.
 const shortcut = "(s => [s.classList.contains('hidden'), s.open, document.querySelector('#mShortcutText').textContent])(document.querySelector('#mShortcut'))";
 const shortcutText = await ev(`(p => p.togo > 1 ? \`From ${far[1]}, \${p.next} was \${clicksText(p.togo - 1)} from Crafting.\` : \`${far[1]} linked straight to \${p.next}.\`)(game.path[1])`);
@@ -258,14 +256,14 @@ check('without the rule every arrival is still measured, but not shown in play, 
 await ev('finish(false)');
 check('and the result shows them', await until("document.querySelectorAll('#mPath .togo').length === 2"));
 await ev("closeModal(); toSetup()");
-// A game along a shortest route: every click got closer.
+// A game along a shortest route: no shortcut missed.
 await open(`#start=${encodeURIComponent(far[0])}&target=Crafting`);
 await play();
 await ev(`navigate(${JSON.stringify(far[1])}, null)`);
 await until('game.path.length === 2 && !game.loading');
 await ev('finish(false)');
-check('a path where every click got closer says so, with no shortcut', await until("document.querySelector('#mPathSum').textContent === 'Every click got closer.'")
-  && await ev("document.querySelector('#mShortcut').classList.contains('hidden')"), await ev("document.querySelector('#mPathSum').textContent"));
+check('a path where every click got closer has no shortcut', await until("document.querySelectorAll('#mPath .togo').length === 2")
+  && await ev("!document.querySelector('#mPath .worse') && document.querySelector('#mShortcut').classList.contains('hidden')"), await ev("document.querySelector('#mPath').textContent"));
 // Which detour's shortcut shows: the one that took the most clicks more than the shortcut would have, from two up, a
 // checkpoint reached counting as getting there, none from the start or a checkpoint, and none for Exact clicks.
 check('the shortcut is the costliest detour of two clicks or more, a checkpoint ending one, not from the start', await ev(`(() => {
@@ -533,7 +531,7 @@ check('on the count wins, with no golf score', await until('!game.active') && aw
   await ev("document.querySelector('#mBestTitle')?.textContent"));
 // Par + 2 clicks means at least two that get no closer, which Exact clicks needs, so none is marked.
 check('its path has each page\'s count but marks no click that got no closer', await until(`document.querySelectorAll('#mPath .togo').length === ${n}`)
-  && await ev("!document.querySelector('#mPath .worse') && !document.querySelector('#mPathNote').textContent.includes('red') && !document.querySelector('#mPathSum').textContent"),
+  && await ev("!document.querySelector('#mPath .worse') && !document.querySelector('#mPathNote').textContent.includes('red')"),
   await ev("document.querySelector('#mPath').textContent"));
 await ev("closeModal(); toSetup()");
 check('the history marks the win as the pair\'s best, played today', await ev(`(tr => tr.querySelector('.res.won').textContent === '✓ ${n} clicks' && !!tr.querySelector('.best-tag')

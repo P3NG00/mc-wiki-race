@@ -1072,6 +1072,30 @@ await send('browsingContext.setViewport', { context: ctx, viewport: { width: 390
 check('Auto is the redstone map at a phone\'s width', await until("bgStyle() === 'redstone' && bg.W <= 390 && bg.grid?.W === bg.W"), await ev('JSON.stringify([bgStyle(), bg.W, bg.grid?.W])'));
 await send('browsingContext.setViewport', { context: ctx, viewport: null });
 check('and the constellation again on a wide screen', await until("bgStyle() === 'constellation'"));
+// The cursor (a mouse, by the pointer events' type): stars near it make way and the nearest is named,
+// a touch does nothing, leaving the window takes it away, and on the map a torch lights the blocks around it, warmer (on a
+// light theme the torch's orange is darker than the blocks, so it is told by how much redder than blue a block is).
+const move = (x, y, type = 'mouse') => ev(`document.dispatchEvent(new PointerEvent('pointermove', { clientX: ${x}, clientY: ${y}, pointerType: '${type}', bubbles: true })), true`);
+await until('!!bg.sky');
+const star = JSON.parse(await ev("JSON.stringify((P => P.map((p, i) => [i, ...p]).find(([, x, y]) => x > 20 && x < innerWidth - 20 && y > 20 && y < innerHeight - 20))(bg.sky.nodes.map(n => skyStar(n, bgNow()))))"));
+await move(star[1] + 200, star[2], 'touch');
+check('a touch doesn\'t move the stars', await ev('!bg.cursor.in'));
+await move(star[1] + 12, star[2] + 8);
+check('the stars near the cursor make way, and the nearest is named', await until(`bg.sky.nodes[${star[0]}].lit > .5 && Math.hypot(bg.sky.nodes[${star[0]}].lx, bg.sky.nodes[${star[0]}].ly) > 5`),
+  await ev(`JSON.stringify(bg.sky.nodes[${star[0]}])`));
+await ev("document.dispatchEvent(new PointerEvent('pointerout', { relatedTarget: null })), true");
+check('leaving the window puts them back', await until(`bg.glow < .02 && bg.sky.nodes[${star[0]}].lit < .02 && Math.hypot(bg.sky.nodes[${star[0]}].lx, bg.sky.nodes[${star[0]}].ly) < 1`));
+await ev("bgSetting('style', 'redstone'), bgSetting('wave', false)");   // no wave lighting the blocks meanwhile
+const corner = "(() => { const d = bg.dpr, p = bgCtx.getImageData(Math.round((innerWidth - 40) * d), Math.round((innerHeight - 40) * d), 1, 1).data; return p[0] - p[2]; })()";
+await until('!!bg.grid');
+const cold = await ev(corner);
+await move('innerWidth - 40', 'innerHeight - 40');
+check('on the map a torch lights the blocks around the cursor', await until('bg.glow > .95') && await ev(corner) > cold + 30, `${cold} → ${await ev(corner)}`);
+await ev("bgSetting('still', true)");
+await move('innerWidth - 40', 'innerHeight - 40');
+await ev('bgDraw(), true');   // a still frame drawn with the cursor in
+check('reduce motion leaves the cursor alone', await ev(`bg.glow === 0 && ${corner} < ${cold} + 30`), await ev(`JSON.stringify([bg.glow, ${corner}, ${cold}])`));
+await ev("bgSetting('still', false), bgSetting('style', 'auto'), document.dispatchEvent(new PointerEvent('pointerout', { relatedTarget: null }))");
 
 // Injection: a link can carry any text, so a sealed one whose titles are markup and script, with junk rules, kinds and
 // back, is played through every place a title shows (cards, header, path, a frame link, the banner, the peek, the result,

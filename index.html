@@ -3020,7 +3020,7 @@ const bgCanvas = $('#bgCanvas'), bgCtx = bgCanvas.getContext('2d');
 // linkFacts and sampled: the facts counted from it, sampled per difficulty (sampling: under way).
 const bg = { shown: true, W: 0, H: 0, dpr: 1, raf: 0, last: 0, colors: null, sky: null, skyWait: false, grid: null, pulses: [], nextPulse: 0,
   pair: null, pairToken: 0, nextRoll: 0, links: null, linkFacts: null, facts: [], pairFacts: [], factsToken: 0, factTurn: 0, factTimer: 0,
-  fadeTimer: 0, sampled: new Map(), sampling: false };
+  fadeTimer: 0, sampled: new Map(), sampling: false, cursor: { x: 0, y: 0, in: false }, glow: 0 };
 const bgNow = () => performance.now();
 const BG_MAX_LINKS = Math.log1p(Math.max(...WIKI_DATA.articles.map(r => r[1])));
 const bgWeight = page => Math.log1p(WIKI_DATA.articles[page][1]) / BG_MAX_LINKS;   // 0 to 1, by how many articles link to it
@@ -3057,7 +3057,9 @@ function buildSky(links) {   // links: each page's, outside navboxes
   for (const [k, titles] of POOL) {
     for (const t of titles.slice().sort((a, b) => ARTICLES.get(b).links - ARTICLES.get(a).links).slice(0, 64)) {
       const page = PAGE_IDS.get(t), h = hash32(t);
-      nodes.push({ page, topic: WIKI_DATA.topics.indexOf(k), r: 1.6 + 4.2 * bgWeight(page) ** 2, phase: h % 1000 / 150, speed: .00012 + (h >>> 10) % 1000 * 1.8e-7 });
+      // lx, ly: how far the cursor has pushed it; lit: how much it is the one named under the cursor (bgLens)
+      nodes.push({ page, topic: WIKI_DATA.topics.indexOf(k), r: 1.6 + 4.2 * bgWeight(page) ** 2, phase: h % 1000 / 150, speed: .00012 + (h >>> 10) % 1000 * 1.8e-7,
+        lx: 0, ly: 0, lit: 0 });
     }
   }
   const at = new Map(nodes.map((n, i) => [n.page, i])), outs = nodes.map(n => new Set(links[n.page])), ins = nodes.map(() => []);
@@ -3095,7 +3097,9 @@ function buildSky(links) {   // links: each page's, outside navboxes
     const far = Math.max(...m.map(i => Math.hypot(x[i], y[i]))) || 1, [cx, cy] = SKY_DISCS[k] ?? [.5, .5];
     for (const i of m) Object.assign(nodes[i], { x: cx + x[i] / far * .24, y: cy + y[i] / far * .3 });
   });
-  return { nodes, lines, ahead, at, labelled: nodes.map((n, i) => i).sort((a, b) => nodes[b].r - nodes[a].r).slice(0, 14) };
+  const touching = nodes.map(() => []);   // each star's lines, which light with it under the cursor
+  lines.forEach(([a, b]) => { touching[a].push(b); touching[b].push(a); });
+  return { nodes, lines, ahead, at, touching, labelled: nodes.map((n, i) => i).sort((a, b) => nodes[b].r - nodes[a].r).slice(0, 14) };
 }
 // Where a star is on the screen, drifting a little. Upright, the sky turns a quarter.
 function skyPlace(x, y) {
@@ -3132,6 +3136,7 @@ function skyPulse(t) {
 }
 function drawSky(t) {
   const { nodes, lines, labelled } = bg.sky, c = bg.colors, s = c.strength, ctx = bgCtx, P = nodes.map(n => skyStar(n, t));
+  bgLens(P);
   // a faint nebula behind each topic's cluster
   WIKI_DATA.topics.forEach((k, ti) => {
     const m = nodes.flatMap((n, i) => n.topic === ti ? [i] : []);
@@ -3169,8 +3174,9 @@ function drawSky(t) {
     const text = WIKI_DATA.articles[nodes[i].page][0], w = ctx.measureText(text).width, x = P[i][0] - w / 2, y = P[i][1] - nodes[i].r - 5;
     if (taken.some(([tx, ty, tw]) => x < tx + tw + 6 && tx < x + w + 6 && Math.abs(y - ty) < 14)) continue;
     taken.push([x, y, w]);
-    ctx.fillText(text, P[i][0], y);
+    if (nodes[i].lit < .02) ctx.fillText(text, P[i][0], y);   // else named under the cursor (bgNamed), not twice
   }
+  bgNamed(P);
   if (!bgStill() && t > bg.nextPulse && bg.pulses.length < 2) { skyPulse(t); bg.nextPulse = t + 2600 + Math.random() * 2000; }
   bg.pulses = bg.pulses.filter(p => t - p.start < p.hop * (p.path.length + 3));
   ctx.font = `12px ${c.font}`;
@@ -3270,6 +3276,15 @@ function drawGrid(t) {
   ctx.drawImage(img, 0, 0, W, H);
   ctx.globalAlpha = 1;
   const cw = W / cols, ch = H / rows;
+  if (bg.glow > .01) {   // a torch at the cursor: light 8 on its block, a level less a block away, counted as the game does
+    const tx = Math.floor(bg.cursor.x / cw), ty = Math.floor(bg.cursor.y / ch), warm = c.dark ? TORCH_DARK : TORCH_LIGHT;
+    for (let y = Math.max(0, ty - 7); y <= Math.min(rows - 1, ty + 7); y++) for (let x = Math.max(0, tx - 7); x <= Math.min(cols - 1, tx + 7); x++) {
+      const level = 8 - Math.abs(x - tx) - Math.abs(y - ty);
+      if (level <= 0) continue;
+      ctx.fillStyle = bgRgba(warm, level / 8 * (c.dark ? .65 : .5) * bg.glow);
+      ctx.fillRect(Math.round(x * cw), Math.round(y * ch), Math.round((x + 1) * cw) - Math.round(x * cw), Math.round((y + 1) * ch) - Math.round(y * ch));
+    }
+  }
   if (cw >= 5) {   // the seams between blocks
     ctx.strokeStyle = bgRgba(c.bg, .55); ctx.lineWidth = 1; ctx.beginPath();
     for (let x = 1; x < cols; x++) { ctx.moveTo(Math.round(x * cw) + .5, 0); ctx.lineTo(Math.round(x * cw) + .5, H); }
@@ -3277,6 +3292,42 @@ function drawGrid(t) {
     ctx.stroke();
   }
   drawPair(t, page => { const k = cell.get(page); return k === undefined ? null : [(k % cols + .5) * cw, (Math.floor(k / cols) + .5) * ch]; });
+}
+
+// ---- The cursor, with a mouse or pen and motion not reduced: on the constellation the stars near it make way and the
+// nearest names itself, its lines lit; on the map it lights the blocks around it like a torch. cursor: where it last was
+// on the page, in: whether it still is; glow eases in and out from 0 to 1 as it comes and goes (bgFrame).
+const TORCH_DARK = [255, 200, 110], TORCH_LIGHT = [255, 165, 40];
+const bgFollows = () => bg.cursor.in && !bgStill();
+// Each star eases a fifth of the way a frame; a still frame (motion reduced) puts them back at once.
+const bgEase = () => bgStill() ? 1 : .2;
+function bgLens(P) {   // P: the stars on the screen, pushed in place
+  const { x, y } = bg.cursor, ease = bgEase();
+  bg.sky.nodes.forEach((n, i) => {
+    const dx = P[i][0] - x, dy = P[i][1] - y, d = Math.hypot(dx, dy) || 1, push = d < 120 ? (1 - d / 120) ** 2 * 22 * bg.glow : 0;
+    n.lx += (dx / d * push - n.lx) * ease;
+    n.ly += (dy / d * push - n.ly) * ease;
+    P[i][0] += n.lx; P[i][1] += n.ly;
+  });
+}
+function bgNamed(P) {
+  const { nodes, touching } = bg.sky, c = bg.colors, ctx = bgCtx, { x, y } = bg.cursor;
+  let near = -1, best = 60;   // the nearest star within 60 px
+  if (bg.glow > .01) P.forEach(([px, py], i) => { const d = Math.hypot(px - x, py - y); if (d < best) { best = d; near = i; } });
+  const ease = bgEase();
+  nodes.forEach((n, i) => {
+    n.lit += ((i === near ? bg.glow : 0) - n.lit) * ease;
+    if (n.lit < .02) return;
+    const col = c.topic[n.topic], [sx, sy] = P[i], text = WIKI_DATA.articles[n.page][0];
+    ctx.strokeStyle = bgRgba(col, .55 * n.lit); ctx.lineWidth = 1.5; ctx.beginPath();
+    for (const j of touching[i]) { ctx.moveTo(sx, sy); ctx.lineTo(...P[j]); }
+    ctx.stroke();
+    ctx.fillStyle = bgRgba(col, .35 * n.lit); ctx.beginPath(); ctx.arc(sx, sy, n.r + 5 * n.lit, 0, 7); ctx.fill();
+    ctx.fillStyle = bgRgba(col, .9 * n.lit); ctx.beginPath(); ctx.arc(sx, sy, n.r, 0, 7); ctx.fill();
+    ctx.font = `600 12px ${c.font}`; ctx.textAlign = 'center';
+    ctx.lineWidth = 4; ctx.strokeStyle = bgRgba(c.bg, .8 * n.lit); ctx.strokeText(text, sx, sy - n.r - 8);
+    ctx.fillStyle = bgRgba(c.ink, .85 * n.lit); ctx.fillText(text, sx, sy - n.r - 8);
+  });
 }
 
 // ---- The wave: a page lights at its clicks from the start, spread a little within each click so it ripples.
@@ -3341,7 +3392,9 @@ async function bgPair() {
   if (bgSet.wave && setup.start && PAGE_IDS.has(setup.start.title)) {
     const graph = await bgGraph().catch(() => null);
     if (token !== bg.pairToken) return;
-    if (graph) wave = makeWave(distancesFrom(graph, setup.start.title), bgNow() + 300);
+    // the cards shown are kept, as par keeps them, so a hub card on Hard is reached
+    const titles = cards.map(([, info]) => info.title);
+    if (graph) wave = makeWave(distancesFrom(graph, setup.start.title, routeUsable({ keep: titles, rules: rules(), content: contentInPlay(titles) })), bgNow() + 300);
   }
   bg.pair = { stops, route, wave };
   bgPairFacts();
@@ -3433,9 +3486,11 @@ async function bgPairFacts() {
   bg.factTurn = 0;
   bgNextFact();   // also when the start has no facts, so the line never keeps the last start's
 }
-// The next fact, every 7 seconds; the cards' and the wiki's take turns. With motion reduced it doesn't change by itself.
+// The next fact, every 7 seconds; the cards' and the wiki's take turns. With motion reduced it doesn't change by itself,
+// and it waits while the line is hidden (in play, or Off): bgShow and bgSetting start it again.
 function bgNextFact() {
   clearTimeout(bg.factTimer); clearTimeout(bg.fadeTimer);
+  if (!bg.shown || bgStyle() === 'off') return;
   const el = $('#bgFacts'), all = bg.facts, mine = bg.pairFacts, turn = bg.factTurn++;
   if (!all.length) return;
   const html = !mine.length ? all[turn % all.length] : turn % 2 ? all[(turn >> 1) % all.length] : mine[(turn >> 1) % mine.length];
@@ -3459,6 +3514,7 @@ function bgFrame() {
   if (t - bg.last >= 32) {
     bg.last = t;
     if (bgSet.roll && !bgStill() && t > bg.nextRoll) { bg.nextRoll = Infinity; bgRoll(); }
+    bg.glow += ((bgFollows() ? 1 : 0) - bg.glow) * .15;
     bgPaint(t);
   }
   bgSchedule();
@@ -3470,6 +3526,7 @@ function bgPaint(t) {
   bgCtx.setTransform(bg.dpr, 0, 0, bg.dpr, 0, 0);
   bgCtx.clearRect(0, 0, bg.W, bg.H);
   if (!bg.W || !bg.H || !bg.colors) return;
+  if (bgStill()) bg.glow = 0;   // bgFrame eases it, but doesn't run then
   if (style === 'redstone') drawGrid(t);
   else if (style === 'constellation' && bg.sky) drawSky(t);
 }
@@ -3492,6 +3549,7 @@ function bgDraw() {
 function bgShow(on) {
   bg.shown = on;
   bgDraw();
+  bgNextFact();
 }
 // The Background box's controls, from the settings.
 function bgControls() {
@@ -3644,8 +3702,11 @@ for (const type of ['click', 'change', 'input']) $('#setup').addEventListener(ty
 document.addEventListener('click', e => { if (!$('#bgOpts').contains(e.target)) $('#bgOpts').open = false; });
 document.addEventListener('keydown', e => { if (e.key === 'Escape') $('#bgOpts').open = false; });
 addEventListener('resize', bgDraw);
+// The cursor (see bgLens): a touch has no place to hover, and leaving the window takes it away.
+document.addEventListener('pointermove', e => { if (e.pointerType !== 'touch') Object.assign(bg.cursor, { x: e.clientX, y: e.clientY, in: true }); }, { passive: true });
+document.addEventListener('pointerout', e => { if (!e.relatedTarget) bg.cursor.in = false; });
 BG_PHONE.addEventListener('change', bgDraw);
-BG_CALM.addEventListener('change', () => { bgDraw(); bgNextFact(); });
+BG_CALM.addEventListener('change', () => { bgPair(); bgDraw(); bgNextFact(); });
 document.addEventListener('visibilitychange', bgDraw);
 bgTheme();
 bgFacts(null);

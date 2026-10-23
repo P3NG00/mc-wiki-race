@@ -365,11 +365,14 @@
   @keyframes toast-in { from { opacity: 0; translate: 0 -12px; } }
   .hud .goal.reached { animation: reached 1.2s ease-out; border-radius: var(--radius); }
   @keyframes reached { from { background: var(--accent-soft); box-shadow: 0 0 0 6px var(--accent-soft); } }
-  @media (prefers-reduced-motion: reduce) {
-    .toast, .toast.stay, .hud .goal.reached, #setup.busy .card.empty .title { animation: none; }
-    /* the selectors above, so as specific */
-    :is(#setup.busy .status:not(.err, :empty), .setup-par.working)::before, #setup.busy .card.empty .tag::after { animation-duration: 3s; }
-  }
+  /* The effects' sparks (see effect()), the click count bumping as a click's land, and Distance's cheer lighting its count. */
+  #fx { position: fixed; inset: 0; width: 100%; height: 100%; z-index: 11; pointer-events: none; }
+  .stat .v.bump { animation: bump .35s ease-out; transform-origin: 100% 50%; }
+  @keyframes bump { 35% { scale: 1.35; color: var(--accent); } }
+  .hint.closer { background: var(--accent-soft); color: var(--accent); animation: bump .4s ease-out; }
+  /* Reduce motion (calm(): the box, or the system's setting) */
+  :root.calm :is(.toast, .toast.stay, .hud .goal.reached, #setup.busy .card.empty .title, .stat .v.bump, .hint.closer) { animation: none; }
+  :root.calm :is(#setup.busy .status:not(.err, :empty), .setup-par.working)::before, :root.calm #setup.busy .card.empty .tag::after { animation-duration: 3s; }
 
   /* ---------- Modal ---------- */
   .modal-bg { position: fixed; inset: 0; background: rgba(0,0,0,.45); display: grid; place-items: center; padding: 16px; z-index: 10; }
@@ -505,6 +508,7 @@ const THEMES = [...new Set(['auto', 'light', 'dark', ...Array.from(document.quer
     <div class="head-opts">
       <label><input type="checkbox" id="soundToggle"> Sound</label>
       <label title="A clock while you play, and your time in the result. Off records no time, for a relaxed game."><input type="checkbox" id="timerToggle"> Timer</label>
+      <label id="motionLabel"><input type="checkbox" id="motionToggle"> Reduce motion</label>
       <label>Theme <select id="themeSelect"></select></label>
       <details class="bg-opts" id="bgOpts">
         <summary>Background</summary>
@@ -518,7 +522,6 @@ const THEMES = [...new Set(['auto', 'light', 'dark', ...Array.from(document.quer
           <label title="Light up every page by how many clicks it is from the start."><input type="checkbox" id="bgWave"> Wave from the start</label>
           <label title="Draw the shortest route between the cards: it gives the game away."><input type="checkbox" id="bgRoute"> Show the route (spoiler)</label>
           <label title="Show pairs of its own until you change anything on the page, then follow your cards."><input type="checkbox" id="bgRoll"> Roll by itself</label>
-          <label><input type="checkbox" id="bgStill"> Reduce motion</label>
         </div>
       </details>
     </div>
@@ -662,6 +665,7 @@ const THEMES = [...new Set(['auto', 'light', 'dark', ...Array.from(document.quer
 </section>
 
 <div class="modal-bg hidden" id="modalBg"><div class="modal" id="modal" role="dialog" aria-modal="true"></div></div>
+<canvas id="fx" aria-hidden="true" hidden></canvas>
 
 <script src="wiki-data.js"></script>
 <script>
@@ -958,7 +962,7 @@ const RULES = {
   nonav: { label: 'No navboxes' },
   blind: { label: 'Blind target', help: 'The target is hidden until you start, then you only get its name. A Relay shows each stop once you reach the one before.' },
   lead: { label: 'Top links only', help: 'Only the links above an article’s first heading work: its opening text, infobox and the notes at the top. Routes get much longer.' },
-  distance: { label: 'Distance', help: 'Always shows how many clicks your next stop is from your page, by the shortest route: the target, a checkpoint, the nearest find or the start on the way back.' },
+  distance: { label: 'Distance', help: 'Always shows how many clicks your next stop is from your page, by the shortest route: the target, a checkpoint, the nearest find or the start on the way back. A click that gets you closer is cheered.' },
   checkpoint: { label: 'Relay' },
   roundtrip: { label: 'Round trip', help: 'Then go back to the start, never through a page of the way there.' },
   scavenger: { label: 'Scavenger hunt' },
@@ -1947,6 +1951,7 @@ function celebrateCheckpoint() {
   showToast(`✓ ${what}${then}${game.stuck ? ' ' + stuckText() : ''}`, game.stuck ? null : stranded ? 6000 : 3000);
   $('.hud .goal').classList.add('reached');
   play('checkpoint');
+  effect('burst', middleOf($('#toast')));
 }
 function hideToast() { clearTimeout(game.toastTimer); $('#toast').classList.add('hidden'); $('.hud .goal').classList.remove('reached'); }
 
@@ -2000,13 +2005,15 @@ function cacheParse(keys, page) {
   while (parseCache.size > PARSE_CACHE_MAX) parseCache.delete(parseCache.keys().next().value);
 }
 
-async function navigate(title, fragment, { back = false } = {}) {
+// from: where the click was on the page, for its sparks (effect).
+async function navigate(title, fragment, { back = false, from = null } = {}) {
   if (!game.active || game.loading) return;
   const token = ++game.navToken;
-  if (game.path.length) play(back ? 'back' : 'click', game.path.length - 1);
+  if (game.path.length) { play(back ? 'back' : 'click', game.path.length - 1); effect('orbs', from); }
   game.loading = true;   // stays set until the frame reports it has rendered (frameReady)
   pauseClock();
   hideToast();
+  $('#hudHint').classList.remove('closer');
   renderHud();
   showOverlay(`<div class="spinner"></div>Loading ${esc(title)}…`);
   let page;
@@ -2077,6 +2084,7 @@ function frameReady(token, live) {
   resumeClock();
   if (game.celebrate) { game.celebrate = false; celebrateCheckpoint(); }
   else if (game.stuck) showToast(stuckText());
+  cheer(game.path.at(-1));
 }
 
 // ---------------------------------------------------------------- Sounds
@@ -2150,11 +2158,136 @@ const SOUNDS = {
     tone(330, 0.9, 1, { type: 'sawtooth', gain: 0.4, cutoff: 1100, slide: 300, vibrato: 6 });
   },
   giveUp() { tone(262, 0, 0.25); tone(196, 0.18, 0.6); },
+  // Distance's cheer for a click that got closer: two quick bright notes, a step higher for each click less to go, from 4.
+  closer(togo) {
+    const f = 1047 * 2 ** (PENTATONIC[4 - Math.min(togo, 4)] / 12);
+    tone(f, 0, 0.1, { type: 'sine', gain: 0.45 }); tone(f * 1.5, 0.07, 0.3, { type: 'sine', gain: 0.4 });
+  },
 };
 // Unplayable audio (no Web Audio, a blocked context) just means silence.
 function play(name, ...args) {
   if (!soundOn) return;
   try { audioOut(); SOUNDS[name](...args); } catch { /* no sound */ }
+}
+
+// ---------------------------------------------------------------- Effects
+// Sparks over everything, on #fx, which takes no clicks: a click's fly from the link (or Back) into the click count,
+// which bumps as they land, a dead link puffs, a checkpoint or find bursts from its banner and a win from the result's
+// heading, a new personal best more and in gold. None of them says how a game is going, but Distance's cheer (cheer).
+// Reduce motion draws none; the sounds still play.
+// Reduce motion, the box beside Timer (mwr.reduceMotion), is on in effect while the system asks for it (SYSTEM_CALM),
+// which ticks the box and holds it. It stops the effects, the banners' and bumps' animations (:root.calm) and the
+// background's (see the Background section).
+const SYSTEM_CALM = matchMedia('(prefers-reduced-motion: reduce)');
+let calmBox = store.get('mwr.reduceMotion', false) === true;
+const calm = () => calmBox || SYSTEM_CALM.matches;
+function syncCalm() {
+  document.documentElement.classList.toggle('calm', calm());
+  $('#motionToggle').checked = calm();
+  $('#motionToggle').disabled = SYSTEM_CALM.matches;
+  $('#motionLabel').title = SYSTEM_CALM.matches ? 'Your system asks for reduced motion.' : 'No sparks, no moving banners and a still background.';
+}
+function setCalm(on) {
+  calmBox = on;
+  store.set('mwr.reduceMotion', on);
+  syncCalm();
+  if (calm()) fx.parts = [];   // sparks in flight go at the next frame
+  bgPair(); bgDraw(); bgNextFact();
+}
+const fxCanvas = $('#fx'), fxCtx = fxCanvas.getContext('2d');
+const fx = { parts: [], raf: 0, last: 0, W: 0, H: 0, dpr: 1 };
+const middleOf = el => { const r = el?.getBoundingClientRect(); return r && { x: r.left + r.width / 2, y: r.top + r.height / 2 }; };
+const cssColor = name => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+const sparkColors = () => [cssColor('--accent'), cssColor('--viz-items')];
+// Restarts an element's bump animation (.bump, or the class given).
+function bump(el, cls = 'bump') { el.classList.remove(cls); void el.offsetWidth; el.classList.add(cls); }
+// Each spark is a square: flying free (velocity v in px/s, gravity g, fading) or, with to, along a curve through via
+// into to, speeding up. born and life are in ms, born possibly ahead; land runs when a spark with to gets there.
+const rnd = (a, b) => a + Math.random() * (b - a);
+function scatter(from, n, colors, speed, g = 700) {
+  const t = performance.now();
+  for (let i = 0; i < n; i++) {
+    const a = rnd(0, 2 * Math.PI), v = rnd(speed * .35, speed);
+    fx.parts.push({ x: from.x, y: from.y, vx: Math.cos(a) * v, vy: Math.sin(a) * v - speed * .45, g, size: rnd(3, 6) | 0,
+      color: colors[i % colors.length], born: t + rnd(0, 60), life: rnd(650, 1100) });
+  }
+}
+const EFFECTS = {
+  orbs(from) {
+    const to = middleOf($('#hudClicks')), t = performance.now(), colors = sparkColors();
+    let landed = false;
+    const land = () => { if (!landed) { landed = true; bump($('#hudClicks')); } };
+    for (let i = 0; i < 7; i++) {
+      const x = from.x + rnd(-8, 8), y = from.y + rnd(-8, 8);
+      fx.parts.push({ x, y, to, via: { x: (x + to.x) / 2 + rnd(-140, 140), y: Math.min(y, to.y) - rnd(20, 120) }, size: rnd(4, 6) | 0,
+        color: colors[i % 2], born: t + i * 25, life: rnd(450, 600), land });
+    }
+  },
+  puff(from) { scatter(from, 7, [cssColor('--muted')], 90, 0); },
+  burst(from) { scatter(from, 24, sparkColors(), 300); },
+  sparkle(from) { scatter(from, 10, sparkColors(), 160, 300); },
+  win(from) { scatter(from, 48, WIKI_DATA.topics.map(k => cssColor('--viz-' + k)), 420); },
+  best(from) {
+    const colors = sparkColors().reverse();   // gold first
+    scatter(from, 80, colors, 520);
+    setTimeout(() => scatter(from, 40, colors, 380), 250);
+  },
+};
+// Plays an effect from a point on the page; with no point (a navigation with no click, as Retry's) a click's just bumps
+// the count. Like play(), any error is swallowed: this runs inside navigate and finish.
+function effect(name, from) {
+  try {
+    if (!from || calm()) { if (name === 'orbs') bump($('#hudClicks')); return; }
+    EFFECTS[name](from);
+    if (!fx.raf) { fx.last = performance.now(); fx.raf = requestAnimationFrame(fxFrame); }
+  } catch { /* no effect */ }
+}
+function fxFrame(t) {
+  fx.raf = 0;
+  const dt = Math.min(50, t - fx.last) / 1000, ctx = fxCtx;
+  fx.last = t;
+  fxCanvas.hidden = false;
+  if (fx.W !== innerWidth || fx.H !== innerHeight || fx.dpr !== Math.min(2, devicePixelRatio || 1)) {
+    Object.assign(fx, { W: innerWidth, H: innerHeight, dpr: Math.min(2, devicePixelRatio || 1) });
+    fxCanvas.width = Math.round(fx.W * fx.dpr); fxCanvas.height = Math.round(fx.H * fx.dpr);
+  }
+  ctx.setTransform(fx.dpr, 0, 0, fx.dpr, 0, 0);
+  ctx.clearRect(0, 0, fx.W, fx.H);
+  fx.parts = fx.parts.filter(p => {
+    const age = t - p.born;
+    if (age < 0) return true;
+    if (age > p.life) { p.land?.(); return false; }
+    let x, y, alpha = 1;
+    if (p.to) {
+      const k = (age / p.life) ** 2, j = 1 - k;
+      x = j * j * p.x + 2 * j * k * p.via.x + k * k * p.to.x;
+      y = j * j * p.y + 2 * j * k * p.via.y + k * k * p.to.y;
+    } else {
+      p.vx *= 1 - 1.8 * dt; p.vy = p.vy * (1 - 1.8 * dt) + p.g * dt;
+      x = p.x += p.vx * dt; y = p.y += p.vy * dt;
+      alpha = 1 - age / p.life;
+    }
+    ctx.globalAlpha = alpha;
+    ctx.fillStyle = p.color;
+    ctx.fillRect(Math.round(x - p.size / 2), Math.round(y - p.size / 2), p.size, p.size);
+    return true;
+  });
+  ctx.globalAlpha = 1;
+  if (fx.parts.length) fx.raf = requestAnimationFrame(fxFrame);
+  else fxCanvas.hidden = true;
+}
+// Distance: a click that got closer (gotCloser) is cheered once its article shows, with a ding a step higher the nearer
+// it is, sparks from the count and the count lit until the next click. A click that didn't gets nothing at all: no
+// colder, which only ever felt like being told off (it is the result's path that marks those).
+function cheer(entry) {
+  if (!game.rules.includes('distance')) return;
+  const i = game.path.indexOf(entry);
+  Promise.all([game.path[i - 1]?.measured, entry.measured]).then(() => {
+    if (game.path.at(-1) !== entry || !game.active || game.loading || !gotCloser(game.path, i, !!game.exact)) return;
+    play('closer', entry.togo);
+    bump($('#hudHint'), 'closer');
+    effect('sparkle', middleOf($('#hudHint')));
+  });
 }
 
 // ---------------------------------------------------------------- Themes
@@ -2253,14 +2386,16 @@ function renderArticle(page, fragment, token, blocked = [], seen = []) {
       a.removeAttribute('target');
     }
     window.mwrLive = document.querySelectorAll('.mwr-live').length;   // sent with ready, for the parent's stuck banner
+    // Where the click was, for the parent's effects: the pointer, or the link's middle when a key pressed it (detail 0).
     document.addEventListener('click', e => {
       const a = e.target.closest('a, area');
       if (!a) return;
       e.preventDefault();
-      const c = classify(a);
-      if (!c || c.kind === 'blocked') { parent.postMessage({ mwr: 'dead' }, '*'); return; }
+      const c = classify(a), r = a.getBoundingClientRect();
+      const at = e.detail ? { x: e.clientX, y: e.clientY } : { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+      if (!c || c.kind === 'blocked') { parent.postMessage({ mwr: 'dead', ...at }, '*'); return; }
       if (c.kind === 'anchor') scrollToId(c.id);
-      else parent.postMessage({ mwr: 'nav', title: c.title, frag: c.frag }, '*');
+      else parent.postMessage({ mwr: 'nav', title: c.title, frag: c.frag, ...at }, '*');
     }, true);
     document.addEventListener('submit', e => e.preventDefault(), true);
     document.addEventListener('keydown', e => parent.postMessage({ mwr: 'key', key: e.key }, '*'));
@@ -2685,10 +2820,16 @@ ${WIKI_STYLES.map(h => `<link rel="stylesheet" href="${esc(h)}">`).join('\n')}
   $('#frame').srcdoc = html;
 }
 
+// A point in the frame, as the frame posts it, on the page.
+function fromFrame({ x, y }) {
+  if (!Number.isFinite(x) || !Number.isFinite(y)) return null;
+  const r = $('#frame').getBoundingClientRect();
+  return { x: r.left + x, y: r.top + y };
+}
 window.addEventListener('message', e => {
   if (e.source !== $('#frame').contentWindow || !e.data) return;
-  if (e.data.mwr === 'nav') navigate(e.data.title, e.data.frag);
-  if (e.data.mwr === 'dead' && game.active && !game.loading) play('dead');
+  if (e.data.mwr === 'nav') navigate(e.data.title, e.data.frag, { from: fromFrame(e.data) });
+  if (e.data.mwr === 'dead' && game.active && !game.loading) { play('dead'); effect('puff', fromFrame(e.data)); }
   if (e.data.mwr === 'ready') { syncFrameTheme(); frameReady(e.data.token, e.data.live); }
   if (e.data.mwr === 'key' && e.data.key === 'Escape' && modalDismissable) closeModal();
 });
@@ -2697,7 +2838,7 @@ window.addEventListener('message', e => {
 const canGoBack = () => !game.rules.includes('noback') && !game.exact;
 function goBack() {
   if (game.stack.length < 2 || game.loading || !canGoBack()) return;
-  navigate(game.stack[game.stack.length - 2], null, { back: true });
+  navigate(game.stack[game.stack.length - 2], null, { back: true, from: middleOf($('#btnBack')) });
 }
 
 // ---------------------------------------------------------------- Par
@@ -3004,6 +3145,9 @@ async function clicksToGo(title) {
 // it), going by the counts measured; none do for Exact clicks, which has to take detours.
 const noCloser = (path, i, exact) => !exact && i > 0 && !path[i].via && !path[i].found
   && Number.isInteger(path[i - 1].togo) && (path[i].togo === null || path[i].togo >= path[i - 1].togo);
+// Whether it got closer, with both counts known, for Distance's cheer.
+const gotCloser = (path, i, exact) => !exact && i > 0 && !path[i].via && !path[i].found
+  && Number.isInteger(path[i - 1].togo) && Number.isInteger(path[i].togo) && path[i].togo < path[i - 1].togo;
 // The shortcut you missed, for the result: of the clicks that got no closer, the one whose detour took the most clicks
 // more than taking the page's own shortcut (its next, measured with its count) would have, until a page as close as that
 // was reached, or a checkpoint or find, or else to the end of the game. Only a detour of SHORTCUT_MIN or more is worth
@@ -3180,6 +3324,7 @@ function finish(won, lost = null) {
       <button id="mSame">Retry this pair</button>
       <button class="primary" id="mNew">New game</button>
     </div></div>`, false);
+  if (won) effect(newBest ? 'best' : 'win', middleOf($('.result-head h2')));
   showPar(rec, game.parReady);
   const ol = $('#mPath');
   Promise.all(path.map(p => p.measured)).then(() => {
@@ -3244,10 +3389,10 @@ function toSetup() {
 // click, like a redstone signal. Show the route draws the setup's par route. Under Blind target only the start is
 // marked: no target, route or reaching it. The facts line (#bgFacts) above the footer cycles facts about the wiki and
 // the cards. All of it comes from wiki-data.js and the link graph, which the setup screen loads for par anyway.
-// Reduce motion (or the system's setting) draws still frames. The settings are mwr.background.
+// Reduce motion (calm()) draws still frames. The settings are mwr.background.
 const BG_STYLES = ['auto', 'constellation', 'redstone', 'off'];
-const bgSet = { style: 'auto', wave: false, route: false, roll: true, still: false };
-const BG_BOXES = { wave: '#bgWave', route: '#bgRoute', roll: '#bgRoll', still: '#bgStill' };   // the box's checkboxes
+const bgSet = { style: 'auto', wave: false, route: false, roll: true };
+const BG_BOXES = { wave: '#bgWave', route: '#bgRoute', roll: '#bgRoll' };   // the box's checkboxes
 {
   const saved = store.get('mwr.background', null);
   if (saved && typeof saved === 'object') {
@@ -3255,9 +3400,8 @@ const BG_BOXES = { wave: '#bgWave', route: '#bgRoute', roll: '#bgRoll', still: '
     for (const k of Object.keys(BG_BOXES)) if (typeof saved[k] === 'boolean') bgSet[k] = saved[k];
   }
 }
-const BG_PHONE = matchMedia('(max-width: 720px)'), BG_CALM = matchMedia('(prefers-reduced-motion: reduce)');
+const BG_PHONE = matchMedia('(max-width: 720px)');
 const bgStyle = () => bgSet.style === 'auto' ? (BG_PHONE.matches ? 'redstone' : 'constellation') : bgSet.style;
-const bgStill = () => bgSet.still || BG_CALM.matches;
 const bgCanvas = $('#bgCanvas'), bgCtx = bgCanvas.getContext('2d');
 // shown: whether the setup screen is. pair: what is marked (bgPair). sky and grid: the two pictures, made when first
 // needed (skyWait: the sky's is under way). colors: from the theme (bgTheme). links: the link graph's, once it is in.
@@ -3352,7 +3496,7 @@ function skyPlace(x, y) {
   return [mx + u * (W - 2 * mx), my + v * (H - 2 * my)];
 }
 function skyStar(n, t) {
-  const [x, y] = skyPlace(n.x, n.y), a = bgStill() ? 0 : 7;
+  const [x, y] = skyPlace(n.x, n.y), a = calm() ? 0 : 7;
   return [x + a * Math.sin(t * n.speed + n.phase), y + a * Math.cos(t * n.speed * 1.3 + n.phase * 2)];
 }
 // A page that isn't a star sits among the stars it links to (or the middle, if none).
@@ -3416,7 +3560,7 @@ function drawSky(t) {
   // ends, else the best-linked stars' plain labels, which keep clear of the markers' and pulses' names too.
   const name = i => WIKI_DATA.articles[nodes[i].page][0], spot = page => bg.sky.at.has(page) ? P[bg.sky.at.get(page)] : skyPlace(...skySpot(page));
   const stops = bg.pair?.stops ?? [], marked = new Set(stops.flatMap(st => bg.sky.at.has(st.page) ? [bg.sky.at.get(st.page)] : []));
-  if (!bgStill() && t > bg.nextPulse && bg.pulses.length < 2) { skyPulse(t); bg.nextPulse = t + 2600 + Math.random() * 2000; }
+  if (!calm() && t > bg.nextPulse && bg.pulses.length < 2) { skyPulse(t); bg.nextPulse = t + 2600 + Math.random() * 2000; }
   bg.pulses = bg.pulses.filter(p => t - p.start < p.hop * (p.path.length + 3));
   const ends = new Map();   // star: how strongly a pulse names it
   for (const p of bg.pulses) {
@@ -3556,9 +3700,9 @@ function drawGrid(t) {
 // nearest names itself, its lines lit; on the map it lights the blocks around it like a torch. cursor: where it last was
 // on the page, in: whether it still is; glow eases in and out from 0 to 1 as it comes and goes (bgFrame).
 const TORCH_DARK = [255, 200, 110], TORCH_LIGHT = [255, 165, 40];
-const bgFollows = () => bg.cursor.in && !bgStill();
+const bgFollows = () => bg.cursor.in && !calm();
 // Each star eases a fifth of the way a frame; a still frame (motion reduced) puts them back at once.
-const bgEase = () => bgStill() ? 1 : .2;
+const bgEase = () => calm() ? 1 : .2;
 function bgLens(P) {   // P: the stars on the screen, pushed in place
   const { x, y } = bg.cursor, ease = bgEase();
   bg.sky.nodes.forEach((n, i) => {
@@ -3601,8 +3745,8 @@ function makeWave(dist, start) {
 // With motion reduced the wave has always already passed.
 function waveLight(wave, page, t) {
   const d = wave.dist[page];
-  if (d < 0 || (!bgStill() && t < wave.when[page])) return null;
-  return { glow: d === 0 ? .9 : [0, .3, .12, .06][Math.min(3, d)], flash: bgStill() ? 0 : Math.max(0, 1 - (t - wave.when[page]) / WAVE_FLASH) ** 2 };
+  if (d < 0 || (!calm() && t < wave.when[page])) return null;
+  return { glow: d === 0 ? .9 : [0, .3, .12, .06][Math.min(3, d)], flash: calm() ? 0 : Math.max(0, 1 - (t - wave.when[page]) / WAVE_FLASH) ** 2 };
 }
 
 // ---- What is marked: the cards in use, or with Roll by itself a pair of its own every so often.
@@ -3612,7 +3756,7 @@ function drawPair(t, spot) {
   if (pair.route) {
     const pts = pair.route.map(spot).filter(Boolean);
     ctx.strokeStyle = bgRgba(c.accent, .7 * c.strength); ctx.lineWidth = 2.5;
-    ctx.setLineDash([6, 5]); ctx.lineDashOffset = bgStill() ? 0 : -t / 40;
+    ctx.setLineDash([6, 5]); ctx.lineDashOffset = calm() ? 0 : -t / 40;
     ctx.beginPath(); pts.forEach((p, i) => i ? ctx.lineTo(...p) : ctx.moveTo(...p)); ctx.stroke();
     ctx.setLineDash([]);
     ctx.fillStyle = bgRgba(c.accent, .8 * c.strength);
@@ -3629,7 +3773,7 @@ function drawPair(t, spot) {
 // Where a marker's label of width w goes over x: centred on it, but kept on the screen.
 const bgLabelX = (x, w) => Math.min(bg.W - w / 2 - 6, Math.max(w / 2 + 6, x));
 function bgMarker([x, y], col, text, t, a) {
-  const ctx = bgCtx, c = bg.colors, r = 7 + (bgStill() ? 0 : 1.5 * Math.sin(t / 400));
+  const ctx = bgCtx, c = bg.colors, r = 7 + (calm() ? 0 : 1.5 * Math.sin(t / 400));
   ctx.font = `600 12px ${c.font}`; ctx.textAlign = 'center';
   const tx = bgLabelX(x, ctx.measureText(text).width);
   ctx.strokeStyle = bgRgba(col, .85 * a); ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(x, y, r, 0, 7); ctx.stroke();
@@ -3644,7 +3788,7 @@ const bgGraph = () => linkGraph(rules());
 async function bgPair() {
   bgFacts(bg.links);   // the difficulty may have changed
   bgSample();
-  if (bgSet.roll && !bgStill()) return bgPairFacts();   // a pair of its own is marked; the line still talks about the cards
+  if (bgSet.roll && !calm()) return bgPairFacts();   // a pair of its own is marked; the line still talks about the cards
   const token = ++bg.pairToken;
   const blind = isBlind(), keys = blind ? ['start'] : cardKeys(), cards = keys.map(w => [w, setup[w]]).filter(([, info]) => info && PAGE_IDS.has(info.title));
   const stops = cards.map(([w, info]) => ({ page: PAGE_IDS.get(info.title), start: w === 'start', label: `${$('.tag', cardBox(w)).textContent} · ${info.title}` }));
@@ -3755,7 +3899,7 @@ function bgNextFact() {
   const el = $('#bgFacts'), all = bg.facts, mine = bg.pairFacts, turn = bg.factTurn++;
   if (!all.length) return;
   const html = !mine.length ? all[turn % all.length] : turn % 2 ? all[(turn >> 1) % all.length] : mine[(turn >> 1) % mine.length];
-  if (bgStill()) { el.innerHTML = html; el.classList.remove('out'); }
+  if (calm()) { el.innerHTML = html; el.classList.remove('out'); }
   else {
     el.classList.add('out');
     bg.fadeTimer = setTimeout(() => { el.innerHTML = html; el.classList.remove('out'); }, el.innerHTML ? 500 : 0);
@@ -3774,20 +3918,20 @@ function bgFrame() {
   const t = bgNow();
   if (t - bg.last >= 32) {
     bg.last = t;
-    if (bgSet.roll && !bgStill() && t > bg.nextRoll) { bg.nextRoll = Infinity; bgRoll(); }
+    if (bgSet.roll && !calm() && t > bg.nextRoll) { bg.nextRoll = Infinity; bgRoll(); }
     bg.glow += ((bgFollows() ? 1 : 0) - bg.glow) * .15;
     bgPaint(t);
   }
   bgSchedule();
 }
 const bgLive = () => bg.shown && bgStyle() !== 'off' && !document.hidden;
-const bgSchedule = () => { if (!bg.raf && bgLive() && !bgStill()) bg.raf = requestAnimationFrame(bgFrame); };
+const bgSchedule = () => { if (!bg.raf && bgLive() && !calm()) bg.raf = requestAnimationFrame(bgFrame); };
 function bgPaint(t) {
   const style = bgStyle();
   bgCtx.setTransform(bg.dpr, 0, 0, bg.dpr, 0, 0);
   bgCtx.clearRect(0, 0, bg.W, bg.H);
   if (!bg.W || !bg.H || !bg.colors) return;
-  if (bgStill()) bg.glow = 0;   // bgFrame eases it, but doesn't run then
+  if (calm()) bg.glow = 0;   // bgFrame eases it, but doesn't run then
   if (style === 'redstone') drawGrid(t);
   else if (style === 'constellation' && bg.sky) drawSky(t);
 }
@@ -3805,7 +3949,7 @@ function bgDraw() {
     (window.requestIdleCallback ?? setTimeout)(() => { bg.sky = buildSky(bg.links); bgDraw(); });
   }
   if (bgCanvas.clientWidth !== bg.W || bgCanvas.clientHeight !== bg.H) bgSize();
-  if (bgStill()) bgPaint(bgNow()); else bgSchedule();
+  if (calm()) bgPaint(bgNow()); else bgSchedule();
 }
 // startGame and toSetup: the background only runs behind the setup screen.
 function bgShow(on) {
@@ -3961,19 +4105,20 @@ setSound(soundOn);
 // The Timer box is read once, at startGame (game.timed), so a game is timed or not throughout.
 $('#timerToggle').checked = store.get('mwr.timer', true) !== false;
 $('#timerToggle').onchange = e => store.set('mwr.timer', e.target.checked);
+$('#motionToggle').onchange = e => setCalm(e.target.checked);
 $('#soundToggle').onchange = e => { setSound(e.target.checked); play('click', 0); };
 $('#btnSound').onclick = () => { setSound(!soundOn); play('click', 0); };
 $('#themeSelect').innerHTML = THEMES.map(t => `<option value="${esc(t)}">${esc(THEME_LABELS[t] || t)}</option>`).join('');
 $('#themeSelect').value = document.documentElement.dataset.theme || 'auto';
 $('#themeSelect').onchange = e => setTheme(e.target.value);
 matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => { syncFrameTheme(); bgTheme(); });
-// The Background box (see the Background section). Any change on the setup screen outside it turns Roll by itself off,
-// and it stays off (saved) until it is ticked again.
+// The Background box (see the Background section). Any change on the setup screen outside it and Reduce motion turns Roll
+// by itself off, and it stays off (saved) until it is ticked again.
 bgControls();
 $('#bgStyle').onchange = e => bgSetting('style', e.target.value);
 for (const [k, sel] of Object.entries(BG_BOXES)) $(sel).onchange = e => bgSetting(k, e.target.checked);
 for (const type of ['click', 'change', 'input']) $('#setup').addEventListener(type, e => {
-  if (!bgSet.roll || e.target.closest('#bgOpts, #btnBgView') || (type === 'click' && !e.target.closest('button, a, input, select'))) return;
+  if (!bgSet.roll || e.target.closest('#bgOpts, #btnBgView, #motionLabel') || (type === 'click' && !e.target.closest('button, a, input, select'))) return;
   bgSetting('roll', false);
 }, true);
 document.addEventListener('click', e => { if (!e.target.closest('#bgOpts, #btnBgView')) $('#bgOpts').open = false; });
@@ -3985,7 +4130,8 @@ addEventListener('resize', bgDraw);
 document.addEventListener('pointermove', e => { if (e.pointerType !== 'touch') Object.assign(bg.cursor, { x: e.clientX, y: e.clientY, in: true }); }, { passive: true });
 document.addEventListener('pointerout', e => { if (!e.relatedTarget) bg.cursor.in = false; });
 BG_PHONE.addEventListener('change', bgDraw);
-BG_CALM.addEventListener('change', () => { bgPair(); bgDraw(); bgNextFact(); });
+syncCalm();
+SYSTEM_CALM.addEventListener('change', () => setCalm(calmBox));
 document.addEventListener('visibilitychange', bgDraw);
 bgTheme();
 bgFacts(null);

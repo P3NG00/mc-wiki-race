@@ -211,11 +211,19 @@ await open(`#start=${encodeURIComponent(far[0])}&target=Crafting&rules=distance`
 await play();
 check('Distance: the start is par away, in the header', await until(`game.path[0].togo === ${farPar} && !game.loading`) &&
   await ev(`!${hudHint}.classList.contains('hidden') && ${hudHint}.textContent === '${farPar} clicks to go'`), await ev(`${hudHint}.textContent`));
-await ev(`navigate(${JSON.stringify(far[1])}, null)`);
+// A click's sparks fly from where it was into the click count, which bumps as they land.
+check('a click sends its sparks to the click count, which takes no clicks', await ev(`(navigate(${JSON.stringify(far[1])}, null, { from: { x: 300, y: 300 } }), fx.parts.length === 7
+  && fx.parts.every(p => p.to) && getComputedStyle($('#fx')).pointerEvents === 'none')`));
+check('the click count bumps as they land', await until("$('#hudClicks').classList.contains('bump')"));
 check('Distance: a step along a shortest route is a click closer, in the header and on the path', await until(`game.path.at(-1).togo === ${farPar - 1} && !game.loading`) &&
   await ev(`${hudHint}.textContent === clicksText(${farPar - 1}) + ' to go' && document.querySelector('#pathList li.cur').textContent.endsWith(' ${farPar - 1} to go')`), far.join(' → '));
+check('Distance: a click closer is cheered, its count lit', await until(`${hudHint}.classList.contains('closer')`));
 await ev(`navigate(${JSON.stringify(far[0])}, null)`);
 check('Distance: going back is a click further', await until(`game.path.at(-1).togo === ${farPar} && !game.loading`), await ev('game.path.at(-1).togo'));
+await sleep(300);
+check('Distance: a click further gets no cheer', await ev(`!${hudHint}.classList.contains('closer')`));
+check('a checkpoint, a find or Exact clicks gets no cheer', await ev(`(p => gotCloser(p, 1, false) && !gotCloser(p, 1, true) && !gotCloser([p[0], { ...p[1], via: 1 }], 1, false)
+  && !gotCloser([p[0], { ...p[1], found: ['Ghast'] }], 1, false) && !gotCloser([p[0], { togo: undefined }], 1, false))([{ togo: 3 }, { togo: 2 }])`));
 // A dead end, a page with no route anywhere (no links outside navboxes, no navboxes), has no route.
 const deadEnd = await ev(`linkGraph([]).then(g => WIKI_DATA.articles.map(([t]) => t).find(t => !spinoffOf(t) && !g.links[PAGE_IDS.get(t)].length && !g.carries[PAGE_IDS.get(t)].length))`);
 check('the snapshot has a dead end', typeof deadEnd === 'string' && await ev(`PAGE_IDS.has(${JSON.stringify(deadEnd)})`), String(deadEnd));
@@ -313,6 +321,7 @@ const relayPar = await ev("parRoute({ start: 'Diamond', vias: ['Creeper', 'Zombi
 await ev("navigate('Crafting', null)");
 check('the relay is won and recorded with both checkpoints, par over the whole chain', await until('!game.active') &&
   await ev(`(r => r.won && r.vias.join() === 'Creeper,Zombie' && r.par === ${relayPar})(store.get('mwr.history', [])[0])`), `par ${relayPar}`);
+check('a win bursts over the result', await ev("fx.parts.length >= 48 && !$('#fx').hidden"), await ev('fx.parts.length'));
 await ev("closeModal(); toSetup()");
 // Swap reverses the whole chain. A third checkpoint rolls a third card; back to one, Reroll all drops the other two.
 await ev("document.querySelector('#btnSwap').click()");
@@ -1192,11 +1201,11 @@ check('Random game sets the settings at random and fills the cards they use', ra
 
 // The background: its settings and their defaults, Roll by itself turning off at a change on the page but not in its
 // own box, the cards marked with the route only as a spoiler and nothing past the start under Blind target, the facts
-// line, Off, play, reduce motion, and Auto's map at a phone's width.
-await ev("localStorage.removeItem('mwr.background')");
+// line, Off, play, Reduce motion (beside Timer), and Auto's map at a phone's width.
+await ev("localStorage.removeItem('mwr.background'), localStorage.removeItem('mwr.reduceMotion')");
 await open('#start=Diamond&target=Crafting');
-check('the background is on by default: Auto, Roll by itself, the rest off, and its box says so', await ev(`JSON.stringify(bgSet) === '{"style":"auto","wave":false,"route":false,"roll":true,"still":false}'
-  && $('#bgStyle').value === 'auto' && $('#bgRoll').checked && !$('#bgWave').checked && !$('#bgRoute').checked && !$('#bgStill').checked`), await ev('JSON.stringify(bgSet)'));
+check('the background is on by default: Auto, Roll by itself, the rest off, and its box says so', await ev(`JSON.stringify(bgSet) === '{"style":"auto","wave":false,"route":false,"roll":true}'
+  && $('#bgStyle').value === 'auto' && $('#bgRoll').checked && !$('#bgWave').checked && !$('#bgRoute').checked && !$('#motionToggle').checked && !document.documentElement.classList.contains('calm')`), await ev('JSON.stringify(bgSet)'));
 check('Auto is the constellation on a wide screen, drawn with the facts line shown', await ev("bgStyle() === 'constellation' && !$('#bgCanvas').hidden && !$('#bgFacts').hidden")
   && await until("!!bg.sky && bg.sky.nodes.length === WIKI_DATA.topics.length * 64"));
 check('the sky is laid out the same every time', await ev("JSON.stringify(buildSky(bg.links).nodes.map(n => [n.x, n.y])) === JSON.stringify(bg.sky.nodes.map(n => [n.x, n.y]))"));
@@ -1205,6 +1214,10 @@ check('the facts line starts with the snapshot\'s pages, and gets how far apart 
 check('Roll by itself marks pairs of its own', await until("!!bg.pair && bg.pair.stops.length === 2 && !bg.pair.stops[0].label.startsWith('Start')"), await ev('JSON.stringify(bg.pair?.stops)'));
 await ev("$('#bgWave').click()");
 check('a change in the Background box leaves it on', await ev("bgSet.roll && bgSet.wave && store.get('mwr.background').wave === true"));
+check('so does Reduce motion, which is saved and stops the effects', await ev(`($('#motionToggle').click(), effect('win', { x: 100, y: 100 }), bgSet.roll && fx.parts.length === 0
+  && store.get('mwr.reduceMotion') === true && document.documentElement.classList.contains('calm'))`));
+check('and lets them play again unticked', await ev(`($('#motionToggle').click(), effect('puff', { x: 100, y: 100 }), bgSet.roll && fx.parts.length === 7
+  && store.get('mwr.reduceMotion') === false && !document.documentElement.classList.contains('calm'))`));
 await ev("$('#btnRerollAll').click()");
 check('a change on the page turns it off, saved, and the cards are marked', await until(`${ready} && !bgSet.roll && store.get('mwr.background').roll === false
   && bg.pair?.stops[0].label === 'Start · ' + setup.start.title && bg.pair.stops[1].label === 'Target · ' + setup.goal.title`), await ev('JSON.stringify(bg.pair?.stops)'));
@@ -1216,10 +1229,10 @@ check('under Blind target only the start is marked, with no route, and the facts
   && await until("bg.pairFacts.length === 2"), await ev('JSON.stringify(bg.pairFacts)'));
 await ev("document.querySelector('#rules input[value=blind]').click()");
 await until(ready);
-await ev("localStorage.setItem('mwr.background', JSON.stringify({ style: 'redstone', wave: true, route: false, roll: false, still: true, junk: 1 }))");
+await ev("localStorage.setItem('mwr.background', JSON.stringify({ style: 'redstone', wave: true, route: false, roll: false, junk: 1 })), localStorage.setItem('mwr.reduceMotion', 'true')");
 await open('#start=Diamond&target=Crafting');
-check('the settings load on a visit, and the box shows them', await ev(`JSON.stringify(bgSet) === '{"style":"redstone","wave":true,"route":false,"roll":false,"still":true}'
-  && $('#bgStyle').value === 'redstone' && $('#bgWave').checked && !$('#bgRoll').checked && $('#bgStill').checked`), await ev('JSON.stringify(bgSet)'));
+check('the settings load on a visit, and the box shows them', await ev(`JSON.stringify(bgSet) === '{"style":"redstone","wave":true,"route":false,"roll":false}'
+  && $('#bgStyle').value === 'redstone' && $('#bgWave').checked && !$('#bgRoll').checked && $('#motionToggle').checked && document.documentElement.classList.contains('calm')`), await ev('JSON.stringify(bgSet)'));
 check('reduce motion draws a still frame: no animation, the wave already passed', await until("!!bg.pair?.wave && !!bg.grid") && await ev("bg.raf === 0 && waveLight(bg.pair.wave, PAGE_IDS.get('Crafting'), 0) !== null"));
 await play();
 check('the background hides while you play', await ev("$('#bgCanvas').hidden && !bgLive()"));
@@ -1227,7 +1240,7 @@ await ev('toSetup()');
 check('and comes back on the setup screen', await ev("!$('#bgCanvas').hidden && bgLive()"));
 await ev("$('#bgStyle').value = 'off', $('#bgStyle').dispatchEvent(new Event('change'))");
 check('Off hides the background and the facts line', await ev("$('#bgCanvas').hidden && $('#bgFacts').hidden && store.get('mwr.background').style === 'off'"));
-await ev("bgSetting('style', 'auto'), bgSetting('still', false)");
+await ev("bgSetting('style', 'auto'), setCalm(false)");
 await send('browsingContext.setViewport', { context: ctx, viewport: { width: 390, height: 844 } });
 check('Auto is the redstone map at a phone\'s width', await until("bgStyle() === 'redstone' && bg.W <= 390 && bg.grid?.W === bg.W"), await ev('JSON.stringify([bgStyle(), bg.W, bg.grid?.W])'));
 await send('browsingContext.setViewport', { context: ctx, viewport: null });
@@ -1261,11 +1274,11 @@ await until('!!bg.grid');
 const cold = await ev(corner);
 await move('innerWidth - 40', 'innerHeight - 40');
 check('on the map a torch lights the blocks around the cursor', await until('bg.glow > .95') && await ev(corner) > cold + 30, `${cold} → ${await ev(corner)}`);
-await ev("bgSetting('still', true)");
+await ev("setCalm(true)");
 await move('innerWidth - 40', 'innerHeight - 40');
 await ev('bgDraw(), true');   // a still frame drawn with the cursor in
 check('reduce motion leaves the cursor alone', await ev(`bg.glow === 0 && ${corner} < ${cold} + 30`), await ev(`JSON.stringify([bg.glow, ${corner}, ${cold}])`));
-await ev("bgSetting('still', false), bgSetting('style', 'auto'), document.dispatchEvent(new PointerEvent('pointerout', { relatedTarget: null }))");
+await ev("setCalm(false), bgSetting('style', 'auto'), document.dispatchEvent(new PointerEvent('pointerout', { relatedTarget: null }))");
 // Background only: the corner button hides the setup screen but the Background box (open), the facts line and itself,
 // with the picture stronger, and doesn't turn Roll by itself off; Escape or the button brings the screen back, and Off
 // leaves it and hides the button.

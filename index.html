@@ -655,8 +655,8 @@ const KIND_MEMBERS = new Map(Object.entries(KINDS).map(([k, kind]) => [k, new Se
 // A kind's best-known members, to show what it means.
 const kindExamples = k => KINDS[k].members.toSorted((a, b) => ARTICLES.get(b).links - ARTICLES.get(a).links).slice(0, 3);
 const WIKI_STYLES = [
-  'ext.Tabber|ext.embedVideo.styles|jquery.makeCollapsible.styles|jquery.tablesorter.styles|mediawiki.page.gallery.styles|skins.vector.styles.legacy',
-  'ext.gadget.site-styles|ext.gadget.sound-styles',
+  'ext.Tabber|ext.cite.styles|ext.embedVideo.styles|ext.math.styles|jquery.makeCollapsible|jquery.makeCollapsible.styles|jquery.tablesorter.styles|mediawiki.page.gallery.styles|skins.vector.styles.legacy',
+  'ext.gadget.site-styles|ext.gadget.sound|ext.gadget.sound-styles',
   'site.styles',
   // The wiki's dark theme. Apart from a few rules that change nothing visible here, it is scoped to
   // body.wgl-theme-dark, so it is always loaded and switching the article's theme is a body class change.
@@ -1977,17 +1977,27 @@ function renderArticle(page, fragment, token, blocked = [], seen = []) {
       if (BLOCKED.has(t)) return { kind: 'blocked', why: 'No hubs' };
       return { kind: 'article', title: t, frag, seen: SEEN.has(t) };
     }
+    // What folds (see the folding boxes below) to what opens it, for a link to a section inside.
+    const unfolders = new Map();
     function scrollToId(id) {
       if (!id) return;
       const el = document.getElementById(id) || document.getElementById(id.replace(/ /g, '_'));
-      if (el) el.scrollIntoView({ block: 'start' });
+      if (!el) return;
+      for (let p = el; p; p = p.parentElement) unfolders.get(p)?.();   // the folded boxes around it open first
+      el.scrollIntoView({ block: 'start' });
     }
     // <area> covers image maps (ImageMap extension).
     for (const a of document.querySelectorAll('a, area')) {
       const c = classify(a);
       if (!c || c.kind === 'blocked') a.classList.add('mwr-dead');
       else if (c.kind === 'article') a.classList.add('mwr-live');
-      if (c?.kind === 'blocked') a.title = 'Off limits: ' + c.why;
+      // The Minecraft-style tooltips (below) show the link's own title, with the note on a line of its own.
+      const note = c?.kind === 'blocked' ? 'Off limits: ' + c.why : c?.seen ? 'Already on your path' : '';
+      if (note) {
+        if (a.hasAttribute('title')) a.dataset.mwrTitle = a.title;
+        a.dataset.mwrNote = note;
+      }
+      if (c?.kind === 'blocked') a.title = note;
       if (c?.seen) { a.classList.add('mwr-seen'); a.title = (a.title ? a.title + ' · ' : '') + 'already on your path'; }
       a.removeAttribute('target');
     }
@@ -2078,6 +2088,255 @@ function renderArticle(page, fragment, token, blocked = [], seen = []) {
       const label = Object.assign(document.createElement('label'), { htmlFor: tab.id, className: 'layered-blueprint-tab', textContent: tab.textContent });
       tab.replaceWith(radio, label);
     }
+    // The wiki's folding boxes, from its two scripts, which the frame doesn't load: without them every box shows open, as
+    // on the wiki with JavaScript off. After the animator, which measures frames inside folded boxes as 0 px.
+    // The wiki's own (MediaWiki:Common.js). A .collapsible gets a [show]/[hide] toggle and starts folded if .collapsed. A
+    // table folds to its header row, a tr.collapsible-rows the rows after it, anything else its .collapsible-content
+    // (wrapped around its contents when it has none). Folding sets the collapsed class, which the CSS copied into the
+    // frame's styles hides. A box with the id collapsible-X can instead be toggled by .collapsetoggle-custom.collapsible-X-toggle.
+    for (const box of document.querySelectorAll('#mw-content-text .collapsible')) {
+      const showText = box.dataset.expandtext || 'show', hideText = box.dataset.collapsetext || 'hide';
+      let parts = [box];
+      if (box.tagName !== 'TABLE' && !box.querySelector(':scope > .collapsible-content')) {
+        if (box.matches('tr.collapsible-rows')) {
+          let rows = [];
+          for (let r = box.nextElementSibling; r && !r.classList.contains('collapsible-rows'); r = r.nextElementSibling) rows.push(r);
+          if (rows.some(r => r.classList.contains('collapsible-row'))) rows = rows.filter(r => r.classList.contains('collapsible-row'));
+          else rows.forEach(r => r.classList.add('collapsible-row'));
+          if (box.classList.contains('collapsed') && !rows.some(r => r.classList.contains('collapsed'))) rows.forEach(r => r.classList.add('collapsed'));
+          parts = [box, ...rows];
+        } else if (box.tagName === 'TR') {
+          for (const c of box.children) c.classList.add('collapsible-content');
+        } else {
+          const content = Object.assign(document.createElement('div'), { className: 'collapsible-content' });
+          content.append(...box.childNodes);
+          box.append(content);
+        }
+      }
+      const custom = /^collapsible-./.test(box.id)
+        ? [...document.getElementsByClassName(box.id + '-toggle')].filter(t => t.classList.contains('collapsetoggle-custom')) : [];
+      let links;
+      if (custom.length) {
+        custom.forEach(t => t.style.visibility = 'visible');
+        const inner = custom.flatMap(t => [...t.querySelectorAll('.jslink')]);   // only those are clickable if it has any
+        links = inner.length ? inner : custom;
+      } else {
+        let container;
+        if (box.tagName === 'TABLE') {
+          const kids = [...box.children], head = kids.find(c => c.tagName === 'THEAD'), body = kids.find(c => c.tagName === 'TBODY');
+          const rows = head?.children.length ? head.children : body?.children.length ? body.children : kids.filter(c => c.tagName === 'TR');
+          container = rows[0]?.lastElementChild;
+        } else {
+          container = box.firstElementChild;
+          if (container?.classList.contains('collapsible-content')) container = box;
+        }
+        const toggle = Object.assign(document.createElement('span'), { className: 'collapsetoggle' });
+        const link = Object.assign(document.createElement('span'), { className: 'jslink' });
+        toggle.append('[', link, ']');
+        const after = container !== box && (box.classList.contains('collapsetoggle-inline') || box.classList.contains('collapse-button-none'));
+        container?.[after ? 'append' : 'prepend'](toggle);
+        links = [link];
+      }
+      const folded = () => box.classList.contains('collapsed');
+      const label = () => links.forEach(l => l.textContent = folded() ? showText : hideText);
+      const flip = () => { parts.forEach(p => p.classList.toggle('collapsed')); label(); };
+      for (const l of links) {
+        l.tabIndex = 0;
+        l.addEventListener('click', e => { if (!e.target.closest('a, button')) { flip(); e.stopPropagation(); } });
+        l.addEventListener('keydown', e => { if (e.key === 'Enter') { flip(); e.stopPropagation(); } });
+      }
+      label();
+      for (const p of parts) unfolders.set(p, () => folded() && flip());
+    }
+    // MediaWiki's (jquery.makeCollapsible). A .mw-collapsible gets a [hide] button, or uses the toggle or placeholder it
+    // holds, and starts folded if .mw-collapsed. A table folds to its first row, or its caption when it has one, a list to
+    // its first item, anything else to the button, its contents wrapped in .mw-collapsible-content. Elements with the
+    // class mw-customtoggle-X fold #mw-customcollapsible-X instead. What folds gets the hidden attribute, until-found
+    // where the browser has it, so finding text inside opens it.
+    const UNTIL_FOUND = 'onbeforematch' in document.body ? 'until-found' : 'hidden';
+    const mwButton = text => {
+      const b = Object.assign(document.createElement('button'), { type: 'button', className: 'mw-collapsible-toggle mw-collapsible-toggle-default' });
+      b.append(Object.assign(document.createElement('span'), { className: 'mw-collapsible-text', textContent: text }));
+      return b;
+    };
+    const ownToggle = el => el?.querySelector(':scope > .mw-collapsible-toggle, .mw-collapsible-toggle-placeholder');
+    for (const box of document.querySelectorAll('#mw-content-text .mw-collapsible')) {
+      box.classList.add('mw-made-collapsible');
+      const hideText = box.dataset.collapsetext || 'hide', showText = box.dataset.expandtext || 'show';
+      const customClass = box.id.startsWith('mw-customcollapsible-') ? box.id.replace('mw-customcollapsible', 'mw-customtoggle') : '';
+      let toggles = customClass ? [...document.getElementsByClassName(customClass)] : [];
+      toggles.forEach(t => t.classList.add('mw-customtoggle'));
+      const isDefault = !toggles.length;   // its own button or one it holds, which the folding relabels
+      if (isDefault) {
+        let toggle;
+        if (box.tagName === 'TABLE') {
+          const caption = box.querySelector(':scope > caption');
+          if (caption) toggle = ownToggle(caption) || caption.appendChild(mwButton(hideText));
+          else {
+            const cells = [...box.querySelector('tr')?.children || []].filter(c => c.matches('th, td'));
+            toggle = cells.map(ownToggle).find(Boolean);
+            if (!toggle) { toggle = mwButton(hideText); cells.at(-1)?.prepend(toggle); }
+          }
+        } else if (box.parentElement?.tagName === 'LI' && box.parentElement.querySelectorAll(':scope > .mw-collapsible').length === 1 && !ownToggle(box)) {
+          toggle = mwButton(hideText);
+          box.before(toggle);
+        } else if (box.matches('ul, ol')) {
+          const first = box.querySelector('li');
+          toggle = ownToggle(first);
+          if (!toggle) {
+            if (first && !first.value) first.value = 1;   // keeps a numbered list starting at 1
+            toggle = mwButton(hideText);
+            const li = Object.assign(document.createElement('li'), { className: 'mw-collapsible-toggle-li' });
+            li.append(toggle);
+            box.prepend(li);
+          }
+        } else {
+          toggle = ownToggle(box);
+          if (!box.querySelector(':scope > .mw-collapsible-content')) {
+            const content = Object.assign(document.createElement('div'), { className: 'mw-collapsible-content' });
+            content.append(...box.childNodes);
+            box.append(content);
+          }
+          if (!toggle) { toggle = mwButton(hideText); box.prepend(toggle); }
+        }
+        if (toggle.classList.contains('mw-collapsible-toggle-placeholder')) {
+          const real = mwButton(hideText);
+          toggle.replaceWith(real);
+          toggle = real;
+        }
+        toggles = [toggle];
+      }
+      const parts = () => {
+        if (box.tagName === 'TABLE') {
+          const rows = box.querySelector(':scope > caption') ? box.querySelectorAll(':scope > * > tr') : box.querySelectorAll(':scope > tbody > tr');
+          return [...rows].filter(r => !toggles.some(t => t.closest('tr') === r));
+        }
+        if (box.matches('ul, ol')) return [...box.querySelectorAll(':scope > li')].filter(li => !toggles.some(t => t.parentElement === li));
+        return [box.querySelector(':scope > .mw-collapsible-content') || box];
+      };
+      const fold = on => {
+        box.classList.toggle('mw-collapsed', on);
+        if (isDefault) for (const t of toggles) {
+          t.classList.toggle('mw-collapsible-toggle-collapsed', on);
+          t.classList.toggle('mw-collapsible-toggle-expanded', !on);
+          t.setAttribute('aria-expanded', String(!on));
+          const text = t.querySelector('.mw-collapsible-text');
+          if (text) text.textContent = on ? showText : hideText;
+        }
+        for (const p of parts()) on ? p.setAttribute('hidden', UNTIL_FOUND) : p.removeAttribute('hidden');
+      };
+      const flip = () => fold(!box.classList.contains('mw-collapsed'));
+      for (const t of toggles) {
+        t.setAttribute('aria-expanded', 'true');
+        t.tabIndex = 0;
+        t.addEventListener('click', e => { if (!e.target.closest('a[href]')) { e.preventDefault(); e.stopPropagation(); flip(); } });
+        // A button already clicks on Enter and Space.
+        t.addEventListener('keydown', e => { if (t.tagName !== 'BUTTON' && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); e.stopPropagation(); flip(); } });
+      }
+      box.addEventListener('beforematch', () => fold(false));
+      if (box.classList.contains('mw-collapsed')) fold(true);
+      unfolders.set(box, () => box.classList.contains('mw-collapsed') && fold(false));
+    }
+    // The wiki's sound gadget (MediaWiki:Gadget-sound.js): each .sound is a speaker that plays its hidden audio when
+    // clicked and stops it when clicked again, back at the start.
+    for (const sound of document.querySelectorAll('#mw-content-text .sound')) {
+      const audio = sound.querySelector('.sound-audio audio');
+      sound.title = 'Click to play';
+      sound.addEventListener('click', e => {
+        if (e.target.tagName === 'A' || !audio) return;
+        if (audio.paused) audio.play().catch(() => {});   // a sound that fails to load just doesn't play
+        else audio.pause();
+      });
+      audio?.addEventListener('play', () => { sound.classList.add('sound-playing'); sound.title = 'Click to stop'; });
+      audio?.addEventListener('pause', () => {
+        audio.currentTime = 0;
+        sound.classList.remove('sound-playing');
+        sound.title = 'Click to play';
+      });
+    }
+    // The wiki's Minecraft-style tooltips (MediaWiki:Common.js), in place of the browser's. Hovering a .minetip or an
+    // inventory slot's item shows its data-minetip-title, or else its title, or else the title of the deepest element at
+    // its start, in Minecraft's tooltip, with the game's formatting codes (&e yellow, &l bold, &#rrggbb…), and its
+    // data-minetip-text under it, a line per /. A backslash before & or / makes it plain text. The note the game gives a
+    // link (off limits, already on your path) is a line of its own. Its titles are removed at the first hover, so the
+    // browser's tooltip doesn't show as well.
+    const BACKSLASH = String.fromCharCode(92);
+    const tipEscape = text => text.split(BACKSLASH + BACKSLASH).join('&#92;').split(BACKSLASH + '&').join('&#38;')
+      .replace(/</g, '&#60;').replace(/>/g, '&#62;');
+    const ownTitle = el => el.dataset.mwrNote ? el.dataset.mwrTitle ?? null : el.getAttribute('title');
+    const tipTitle = el => {
+      let title = el.getAttribute('data-minetip-title');
+      const own = ownTitle(el);
+      if (title === null && own !== null) {
+        title = own.replace(/&/g, BACKSLASH + '&').trim();
+        el.setAttribute('data-minetip-title', title);
+      }
+      // None, or only formatting codes: the title of the deepest element at its start is added.
+      if (title === null || title !== '' && title.replace(/&([0-9a-jl-qs-vyzr]|#[0-9a-fA-F]{6}|[$][0-9a-fA-F]{3})/g, '') === '') {
+        let child = el, childTitle = null;
+        do {
+          if (ownTitle(child) !== null) childTitle = ownTitle(child);
+          child = child.firstChild;
+        } while (child && child.nodeType === 1);
+        if (childTitle === null) return null;
+        title = (title || '') + childTitle.replace(/&/g, BACKSLASH + '&').trim();
+        el.setAttribute('data-minetip-title', title);
+      }
+      return title;
+    };
+    let tip = null, tipW = 0, tipH = 0;
+    const hideTip = () => { tip?.remove(); tip = null; };
+    const placeTip = e => {
+      const winW = document.documentElement.clientWidth, winH = document.documentElement.clientHeight;
+      let top = e.clientY - 34, left = e.clientX + 14;
+      if (left + tipW > winW) left -= tipW + 36;   // off the right: to the left of the pointer
+      if (left < 0) {   // then off the left too: above the pointer, or below it if that is off the top
+        left = 0;
+        top -= tipH - 22;
+        if (top < 0) top += tipH + 47;
+      } else if (top < 0) top = 0;
+      else if (top + tipH > winH) top = winH - tipH;
+      tip.style.top = top + 'px';
+      tip.style.left = left + 'px';
+    };
+    const showTip = (el, e) => {
+      hideTip();
+      const title = tipTitle(el);
+      if (title === null) return;   // nothing to show, so the browser's tooltips stay
+      if (!el.mwrTipReady) {
+        for (const t of [el, ...el.querySelectorAll('[title]')]) t.removeAttribute('title');
+        el.mwrTipReady = true;
+      }
+      if (!title) return;
+      let content = '<span class="minetip-title">' + tipEscape(title) + '&r</span>';
+      const description = (el.getAttribute('data-minetip-text') || '').trim();
+      if (description) {
+        content += '<span class="minetip-description">' + tipEscape(description).split(BACKSLASH + '/').join('&#47;').split('/').join('<br>') + '&r</span>';
+      }
+      const noted = el.matches('[data-mwr-note]') ? el : el.querySelector('[data-mwr-note]');
+      if (noted) content += '<span class="minetip-description">&' + (noted.classList.contains('mwr-seen') ? 'd' : 'c') + tipEscape(noted.dataset.mwrNote) + '&r</span>';
+      while (content.search(/&(?:[0-9a-jl-qs-vyz]|#[0-9a-fA-F]{6}|[$][0-9a-fA-F]{3})/) > -1) {
+        content = content.replace(/&([0-9a-jl-qs-vyz])(.*?)(&r|$)/g, '<span class="format-$1">$2</span>&r');
+        content = content.replace(/&(?:#([0-9a-fA-F]{6})|[$]([0-9a-fA-F]{3}))(.*?)(&r|$)/g, '<span class="format-custom" style="color: #$1$2;">$3</span>&r');
+      }
+      tip = Object.assign(document.createElement('div'), { id: 'minetip-tooltip', innerHTML: content.replace(/&r/g, '') });
+      document.body.append(tip);
+      const cs = getComputedStyle(tip), r = tip.getBoundingClientRect();
+      tipW = r.width + parseFloat(cs.marginLeft) + parseFloat(cs.marginRight);
+      tipH = r.height + parseFloat(cs.marginTop) + parseFloat(cs.marginBottom);
+      placeTip(e);
+    };
+    const TIPPED = '.minetip, .invslot-item';
+    const articleText = document.getElementById('mw-content-text');
+    articleText.addEventListener('mouseover', e => {
+      const el = e.target.closest(TIPPED);
+      if (el && !el.contains(e.relatedTarget)) showTip(el, e);
+    });
+    articleText.addEventListener('mousemove', e => { if (tip && e.target.closest(TIPPED)) placeTip(e); });
+    articleText.addEventListener('mouseout', e => {
+      const el = e.target.closest(TIPPED);
+      if (el && !el.contains(e.relatedTarget)) hideTip();
+    });
     scrollToId(FRAG);
   `;
 
@@ -2125,6 +2384,16 @@ ${WIKI_STYLES.map(h => `<link rel="stylesheet" href="${esc(h)}">`).join('\n')}
   body.wgl-theme-dark a.mwr-seen:has(img) { outline-color: #a99cf0; }
   .mwr-live:focus-visible { outline: 2px solid currentColor; outline-offset: 1px; }
   img.mwr-broken { display: inline-block; overflow: hidden; color: transparent; }
+  /* What a folded .collapsible hides, from the wiki's styles, which only hide it once the wiki's script has run
+     (.client-js). The frame script does that script's job. */
+  .collapsible.collapsed > tr:not(:first-child), .collapsible.collapsed > tbody > tr:not(:first-child),
+  .collapsible.collapsed > thead + tbody > tr:first-child, .collapsible.collapsed > tbody + tbody > tr:first-child,
+  .collapsible.collapsed > tfoot > tr, .collapsible.collapsed > .collapsible-content,
+  .collapsible.collapsible-rows ~ .collapsible-row.collapsed { display: none; }
+  /* The sound gadget's speakers, from the same styles under the same condition. */
+  .sound-audio { display: none; }
+  .sound-audio:has(.mw-broken-media) { display: inline; }
+  .sound-title::after { content: ''; display: inline-block; width: 1.143em; height: 1.143em; margin-left: .286em; vertical-align: text-top; }
   ${noNav ? '.navbox, .mw-heading:has(> #Navigation) { display: none !important; }' : ''}
 </style>
 </head><body class="mediawiki ltr sitedir-ltr ns-0 ns-subject skin-vector skin-vector-legacy action-view ${WGL_THEME_CLASSES[dark ? 'dark' : 'light'].join(' ')}">

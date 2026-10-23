@@ -60,13 +60,14 @@ await send('browsingContext.navigate', { context: ctx, url: fileUrl + '#start=Di
 const liveOff = JSON.parse(await ev(`(async () => {
   const titles = ['Diamond', 'Diamond Pickaxe', 'Pickaxe', 'Iron Pickaxe', 'Crafting', 'Beacon', 'Icons.png', 'Minecraft Dungeons',
     'Dungeons:Creeper', 'Blaze Rod', 'Blaze', 'Zombified Piglin', 'Iron Ingot', 'Gold Ingot', 'Coal', 'Emerald', 'Redstone Dust', 'Oxygène',
-    'Gravelly Mountains+', 'How did we get here? (block)', 'Village & Pillage'];
+    'Gravelly Mountains+', 'How did we get here? (block)', 'Village & Pillage', 'Bastion Remnant'];
   // A request that fails leaves its pages null, which fails the facts about them.
   const info = await api({ action: 'query', prop: 'info', titles: [...titles, 'de:Diamant'].join('|') }).then(d => d.query, () => null);
   const doc = t => api({ action: 'parse', page: t, prop: 'text|categories', redirects: '1' }).then(({ parse: p }) =>
     Object.assign(new DOMParser().parseFromString(p.text, 'text/html'), { cats: p.categories.map(c => c.category) }), () => null);
-  const [diamond, pickaxe, diamondPickaxe, ironIngot, beacon, icons, dungeons, creeper, blazeRod, blaze] = await Promise.all(
-    ['Diamond', 'Pickaxe', 'Diamond Pickaxe', 'Iron Ingot', 'Beacon', 'Icons.png', 'Minecraft Dungeons', 'Dungeons:Creeper', 'Blaze Rod', 'Blaze'].map(doc));
+  const [diamond, pickaxe, diamondPickaxe, ironIngot, beacon, icons, dungeons, creeper, blazeRod, blaze, bastion] = await Promise.all(
+    ['Diamond', 'Pickaxe', 'Diamond Pickaxe', 'Iron Ingot', 'Beacon', 'Icons.png', 'Minecraft Dungeons', 'Dungeons:Creeper', 'Blaze Rod', 'Blaze',
+      'Bastion Remnant'].map(doc));
   const zpDesc = await pageInfo('Zombified Piglin').then(i => i?.desc, () => null);
   const hrefs = (d, sel = 'a[href^="/w/"]') => [...d.querySelectorAll(sel)].map(a => a.getAttribute('href'));
   const linksTo = (d, t) => hrefs(d).some(h => h.split('#')[0] === '/w/' + t);
@@ -82,13 +83,17 @@ const liveOff = JSON.parse(await ev(`(async () => {
       ts.some(t => HUB_TITLES.get(t) === 'Crafting') && ts.includes('Pickaxe') && ts.some(t => LEFT_OUT.has(t)))(textTitles(diamond)),
     'Pickaxe links Diamond, Iron Pickaxe and Diamond Pickaxe, and Diamond Pickaxe links Pickaxe (plain)': () =>
       ['Diamond', 'Iron_Pickaxe', 'Diamond_Pickaxe'].every(t => linksTo(pickaxe, t)) && hrefs(diamondPickaxe).includes('/w/Pickaxe'),
-    'Pickaxe has a crafting output slot of two or more items and infobox tabs of three or more panels': () =>
+    'Pickaxe has a crafting output slot of two or more items, a crafting slot linking Diamond and infobox tabs of three or more panels': () =>
       new Set([...pickaxe.querySelector('.mcui .invslot-large.animated').children].map(f => f.querySelector('a')?.title)).size > 1 &&
-      pickaxe.querySelectorAll('.infobox .tabber > .tabbertab[data-title]').length > 2,
+      !!pickaxe.querySelector('.invslot-item a[href="/w/Diamond"]') && pickaxe.querySelectorAll('.infobox .tabber > .tabbertab[data-title]').length > 2,
     'Iron Ingot has 50+ links': () => hrefs(ironIngot).length > 50,
-    'Beacon has a layered blueprint of three or more layers and a calculator': () =>
-      beacon.querySelectorAll('.layered-blueprint .layered-blueprint-layer').length > 2 &&
+    'Beacon has a layered blueprint of three or more layers, a calculator and sounds': () =>
+      !!beacon.querySelector('.sound .sound-title + .sound-audio audio') && beacon.querySelectorAll('.layered-blueprint .layered-blueprint-layer').length > 2 &&
       beacon.querySelectorAll('.layered-blueprint .layered-blueprint-tab').length > 1 && !!beacon.querySelector('.mcw-calc'),
+    'Bastion Remnant has a folded File structure box, a folded table of article links, an open mw-collapsible table and folded navbox groups': () =>
+      !!bastion.querySelector('table.collapsible.collapsed[data-description="File structure"]') &&
+      [...bastion.querySelectorAll('table.wikitable.collapsible.collapsed')].some(t => t.querySelector('tr + tr a[href^="/w/"]')) &&
+      !!bastion.querySelector('table.mw-collapsible:not(.mw-collapsed)') && !!bastion.querySelector('.navbox .collapsible.collapsed'),
     'Icons.png has image-map links': () => hrefs(icons, 'area[href^="/w/"]').length > 0,
     'Minecraft Dungeons and Dungeons:Creeper link Dungeons: pages': () => [dungeons, creeper].every(d => hrefs(d).some(h => h.startsWith('/w/Dungeons:'))),
     'Blaze Rod links Blaze (plain), which the live wiki puts in Nether mobs': () => hrefs(blazeRod).includes('/w/Blaze') && blaze.cats.includes('Nether_mobs'),
@@ -166,7 +171,8 @@ check('links to articles on the path are marked', seenLinks[0].length > 0 && see
   seenLinks[1].length > 0 && !seenLinks[1].some(Boolean), JSON.stringify(seenLinks));
 // The crafting grid's slots cycle through their frames (Wooden, Golden, Stone… Pickaxe) and hold still under the pointer.
 const outputSlot = "document.querySelector('.mcui .invslot-large.animated')";
-const shownItem = `${outputSlot}?.querySelector(':scope > .animated-active a')?.title`;
+// By its link, since hovering a slot takes the titles away for the Minecraft-style tooltip.
+const shownItem = `${outputSlot}?.querySelector(':scope > .animated-active a')?.getAttribute('href')`;
 const firstItem = await ev(shownItem, f);
 const slotRef = (await send('script.evaluate', { target: { context: f }, expression: `(s => (s.scrollIntoView({ block: 'center' }), s))(${outputSlot})`, awaitPromise: false })).result?.result?.sharedId;
 check('crafting slots animate', !!firstItem && await until(`${shownItem} !== ${JSON.stringify(firstItem)}`, 5000, f),
@@ -177,7 +183,18 @@ const heldItem = await ev(shownItem, f);
 await sleep(4500);
 const stillItem = await ev(shownItem, f);
 check('crafting slots hold still under the pointer', !!heldItem && stillItem === heldItem, `${heldItem} -> ${stillItem}`);
+// The slot under the pointer shows its item in a Minecraft-style tooltip instead of the browser's, which goes when the
+// pointer does. A link to an article already on the path says so on a line of its own.
+const tipText = "document.querySelector('#minetip-tooltip')?.innerText";
+const slotTip = JSON.parse(await ev(`JSON.stringify([${tipText}, getComputedStyle(document.querySelector('#minetip-tooltip')).fontFamily,
+  ${outputSlot}.querySelector(':scope > .animated-active').dataset.minetipTitle, !!${outputSlot}.querySelector(':scope > .animated-active [title]')])`, f));
 await moveTo('viewport');
+const tipGone = await ev(`${tipText} === undefined`, f);
+await ev(`(s => s.dispatchEvent(new MouseEvent('mouseover', { bubbles: true, clientX: 10, clientY: 10 })))([...document.querySelectorAll('.invslot-item')].find(s => s.querySelector('a.mwr-seen[href="/w/Diamond"]')))`, f);
+const seenTip = await ev(`[${tipText}, document.querySelector('#minetip-tooltip .format-d')?.textContent].join('|')`, f);
+check('a hovered slot shows a Minecraft-style tooltip, with a note on a link to the path', !!slotTip[2] && slotTip[0]?.split('\n')[0] === slotTip[2] &&
+  slotTip[1].startsWith('Minecraft') && !slotTip[3] && tipGone && seenTip === 'Diamond\nAlready on your path|Already on your path', JSON.stringify([...slotTip, tipGone, seenTip]));
+await ev("document.querySelector('#minetip-tooltip')?.remove()", f);
 await send('input.releaseActions', { context: ctx });
 // The infobox's tabs (Wooden, Golden, Stone…) show one picture at a time, and clicking a tab switches to it.
 const tabState = `JSON.stringify((t => ({ tabs: [...t.querySelectorAll('.tabbernav li')].map(li => (li.classList.contains('tabberactive') ? '*' : '') + li.textContent),
@@ -394,6 +411,43 @@ const aboveHidden = await until(`/^vvh+$/.test(${layers})`, 3000, f);
 check('blueprint layers can be chosen', allShown && aboveHidden && await ev('game.path.length === 1'), `${layersBefore} -> ${await ev(layers, f)}`);
 // A calculator only says it is loading without the wiki's script, so it is hidden.
 check('calculator placeholders are hidden', await ev("(c => c.length > 0 && c.every(e => !e.offsetHeight))([...document.querySelectorAll('.mcw-calc')])", f));
+// The sound gadget: a speaker plays its sound when clicked and stops it when clicked again, and that isn't a click. A real
+// click, since the browser only lets a page play sound after one.
+const sound = "document.querySelector('.sound')";
+const speaker = await ev(`(s => [getComputedStyle(s.querySelector('.sound-title'), '::after').width !== '0px', !s.querySelector('audio').checkVisibility(), s.title].join())(${sound})`, f);
+const soundRef = (await send('script.evaluate', { target: { context: f }, expression: `(s => (s.scrollIntoView({ block: 'center' }), s))(${sound})`, awaitPromise: false })).result?.result?.sharedId;
+await send('input.performActions', { context: f, actions: [{ type: 'pointer', id: 'mouse', actions: [
+  { type: 'pointerMove', x: 0, y: 0, origin: { type: 'element', element: { sharedId: soundRef } } }, { type: 'pointerDown', button: 0 }, { type: 'pointerUp', button: 0 }] }] });
+await send('input.releaseActions', { context: ctx });
+const playing = await until(`${sound}.classList.contains('sound-playing') && ${sound}.title === 'Click to stop'`, 5000, f);
+await ev(`${sound}.click()`, f);
+const stopped = await until(`!${sound}.classList.contains('sound-playing') && ${sound}.querySelector('audio').paused && ${sound}.title === 'Click to play'`, 5000, f);
+check('a speaker plays its sound and stops it', speaker === 'true,true,Click to play' && playing && stopped && await ev('game.path.length === 1'),
+  `${speaker} playing=${playing} stopped=${stopped}`);
+
+// The wiki's folding boxes fold as on the wiki: Bastion Remnant's File structure and the tables of its parts' blocks start
+// folded with a [show] toggle, its sortable tables start open with a [hide] button, and so do its navboxes, with groups
+// inside them folded (in Relaxed, which shows navboxes). Toggling one isn't a click.
+await send('browsingContext.navigate', { context: ctx, url: 'about:blank', wait: 'complete' });
+await send('browsingContext.navigate', { context: ctx, url: fileUrl + '#start=Bastion%20Remnant&target=Diamond', wait: 'complete' });
+await until("!document.querySelector('#btnPlay').disabled");
+await ev("document.querySelector('#btnPlay').click()");
+await until("game.path.length === 1 && !game.loading");
+f = await frameCtx();
+await ev("window.mwrPart = [...document.querySelectorAll('table.wikitable.collapsible.collapsed')].find(t => t.querySelector('tr + tr .mwr-live'))", f);
+const folds = `JSON.stringify({
+  file: (b => [b.classList.contains('collapsed'), b.querySelector('.jslink').textContent, b.rows[1].offsetHeight > 0])(document.querySelector('.collapsible[data-description="File structure"]')),
+  part: (b => [b.classList.contains('collapsed'), b.querySelector('.jslink').textContent, [...b.querySelectorAll('.mwr-live')].some(a => a.offsetHeight > 0)])(window.mwrPart),
+  mw: (b => [b.querySelector('.mw-collapsible-toggle').textContent, b.tBodies[0].rows[1].offsetHeight > 0])(document.querySelector('table.mw-collapsible')),
+  nav: [document.querySelector('.navbox.collapsible:not(.collapsed) .jslink')?.textContent,
+    (b => [b?.querySelector('.jslink').textContent, b?.rows[1].offsetHeight > 0])(document.querySelector('.navbox .collapsible.collapsed'))] })`;
+const foldsBefore = await ev(folds, f);
+check('folded boxes start as on the wiki', foldsBefore === '{"file":[true,"show",false],"part":[true,"show",false],"mw":["hide",true],"nav":["hide",["show",false]]}', foldsBefore);
+await ev(`document.querySelector('.collapsible[data-description="File structure"] .jslink').click(); window.mwrPart.querySelector('.jslink').click();
+  document.querySelector('table.mw-collapsible .mw-collapsible-toggle').click()`, f);
+const foldsAfter = await ev(folds, f);
+check('their toggles open and fold them, and the links inside work', foldsAfter === '{"file":[false,"hide",true],"part":[false,"hide",true],"mw":["show",false],"nav":["hide",["show",false]]}' &&
+  await ev('game.path.length === 1 && clicks() === 0'), foldsAfter);
 
 // Content: the Content and Spin-offs rows. Rolls draw from what is on, and links into a spin-off work only in a game that
 // has it on, by its checkbox or because a card's page is in it. The boxes are set without a change event where a reroll

@@ -229,6 +229,20 @@
   .bg-facts { margin: 28px 0 0; color: var(--muted); font-size: 13.5px; min-height: 1.45em; transition: opacity .5s; }
   .bg-facts b { color: var(--ink); font-weight: 600; }
   .bg-facts.out { opacity: 0; }
+  /* The corner button, and Background only (bgView): the setup screen hidden but the Background box, the facts line and
+     the button, so the picture shows whole. visibility, unlike display, lets those three show inside the hidden screen. */
+  .bg-view-btn {
+    position: fixed; right: 16px; bottom: 16px; z-index: 5; width: 40px; height: 40px; padding: 0;
+    border-radius: 50%; box-shadow: var(--shadow); font-size: 17px; line-height: 1;
+  }
+  body.bg-view { overflow: hidden; }
+  body.bg-view #setup { visibility: hidden; }
+  body.bg-view :is(#bgOpts, #bgFacts, #btnBgView) { visibility: visible; }
+  body.bg-view #bgOpts {
+    position: fixed; top: 16px; right: 16px; z-index: 20; max-width: calc(100vw - 32px); padding: 6px 12px;
+    background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow);
+  }
+  body.bg-view #bgFacts { position: fixed; left: 16px; right: 72px; bottom: 26px; margin: 0; text-align: center; }
   /* Text straight on the background keeps a halo of the page's colour, so the picture never cuts into it. */
   #setup :is(.setup-head, .sub, .your-game, .step, .setup-par, .status, .history-head, .bg-facts, .site-foot) {
     text-shadow: 0 0 3px var(--bg), 0 0 6px var(--bg), 0 0 10px var(--bg);
@@ -564,6 +578,7 @@ const THEMES = [...new Set(['auto', 'light', 'dark', ...Array.from(document.quer
   </div>
 
   <p class="bg-facts" id="bgFacts" hidden></p>
+  <button class="bg-view-btn" id="btnBgView" aria-pressed="false" hidden></button>
 
   <footer class="site-foot">
     <p>Made and run by <a href="https://BryantF.xyz">BryantF.xyz</a> · Contact: <a href="mailto:BryantF.xyz+mcwikirace@gmail.com">BryantF.xyz+mcwikirace@gmail.com</a></p>
@@ -3037,7 +3052,8 @@ function bgTheme() {
   };
   const c = { dark: themeIsDark(), bg: rgb('--bg'), ink: rgb('--ink'), muted: rgb('--muted'), accent: rgb('--accent'), target: rgb('--target'),
     red: rgb('--viz-redstone'), topic: WIKI_DATA.topics.map(k => rgb('--viz-' + k)),
-    strength: parseFloat(cs.getPropertyValue('--viz-opacity')) || .5, font: cs.getPropertyValue('--font').trim() || 'sans-serif' };
+    // stronger with nothing in front of it (Background only)
+    strength: Math.min(1, (parseFloat(cs.getPropertyValue('--viz-opacity')) || .5) * (bgViewing() ? 1.6 : 1)), font: cs.getPropertyValue('--font').trim() || 'sans-serif' };
   c.other = bgMix(c.bg, c.muted, .7);
   c.family = bgMix(c.muted, c.target, .35);
   bg.colors = c;
@@ -3535,7 +3551,8 @@ function bgDraw() {
   if (!bg.colors) return;
   const style = bgStyle(), off = style === 'off';
   bgCanvas.hidden = off || !bg.shown;
-  $('#bgFacts').hidden = off;
+  $('#bgFacts').hidden = $('#btnBgView').hidden = off;
+  if (off && bgViewing()) bgView(false);
   if (!bgLive()) return;
   // The sky is made in an idle moment the first time it shows once the links are in, not for the map or Off.
   if (style === 'constellation' && !bg.sky && bg.links && !bg.skyWait) {
@@ -3548,9 +3565,24 @@ function bgDraw() {
 // startGame and toSetup: the background only runs behind the setup screen.
 function bgShow(on) {
   bg.shown = on;
+  if (!on) bgView(false);   // a game never starts in Background only
   bgDraw();
   bgNextFact();
 }
+// Background only: everything on the setup screen hidden but the Background box (open), the facts line and the corner
+// button, which brings it back, as Escape does. Neither the button nor the box turns Roll by itself off.
+function bgView(on) {
+  const b = $('#btnBgView'), was = bgViewing();
+  document.body.classList.toggle('bg-view', on);
+  b.textContent = on ? '✕' : '✦';
+  b.title = on ? 'Back to the game (Esc)' : 'Show only the background';
+  b.setAttribute('aria-label', b.title);
+  b.setAttribute('aria-pressed', String(on));
+  if (on === was) return;   // Escape, a game starting and the first call change nothing
+  $('#bgOpts').open = on;
+  bgTheme();   // its strength
+}
+const bgViewing = () => document.body.classList.contains('bg-view');
 // The Background box's controls, from the settings.
 function bgControls() {
   $('#bgStyle').value = bgSet.style;
@@ -3696,11 +3728,13 @@ bgControls();
 $('#bgStyle').onchange = e => bgSetting('style', e.target.value);
 for (const [k, sel] of Object.entries(BG_BOXES)) $(sel).onchange = e => bgSetting(k, e.target.checked);
 for (const type of ['click', 'change', 'input']) $('#setup').addEventListener(type, e => {
-  if (!bgSet.roll || $('#bgOpts').contains(e.target) || (type === 'click' && !e.target.closest('button, a, input, select'))) return;
+  if (!bgSet.roll || e.target.closest('#bgOpts, #btnBgView') || (type === 'click' && !e.target.closest('button, a, input, select'))) return;
   bgSetting('roll', false);
 }, true);
-document.addEventListener('click', e => { if (!$('#bgOpts').contains(e.target)) $('#bgOpts').open = false; });
-document.addEventListener('keydown', e => { if (e.key === 'Escape') $('#bgOpts').open = false; });
+document.addEventListener('click', e => { if (!e.target.closest('#bgOpts, #btnBgView')) $('#bgOpts').open = false; });
+document.addEventListener('keydown', e => { if (e.key === 'Escape') { $('#bgOpts').open = false; bgView(false); } });
+bgView(false);
+$('#btnBgView').onclick = () => bgView(!bgViewing());
 addEventListener('resize', bgDraw);
 // The cursor (see bgLens): a touch has no place to hover, and leaving the window takes it away.
 document.addEventListener('pointermove', e => { if (e.pointerType !== 'touch') Object.assign(bg.cursor, { x: e.clientX, y: e.clientY, in: true }); }, { passive: true });

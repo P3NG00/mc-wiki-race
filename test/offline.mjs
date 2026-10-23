@@ -1096,6 +1096,21 @@ await move('innerWidth - 40', 'innerHeight - 40');
 await ev('bgDraw(), true');   // a still frame drawn with the cursor in
 check('reduce motion leaves the cursor alone', await ev(`bg.glow === 0 && ${corner} < ${cold} + 30`), await ev(`JSON.stringify([bg.glow, ${corner}, ${cold}])`));
 await ev("bgSetting('still', false), bgSetting('style', 'auto'), document.dispatchEvent(new PointerEvent('pointerout', { relatedTarget: null }))");
+// Background only: the corner button hides the setup screen but the Background box (open), the facts line and itself,
+// with the picture stronger, and doesn't turn Roll by itself off; Escape or the button brings the screen back, and Off
+// leaves it and hides the button.
+const seen = sel => `$('${sel}').checkVisibility({ visibilityProperty: true })`;
+await ev("bgSetting('roll', true), $('#btnBgView').click()");
+check('the corner button shows only the background, with its box open and stronger', await ev(`bgViewing() && $('#bgOpts').open && bgSet.roll
+  && !${seen('#btnPlay')} && !${seen('#cardStart')} && ${seen('#bgStyle')} && ${seen('#btnBgView')} && ${seen('#bgFacts')}
+  && bg.colors.strength > parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--viz-opacity'))`));
+await ev("document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))");
+check('Escape brings the setup screen back', await ev(`!bgViewing() && ${seen('#btnPlay')} && !$('#bgOpts').open && bgSet.roll`));
+await ev("$('#btnBgView').click(), $('#btnBgView').click()");
+check('and so does the button', await ev(`!bgViewing() && ${seen('#btnPlay')}`));
+await ev("$('#btnBgView').click(), $('#bgStyle').value = 'off', $('#bgStyle').dispatchEvent(new Event('change'))");
+check('Off leaves it and hides the button', await ev("!bgViewing() && $('#btnBgView').hidden"));
+await ev("bgSetting('style', 'auto'), bgSetting('roll', false)");
 
 // Injection: a link can carry any text, so a sealed one whose titles are markup and script, with junk rules, kinds and
 // back, is played through every place a title shows (cards, header, path, a frame link, the banner, the peek, the result,

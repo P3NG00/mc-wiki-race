@@ -1112,6 +1112,39 @@ await ev("$('#btnBgView').click(), $('#bgStyle').value = 'off', $('#bgStyle').di
 check('Off leaves it and hides the button', await ev("!bgViewing() && $('#btnBgView').hidden"));
 await ev("bgSetting('style', 'auto'), bgSetting('roll', false)");
 
+// The setup screen holds still: what was clicked stays where it is in the window while the cards above it roll and the
+// help changes, at the bottom of the page too (the history hidden, so Articles' help, which gets shorter, is near it), and
+// a click on a rule's text doesn't scroll to its box when the box is above the window. Scrolling the page lets go.
+// holdsStill: the most a choice in Articles clicked at the bottom of the page moves as drawn until the cards are in,
+// measured whenever something on the screen changes size, by an observer made after the game's, so it sees each change
+// as the game left it.
+const holdsStill = async value => {
+  const label = `$('input[name=mode][value=${value}]').parentElement`;
+  await ev(`(() => { scrollTo(0, 1e6); const t = ${label}.getBoundingClientRect().top;
+    window.drift = 0; window.drifts = new ResizeObserver(() => { window.drift = Math.max(window.drift, Math.abs(${label}.getBoundingClientRect().top - t)); });
+    document.querySelectorAll('#setup > *, .game-settings > *, #settings > *, #setup .card').forEach(el => window.drifts.observe(el));
+    ${label}.click(); })()`);
+  await sleep(100);
+  await until(ready);
+  await sleep(300);
+  const drift = await ev('window.drifts.disconnect(), window.drift');
+  return [drift < 1, `moved up to ${drift}px`];
+};
+await ev("$('#history').classList.add('hidden'), $('input[name=mode][value=everyday]').click()");
+await until(ready);
+check('a click on the setup screen holds what was clicked still, at the bottom of the page where the help under it gets shorter', ...await holdsStill('deep'));
+const ruleAt = JSON.parse(await ev(`(() => { const l = $('input.rule[value=noback]').parentElement; scrollBy(0, l.getBoundingClientRect().top + 30);
+  const r = l.getBoundingClientRect(); return JSON.stringify({ x: Math.round(r.left + r.width / 2), y: Math.round(r.bottom - 10), scroll: scrollY }); })()`));
+await send('input.performActions', { context: ctx, actions: [{ type: 'pointer', id: 'mouse', parameters: { pointerType: 'mouse' },
+  actions: [{ type: 'pointerMove', x: ruleAt.x, y: ruleAt.y }, { type: 'pointerDown', button: 0 }, { type: 'pointerUp', button: 0 }] }] });
+await sleep(300);
+check('a click on a rule whose box is above the window doesn\'t scroll to the box', await ev(`$('input.rule[value=noback]').checked && Math.abs(scrollY - ${ruleAt.scroll}) < 1`),
+  await ev(`JSON.stringify([$('input.rule[value=noback]').checked, ${ruleAt.scroll}, scrollY])`));
+await ev("$('input.rule[value=noback]').click()");
+await send('input.performActions', { context: ctx, actions: [{ type: 'wheel', id: 'wheel', actions: [{ type: 'scroll', x: 200, y: 400, deltaX: 0, deltaY: -300 }] }] });
+check('scrolling lets go', await until("!keep && !$('#setup').classList.contains('keeping')"));
+await ev('renderHistory()');
+
 // Injection: a link can carry any text, so a sealed one whose titles are markup and script, with junk rules, kinds and
 // back, is played through every place a title shows (cards, header, path, a frame link, the banner, the peek, the result,
 // the history). The made-up wiki takes the titles as real pages, which the live one never would, so it is the stricter

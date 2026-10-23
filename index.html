@@ -121,6 +121,7 @@
   /* What is set, above the cards: the game, extra rules, articles and difficulty. */
   .your-game { display: flex; flex-wrap: wrap; gap: 4px 12px; align-items: baseline; margin-bottom: 10px; }
   /* The game and settings, under the cards and Start: play first, adjust if you want to. */
+  #setup.keeping { overflow-anchor: none; }   /* see keepPlace */
   .game-settings { margin-top: 36px; padding-top: 24px; border-top: 1px solid var(--line); }
   .kicker, .step { font-size: 12px; font-weight: 700; letter-spacing: .07em; text-transform: uppercase; color: var(--muted); }
   .daily-box .kicker { display: block; }
@@ -587,6 +588,7 @@ const THEMES = [...new Set(['auto', 'light', 'dark', ...Array.from(document.quer
     <p id="wikiCopy">Which articles come up, and par, go by the wiki’s <a href="https://minecraft.wiki/w/Minecraft_Wiki:Offline_use">offline copy</a> from <span id="wikiCopyDate"></span>.</p>
     <p>MC Wiki Race is not an official Minecraft product, and is not approved by or associated with Mojang, Microsoft or minecraft.wiki.</p>
   </footer>
+  <div id="setupRoom" aria-hidden="true"></div>
 </section>
 
 <!-- ======================= GAME ======================= -->
@@ -1029,6 +1031,8 @@ function renderCard(which) {
   const card = cardBox(which);
   const info = setup[which];
   const blind = which !== 'start' && isBlind();
+  // A card emptied for a roll keeps its height until its article is in, so what is under it stays where it is.
+  card.style.minHeight = info || blind ? '' : card.offsetHeight + 'px';
   $('.title', card).textContent = blind ? 'Hidden' : info ? info.title : '…';
   $('.desc', card).textContent = blind ? `Blind target: picked and shown ${shownWhen(which)}.` : !info ? '' : info.desc || 'No description available.';
   $('.actions', card).classList.toggle('hidden', blind);
@@ -3780,6 +3784,52 @@ function randomGame() {
 }
 $('#btnRandom').onclick = randomGame;
 $('#settings').addEventListener('change', updateGameSum);
+// What was last clicked or changed on the setup screen stays where it is in the window: when anything above it changes
+// size (the line above the cards, the cards as they roll and their pictures come in, Start's row, the help in the strip),
+// the page scrolls by as much before it is drawn. When what is under it gets shorter at the bottom of the page, room
+// under the footer (#setupRoom) keeps the page long enough, and goes as the page is scrolled up out of it. Scrolling the
+// page, resizing the window or leaving the setup screen lets go.
+let keep = null;   // { el, top, y }: the element, its top in the window, and the scroll it was kept at
+// While something is kept the browser's own scroll anchoring is off, since it holds whatever it picks in place instead
+// and its scrolling would read as the player's.
+function setKeep(k) {
+  keep = k;
+  $('#setup').classList.toggle('keeping', !!k);
+}
+// The room the page needs under the footer to be scrolled to y.
+function roomFor(y) {
+  const room = $('#setupRoom');
+  room.style.height = Math.max(0, y + innerHeight - (document.documentElement.scrollHeight - room.offsetHeight)) + 'px';
+}
+function keepPlace() {
+  if (!keep) return;
+  if ($('#setup').classList.contains('hidden') || !keep.el.getClientRects().length) {
+    setKeep(null);
+    $('#setupRoom').style.height = '';
+    return;
+  }
+  const y = scrollY + keep.el.getBoundingClientRect().top - keep.top;
+  roomFor(y);
+  if (Math.abs(y - scrollY) >= 1) scrollTo({ top: y, behavior: 'instant' });
+  keep.y = scrollY;
+}
+const keepWatch = new ResizeObserver(keepPlace);
+document.querySelectorAll('#setup > :not(#setupRoom), .game-settings > *, #settings > *, #setup .card').forEach(el => keepWatch.observe(el));
+for (const type of ['click', 'change']) $('#setup').addEventListener(type, e => {
+  const el = e.target.closest('label') ?? e.target.closest('button, select, input, summary') ?? e.target;
+  // A click on a box's label focuses the box, which scrolls to it when only the label is in the window: back to where the click was.
+  if (keep?.el === el && e.target !== el && Math.abs(scrollY - keep.y) >= 1) scrollTo({ top: keep.y, behavior: 'instant' });
+  setKeep({ el, top: el.getBoundingClientRect().top, y: scrollY });
+}, true);
+addEventListener('scroll', () => {
+  // Up at the bottom of the page is the browser holding the scroll to a page that got shorter, not the player scrolling.
+  if (keep && Math.abs(scrollY - keep.y) >= 1) {
+    if (scrollY < keep.y && scrollY + innerHeight >= document.documentElement.scrollHeight - 1) keepPlace();
+    else setKeep(null);
+  }
+  if (!keep && $('#setupRoom').offsetHeight) roomFor(scrollY);
+}, { passive: true });
+addEventListener('resize', () => { setKeep(null); $('#setupRoom').style.height = ''; });
 // Swap plays the whole chain backwards, checkpoints included. A round trip goes round the same loop from its target
 // instead: the start and target change places, and the checkpoints of the way back come first.
 $('#btnSwap').onclick = () => {

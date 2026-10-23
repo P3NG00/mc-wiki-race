@@ -700,7 +700,9 @@ await ev("document.querySelector('#hKeep').click()");
 check('cancelling Clear history keeps it', await ev(`${histLen} > 0 && !document.querySelector('#history').classList.contains('hidden')`), await ev(histLen));
 await ev("document.querySelector('#btnClearHistory').click()");
 await ev("document.querySelector('#hClear').click()");
-check('Clear history empties it', await ev(`${histLen} === 0 && document.querySelector('#history').classList.contains('hidden') && document.querySelector('#modalBg').classList.contains('hidden')`),
+// The heading and the Advancements button stay while any advancement is earned.
+check('Clear history empties it', await ev(`${histLen} === 0 && document.querySelector('.history-wrap').classList.contains('hidden')
+  && document.querySelector('#history').classList.contains('hidden') === !advEarned() && document.querySelector('#modalBg').classList.contains('hidden')`),
   await ev(histLen));
 
 // Challenge links carry any title intact: ones with &, +, ?, %, =, /, :, quotes and accents survive challengeLink()'s
@@ -805,7 +807,7 @@ await ev(`localStorage.setItem('mwr.history', '{"oops":1}')`);
 await send('browsingContext.navigate', { context: ctx, url: 'about:blank', wait: 'complete' });
 await send('browsingContext.navigate', { context: ctx, url: fileUrl + '#start=Diamond&target=Diamond%20Pickaxe', wait: 'complete' });
 check('history that isn’t a list doesn’t stop the setup screen', await until("!document.querySelector('#btnPlay').disabled") &&
-  await ev("document.querySelector('#history').classList.contains('hidden')"));
+  await ev("document.querySelector('.history-wrap').classList.contains('hidden')"));
 const rec = JSON.stringify({ start: 'Diamond', goal: 'Iron Ingot', rules: [], won: true, clicks: 2, ms: 5000, at: Date.now() });
 await ev(`store.set('mwr.history', [null, 5, { ...${rec}, clicks: '<b>2</b>' }, { ...${rec}, rules: ['nope'] }, { ...${rec}, topic: 'constructor' }, ${rec}]); renderHistory()`);
 check('only real records are shown', await ev("document.querySelectorAll('#history tbody tr').length === 1 && !document.querySelector('#history tbody b')"),

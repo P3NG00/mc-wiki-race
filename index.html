@@ -372,7 +372,70 @@
   .hint.closer { background: var(--accent-soft); color: var(--accent); animation: bump .4s ease-out; }
   /* Reduce motion (calm(): the box, or the system's setting) */
   :root.calm :is(.toast, .toast.stay, .hud .goal.reached, #setup.busy .card.empty .title, .stat .v.bump, .hint.closer) { animation: none; }
+  :root.calm .adv-toast { animation-name: adv-fade-in; } :root.calm .adv-toast.out { animation-name: adv-fade-out; }
   :root.calm :is(#setup.busy .status:not(.err, :empty), .setup-par.working)::before, :root.calm #setup.busy .card.empty .tag::after { animation-duration: 3s; }
+
+  /* ---------- Advancements ---------- */
+  /* The toasts keep Minecraft's dark box in every theme: the tier's heading in yellow, a challenge's in purple. */
+  .adv-toasts { position: fixed; top: 16px; right: 16px; z-index: 12; display: flex; flex-direction: column; gap: 8px; width: 320px; max-width: calc(100vw - 32px); pointer-events: none; }
+  .adv-toast { display: flex; gap: 12px; align-items: center; padding: 10px 14px 10px 10px; border-radius: 6px; color: #fff;
+    background: #212121; border: 2px solid #4a4a4a; box-shadow: 0 0 0 2px #0b0b0b, 0 8px 24px rgba(0,0,0,.35); animation: adv-in .35s cubic-bezier(.2,.9,.3,1.2) both; }
+  .adv-toast.out { animation: adv-out .35s ease-in both; }
+  @keyframes adv-in { from { translate: 120% 0; } }
+  @keyframes adv-out { to { translate: 120% 0; } }
+  @keyframes adv-fade-in { from { opacity: 0; } }
+  @keyframes adv-fade-out { to { opacity: 0; } }
+  .adv-toast .t { font-size: 13px; font-weight: 700; color: #ffd84a; }
+  .adv-toast.challenge .t { color: #d98bff; }
+  .adv-toast .n { font-size: 15px; font-weight: 600; line-height: 1.25; }
+  /* Frames: a task's square, a goal's rounded, a challenge's spiky; gold once earned. */
+  .adv-frame { --size: 52px; --frame: var(--line); --frame-in: var(--bg); position: relative; flex: none; width: var(--size); height: var(--size); display: grid; place-items: center; }
+  .adv-frame::before, .adv-frame::after { content: ''; position: absolute; }
+  .adv-frame::before { inset: 0; background: var(--frame); }
+  .adv-frame::after { inset: 3px; background: var(--frame-in); }
+  .adv-frame.task::before { border-radius: 4px; } .adv-frame.task::after { border-radius: 2px; }
+  .adv-frame.goal::before { border-radius: 40%; } .adv-frame.goal::after { border-radius: 38%; }
+  .adv-frame.challenge::before, .adv-frame.challenge::after { clip-path: polygon(50.0% 0.0%, 58.0% 9.8%, 69.1% 3.8%, 72.8% 15.9%, 85.4% 14.6%, 84.1% 27.2%, 96.2% 30.9%, 90.2% 42.0%, 100.0% 50.0%, 90.2% 58.0%, 96.2% 69.1%, 84.1% 72.8%, 85.4% 85.4%, 72.8% 84.1%, 69.1% 96.2%, 58.0% 90.2%, 50.0% 100.0%, 42.0% 90.2%, 30.9% 96.2%, 27.2% 84.1%, 14.6% 85.4%, 15.9% 72.8%, 3.8% 69.1%, 9.8% 58.0%, 0.0% 50.0%, 9.8% 42.0%, 3.8% 30.9%, 15.9% 27.2%, 14.6% 14.6%, 27.2% 15.9%, 30.9% 3.8%, 42.0% 9.8%); }
+  .adv-frame.challenge::after { inset: 4px; }
+  .adv-frame img, .adv-frame .emoji { position: relative; z-index: 1; width: 60%; height: 60%; object-fit: contain; image-rendering: pixelated; }
+  .adv-frame .emoji { display: grid; place-items: center; font-size: calc(var(--size) * .36); line-height: 1; color: var(--muted); }
+  .adv-frame.got { --frame: var(--viz-items); --frame-in: color-mix(in srgb, var(--viz-items) 16%, var(--panel)); }
+  .adv-toast .adv-frame { --size: 44px; --frame: #c9a227; --frame-in: #3b3220; }
+  .adv-toast.challenge .adv-frame { --frame: #b46be0; --frame-in: #33223e; }
+  .history-head .adv-btn { margin-left: auto; padding: 4px 12px; border-radius: var(--radius-pill); font-weight: 600; font-size: 14px; }
+  .adv-btn .count { color: var(--muted); font-weight: 400; margin-left: 4px; }
+  /* The panel: its head (the count, a bar, the one picked) stays at the top while the groups scroll under it. */
+  .modal:has(.adv-panel) { max-width: 760px; padding-top: 0; }
+  .adv-head { position: sticky; top: 0; z-index: 2; background: var(--panel); padding: 20px 0 12px; border-bottom: 1px solid var(--line); }
+  .adv-head .top { display: flex; align-items: baseline; gap: 12px; }
+  .adv-head h2 { margin: 0; }
+  .adv-head .close { margin-left: auto; padding: 2px 10px; }
+  .adv-panel .bar { height: 8px; border-radius: var(--radius-pill); background: var(--bg); border: 1px solid var(--line); overflow: hidden; margin: 8px 0 0; max-width: 100%; }
+  .adv-panel .bar i, .adv-tile .mini i { display: block; height: 100%; background: var(--accent); border-radius: inherit; }
+  .adv-panel .detail { display: flex; gap: 14px; align-items: center; margin-top: 12px; min-height: 64px; padding: 10px 12px; border-radius: var(--radius); background: var(--bg); }
+  .adv-panel .detail .adv-frame { --size: 56px; }
+  .adv-panel .detail .adv-frame:not(.got) { --frame-in: var(--panel); }
+  .adv-panel .detail .name { font-weight: 700; font-size: 16px; }
+  .adv-panel .detail .tier { font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); margin-left: 6px; }
+  .adv-panel .detail p { margin: 2px 0 0; }
+  .adv-panel .detail .when { font-size: 13px; color: var(--accent); font-weight: 600; }
+  .adv-panel .detail > div { flex: 1; min-width: 0; }
+  .adv-panel .detail .bar { max-width: 260px; }
+  .adv-group h3 { margin: 18px 0 2px; font-size: 12px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+  .adv-group .note { margin: 0 0 8px; }
+  .adv-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(92px, 1fr)); gap: 6px; }
+  .adv-tile { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 10px 4px 8px; border: 1px solid transparent; background: none;
+    text-align: center; font-size: 12.5px; line-height: 1.2; }
+  button.adv-tile:hover { border-color: var(--line); background: var(--bg); }
+  .adv-tile.picked { border-color: var(--accent); background: var(--accent-soft); }
+  .adv-tile:not(.got) :is(img, .emoji) { filter: grayscale(1); opacity: .45; }
+  .adv-tile:not(.got) .label { color: var(--muted); }
+  .adv-tile .mini { width: 70%; height: 4px; border-radius: 2px; background: var(--line); overflow: hidden; }
+  .adv-foot { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px 12px; margin-top: 20px; padding-top: 12px; border-top: 1px solid var(--line); }
+  @media (max-width: 720px) {
+    .adv-toasts { left: 8px; right: 8px; top: 8px; width: auto; max-width: none; }
+    .adv-grid { grid-template-columns: repeat(auto-fill, minmax(78px, 1fr)); }
+  }
 
   /* ---------- Modal ---------- */
   .modal-bg { position: fixed; inset: 0; background: rgba(0,0,0,.45); display: grid; place-items: center; padding: 16px; z-index: 10; }
@@ -611,7 +674,8 @@ const THEMES = [...new Set(['auto', 'light', 'dark', ...Array.from(document.quer
   </div>
 
   <div class="history hidden" id="history">
-    <div class="history-head"><h2>Recent games</h2><button class="link" id="btnClearHistory">Clear history</button></div>
+    <div class="history-head"><h2>Recent games</h2><button class="link" id="btnClearHistory">Clear history</button>
+      <button class="adv-btn" id="btnAdv">🏆 Advancements <span class="count mono" id="advCount"></span></button></div>
     <div class="history-wrap"><table><thead><tr><th>Game</th><th>Route</th><th>Result</th><th>Time</th><th>When</th></tr></thead><tbody></tbody></table></div>
   </div>
 
@@ -666,6 +730,7 @@ const THEMES = [...new Set(['auto', 'light', 'dark', ...Array.from(document.quer
 
 <div class="modal-bg hidden" id="modalBg"><div class="modal" id="modal" role="dialog" aria-modal="true"></div></div>
 <canvas id="fx" aria-hidden="true" hidden></canvas>
+<div class="adv-toasts" id="advToasts" role="status"></div>
 
 <script src="wiki-data.js"></script>
 <script>
@@ -885,6 +950,7 @@ async function pageInfo(title) {
 
 // ---------------------------------------------------------------- Setup screen
 // rolls: per-card token, so superseded rolls are dropped. daily: the date, while the cards hold that day's pair.
+// challenge: whether they hold a challenge link's game, unchanged (for the Accepted advancement).
 // via0…via2: the checkpoints, in order, as many as the Checkpoint rule's count while it is on.
 const VIA_KEYS = ['via0', 'via1', 'via2'];
 // exact: Exact clicks's route for the cards (updateSetupPar). extra: its clicks over par, the number picked or, for
@@ -892,7 +958,7 @@ const VIA_KEYS = ['via0', 'via1', 'via2'];
 // with Round trip, how many of the checkpoints come after the target, on the way back (see syncVia). blind: whether
 // Blind target was on when the rules were last set, so turning it off drops the cards it held unseen (see hiddenKeys).
 // route: the cards' par route, for the background (none under Blind target).
-const setup = { start: null, via0: null, via1: null, via2: null, goal: null, daily: null, busy: 0, exact: null, extra: null, kinds: null, back: null, blind: false, route: null,
+const setup = { start: null, via0: null, via1: null, via2: null, goal: null, daily: null, challenge: false, busy: 0, exact: null, extra: null, kinds: null, back: null, blind: false, route: null,
   rolls: { start: 0, via0: 0, via1: 0, via2: 0, goal: 0 } };
 const viaCount = () => +$('#viaCount').value;
 // Scavenger's mode while it is on: 'articles' (the checkpoint cards and the target card hold them) or 'kinds'.
@@ -1256,6 +1322,7 @@ const LEFT_DAILY = 'Any change to the daily challenge makes it an ordinary game.
 function leaveDaily() {
   const was = !!setup.daily;
   setup.daily = null;
+  setup.challenge = false;   // a challenge link's game too, for Accepted
   return was;
 }
 
@@ -1788,7 +1855,10 @@ function renderHistory() {
     const b = best.get(pair(r));
     if (r.won && (!b || beats(r, b))) best.set(pair(r), r);
   }
-  $('#history').classList.toggle('hidden', rows.length === 0);
+  // With no games but advancements earned (after Clear history), only the heading and the Advancements button show.
+  $('#history').classList.toggle('hidden', rows.length === 0 && !advEarned());
+  for (const el of ['.history-wrap', '#btnClearHistory']) $(el).classList.toggle('hidden', rows.length === 0);
+  $('#advCount').textContent = `${advEarned()} / ${Object.keys(ADVANCEMENTS).length}`;
   $('#history tbody').innerHTML = rows.slice(0, 15).map(r => {
     const tags = [[GAMES[gameOf(r.rules)].label, 'game'], ...extraLabels(r.rules).map(t => [t]),
       ...r.daily ? [[`Daily ${shortDate(new Date(r.daily + 'T00:00'))}`, 'daily']] : []];   // local midnight of that day
@@ -1815,6 +1885,7 @@ const game = {
   rules: [],         // rule keys in play, read from the checkboxes at start
   daily: null,       // the date, if this is that day's daily pair
   onDay: false,      // whether that daily started on its own day, which a streak needs
+  challenge: false,  // whether it came from a challenge link (setup.challenge)
   link: '',          // a link that plays this game (gameLink), made at the start
   vias: [],          // the checkpoints (Checkpoint rule), to be reached in order before the target counts
   viaNext: 0,        // how many of them have been reached
@@ -1973,7 +2044,7 @@ function startGame() {
   const vias = roundTrip && !hunt ? [...cps.slice(0, out), setup.goal, ...cps.slice(out)] : cps, goal = roundTrip ? setup.start : hunt ? null : setup.goal;
   const exact = r.includes('exact') ? setup.exact : null, limit = exact ? exact.length - 1 : r.includes('limit') ? CLICK_LIMIT : 0;
   Object.assign(game, { active: true, link: gameLink(), start: setup.start, goal, vias, viaNext: 0, roundTrip, turn: roundTrip && !hunt ? out + 1 : 0, hunt,
-    dead: new Set(), exact, limit, celebrate: false, stuck: false, daily: setup.daily, onDay: setup.daily === today(), rules: r, content: contentInPlay(cards.map(c => c.title)), timed: $('#timerToggle').checked, path: [],
+    dead: new Set(), exact, limit, celebrate: false, stuck: false, cheerRun: 0, challenge: setup.challenge, daily: setup.daily, onDay: setup.daily === today(), rules: r, content: contentInPlay(cards.map(c => c.title)), timed: $('#timerToggle').checked, path: [],
     seen: new Map(), stack: [], elapsed: 0, runningSince: 0, loading: false, par: null });
   // Par shows in the header once it is known: at once when the setup screen has loaded the link graph.
   const parReady = game.parReady = cardsRoute(cards.map(c => c.title), r, kinds, back);
@@ -2041,6 +2112,7 @@ async function navigate(title, fragment, { back = false, from = null } = {}) {
   const finds = hunting() && game.path.length ? huntFinds(page) : [];   // the start never counts
   game.path.push({ title: page.title, back, ...(via && { via }), ...(finds.length && { found: finds.map(h => h.label) }) });
   for (const h of finds) h.found = page.title;
+  advArrive(page.title, back);
   game.seen.set(title, page.title).set(page.title, page.title);   // the link's title too, in case it was a redirect
   // With Exact clicks every page visited is dead, by every title that led to it, before the arrival is measured; only the
   // target can still be arrived at, too soon.
@@ -2085,6 +2157,7 @@ function frameReady(token, live) {
   if (game.celebrate) { game.celebrate = false; celebrateCheckpoint(); }
   else if (game.stuck) showToast(stuckText());
   cheer(game.path.at(-1));
+  advPump();
 }
 
 // ---------------------------------------------------------------- Sounds
@@ -2283,11 +2356,231 @@ function cheer(entry) {
   if (!game.rules.includes('distance')) return;
   const i = game.path.indexOf(entry);
   Promise.all([game.path[i - 1]?.measured, entry.measured]).then(() => {
-    if (game.path.at(-1) !== entry || !game.active || game.loading || !gotCloser(game.path, i, !!game.exact)) return;
+    if (game.path.at(-1) !== entry || !game.active || game.loading) return;
+    if (!gotCloser(game.path, i, !!game.exact)) { game.cheerRun = 0; return; }   // cheerRun: cheers in a row, for On a Roll
     play('closer', entry.togo);
     bump($('#hudHint'), 'closer');
     effect('sparkle', middleOf($('#hudHint')));
+    if (++game.cheerRun >= 3) { advEarn({ onARoll: true }); advPump(); }
   });
+}
+
+// ---------------------------------------------------------------- Advancements
+// Minecraft-style advancements, each a task, goal or challenge (ADV_TIERS), earned once and announced by a toast with
+// its tier's heading and sound. mwr.advancements keeps what is earned (got: key to when) and what some count toward:
+// wins, articles visited, the different articles visited (pages, by title, so a new snapshot keeps them) and the topics
+// seen. They are checked as a page arrives (advArrive), as a game ends (advFinish) and as Distance cheers (cheer). Skill
+// and speed ones need par ADV_PAR or more and the pair's first game, none of it in the history before, so a typed easy
+// pair or Retry this pair doesn't earn them; speed ones also need the Timer.
+const ADV_PAR = 3;
+const ADV_TIERS = {
+  task: { label: 'Task', title: 'Advancement Made!', sound: 'checkpoint' },
+  goal: { label: 'Goal', title: 'Goal Reached!', sound: 'win' },
+  challenge: { label: 'Challenge', title: 'Challenge Complete!', sound: 'best' },
+};
+const ADV_GROUPS = {
+  start: { label: 'Getting started' },
+  skill: { label: 'Skill', note: `Par ${ADV_PAR} or more, on a pair’s first game.` },
+  speed: { label: 'Speed', note: `Timer on, par ${ADV_PAR} or more, on a pair’s first game.` },
+  keep: { label: 'Keeping at it' },
+  explore: { label: 'Exploring' },
+  secret: { label: 'Secret', note: 'Hidden until you find them.' },
+};
+// icon: the article whose picture it shows (the emoji until that loads, or if it doesn't). A count is of tally
+// (advTally), in unit.
+const ADVANCEMENTS = Object.fromEntries([
+  ['firstClick', 'start', 'First Click', 'Click a link in a game.', 'task', 'Wooden Pickaxe', '⛏️'],
+  ['hello', 'start', 'Hello, Wiki', 'Win a game.', 'task', 'Book and Quill', '📖'],
+  ['daily', 'start', 'Daily Bread', 'Play a daily.', 'task', 'Bread', '🍞'],
+  ['relay', 'start', 'Relay Racer', 'Win a Relay.', 'task', 'Saddle', '🐴'],
+  ['treasure', 'start', 'Treasure Hunter', 'Win a Scavenger hunt.', 'task', 'Chest', '🧰'],
+  ['measure', 'start', 'Measure Twice', 'Win an Exact clicks game.', 'task', 'Spyglass', '📏'],
+  ['thereBack', 'start', 'There and Back Again', 'Win a Round trip.', 'task', 'Compass', '🧭'],
+  ['accepted', 'start', 'Accepted', 'Win a game opened from a challenge link.', 'task', 'Bell', '🔔'],
+  ['par', 'skill', 'Par for the Course', 'Win at par.', 'goal', 'Target', '🎯'],
+  ['birdie', 'skill', 'Birdie', 'Beat par: the live wiki had a shortcut the offline copy didn’t.', 'challenge', 'Parrot', '🐦', { secret: true }],
+  ['hardcore', 'skill', 'Hardcore', 'Win on Hard.', 'goal', 'Totem of Undying', '❤️'],
+  ['noTakeBacks', 'skill', 'No Take-Backs', 'Win with No Back.', 'task', 'Bow', '🏹'],
+  ['blindfolded', 'skill', 'Blindfolded', 'Win with Blind target.', 'goal', 'Blindness', '🙈'],
+  ['sixShooter', 'skill', 'Six Shooter', 'Win with Six clicks.', 'task', 'Crossbow', '6️⃣'],
+  ['topNotch', 'skill', 'Top Notch', 'Win with Top links only.', 'goal', 'Enchanted Golden Apple', '🍎'],
+  ['longWay', 'skill', 'Long Way Round', 'Win Exact clicks at par + 5.', 'challenge', 'Minecart', '🛒'],
+  ['grandTour', 'skill', 'Grand Tour', 'Win a Round trip Relay with 3 checkpoints.', 'challenge', 'Elytra', '🪽'],
+  ['kinds', 'skill', 'Kind Collector', 'Win a Scavenger hunt of kinds.', 'task', 'Bundle', '👝'],
+  ['fullKit', 'skill', 'Full Kit', 'Win on Hard with No Back and Blind target.', 'challenge', 'Netherite Chestplate', '🛡️'],
+  ['quick', 'speed', 'Quick Thinker', 'Win in under 60 seconds.', 'goal', 'Sugar', '⚡'],
+  ['speedrunner', 'speed', 'Speedrunner', 'Win in under 30 seconds.', 'challenge', 'Potion of Swiftness', '🏃'],
+  ['sprinter', 'speed', 'Sprinter', 'Win a par 4+ game in under 45 seconds.', 'challenge', 'Rabbit\'s Foot', '🐇'],
+  ['regular', 'keep', 'Regular', 'Win 10 games.', 'task', 'Iron Ingot', '🥉', { of: 10, tally: 'wins', unit: 'wins' }],
+  ['veteran', 'keep', 'Veteran', 'Win 50 games.', 'goal', 'Gold Ingot', '🥈', { of: 50, tally: 'wins', unit: 'wins' }],
+  ['legend', 'keep', 'Wiki Legend', 'Win 100 games.', 'challenge', 'Diamond', '💎', { of: 100, tally: 'wins', unit: 'wins' }],
+  ['selfImprovement', 'keep', 'Self-Improvement', 'Beat your own best on a pair.', 'task', 'Bottle o\' Enchanting', '📈'],
+  ['habit', 'keep', 'Habit', 'Win the daily 3 days in a row.', 'task', 'Clock', '🕒', { of: 3, tally: 'streak', unit: 'days' }],
+  ['weekStreak', 'keep', 'Week Streak', 'Win the daily 7 days in a row.', 'goal', 'Campfire', '🔥', { of: 7, tally: 'streak', unit: 'days' }],
+  ['devoted', 'keep', 'Devoted', 'Win the daily 30 days in a row.', 'challenge', 'Beacon', '🗼', { of: 30, tally: 'streak', unit: 'days' }],
+  ['bookworm', 'keep', 'Bookworm', 'Visit 1,000 articles in total.', 'goal', 'Bookshelf', '📚', { of: 1000, tally: 'visits', unit: 'articles' }],
+  ['tourist', 'explore', 'Tourist', 'Visit 100 different articles.', 'task', 'Map', '🗺️', { of: 100, tally: 'pages', unit: 'articles' }],
+  ['cartographer', 'explore', 'Cartographer', 'Visit 1,000 different articles.', 'goal', 'Cartography Table', '🧭', { of: 1000, tally: 'pages', unit: 'articles' }],
+  ['aroundWorld', 'explore', 'Around the World', 'Visit articles from all five topics.', 'task', 'Lodestone', '🌍'],
+  ['spinDoctor', 'explore', 'Spin Doctor', 'Visit a spin-off page.', 'task', 'Ender Pearl', '🌀'],
+  ['aprilFools', 'explore', 'April Fools!', 'Visit an April Fools page.', 'task', 'Poisonous Potato', '🥔'],
+  ['onARoll', 'explore', 'On a Roll', 'Have Distance cheer 3 clicks in a row.', 'goal', 'Fire Charge', '🎳'],
+  ['hotStreak', 'explore', 'Hot Streak', 'Win a par 4+ game with Distance cheering every click.', 'challenge', 'Blaze Powder', '🔥'],
+  ['herobrine', 'secret', 'He Is Watching', 'Land on Herobrine.', 'task', 'Herobrine', '👁️', { secret: true }],
+  ['cake', 'secret', 'The Cake Is Real', 'Land on Cake.', 'task', 'Cake', '🎂', { secret: true }],
+  ['rags', 'secret', 'Rags to Riches', 'Win from Dirt to Diamond.', 'goal', 'Diamond Ore', '⛏️', { secret: true }],
+  ['soClose', 'secret', 'So Close', 'Run out of Six clicks one click from the target.', 'task', 'Fishing Rod', '🎣', { secret: true }],
+  ['scenic', 'secret', 'Scenic Route', 'Win in 15 or more clicks.', 'task', 'Boat', '🛶', { secret: true }],
+  ['fullCircle', 'secret', 'Full Circle', 'Click your way back to the start page, without Back, outside a Round trip.', 'task', 'Recovery Compass', '🔄', { secret: true }],
+].map(([key, group, name, how, tier, icon, emoji, x]) => [key, { group, name, how, tier, icon, emoji, ...x }]));
+
+// Read through savedAdvancements, which keeps only what advancements would write: storage is open to the player.
+const advEmpty = () => ({ got: {}, wins: 0, visits: 0, pages: new Set(), topics: [] });
+function savedAdvancements() {
+  const s = store.get('mwr.advancements', null), a = advEmpty();
+  if (!s || typeof s !== 'object') return a;
+  for (const [k, at] of Object.entries(s.got && typeof s.got === 'object' ? s.got : {})) if (isKey(ADVANCEMENTS, k) && Number.isFinite(at)) a.got[k] = at;
+  for (const k of ['wins', 'visits']) if (Number.isInteger(s[k]) && s[k] >= 0) a[k] = s[k];
+  if (Array.isArray(s.pages)) a.pages = new Set(s.pages.filter(t => typeof t === 'string'));
+  if (Array.isArray(s.topics)) a.topics = WIKI_DATA.topics.filter(t => s.topics.includes(t));
+  return a;
+}
+let adv = savedAdvancements();
+const saveAdv = () => store.set('mwr.advancements', { ...adv, pages: [...adv.pages] });
+const advTally = t => t === 'streak' ? dailyStreaks(savedDailies()).now : t === 'pages' ? adv.pages.size : adv[t];
+const advEarned = () => Object.keys(adv.got).length;
+
+// Earns each advancement whose check holds, and every count reached, queueing their toasts.
+const advQueue = [];
+function advEarn(checks) {
+  const counts = Object.entries(ADVANCEMENTS).filter(([, a]) => a.of).map(([k, a]) => [k, advTally(a.tally) >= a.of]);
+  for (const [k, ok] of [...Object.entries(checks), ...counts]) if (ok && !adv.got[k]) { adv.got[k] = Date.now(); advQueue.push(k); }
+  saveAdv();
+}
+// An arrival, from navigate, after its try: nothing may fail there (the game would stay loading), so it swallows its own errors.
+function advArrive(title, back) {
+  try {
+    const i = game.path.length - 1, topic = ARTICLES.get(title)?.topic;
+    adv.visits++;
+    adv.pages.add(title);
+    if (topic && !adv.topics.includes(topic)) adv.topics.push(topic);
+    advEarn({
+      firstClick: i > 0 && !back, herobrine: title === 'Herobrine', cake: title === 'Cake',
+      spinDoctor: !!spinoffOf(title), aprilFools: !!ARTICLES.get(title)?.fams.includes('joke'), aroundWorld: adv.topics.length === WIKI_DATA.topics.length,
+      fullCircle: i > 0 && !back && title === game.start.title && !game.roundTrip,
+    });
+  } catch { /* no advancement */ }
+}
+// A game's end, from finish, with whether it was the pair's first game and a new personal best. What it needs of the
+// game is read before the first await, since Retry this pair may start another; par and the arrivals' counts are waited
+// for. Its toasts come once the result's fanfare has played (ADV_AFTER_RESULT).
+const ADV_AFTER_RESULT = 1200;
+async function advFinish(rec, first, newBest) {
+  const at = performance.now() + ADV_AFTER_RESULT, path = game.path, parReady = game.parReady, rules = game.rules, has = k => rules.includes(k);
+  const g = { exact: !!game.exact, roundTrip: game.roundTrip, checkpoints: checkpoints(), timed: game.timed, challenge: game.challenge };
+  try {
+    if (rec.won) { adv.wins++; saveAdv(); }
+    const par = rec.par ?? await parReady.then(route => route ? route.length - 1 : null, () => null);
+    await Promise.all(path.map(p => p.measured));
+    const won = rec.won, skill = won && first && par >= ADV_PAR, speed = skill && g.timed;
+    advEarn({
+      hello: won, daily: !!rec.daily, relay: won && has('checkpoint'), treasure: won && has('scavenger'), measure: won && g.exact,
+      thereBack: won && g.roundTrip, accepted: won && g.challenge,
+      par: skill && !g.exact && rec.clicks === par, birdie: skill && !g.exact && rec.clicks < par, hardcore: skill && has('nohubs'),
+      noTakeBacks: skill && has('noback'), blindfolded: skill && has('blind'), sixShooter: skill && has('limit'), topNotch: skill && has('lead'),
+      longWay: skill && g.exact && rec.exact - par >= 5, grandTour: skill && g.roundTrip && g.checkpoints === 3 && !has('scavenger'),
+      kinds: skill && !!rec.kinds, fullKit: skill && has('nohubs') && has('noback') && has('blind'),
+      quick: speed && rec.ms < 60000, speedrunner: speed && rec.ms < 30000, sprinter: speed && par >= 4 && rec.ms < 45000,
+      selfImprovement: newBest,
+      hotStreak: won && has('distance') && !g.exact && par >= 4 && path.slice(1, -1).every((p, i) => p.via || p.found || gotCloser(path, i + 1, false)),
+      rags: won && rec.start === 'Dirt' && rec.goal === 'Diamond' && !rec.vias && !g.roundTrip,
+      soClose: !!rec.outOfClicks && !g.exact && path.at(-1).togo === 1, scenic: won && rec.clicks >= 15,
+    });
+  } catch { /* no advancement */ }
+  setTimeout(advPump, Math.max(0, at - performance.now()));
+}
+
+// The toasts: up to ADV_SHOWN at once, each for ADV_MS, the rest waiting; one sound for those shown together, the
+// highest tier's. While playing they sit under the game header, clear of Back and Give up, and wait for an article
+// that is loading (frameReady shows them).
+const ADV_SHOWN = 3, ADV_MS = 5000;
+function advPump() {
+  if (game.active && game.loading) return;
+  const host = $('#advToasts'), tiers = [];
+  while (advQueue.length && host.querySelectorAll('.adv-toast:not(.out)').length < ADV_SHOWN) {
+    const key = advQueue.shift(), a = ADVANCEMENTS[key], el = document.createElement('div');
+    el.className = 'adv-toast ' + a.tier;
+    el.innerHTML = `${advFrame(key)}<div><div class="t">${ADV_TIERS[a.tier].title}</div><div class="n">${esc(a.name)}</div></div>`;
+    host.append(el);
+    tiers.push(a.tier);
+    setTimeout(() => { el.classList.add('out'); setTimeout(() => { el.remove(); advPump(); }, 350); }, ADV_MS);
+  }
+  if (!tiers.length) return;
+  const playing = !$('#game').classList.contains('hidden') && $('#modalBg').classList.contains('hidden');
+  host.style.top = playing ? $('.hud').getBoundingClientRect().bottom + 12 + 'px' : '';
+  play(ADV_TIERS[['challenge', 'goal', 'task'].find(t => tiers.includes(t))].sound);
+  advPictures();
+}
+
+// Pictures: every advancement's article's, asked for once, when a toast or the panel first needs them; until then,
+// or if they don't come, the emoji. Each frame shown then gets its picture.
+const advPics = new Map();
+let advPicsAsked = null;
+function advPictures() {
+  advPicsAsked ??= api({ action: 'query', titles: [...new Set(Object.values(ADVANCEMENTS).map(a => a.icon))].join('|'), redirects: '1',
+    prop: 'pageimages', piprop: 'thumbnail', pithumbsize: '96', pilimit: 'max' }).then(d => {
+    const asked = new Map([...d.query?.normalized ?? [], ...d.query?.redirects ?? []].map(n => [n.to, n.from]));
+    for (const p of d.query?.pages ?? []) if (p.thumbnail) advPics.set(asked.get(p.title) ?? p.title, p.thumbnail.source);
+    for (const el of document.querySelectorAll('.adv-frame[data-adv]')) el.innerHTML = advIcon(el.dataset.adv, el.classList.contains('secret'));
+  }, () => { advPicsAsked = null; });
+}
+const advIcon = (key, hidden) => hidden ? '<span class="emoji" aria-hidden="true">?</span>' : advPics.has(ADVANCEMENTS[key].icon)
+  ? `<img alt="" src="${esc(advPics.get(ADVANCEMENTS[key].icon))}">` : `<span class="emoji" aria-hidden="true">${ADVANCEMENTS[key].emoji}</span>`;
+const advFrame = (key, hidden = false, got = false) =>
+  `<span class="adv-frame ${ADVANCEMENTS[key].tier}${hidden ? ' secret' : ''}${got ? ' got' : ''}" data-adv="${key}">${advIcon(key, hidden)}</span>`;
+
+// The panel, from the button by Recent games: the count and a bar, the one picked (how to get it, when it was earned
+// or how far along a count is), then each group's grid, a secret one ??? until earned; Reset advancements at the foot.
+let advPicked = null;
+function advDetail() {
+  const key = advPicked, a = ADVANCEMENTS[key];
+  if (!a) return '<span class="note">Pick one to see how to get it.</span>';
+  const at = adv.got[key], hidden = a.secret && !at, n = a.of && !at ? Math.min(a.of, advTally(a.tally)) : null;
+  return `${advFrame(key, hidden, !!at)}<div>
+    <div><span class="name">${hidden ? '???' : esc(a.name)}</span><span class="tier">${ADV_TIERS[a.tier].label}</span></div>
+    <p class="how">${hidden ? 'A secret. Keep playing.' : esc(a.how)}</p>
+    ${at ? `<p class="when">Earned ${esc(shortDate(new Date(at)))}</p>`
+      : n !== null ? `<div class="bar"><i style="width: ${100 * n / a.of}%"></i></div><p class="note how">${fmtCount(n)} of ${fmtCount(a.of)} ${a.unit}</p>` : ''}</div>`;
+}
+function openAdvancements() {
+  const all = Object.keys(ADVANCEMENTS), got = advEarned();
+  openModal(`<div class="adv-panel"><div class="adv-head">
+      <div class="top"><h2>Advancements</h2><span class="note">${got} of ${all.length}</span><button class="close" id="aClose" aria-label="Close">✕</button></div>
+      <div class="bar"><i style="width: ${100 * got / all.length}%"></i></div>
+      <div class="detail" id="aDetail">${advDetail()}</div>
+    </div>` + Object.entries(ADV_GROUPS).map(([group, { label, note }]) => {
+      const keys = all.filter(k => ADVANCEMENTS[k].group === group);
+      return `<section class="adv-group"><h3>${label} · ${keys.filter(k => adv.got[k]).length} of ${keys.length}</h3>${note ? `<p class="note">${note}</p>` : ''}
+        <div class="adv-grid">${keys.map(k => {
+          const a = ADVANCEMENTS[k], at = adv.got[k], hidden = a.secret && !at, n = a.of && !at && Math.min(a.of, advTally(a.tally));
+          return `<button class="adv-tile${at ? ' got' : ''}${advPicked === k ? ' picked' : ''}" data-adv-key="${k}">${advFrame(k, hidden, !!at)}`
+            + `<span class="label">${hidden ? '???' : esc(a.name)}</span>${a.of && !at ? `<span class="mini"><i style="width: ${100 * n / a.of}%"></i></span>` : ''}</button>`;
+        }).join('')}</div></section>`;
+    }).join('') + `<div class="adv-foot"><span class="note">Your history and dailies are kept apart: Clear history leaves these.</span>
+      <button class="link" id="aReset">Reset advancements</button></div></div>`);
+  $('#aClose').onclick = closeModal;
+  for (const t of document.querySelectorAll('.adv-tile')) t.onclick = () => {
+    advPicked = t.dataset.advKey;
+    for (const o of document.querySelectorAll('.adv-tile')) o.classList.toggle('picked', o === t);
+    $('#aDetail').innerHTML = advDetail();
+  };
+  $('#aReset').onclick = () => {
+    openModal(`<h2>Reset advancements?</h2><p>This forgets every advancement you’ve earned and the counts toward the rest (wins, articles visited). Your history and dailies stay.</p>
+      <div class="actions"><button id="aKeep">Cancel</button><button class="primary" id="aWipe">Reset advancements</button></div>`);
+    $('#aKeep').onclick = openAdvancements;
+    $('#aWipe').onclick = () => { adv = advEmpty(); saveAdv(); renderHistory(); openAdvancements(); };
+  };
+  advPictures();
 }
 
 // ---------------------------------------------------------------- Themes
@@ -3272,7 +3565,7 @@ function finish(won, lost = null) {
     // The par the target was rolled at, unless a new start or difficulty has moved the game off it since.
     ...(target?.topic && { topic: target.topic }), ...(target?.reach && REACHES[target.reach].fits?.(game.par) !== false && { reach: target.reach }),
     ...(game.content.length && { content: game.content }), ...(game.par !== null && { par: game.par }), ...(game.exact && { exact: game.limit }), rules: game.rules, won, ...(lost && { [lost]: true }), clicks: clicks(), ...(game.timed && { ms }), at: Date.now(), path: game.path.map(p => p.title) };
-  const hist = savedGames();
+  const hist = savedGames(), first = !hist.some(r => recordKey(r) === recordKey(rec));   // the pair's first game, for advancements
   const best = hist.filter(r => r.won && recordKey(r) === recordKey(rec) && sameRules(r, rec))
     .reduce((b, r) => !b || beats(r, b) ? r : b, null);
   hist.unshift(rec);
@@ -3290,6 +3583,7 @@ function finish(won, lost = null) {
       p.stranded && '⛔'].filter(Boolean).map(w => ` <span class="note">${esc(w)}</span>`).join('') +
     (toGoText(p) ? ` <span class="note togo${worse(p, i) ? ' worse' : ''}">${toGoText(p)}</span>` : '') + '</li>').join('');
   const newBest = won && best && beats(rec, best);
+  advFinish(rec, first, !!newBest);
   const bestNote = !won || !best ? '' : newBest ? '<p class="best new">New personal best for this pair!</p>'
     : `<p class="best note">Your best for this pair: ${wonText(best)}.</p>`;
   // The heading: the outcome, with a loss's reason under it. Exact clicks's column holds a route of its count.
@@ -4262,6 +4556,7 @@ $('#btnGiveUp').onclick = () => {
   $('#gKeep').onclick = closeModal;
   $('#gQuit').onclick = () => { $('#modalBg').classList.add('hidden'); finish(false); };
 };
+$('#btnAdv').onclick = openAdvancements;
 $('#btnClearHistory').onclick = () => {
   const n = savedGames().length;
   openModal(`<h2>Clear history?</h2><p>This deletes ${n === 1 ? 'the 1 recorded game' : `all ${n} recorded games`}, personal bests, dailies and the daily streak included. It can’t be undone.</p>
@@ -4332,6 +4627,7 @@ const cardsLoaded = () => !!setup.start && !!(huntMode() === 'kinds' ? setup.kin
       }
       syncVia();
       cardKeys().forEach(renderCard);
+      setup.challenge = true;
       const r = rulesText(rules());
       setStatus(`Challenge loaded${r ? ' with ' + r : ''}. Press Start when ready.`);
     });

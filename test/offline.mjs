@@ -1199,6 +1199,79 @@ for (let i = 0; i < 8; i++) {
 }
 check('Random game sets the settings at random and fills the cards they use', randoms.every(Boolean) && new Set(randoms).size > 4, randoms.join(' ; '));
 
+// Advancements: a par 3+ pair's first game, won at par from a challenge link, earns the firsts, Par for the Course,
+// Accepted and the speed ones, with toasts; the same pair again earns no skill one, nor does a par 1 pair; landing on
+// Cake and back on the start earn their secrets once the article shows; the panel, its counts and a count's progress;
+// storage only keeping what advancements would write; Clear history leaving them and Reset clearing them.
+await ev("['mwr.advancements', 'mwr.history', 'mwr.dailies'].forEach(k => localStorage.removeItem(k))");
+const long = JSON.parse(await ev(`(async () => {
+  const graph = await linkGraph(['nonav']), usable = routeUsable({ keep: [], rules: ['nonav'] });
+  for (const start of POOL_TITLES) {
+    const d = distancesFrom(graph, start, usable), goal = POOL_TITLES.find(t => d[PAGE_IDS.get(t)] >= 3);
+    if (goal) return JSON.stringify(await parRoute({ start, goal, rules: ['nonav'] }));
+  }
+  return 'null';
+})()`));
+check('the snapshot has a pool pair three or more clicks apart on Normal', long?.length >= 4, JSON.stringify(long));
+const earnedKeys = "JSON.stringify(Object.keys(adv.got).sort())";
+const playRoute = async (hash, route) => {
+  await open(hash);
+  await play();
+  for (const t of route.slice(1)) {
+    await ev(`navigate(${JSON.stringify(t)}, null)`);
+    await until(`game.path.at(-1).title === ${JSON.stringify(t)} && !game.loading`);
+  }
+};
+await playRoute(`#start=${encodeURIComponent(long[0])}&target=${encodeURIComponent(long.at(-1))}&rules=nonav`, long);
+const firsts = ['accepted', 'firstClick', 'hello', 'par', 'quick', 'speedrunner', ...long.length > 4 ? ['sprinter'] : []];
+check('a par 3+ pair\'s first game, won at par from a challenge link, earns the firsts, Par for the Course and the speed ones',
+  await until(`${JSON.stringify(firsts)}.every(k => adv.got[k]) && !adv.got.noTakeBacks && adv.wins === 1 && store.get('mwr.advancements').wins === 1`), await ev(earnedKeys));
+check('their toasts show over the result, three at a time, the rest waiting', await until("document.querySelectorAll('#advToasts .adv-toast').length === 3")
+  && await ev(`advQueue.length === ${firsts.length - 3} && $('#advToasts .adv-toast .t').textContent.endsWith('!')`), await ev("$('#advToasts').textContent"));
+check('the arrivals are counted: every visit, the different pages and their topics', await ev(`adv.visits === ${long.length} && adv.pages.size === ${long.length}
+  && adv.topics.every(t => WIKI_DATA.topics.includes(t))`), await ev('JSON.stringify([adv.visits, adv.pages.size, adv.topics])'));
+await ev("closeModal(); toSetup()");
+await playRoute(`#start=${encodeURIComponent(long[0])}&target=${encodeURIComponent(long.at(-1))}&rules=nonav,noback`, long);
+await sleep(500);
+check('the same pair again earns no skill advancement', await until('adv.wins === 2') && await ev('!adv.got.noTakeBacks'), await ev(earnedKeys));
+await ev("closeModal(); toSetup()");
+await playRoute('#start=Diamond&target=Diamond%20Pickaxe&rules=nonav,noback', ['Diamond', 'Diamond Pickaxe']);
+await sleep(500);
+check('nor does a par 1 pair\'s first game', await until('adv.wins === 3') && await ev('game.par === 1 && !adv.got.noTakeBacks'), await ev('game.par'));
+await ev("closeModal(); toSetup()");
+await open('#start=Diamond&target=Crafting&rules=nonav');
+await play();
+await ev("navigate('Cake', null)");
+check('landing on Cake earns its secret, its toast once the article shows', await until("!game.loading && !!adv.got.cake && $('#advToasts').textContent.includes('The Cake Is Real')"),
+  await ev("$('#advToasts').textContent"));
+await ev("navigate('Diamond', null)");
+check('and clicking back to the start, without Back, Full Circle', await until('!game.loading && !!adv.got.fullCircle'));
+await ev('finish(false); closeModal(); toSetup()');
+const earnedN = await ev('advEarned()');
+check('the button by Recent games counts them', await ev(`$('#advCount').textContent === '${earnedN} / ' + Object.keys(ADVANCEMENTS).length && !$('#btnAdv').closest('.hidden')`), await ev("$('#advCount').textContent"));
+await ev("$('#btnAdv').click()");
+check('the panel has every one in its group, the earned in gold and the unearned secrets as ???', await ev(`document.querySelectorAll('.adv-tile').length === Object.keys(ADVANCEMENTS).length
+  && document.querySelectorAll('.adv-tile.got .adv-frame.got').length === ${earnedN} && document.querySelectorAll('.adv-group').length === Object.keys(ADV_GROUPS).length
+  && [...document.querySelectorAll('.adv-tile .label')].filter(l => l.textContent === '???').length === Object.entries(ADVANCEMENTS).filter(([k, a]) => a.secret && !adv.got[k]).length
+  && document.querySelector('.adv-tile[data-adv-key=cake]').textContent.includes('The Cake Is Real')`));
+await ev("document.querySelector('.adv-tile[data-adv-key=regular]').click()");
+check('picking a count shows how far along it is', await ev("$('#aDetail').textContent.includes('Win 10 games.') && $('#aDetail').textContent.includes('3 of 10 wins')"), await ev("$('#aDetail').textContent"));
+await ev("document.querySelector('.adv-tile[data-adv-key=birdie]').click()");
+check('and an unearned secret says nothing of itself', await ev("$('#aDetail').textContent.includes('???') && !$('#aDetail').textContent.includes('Birdie') && !$('#aDetail').textContent.includes('par')"),
+  await ev("$('#aDetail').textContent"));
+await ev('closeModal()');
+await ev("localStorage.setItem('mwr.advancements', JSON.stringify({ got: { hello: 1, nope: 2, par: 'x' }, wins: -1, visits: 4, pages: ['A', 3], topics: ['mobs', 'zz'] }))");
+check('stored advancements keep only what would be written', await ev(`(a => JSON.stringify([a.got, a.wins, a.visits, [...a.pages], a.topics]))(savedAdvancements())`)
+  === JSON.stringify([{ hello: 1 }, 0, 4, ['A'], ['mobs']]), await ev(`(a => JSON.stringify([a.got, a.wins, a.visits, [...a.pages], a.topics]))(savedAdvancements())`));
+await ev('saveAdv()');   // back to the earned ones
+await ev("$('#btnClearHistory').click(); $('#hClear').click()");
+check('Clear history leaves them, the heading and the button still there with no table', await ev(`advEarned() === ${earnedN} && savedGames().length === 0
+  && !$('#history').classList.contains('hidden') && $('.history-wrap').classList.contains('hidden') && $('#btnClearHistory').classList.contains('hidden')`));
+await ev("$('#btnAdv').click(); $('#aReset').click(); $('#aWipe').click()");
+check('Reset advancements forgets them and the counts', await ev(`advEarned() === 0 && adv.wins === 0 && adv.pages.size === 0 && JSON.stringify(store.get('mwr.advancements').got) === '{}'
+  && $('#advCount').textContent.startsWith('0 / ') && document.querySelectorAll('.adv-tile.got').length === 0 && $('#history').classList.contains('hidden')`));
+await ev('closeModal()');
+
 // The background: its settings and their defaults, Roll by itself turning off at a change on the page but not in its
 // own box, the cards marked with the route only as a spoiler and nothing past the start under Blind target, the facts
 // line, Off, play, Reduce motion (beside Timer), and Auto's map at a phone's width.
@@ -1352,7 +1425,7 @@ await ev('closeModal(); toSetup()');
 check('markup titles run nothing anywhere a title shows', peeked === true && frameClean === true && await ev(injected)
   && await ev(`document.querySelector('#history tbody').textContent.includes(${JSON.stringify(payloads[2])})`), JSON.stringify([peeked, frameClean]));
 
-check('only page info and articles are asked for', [...requests.keys()].every(k => k === 'query prop=pageprops|pageimages|extracts' || k === 'parse prop=text|displaytitle|categories'),
+check('only page info, advancements\' pictures and articles are asked for', [...requests.keys()].every(k => ['query prop=pageprops|pageimages|extracts', 'query prop=pageimages', 'parse prop=text|displaytitle|categories'].includes(k)),
   JSON.stringify(Object.fromEntries(requests)));
 check('no uncaught errors', jsErrors.length === 0, jsErrors.slice(0, 3).join(' | '));
 console.log(failures ? `${failures} check(s) failed` : 'All checks passed');

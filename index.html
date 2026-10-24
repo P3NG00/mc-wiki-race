@@ -510,15 +510,15 @@
   :root.gui-textured :is(.nb-stage, .nb-slots button) { background: none; border-image: var(--gui-slot) 1 fill / 2px; }
   .nb-stage img { position: absolute; left: 50%; translate: -50% 0; width: 84px; image-rendering: pixelated; pointer-events: none; }
   .nb-stage .under { top: 108px; }
-  .nb-stage .block { top: 66px; z-index: 1; }
-  .nb-stage .head { top: 40px; width: 56px; z-index: 2; }
-  .nb-stage .hit { position: absolute; left: 14px; right: 14px; top: 66px; height: 84px; z-index: 3; padding: 0; border: 0; border-radius: 0; background: none; box-shadow: none; }
+  .nb-stage .block { top: 62px; z-index: 1; }
+  .nb-stage .head { top: 36px; width: 56px; z-index: 2; }
+  .nb-stage .hit { position: absolute; left: 14px; right: 14px; top: 62px; height: 84px; z-index: 3; padding: 0; border: 0; border-radius: 0; background: none; box-shadow: none; }
   .nb-stage .hit:focus-visible { outline: 2px solid #fff; }
   .nb-stage .drop { animation: nb-drop .22s cubic-bezier(.4,1.6,.6,1); }
   @keyframes nb-drop { from { translate: -50% -14px; opacity: .3; } }
   .nb-stage .bounce { animation: nb-bounce .15s; }
   @keyframes nb-bounce { 50% { scale: 1.06 .94; } }
-  .nb-stage canvas { position: absolute; z-index: 4; left: 50%; top: 58px; width: 20px; height: 20px; margin-left: -10px; image-rendering: pixelated; pointer-events: none; animation: nb-rise 1s ease-out forwards; }
+  .nb-stage canvas { position: absolute; z-index: 4; left: 50%; top: 54px; width: 20px; height: 20px; margin-left: -10px; image-rendering: pixelated; pointer-events: none; animation: nb-rise 1s ease-out forwards; }
   @keyframes nb-rise { to { translate: var(--dx) -54px; opacity: 0; } }
   :root.calm .nb-stage :is(.drop, .bounce) { animation: none; }
   /* What is picked, always as tall (two lines for its name, two for what it is on or plays), so no pick moves the slots. */
@@ -547,7 +547,7 @@
     .note-box .nb-body { grid-template-columns: 1fr; }
     .nb-stage { height: 170px; }
     .note-box .nb-what { height: 36px; }   /* a line each, the width of the window */
-    .nb-stage .under { top: 92px; } .nb-stage :is(.block, .hit) { top: 50px; } .nb-stage .head { top: 24px; } .nb-stage canvas { top: 42px; }
+    .nb-stage .under { top: 92px; } .nb-stage :is(.block, .hit) { top: 46px; } .nb-stage .head { top: 20px; } .nb-stage canvas { top: 38px; }
     .nb-slots { grid-template-columns: repeat(auto-fill, 36px); }
   }
   /* An item in hand: a layer over everything that takes the next click, the item under the pointer, what a click does. */
@@ -2456,8 +2456,9 @@ const ogg = (name, n) => Array.from({ length: n }, (_, i) => `${name}${i + 1}.og
 // or file when that is another's), its sound "Note block <sound>.ogg" (the name, unless said), each its instrument's
 // middle F# at its own pitch, so a scale is the same on any; also: what else under it plays the same. A mob head on top
 // plays its mob's sound instead, one of them at random, at its own pitch whatever the note (so a creeper head's hiss is
-// higher than a creeper's, which hisses at half). A note shows in its pitch's colour, from the Note Block article's
-// pitch table: one for each of the 24 steps from F#3 (the 25th, F#5, is the first's again).
+// higher than a creeper's, which hisses at half); shift moves a head's picture to sit on the note block as the others
+// do (a margin), the dragon's being shorter than wide and reaching forward. A note shows in its pitch's colour, from
+// the Note Block article's pitch table: one for each of the 24 steps from F#3 (the 25th, F#5, is the first's again).
 const NOTE_UNDER = {
   harp: { name: 'Harp', block: 'Dirt', also: 'any other block' }, bass: { name: 'Bass', block: 'Oak Planks', pic: 'Planks', also: 'any wood' },
   bassDrum: { name: 'Bass drum', block: 'Stone', sound: 'bd', also: 'any stone' }, snare: { name: 'Snare drum', block: 'Sand', sound: 'snare', also: 'sand or gravel' },
@@ -2473,7 +2474,8 @@ const NOTE_HEADS = {
   skeleton: { block: 'Skeleton Skull', plays: 'a skeleton’s rattle', sound: ogg('Skeleton idle', 3) },
   witherSkeleton: { block: 'Wither Skeleton Skull', plays: 'a wither skeleton’s rattle', sound: ogg('Wither skeleton idle', 3) },
   zombie: { block: 'Zombie Head', plays: 'a zombie’s moan', sound: ogg('Zombie idle', 3) }, creeper: { block: 'Creeper Head', plays: 'a creeper’s hiss', sound: ['Creeper fuse.ogg'] },
-  piglin: { block: 'Piglin Head', plays: 'a piglin’s snort', sound: ogg('Piglin idle', 5) }, dragon: { block: 'Dragon Head', plays: 'the ender dragon’s roar', sound: ogg('Ender dragon idle', 4) },
+  piglin: { block: 'Piglin Head', plays: 'a piglin’s snort', sound: ogg('Piglin idle', 5) },
+  dragon: { block: 'Dragon Head', plays: 'the ender dragon’s roar', sound: ogg('Ender dragon idle', 4), shift: '8px 0 0 4px' },
 };
 const NOTE_COLORS = ('59E800 82CE00 ACAC00 CE8400 E85900 F92E00 FF0606 F9002E E80059 CE0082 AC00AC 8200CE 5900E8 2E00F9 0606FF 002EF9 '
   + '0059E8 0082CE 00ACAC 00CE82 00E859 00F92E 06FF06 2EF900').split(' ').map(c => '#' + c);
@@ -4165,6 +4167,7 @@ function drawNoteBox(dropped) {
     setImg(img, src);
     if (dropped && src && was !== src) bump(img, 'drop');
   }
+  stage.querySelector('.head').style.margin = h?.shift ?? '';
   box.querySelector('.nb-what').innerHTML = h ? `<b>${esc(h.block)}</b>${esc(h.plays)}` : `<b>${esc(u.name)}</b>on ${esc(u.block)}`;
   box.querySelector('.nb-off').classList.toggle('hidden', soundOn);
 }

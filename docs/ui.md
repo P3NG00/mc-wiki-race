@@ -12,7 +12,15 @@ Thumbnails are requested at 400 px (`pithumbsize`). Every setup card and the pat
 
 ## Sounds
 
-Every sound but one is synthesized with Web Audio when it plays (`SOUNDS`, played through `play()`). The exception is the items' explosion (`explode`, see [items.md](items.md)): one of Minecraft's own four explosion sounds, fetched from the wiki and pitched down at random as the game does, with a synthesized rumble until they are in. The rest are original, in the spirit of note blocks and the XP orb, not copies of Minecraft's: a link click is a pling that climbs a pentatonic scale with each click of the game (played when the navigation starts, so a slow load doesn't delay it), Back falls two notes, a dead link thuds (the frame posts `{mwr:'dead'}`), the checkpoint chimes from `celebrateCheckpoint`, and `finish` plays a fanfare for a win, a longer one for a new personal best, a sad trombone for Six clicks and two falling notes for giving up. The `AudioContext` is made on the first sound, which always follows a click or key press, as browsers require, and any audio error is swallowed. Sound is on by default, muted with the Sound checkbox beside Theme or the speaker button in the game header (`setSound`). With Distance on, a click that got closer also dings (`closer`), a step higher the fewer clicks are left: see Effects.
+Sounds are Minecraft's own where the wiki has one, fetched from it like its pictures and never copied here (`SOUND_FILES`, each key one or more files, one played at random as the game does), and synthesized with Web Audio for the rest (`SOUNDS`, played through `play()`). Each Minecraft one is synthesized too until it is in, or if it doesn't come (`wiki`). Their addresses are asked for once, in one request, on the first sound with Sound on, and each key's files are decoded the first time it is wanted (`loadSounds`): the game's on the first sound (`GAME_SOUNDS`), the items' when one is first taken in hand (`ITEM_SOUNDS`), the fireworks' with their pictures. Nothing is fetched with Sound off, and one that fails is asked again a minute later, not at every sound. The game's:
+- a link click is a note block's harp, climbing a pentatonic scale from F#4 with each click of the game (played when the navigation starts, so a slow load doesn't delay it); Back falls two notes;
+- a dead link is a villager's "hrmm" (`Villager deny`; the frame posts `{mwr:'dead'}`), and so is giving up;
+- a checkpoint or find (`celebrateCheckpoint`) and a task's toast are an arrow's ding (`Successful hit`), at half its pitch, as heard in the game;
+- a new personal best and a challenge's toast are Minecraft's challenge fanfare, not twice at once;
+- a loss (the clicks running out, under Six clicks or Exact clicks) is a villager dying;
+- a win and a goal's toast are a synthesized fanfare, and Rebuild a synthesized arpeggio, since Minecraft has none to match.
+
+The `AudioContext` is made on the first sound, which always follows a click or key press, as browsers require, and any audio error is swallowed. Sound is on by default, muted with the Sound checkbox beside Theme or the speaker button in the game header (`setSound`). With Distance on, a click that got closer also dings (`closer`), a step higher the fewer clicks are left: see Effects.
 
 ## Effects
 

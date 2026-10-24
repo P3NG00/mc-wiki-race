@@ -2240,8 +2240,9 @@ function frameReady(token, live) {
 }
 
 // ---------------------------------------------------------------- Sounds
-// Short blips in the spirit of note blocks and the XP orb, synthesized with Web Audio so there are no sound files.
-// The AudioContext is made on first use, which always follows a click or key press, as browsers require.
+// Minecraft's own sounds from the wiki where it has one (SOUND_FILES), and short blips synthesized with Web Audio for
+// the rest, and in place of those until they are in. The AudioContext is made on first use, which always follows a
+// click or key press, as browsers require.
 let audio;
 let soundOn = store.get('mwr.sound', true) !== false;
 function audioOut() {
@@ -2288,56 +2289,120 @@ function noise(at, dur, { gain = 1, cutoff = 800, filter = 'lowpass', attack } =
   src.connect(new BiquadFilterNode(ctx, { type: filter, frequency: cutoff })).connect(envelope(t, gain, dur, attack));
   src.start(t);
 }
-// A decoded sound file (the items' Minecraft sounds), played at rate.
-function sample(b, rate) { const s = new AudioBufferSourceNode(audio.ctx, { buffer: b, playbackRate: rate }); s.connect(audio.out); s.start(); }
+// Minecraft's own sounds, fetched from the wiki like its pictures, never copied here: each key one or more files, one
+// played at random, as the game does. Their addresses are asked for once, in one request, when a sound is first wanted;
+// each is decoded the first time its key is (loadSounds: the game's on the first sound, the items' when one is taken in
+// hand, the fireworks' with their pictures), and until then, or if it doesn't come, the sound is synthesized. Nothing
+// is fetched with Sound off. One that fails is asked again a minute later, not at every sound.
+const ogg = (name, n) => Array.from({ length: n }, (_, i) => `${name}${i + 1}.ogg`);
+const SOUND_FILES = {
+  harp: ['Note block harp.ogg'], pling: ['Note block pling.ogg'], ding: ['Successful hit.ogg'], deny: ogg('Villager deny', 3),
+  villagerDeath: ['Villager death.ogg'], challenge: ['Challenge complete.ogg'],
+  explode: ogg('Explosion', 4), grass: ogg('Grass dig', 4), wood: ogg('Wood dig', 4), stone: ogg('Stone dig', 4), fuse: ['Fuse.ogg'],
+  ghastCharge: ['Ghast charge.ogg'], ghastShoot: ['Ghast fireball4.ogg'], weak: ogg('Weak attack', 4), anchorCharge: ogg('Respawn anchor charge', 3),
+  creeperDeath: ['Creeper death.ogg'], ghastDeath: ['Ghast death.ogg'],
+  fwLaunch: ['Firework launch.ogg'], fwBlast: ['Firework blast.ogg'], fwLarge: ['Firework large blast.ogg'], fwTwinkle: ['Firework twinkle.ogg'],
+};
+const GAME_SOUNDS = ['harp', 'pling', 'ding', 'deny', 'villagerDeath', 'challenge'];
+const ITEM_SOUNDS = ['explode', 'grass', 'wood', 'stone', 'fuse', 'ghastCharge', 'ghastShoot', 'weak', 'anchorCharge', 'creeperDeath', 'ghastDeath'];
+const soundBank = new Map(), soundsAsked = new Set(), soundStarted = new Map(), later = f => setTimeout(f, 60000);
+let soundUrls = null;
+function loadSounds(keys) {
+  if (!soundOn) return;
+  const want = keys.filter(k => !soundsAsked.has(k));
+  if (!want.length) return;
+  for (const k of want) soundsAsked.add(k);
+  const files = [...new Set(Object.values(SOUND_FILES).flat())].map(f => 'File:' + f);
+  // The API takes 50 titles a request.
+  soundUrls ??= Promise.all(Array.from({ length: Math.ceil(files.length / 50) }, (_, i) => api({ action: 'query', titles: files.slice(i * 50, i * 50 + 50).join('|'),
+    prop: 'imageinfo', iiprop: 'url' }))).then(ds => {
+    const urls = new Map();
+    for (const d of ds) {
+      const asked = new Map((d.query?.normalized ?? []).map(n => [n.to, n.from]));
+      for (const p of d.query?.pages ?? []) if (p.imageinfo) urls.set((asked.get(p.title) ?? p.title).slice(5), p.imageinfo[0].url);
+    }
+    return urls;
+  }, () => { later(() => { soundUrls = null; }); return null; });
+  const again = k => later(() => soundsAsked.delete(k));
+  soundUrls.then(urls => {
+    if (!urls) { want.forEach(again); return; }
+    const { ctx } = audioOut();
+    for (const k of want) Promise.all(SOUND_FILES[k].map(f => urls.has(f) ? fetch(urls.get(f)).then(r => r.arrayBuffer()).then(b => ctx.decodeAudioData(b)).catch(() => null) : null))
+      .then(bs => { bs = bs.filter(Boolean); if (bs.length) soundBank.set(k, bs); else again(k); });
+  }).catch(() => want.forEach(again));
+}
+// A decoded sound played at rate, at seconds from now.
+function sample(b, rate, at = 0) { const s = new AudioBufferSourceNode(audio.ctx, { buffer: b, playbackRate: rate }); s.connect(audio.out); s.start(audio.ctx.currentTime + at); }
+// One of key's Minecraft sounds, if it is in: false if not (the synthesized one plays instead). gap: none again within
+// that many ms (a long one, such as a challenge's fanfare, isn't doubled).
+function wiki(key, rate = 1, at = 0, gap = 0) {
+  const bs = soundBank.get(key);
+  if (!bs) return false;
+  if (gap && performance.now() - (soundStarted.get(key) ?? -1e9) < gap) return true;
+  soundStarted.set(key, performance.now());
+  sample(pick(bs), rate, at);
+  return true;
+}
 // A note block's harp: a soft body and a short bright edge an octave up.
 function pling(freq, at = 0) { tone(freq, at, 0.4); tone(freq * 2, at, 0.12, { type: 'sine', gain: 0.3 }); }
 const PENTATONIC = [0, 2, 4, 7, 9];
 const SOUNDS = {
-  // Each click of a game plays the next note of a pentatonic scale up from F#4, back to the bottom after two octaves.
-  click(n) { pling(370 * 2 ** ((12 * Math.floor(n % 10 / 5) + PENTATONIC[n % 5]) / 12)); },
-  back() { pling(494); pling(370, 0.08); },
-  dead() { tone(140, 0, 0.14, { type: 'sine', slide: 55 }); noise(0, 0.07, { gain: 0.5, cutoff: 500 }); },
-  checkpoint() { [1319, 1661, 1976].forEach((f, i) => tone(f, i * 0.07, 0.3, { type: 'sine', gain: 0.6 })); },
+  // Each click of a game plays the next note of a pentatonic scale up from F#4, back to the bottom after two octaves, on
+  // a note block's harp, which sounds F#4 at its own pitch; Back two notes down. A dead link gets a villager's "hrmm",
+  // a checkpoint or find (and a task's toast) an arrow's ding, as heard in the game, at about half its pitch.
+  click(n) { const k = 12 * Math.floor(n % 10 / 5) + PENTATONIC[n % 5]; if (!wiki('harp', 2 ** (k / 12))) pling(370 * 2 ** (k / 12)); },
+  back() { if (wiki('harp', 2 ** (5 / 12))) { wiki('harp', 1, 0.08); return; } pling(494); pling(370, 0.08); },
+  dead() { if (wiki('deny')) return; tone(140, 0, 0.14, { type: 'sine', slide: 55 }); noise(0, 0.07, { gain: 0.5, cutoff: 500 }); },
+  checkpoint() { if (wiki('ding', 0.5)) return; [1319, 1661, 1976].forEach((f, i) => tone(f, i * 0.07, 0.3, { type: 'sine', gain: 0.6 })); },
   win() {
     [523, 659, 784, 1047].forEach((f, i) => tone(f, i * 0.09, i === 3 ? 0.9 : 0.2, { type: 'square', gain: 0.25, cutoff: 2500 }));
     [523, 659, 784].forEach(f => tone(f, 0.27, 1, { gain: 0.35 }));
   },
+  // A new best (and a challenge's toast): Minecraft's challenge fanfare, once at a time.
   best() {
+    if (wiki('challenge', 1, 0, 7000)) return;
     SOUNDS.win();
     [2093, 2637, 3136, 2637, 3520].forEach((f, i) => tone(f, 0.45 + i * 0.07, 0.25, { type: 'sine', gain: 0.25 }));
   },
-  // The sad trombone.
+  // A loss: a villager dying, or the sad trombone; giving up, a villager's "hrmm".
   lose() {
+    if (wiki('villagerDeath')) return;
     [392, 370, 349].forEach((f, i) => tone(f, i * 0.3, 0.32, { type: 'sawtooth', gain: 0.4, cutoff: 1100 }));
     tone(330, 0.9, 1, { type: 'sawtooth', gain: 0.4, cutoff: 1100, slide: 300, vibrato: 6 });
   },
-  giveUp() { tone(262, 0, 0.25); tone(196, 0.18, 0.6); },
+  giveUp() { if (wiki('deny')) return; tone(262, 0, 0.25); tone(196, 0.18, 0.6); },
   // The items (see Items). explode plays one of Minecraft's own explosion sounds, from the wiki, pitched down at random
-  // as the game does, once they are in (itemSounds); until then, or if they don't come, a deep rumble.
+  // as the game does, once they are in; until then, or if they don't come, a deep rumble.
   explode(big) {
-    const bs = EXPLOSIONS.map(k => itemSounds.get(k)).filter(Boolean), b = bs[Math.floor(Math.random() * bs.length)];
-    if (b) { sample(b, 0.7 * (1 + (Math.random() - Math.random()) * 0.2)); return; }
+    if (wiki('explode', 0.7 * (1 + (Math.random() - Math.random()) * 0.2))) return;
     noise(0, 1.6, { gain: 1.3, cutoff: big ? 300 : 420 }); noise(0, 0.25, { gain: 0.8, cutoff: 2500 }); tone(80, 0, 0.9, { type: 'sine', gain: 0.9, slide: 30 });
   },
   // A firework's launch, blast (large for a large ball) or twinkle, Minecraft's own once in, else a whoosh or a pop.
   firework(k) {
-    const b = itemSounds.get(k);
-    if (b) sample(b, k === 'fwTwinkle' ? 0.9 + Math.random() * 0.25 : 0.95 + Math.random() * 0.1);
-    else if (k === 'fwLaunch') SOUNDS.whoosh();
+    if (wiki(k, k === 'fwTwinkle' ? 0.9 + Math.random() * 0.25 : 0.95 + Math.random() * 0.1)) return;
+    if (k === 'fwLaunch') SOUNDS.whoosh();
     else if (k !== 'fwTwinkle') { noise(0, 0.35, { gain: 0.8, cutoff: k === 'fwLarge' ? 900 : 1600 }); noise(0, 0.06, { gain: 0.6, cutoff: 4000 }); }
   },
-  fuse(dur) { noise(0, dur, { gain: 0.45, cutoff: 3500, filter: 'highpass', attack: dur * 0.9 }); },
-  place() { noise(0, 0.08, { gain: 0.6, cutoff: 700 }); tone(140, 0, 0.1, { type: 'square', gain: 0.15, cutoff: 500 }); },
-  ghast() { tone(800 + Math.random() * 200, 0, 0.9, { type: 'sawtooth', gain: 0.3, vibrato: 40, cutoff: 2400, slide: 420 }); },
-  whoosh() { noise(0, 0.6, { gain: 0.5, cutoff: 1500, attack: 0.2 }); },
+  // As Minecraft has them: TNT's fuse, a creeper's half as high; a block placed by its own sound (TNT's grass, a bed's
+  // wood, an anchor's stone) at 0.8; the ghast's warning and its shot; a weak hit; an anchor charging; a mob dying or a
+  // bed breaking.
+  fuse(dur, creeper) { if (wiki('fuse', creeper ? 0.5 : 1)) return; noise(0, dur, { gain: 0.45, cutoff: 3500, filter: 'highpass', attack: dur * 0.9 }); },
+  place(kind) {
+    if (wiki({ tnt: 'grass', bed: 'wood', anchor: 'stone' }[kind], 0.8)) return;
+    noise(0, 0.08, { gain: 0.6, cutoff: 700 }); tone(140, 0, 0.1, { type: 'square', gain: 0.15, cutoff: 500 });
+  },
+  ghast() { if (wiki('ghastCharge')) return; tone(800 + Math.random() * 200, 0, 0.9, { type: 'sawtooth', gain: 0.3, vibrato: 40, cutoff: 2400, slide: 420 }); },
+  whoosh() { if (wiki('ghastShoot')) return; noise(0, 0.6, { gain: 0.5, cutoff: 1500, attack: 0.2 }); },
   hum() { tone(220, 0, 0.5, { type: 'sine', gain: 0.4, vibrato: 4 }); },
-  charge(n) { tone(180 + n * 90, 0, 0.35, { type: 'square', gain: 0.2, cutoff: 1500, slide: 260 + n * 90 }); noise(0, 0.1, { gain: 0.3, cutoff: 2000 }); },
-  bonk() { tone(300, 0, 0.08, { type: 'square', gain: 0.25, cutoff: 1200, slide: 160 }); noise(0, 0.06, { gain: 0.4, cutoff: 1500 }); },
-  poof() { noise(0, 0.4, { gain: 0.6, cutoff: 2000, attack: 0.02 }); },
+  charge(n) { if (wiki('anchorCharge')) return; tone(180 + n * 90, 0, 0.35, { type: 'square', gain: 0.2, cutoff: 1500, slide: 260 + n * 90 }); noise(0, 0.1, { gain: 0.3, cutoff: 2000 }); },
+  bonk() { if (wiki('weak')) return; tone(300, 0, 0.08, { type: 'square', gain: 0.25, cutoff: 1200, slide: 160 }); noise(0, 0.06, { gain: 0.4, cutoff: 1500 }); },
+  poof(kind) { if (wiki({ creeper: 'creeperDeath', ghast: 'ghastDeath', bed: 'wood' }[kind])) return; noise(0, 0.4, { gain: 0.6, cutoff: 2000, attack: 0.02 }); },
   rebuild() { [262, 330, 392, 523].forEach((f, i) => tone(f, i * 0.1, 0.35, { type: 'sine', gain: 0.4 })); },
-  // Distance's cheer for a click that got closer: two quick bright notes, a step higher for each click less to go, from 4.
+  // Distance's cheer for a click that got closer: two quick bright notes, a step higher for each click less to go, from 4,
+  // on a note block's pling (F#4 at its own pitch) from C5.
   closer(togo) {
+    const k = 6 + PENTATONIC[4 - Math.min(togo, 4)];
+    if (wiki('pling', 2 ** (k / 12))) { wiki('pling', 1.5 * 2 ** (k / 12), 0.07); return; }
     const f = 1047 * 2 ** (PENTATONIC[4 - Math.min(togo, 4)] / 12);
     tone(f, 0, 0.1, { type: 'sine', gain: 0.45 }); tone(f * 1.5, 0.07, 0.3, { type: 'sine', gain: 0.4 });
   },
@@ -2345,7 +2410,7 @@ const SOUNDS = {
 // Unplayable audio (no Web Audio, a blocked context) just means silence.
 function play(name, ...args) {
   if (!soundOn) return;
-  try { audioOut(); SOUNDS[name](...args); } catch { /* no sound */ }
+  try { audioOut(); loadSounds(GAME_SOUNDS); SOUNDS[name](...args); } catch { /* no sound */ }
 }
 
 // ---------------------------------------------------------------- Effects
@@ -2793,13 +2858,11 @@ const ITEMS = {
 };
 const ITEM_EMOJI = { TNT: '🧨', 'End Crystal': '💎', Ghast: '👻', 'Fire Charge': '🔥', Creeper: '🟩', Bed: '🛏️', 'Respawn Anchor': '⚓', 'Firework Rocket': '🎆' };
 // Files shown as they are: the end crystal turning above its base, the respawn anchor at each charge, the explosion's 16
-// frames (white, which blast tints grey as Minecraft does) and Minecraft's four explosion sounds; for fireworks, the
-// rocket, the spark's 7 frames (white, which they tint) and the sounds of a launch, a blast, a large one and a twinkle.
+// frames (white, which blast tints grey as Minecraft does); for fireworks, the rocket and the spark's 7 frames (white,
+// which they tint). Their sounds are with the game's (SOUND_FILES).
 const ITEM_FILES = { crystal: 'End Crystal JE2.gif', ...Object.fromEntries([0, 1, 2, 3, 4].map(n => ['anchor' + n, `Respawn Anchor (${n}) JE1.png`])),
   ...Object.fromEntries(Array.from({ length: 16 }, (_, i) => ['boom' + i, `Explosion (texture ${i}) JE1.png`])),
-  ...Object.fromEntries([1, 2, 3, 4].map(n => ['sound' + n, `Explosion${n}.ogg`])),
-  rocket: 'Firework Rocket JE2 BE2.png', ...Object.fromEntries(Array.from({ length: 7 }, (_, i) => ['spark' + i, `Spark (texture ${i}) JE1 BE1.png`])),
-  fwLaunch: 'Firework launch.ogg', fwBlast: 'Firework blast.ogg', fwLarge: 'Firework large blast.ogg', fwTwinkle: 'Firework twinkle.ogg' };
+  rocket: 'Firework Rocket JE2 BE2.png', ...Object.fromEntries(Array.from({ length: 7 }, (_, i) => ['spark' + i, `Spark (texture ${i}) JE1 BE1.png`])) };
 // The items' pictures (as the cards ask), asked for in an idle moment after the page loads, since the hotbar's buttons
 // show TNT's (or say TNT if it doesn't come); the files' addresses once the hotbar first opens. The explosion's frames
 // and sounds themselves only load when an item is first taken in hand.
@@ -2844,19 +2907,6 @@ function loadBoomFrames() {
     }));
   });
 }
-// The items' sounds (ITEM_FILES), each decoded once when first wanted, after a click, so the AudioContext may start: the
-// explosion's when an item is first taken in hand, the fireworks' with their pictures. One that fails is asked again
-// next time.
-const itemSounds = new Map(), soundsAsked = new Set(), EXPLOSIONS = ['sound1', 'sound2', 'sound3', 'sound4'];
-function loadItemSounds(keys = EXPLOSIONS) {
-  try {
-    const { ctx } = audioOut();
-    for (const k of keys) if (itemFiles.has(k) && !soundsAsked.has(k)) {
-      soundsAsked.add(k);
-      fetch(itemFiles.get(k)).then(r => r.arrayBuffer()).then(b => ctx.decodeAudioData(b)).then(b => itemSounds.set(k, b), () => soundsAsked.delete(k));
-    }
-  } catch { /* no sound */ }
-}
 
 // Fireworks, as Minecraft's: a rocket rises from where it is launched on a trail of white sparks, faster and faster,
 // and bursts in one of its shapes, each spark one of the star's 1 or 2 dye colours, shrinking through the spark's frames
@@ -2897,7 +2947,7 @@ let fwPics = null, fwAsked = null;   // fwPics: the spark's frames, biggest firs
 const fwTints = new Map();
 function fireworkAssets() {
   return fwAsked ??= itemFileUrls().then(() => {
-    loadItemSounds(['fwLaunch', 'fwBlast', 'fwLarge', 'fwTwinkle']);
+    loadSounds(['fwLaunch', 'fwBlast', 'fwLarge', 'fwTwinkle']);
     const keys = [...Array.from({ length: 7 }, (_, i) => 'spark' + i), 'rocket'];
     if (!keys.every(k => itemFiles.has(k))) return [];
     return Promise.all(keys.map(k => new Promise(ok => {
@@ -3326,7 +3376,8 @@ function holdItem(k) {
   items.holding = k;
   breaker.prepare(itemsRoot(), keepWhole);
   if (inGame()) $('#frame').contentWindow?.postMessage({ mwr: 'arm' }, '*');
-  itemAssets().then(() => { loadBoomFrames(); loadItemSounds(); fireworkAssets(); });
+  loadSounds(ITEM_SOUNDS);
+  itemAssets().then(() => { loadBoomFrames(); fireworkAssets(); });
   const layer = document.body.appendChild(Object.assign(document.createElement('div'), { className: 'hold' }));
   const ghost = document.body.appendChild(Object.assign(document.createElement('div'), { className: 'ghost', innerHTML: itemPic(ITEMS[k].page) }));
   const tip = document.body.appendChild(Object.assign(document.createElement('div'), { className: 'hold-tip',
@@ -3417,7 +3468,7 @@ function itemSay(p, text) {
 }
 // A thing gone in a puff, as a mob dies, or a block breaks, in its own colours.
 function poofThing(t, colours) {
-  removeThing(t); play('poof');
+  removeThing(t); play('poof', t.kind);
   effect('poof', { ...t.p, on: t.anchor?.on, colours });
 }
 function lightTnt(t, ms) {
@@ -3468,7 +3519,7 @@ const ITEM_USE = {
     fireworkAssets().then(() => launchFirework(p, to, [fwStar()], on));
   },
   tnt(p) {
-    play('place');
+    play('place', 'tnt');
     const t = placeThing('tnt drop', p, itemPic('TNT'));
     t.el.onclick = () => lightTnt(t, 4000);
   },
@@ -3524,7 +3575,7 @@ const ITEM_USE = {
       if (c.gone) return;
       const dt = Math.min(.05, (t - last) / 1000), dx = items.pointer.x - c.p.x, dy = items.pointer.y - c.p.y, d = Math.hypot(dx, dy) || 1;
       last = t;
-      if (d < 70 || (fuse > 0 && d < 150)) { if (fuse === 0) play('fuse', 1.5); fuse += dt; }
+      if (d < 70 || (fuse > 0 && d < 150)) { if (fuse === 0) play('fuse', 1.5, true); fuse += dt; }
       else { fuse = Math.max(0, fuse - dt * 2); c.p = { x: c.p.x + dx / d * 130 * dt, y: c.p.y + dy / d * 130 * dt }; }
       const k = fuse / 1.5;
       if (Math.abs(dx) > 4 && fuse === 0) c.el.classList.toggle('right', dx > 0);   // the picture faces left
@@ -3536,13 +3587,13 @@ const ITEM_USE = {
     c.raf = requestAnimationFrame(step);
   },
   bed(p) {
-    play('place');
+    play('place', 'bed');
     const t = placeThing('bed', p, itemPic('Bed'));
     t.el.onclick = () => { itemSay(t.p, 'You can’t sleep here'); removeThing(t); advEarn({ intentional: true }); blast(t.p, 1.3); };
   },
   // Its picture shows its charge, 0 to 4; full, the next click sets your spawn, which outside the Nether is a blast.
   anchor(p) {
-    play('place');
+    play('place', 'anchor');
     const t = placeThing('anchor', p, itemFile('anchor0', 'Respawn Anchor'));
     let charge = 0;
     t.el.onclick = () => {

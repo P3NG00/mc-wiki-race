@@ -1575,14 +1575,30 @@ async function rollOne(which, group, accept = () => true, titles = null) {
 // WEB_HEART, a target a route from it, and a checkpoint, or either end of a round trip, both, so the cards always have a
 // route between them. Otherwise Chaos rolls pages such as Bee Our Guest, whose only links are hubs (dead in Hard), or
 // a subpage that links nowhere. A page the snapshot lacks passes, and so does every page if the graph can't load.
+// One search from WEB_HEART and one back to it answer that for every page: a page reaches it if a page it links to (or
+// one in a navbox it carries) does, and is reached from it if a page linking to it (or carrying a navbox it is in) is.
+// The page itself may be one the searches go around, a hub on Hard, as a card is kept live in play. They are made once
+// for the rules and the Content in play (webSearches), which a spin-off page adds its own spin-off to.
+const webSearches = new Map();
+function webOf(graph, rules, content) {
+  const key = [rules.join(), content.join()].join('|');
+  if (!webSearches.has(key)) {
+    const usable = routeUsable({ keep: [], rules, content });
+    webSearches.set(key, { from: distancesFrom(graph, WEB_HEART, usable), to: distancesTo(graph, PAGE_IDS.get(WEB_HEART), usable) });
+  }
+  return webSearches.get(key);
+}
 async function joinsWeb(which) {
   const r = rules(), graph = await linkGraph(r).catch(() => null), heart = PAGE_IDS.get(WEB_HEART);
   if (!graph) return () => true;
   const both = VIA_KEYS.includes(which) || r.includes('roundtrip'), out = both || which !== 'goal', into = both || which !== 'start';
+  const linkers = linksInto(graph), boxed = boxesInto(graph);
   return title => {
     const page = PAGE_IDS.get(title);
-    return page === undefined || (!out || distancesFrom(graph, title)[heart] >= 0)
-      && (!into || distancesTo(graph, page, routeUsable({ keep: [title], rules: r, content: contentInPlay([title]) }))[heart] >= 0);
+    if (page === undefined || page === heart) return true;
+    const { from, to } = webOf(graph, r, contentInPlay([title]));
+    return (!out || graph.links[page].some(u => to[u] >= 0) || (graph.carries?.[page] ?? []).some(b => graph.boxes[b].some(u => to[u] >= 0)))
+      && (!into || linkers[page].some(u => from[u] >= 0) || (boxed?.boxesOf[page] ?? []).some(b => boxed.carriers[b].some(u => from[u] >= 0)));
   };
 }
 
@@ -4914,19 +4930,20 @@ function routeUsable({ keep, avoid = new Set(), rules, content = [] }) {
 // navboxes the boxes holding each page and the pages carrying each box.
 const reversed = new WeakMap();
 const reverseOf = (list, make) => reversed.get(list) ?? reversed.set(list, make()).get(list);
+const linksInto = graph => reverseOf(graph.links, () => {
+  const r = graph.links.map(() => []);
+  graph.links.forEach((vs, u) => vs.forEach(v => r[v].push(u)));
+  return r;
+});
+const boxesInto = graph => graph.boxes && reverseOf(graph.boxes, () => {
+  const boxesOf = graph.links.map(() => []), carriers = graph.boxes.map(() => []);
+  graph.boxes.forEach((vs, b) => vs.forEach(v => boxesOf[v].push(b)));
+  graph.carries.forEach((bs, u) => bs.forEach(b => carriers[b].push(u)));
+  return { boxesOf, carriers };
+});
 // The fewest clicks from every page to goal (-1 for none), through usable pages.
 function distancesTo(graph, goal, usable) {
-  const into = reverseOf(graph.links, () => {
-    const r = graph.links.map(() => []);
-    graph.links.forEach((vs, u) => vs.forEach(v => r[v].push(u)));
-    return r;
-  });
-  const boxed = graph.boxes && reverseOf(graph.boxes, () => {
-    const boxesOf = graph.links.map(() => []), carriers = graph.boxes.map(() => []);
-    graph.boxes.forEach((vs, b) => vs.forEach(v => boxesOf[v].push(b)));
-    graph.carries.forEach((bs, u) => bs.forEach(b => carriers[b].push(u)));
-    return { boxesOf, carriers };
-  });
+  const into = linksInto(graph), boxed = boxesInto(graph);
   const dist = new Int32Array(graph.links.length).fill(-1), queue = [goal], opened = new Set();
   dist[goal] = 0;
   for (let i = 0; i < queue.length; i++) {

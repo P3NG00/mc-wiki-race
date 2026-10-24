@@ -1269,7 +1269,21 @@ check('and its shake leaves what is fixed on the screen where it is', await ev("
   await ev("JSON.stringify([getComputedStyle(document.body).translate, $('#btnItems').getBoundingClientRect().bottom, innerHeight])"));
 await ev('scrollTo(0, 0)');
 await ev("$('#btnRebuild').click()");
-check('Rebuild puts every piece back', await until("!items.broken && !document.querySelector('#setup [data-broke-style], #setup .brk-word, #setup .brk-thrown')", 4000));
+check('Rebuild puts every piece back', await until("!items.broken && !document.querySelector('#setup [data-broke-style], #setup .brk-word, #setup .brk-run, #setup .brk-thrown')", 4000));
+// Splitting the text into pieces lays nothing out anew (the rules' own spans are columns), and blasts all down the
+// page, twice over, where pieces already lie, leave it ending where it did.
+await ev("$('#rules').scrollIntoView(); window.sizes = new Map([...document.querySelectorAll('#setup *')].map(el => [el, el.getBoundingClientRect().height]))");
+await ev("holdItem('crystal'); dropItem()");
+check('taking an item in hand, the text in view split into pieces, moves nothing', await ev("document.querySelector('#rules .brk-word') && [...sizes].every(([el, h]) => Math.abs(el.getBoundingClientRect().height - h) < .5)"));
+for (let round = 0; round < 2; round++) for (let y = 0; y < pageHeight; y += 400) {
+  await ev(`scrollTo(0, ${y}); for (const x of [200, 500, 800]) { holdItem('crystal'); $('.hold').onclick({ clientX: x, clientY: Math.min(innerHeight - 20, ${y} + 300 - scrollY) }); dropItem(); $('.thing.crystal').click(); }`);
+  await sleep(150);
+}
+await sleep(3000);
+check('blasts all down the page and on its pieces leave it no longer', await ev(`document.documentElement.scrollHeight <= ${pageHeight} + 2 && document.querySelectorAll('#setup .brk-thrown').length > 100`),
+  await ev(`JSON.stringify([document.documentElement.scrollHeight, ${pageHeight}, document.querySelectorAll('#setup .brk-thrown').length])`));
+await ev("scrollTo(0, 0); $('#btnRebuild').click()");
+await until("!items.broken && !document.querySelector('#setup [data-broke-style]')", 4000); await sleep(100);
 await ev("setCalm(true); holdItem('bed'); $('.hold').onclick({ clientX: 400, clientY: 300 }); dropItem(); $('.thing.bed').click()");
 check('with motion reduced the pieces fade where they are', await ev("(els => els.some(el => el.style.opacity === '0.12') && els.every(el => !el.style.transform))([...document.querySelectorAll('#setup [data-broke-style]')])"));
 await ev("$('#btnRebuild').click(); setCalm(false)");

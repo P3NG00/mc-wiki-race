@@ -2788,57 +2788,81 @@ function loadItemSounds() {
 // The pieces of a page, and throwing them. One function, so the article's frame gets the same code as its source
 // (renderArticle) and runs it on its own pieces. prepare finds the pieces in a region: from the root down, any box too
 // big to be one piece, or holding something to keep whole (keep, a selector), gives its children, and the too big its
-// text as pieces of four words, up to MAX. The boxes are all measured before the text is split, so the page is laid out
-// once. breakApart throws the pieces a blast reaches, by their nearest edge, harder the nearer, as the shockwave gets to
-// them, and they fall onto what is left of the page below them (or its bottom); pieces already thrown it throws again,
-// and those at rest fall further if what they rested on is gone. A thrown piece takes no clicks and loses its text
-// shadow (costly to repaint as it moves), and a box with nothing left to see loses its background, border and shadow,
-// so no empty shell is left. With motion reduced (still) the pieces fade where they are instead. putBack puts every
-// piece back, flying (or at once), and the text whole again.
+// text as pieces of up to four words on a line, up to MAX. The boxes are all measured before the text is split, so the
+// page is laid out once. breakApart throws the pieces a blast reaches, by their nearest edge, harder the nearer, as the
+// shockwave gets to them, and they fall onto what is left of the page below them (or its bottom); pieces already thrown
+// it throws again, and those at rest fall further if what they rested on is gone. A thrown piece takes no clicks and
+// loses its text shadow (costly to repaint as it moves), and a box with nothing left to see loses its background,
+// border and shadow, so no empty shell is left. With motion reduced (still) the pieces fade where they are instead.
+// putBack puts every piece back, flying (or at once), and the text whole again.
 function pageBreaker() {
   const MAX = 700, BIG = 160 * 80, TEXTY = /^(P|LI|DD|DT|TD|TH|H[1-6]|DIV|SPAN|A|B|I|SMALL)$/;
   let busy = 0, raf = 0, last = 0, until = 0, sideways = null;   // sideways: [element, its own overflow-x], while it is set
-  const thrown = new Map();   // piece: its fall
+  const thrown = new Map(), frozen = new Set(), emptied = new Set();   // piece: its fall; the boxes keeping their size; those hollow
   // The pieces in region ({ x, y, r }, a circle on the screen), or by default in view: taking an item in hand splits the
   // text in view ahead of a blast, and the blast finds its own pieces around it, wherever the page is scrolled.
   function prepare(root, keep, region) {
-    const pieces = [], hollow = [];
+    const pieces = [], boxes = [], kept = [], splits = [];
     const within = r => region ? near(r, region.x, region.y) <= region.r : r.bottom > 0 && r.top < innerHeight;
     (function walk(node) {
       for (const el of node.children) {
         if (pieces.length >= MAX || (keep && el.matches(keep)) || /^(SCRIPT|STYLE|LINK|META|BR|TEMPLATE)$/.test(el.tagName)) continue;
         const r = el.getBoundingClientRect();
         if (!(r.width > 0 && r.height > 0 && within(r))) continue;
-        if (keep && el.querySelector(keep)) walk(el);   // what holds something kept whole gives its other pieces
-        else if (r.width * r.height > BIG && (el.children.length || TEXTY.test(el.tagName))) { hollow.push(el); walk(el); }
+        // A piece already thrown stays one piece: turned, it can measure as big, and its own pieces would be thrown
+        // on top of its throw, far off the page. So what holds pieces already thrown gives its other pieces (its
+        // text is in pieces already), rather than taking them along.
+        if (el.classList.contains('brk-thrown')) pieces.push(el);
+        else if (keep && el.querySelector(keep)) { kept.push(el); walk(el); }   // what holds something kept whole gives its other pieces
+        else if (el.querySelector('.brk-thrown')) { boxes.push(el); walk(el); }
+        // Too big, or inline over a line's end (as an inline block it couldn't break there): its pieces, its text too.
+        else if ((r.width * r.height > BIG && (el.children.length || TEXTY.test(el.tagName))) || (el.getClientRects().length > 1 && el.textContent.trim())) {
+          boxes.push(el); splits.push([el, /flex|grid/.test(getComputedStyle(el).display)]); walk(el);
+        }
         else pieces.push(el);
       }
     })(root);
-    for (const el of hollow) pieces.push(...words(el));
-    return { pieces, boxes: hollow };
+    for (const split of splits.map(([el, flex]) => words(el, flex))) pieces.push(...split());   // all measured, then split
+    return { pieces, boxes, kept };
   }
-  // A box's text as pieces of four words, the spaces between pieces left out of them (a piece's own edge spaces would
-  // collapse once it is an inline block).
-  function words(el) {
-    const made = [];
-    for (const n of [...el.childNodes]) {
+  // A box's text as pieces of up to four words, each on one line (one going over a line's end, made an inline block,
+  // couldn't break there, and the text would be laid out anew), the spaces between pieces left out of them (a piece's
+  // own edge spaces would collapse once it is an inline block). In a flex or grid box each run of text is one item, so
+  // its pieces go in an element of their own that takes its place, or each piece would be an item of its own. They
+  // are elements of our own, inline as a span is, but out of reach of any style the page has for spans (the setup
+  // screen's rules make theirs columns). The text is measured now and split by the function returned, so every box
+  // is measured before any is split.
+  const plain = tag => Object.assign(document.createElement(tag), { className: tag });
+  function words(el, flex) {
+    const range = document.createRange(), texts = [];
+    for (const n of el.childNodes) {
       if (n.nodeType !== 3 || !n.textContent.trim()) continue;
-      const f = document.createDocumentFragment(), parts = n.textContent.split(/(\s+)/).filter(Boolean);
-      let group = [], count = 0;
-      const flush = () => {
-        if (!group.length) return;
-        const s = document.createElement('span');
-        s.className = 'brk-word'; s.textContent = group.join(''); f.append(s); made.push(s); group = []; count = 0;
-      };
-      parts.forEach((part, i) => {
-        if (!/^\s+$/.test(part)) { group.push(part); count++; }
-        else if (count >= 4 || !group.length || i === parts.length - 1) { flush(); f.append(part); }
-        else group.push(part);
-      });
-      flush();
-      n.replaceWith(f);
+      const parts = n.textContent.split(/(\s+)/).filter(Boolean);
+      let at = 0;
+      const lines = parts.map(part => { range.setStart(n, at); range.setEnd(n, at += part.length); return /^\s+$/.test(part) ? null : range.getClientRects()[0]?.top; });
+      texts.push([n, parts, lines]);
     }
-    return made;
+    return () => {
+      const made = [];
+      for (const [n, parts, lines] of texts) {
+        if (flex) { const run = plain('brk-run'); n.replaceWith(run); run.append(n); }
+        const f = document.createDocumentFragment();
+        let group = [], count = 0, line;
+        const flush = () => {
+          if (!group.length) return;
+          const s = plain('brk-word');
+          s.textContent = group.join(''); f.append(s); made.push(s); group = []; count = 0;
+        };
+        parts.forEach((part, i) => {
+          if (lines[i] !== null) { if (!group.length) line = lines[i]; group.push(part); count++; }
+          else if (count >= 4 || !group.length || i === parts.length - 1 || Math.abs(lines[i + 1] - line) > 1) { flush(); f.append(part); }
+          else group.push(part);
+        });
+        flush();
+        n.replaceWith(f);
+      }
+      return made;
+    };
   }
   const save = el => { if (!('brokeStyle' in el.dataset)) el.dataset.brokeStyle = el.getAttribute('style') ?? ''; };
   const near = (r, x, y) => Math.hypot(Math.max(r.left - x, 0, x - r.right), Math.max(r.top - y, 0, y - r.bottom));
@@ -2884,7 +2908,7 @@ function pageBreaker() {
   function breakApart(root, bx, by, power, keep, still) {
     const now = performance.now();
     if (now < busy) return 0;   // being put back
-    const reach = 220 * power, { pieces, boxes } = prepare(root, keep, { x: bx, y: by, r: reach + 40 }), sx = scrollX, sy = scrollY;
+    const reach = 220 * power, { pieces, boxes, kept } = prepare(root, keep, { x: bx, y: by, r: reach + 40 }), sx = scrollX, sy = scrollY;
     bx += sx; by += sy;
     // The first blast notes where the page ends, the floor, so pieces resting on it can't make the page longer, and the
     // page no longer scrolls sideways, so pieces flying off the side can't make it wider.
@@ -2897,7 +2921,19 @@ function pageBreaker() {
       el.style.setProperty('overflow-x', 'hidden', 'important');
     }
     const fresh = pieces.filter(el => !thrown.has(el)), rects = fresh.map(el => el.getBoundingClientRect());
-    const inline = fresh.map(el => getComputedStyle(el).display === 'inline');
+    // The inline pieces: a picture or control, or else how tall it is with all it holds, and whether it sits on the line.
+    const inline = fresh.map(el => {
+      const c = getComputedStyle(el);
+      if (c.display !== 'inline') return null;
+      if (SOLID.test(el.tagName)) return { solid: true };
+      let top = Infinity, bottom = -Infinity;
+      for (const e of [el, ...el.querySelectorAll('*')]) for (const r of e.getClientRects()) { top = Math.min(top, r.top); bottom = Math.max(bottom, r.bottom); }
+      return { h: bottom - top, onLine: c.verticalAlign === 'baseline' };
+    });
+    // Every box the pieces are in, as it is laid out now, and whether it is a block that is a layout of its own (its
+    // children's margins stay in it) only by clipping or containing what it holds.
+    const sizes = [...boxes, ...kept].filter(b => !frozen.has(b)).map(b => (c => [b, b.getBoundingClientRect(), c.display,
+      c.display === 'block' && ([c.overflowX, c.overflowY].some(o => /auto|scroll|hidden/.test(o)) || c.contain !== 'none')])(getComputedStyle(b)));
     // A kick away from the blast, by how near it came, after the shockwave gets there (6 px a millisecond).
     const kick = (s, cx, cy, d) => {
       const k = Math.max(0, 1 - d / reach), dx = cx - bx, dy = cy - by, n = Math.hypot(dx, dy) || 1, v = k * 1400 * Math.sqrt(power) + 60;
@@ -2912,7 +2948,12 @@ function pageBreaker() {
       el.classList.add('brk-thrown');
       el.style.setProperty('pointer-events', 'none', 'important');
       el.style.setProperty('text-shadow', 'none', 'important');
-      if (inline[i]) el.style.display = 'inline-block';
+      // An inline piece is made an inline block to be turned. Text keeps the height it had, its line inside no taller
+      // (or it would hang out of the piece, past where it lands), and, if it sat on the line, goes to the line's top,
+      // since as a block its own line could be taller than the one it is on.
+      const flat = inline[i];
+      if (flat) el.style.display = 'inline-block';
+      if (flat && !flat.solid) { el.style.height = el.style.lineHeight = flat.h + 'px'; if (flat.onLine) el.style.verticalAlign = 'top'; }
       if (still) { el.style.transition = 'opacity .6s'; el.style.opacity = '0.12'; }
       else el.style.transition = 'none';
       const s = { el, x: 0, y: 0, vx: 0, vy: 0, rot: 0, spin: 0, t0: 0, w: r.right - r.left, h: r.bottom - r.top, cx: (r.left + r.right) / 2, cy: (r.top + r.bottom) / 2, rest: false, still };
@@ -2927,19 +2968,38 @@ function pageBreaker() {
       if (d < reach) kick(s, cx, cy, d);
       else s.rest = false;
     }
+    // A box that pieces are thrown out of keeps its size, so nothing after it on the page moves: a hollow box no longer
+    // clamps or scrolls what it held. Not a box shown inline, with no size of its own, nor a table's, whose sizes are
+    // only the least it may be, and setting them lays it out anew. One no longer clipping (below) stays a layout of
+    // its own, or its children's margins would go through it.
+    for (const [b, r, display, own] of sizes) if (b.querySelector('.brk-thrown')) {
+      save(b); frozen.add(b);
+      if (own) b.style.setProperty('display', 'flow-root', 'important');
+      if (/^(inline|contents|table.*)$/.test(display)) continue;
+      for (const [k, v] of [['box-sizing', 'border-box'], ['width', r.width + 'px'], ['height', r.height + 'px'], ['flex', '0 0 auto']]) b.style.setProperty(k, v, 'important');
+    }
     // A box once every piece it holds is thrown: hollow, and it may no longer clip, scroll or clamp them (a clamped
-    // box's ellipsis would stay behind). Important, since some of the wiki's own styles are.
+    // box's ellipsis would stay behind). Important, since some of the wiki's own styles are. A table's collapsed borders
+    // are drawn by the table, where its cells were, so its rows and cells lose theirs too.
     for (const box of boxes) {
-      if (box.style.getPropertyValue('border-color') === 'transparent' || intact(box)) continue;
-      save(box);
+      if (emptied.has(box) || intact(box)) continue;
+      save(box); emptied.add(box);
       for (const [k, v] of [['background', 'transparent'], ['border-color', 'transparent'], ['box-shadow', 'none'], ['outline-color', 'transparent'],
-        ['overflow', 'visible'], ['contain', 'none'], ['clip-path', 'none'], ['-webkit-line-clamp', 'none'], ['line-clamp', 'none'], ['text-overflow', 'clip'],
-        ...box.tagName === 'TABLE' ? [['border-collapse', 'separate'], ['border-spacing', '0']] : []]) box.style.setProperty(k, v, 'important');
+        ['overflow', 'visible'], ['contain', 'none'], ['clip-path', 'none'], ['-webkit-line-clamp', 'none'], ['line-clamp', 'none'], ['text-overflow', 'clip']]) box.style.setProperty(k, v, 'important');
+      if (box.tagName === 'TABLE') for (const cell of box.querySelectorAll('tr, td, th')) { save(cell); cell.style.setProperty('border-color', 'transparent', 'important'); }
     }
     // The boxes the thrown pieces are in can't keep them in either.
     for (const box of boxes) if (box.querySelector('.brk-thrown')) {
       save(box);
       for (const [k, v] of [['overflow', 'visible'], ['contain', 'none'], ['clip-path', 'none']]) box.style.setProperty(k, v, 'important');
+    }
+    // Laid out again, a piece made an inline block may have moved (its line wraps differently): where each piece is now
+    // before its throw (a turned piece's middle is where it would be unturned), and its size, so it lands right.
+    if (!still) for (const s of thrown.values()) {
+      if (s.still) continue;
+      const r = s.el.getBoundingClientRect(), cx = (r.left + r.right) / 2 + sx - s.x, cy = (r.top + r.bottom) / 2 + sy - s.y;
+      if (!s.rot) { s.w = r.width; s.h = r.height; }   // unturned, its box is its size
+      if (Math.abs(cx - s.cx) > .5 || Math.abs(cy - s.cy) > .5) Object.assign(s, { cx, cy, rest: false });
     }
     if (!still) findSurfaces(root, keep);
     until = now + 8000;
@@ -2966,6 +3026,7 @@ function pageBreaker() {
         s.y = floor - s.cy - hh; s.vy *= -.28; s.vx *= .75; s.spin *= .6;
         if (Math.abs(s.vy) < 60) { s.vy = 0; s.spin = 0; s.vx *= .5; if (Math.abs(s.vx) < 8) { s.rest = true; s.vx = 0; } }
       }
+      else s.y = Math.min(s.y, bottom - s.cy - hh);   // turning as it rises off a bounce, not a corner below the page's end
       s.el.style.transform = 'translate(' + s.x.toFixed(1) + 'px,' + s.y.toFixed(1) + 'px) rotate(' + s.rot.toFixed(1) + 'deg)';
       moving = true;
     }
@@ -2973,7 +3034,7 @@ function pageBreaker() {
   }
   function putBack(root, atOnce) {
     cancelAnimationFrame(raf); raf = 0;
-    thrown.clear();
+    thrown.clear(); frozen.clear(); emptied.clear();
     if (sideways) { const [el, v, p] = sideways; el.style.setProperty('overflow-x', v, p); sideways = null; }
     const all = [...root.querySelectorAll('[data-broke-style]')];
     const restore = el => {
@@ -2981,7 +3042,7 @@ function pageBreaker() {
       if (el.dataset.brokeStyle) el.setAttribute('style', el.dataset.brokeStyle); else el.removeAttribute('style');
       delete el.dataset.brokeStyle; el.classList.remove('brk-thrown');
     };
-    const whole = () => { for (const s of root.querySelectorAll('.brk-word')) s.replaceWith(s.textContent); root.normalize(); };
+    const whole = () => { for (const sel of ['.brk-word', '.brk-run']) for (const s of root.querySelectorAll(sel)) s.replaceWith(s.textContent); root.normalize(); };
     if (atOnce) { all.forEach(restore); whole(); return; }
     // Only the pieces that moved fly back; everything is restored together once they are in (one layout, not hundreds).
     busy = performance.now() + 1000;

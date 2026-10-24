@@ -631,6 +631,7 @@ const THEMES = [...new Set(['auto', 'light', 'dark', ...Array.from(document.quer
     <div class="head-opts">
       <label><input type="checkbox" id="soundToggle"> Sound</label>
       <label title="A clock while you play, and your time in the result. Off records no time, for a relaxed game."><input type="checkbox" id="timerToggle"> Timer</label>
+      <label id="effectsLabel"><input type="checkbox" id="effectsToggle"> Effects</label>
       <label id="motionLabel"><input type="checkbox" id="motionToggle"> Reduce motion</label>
       <label>Theme <select id="themeSelect"></select></label>
       <details class="bg-opts" id="bgOpts">
@@ -2342,18 +2343,31 @@ function play(name, ...args) {
 // Sparks over everything, on #fx, which takes no clicks: a click's fly from the link (or Back) into the click count,
 // which bumps as they land, a dead link puffs, a checkpoint or find bursts from its banner and a win from the result's
 // heading, a new personal best more and in gold. None of them says how a game is going, but Distance's cheer (cheer).
-// Reduce motion draws none; the sounds still play.
-// Reduce motion, the box beside Timer (mwr.reduceMotion), is on in effect while the system asks for it (SYSTEM_CALM),
+// Reduce motion draws none, and Effects unticked none but the items'; the sounds still play.
+// Reduce motion, the box beside Effects (mwr.reduceMotion), is on in effect while the system asks for it (SYSTEM_CALM),
 // which ticks the box and holds it. It stops the effects, the banners' and bumps' animations (:root.calm) and the
 // background's (see the Background section).
+// Effects, the box beside Timer (mwr.effects, on by default): unticked, the game's own effects don't play, the items'
+// (ITEM_EFFECTS, and the Firework Rocket's) still do, since using an item asks for them. A click's still bumps the
+// count. With motion reduced none plays, and the box shows unticked and held.
 const SYSTEM_CALM = matchMedia('(prefers-reduced-motion: reduce)');
 let calmBox = store.get('mwr.reduceMotion', false) === true;
 const calm = () => calmBox || SYSTEM_CALM.matches;
+let effectsOn = store.get('mwr.effects', true) !== false;
+const ITEM_EFFECTS = new Set(['blast', 'poof']);
 function syncCalm() {
   document.documentElement.classList.toggle('calm', calm());
   $('#motionToggle').checked = calm();
   $('#motionToggle').disabled = SYSTEM_CALM.matches;
   $('#motionLabel').title = SYSTEM_CALM.matches ? 'Your system asks for reduced motion.' : 'No sparks, no moving banners and a still background.';
+  $('#effectsToggle').checked = effectsOn && !calm();
+  $('#effectsToggle').disabled = calm();
+  $('#effectsLabel').title = calm() ? 'Reduce motion stops the effects.' : 'Sparks for clicks and finds, and fireworks for wins. The items’ blasts show either way.';
+}
+function setEffects(on) {
+  effectsOn = on;
+  store.set('mwr.effects', on);
+  syncCalm();
 }
 function setCalm(on) {
   calmBox = on;
@@ -2426,7 +2440,7 @@ const EFFECTS = {
 // the count. Like play(), any error is swallowed: this runs inside navigate and finish.
 function effect(name, from) {
   try {
-    if (!from || calm()) { if (name === 'orbs') bump($('#hudClicks')); return; }
+    if (!from || calm() || !effectsOn && !ITEM_EFFECTS.has(name)) { if (name === 'orbs') bump($('#hudClicks')); return; }
     EFFECTS[name](from);
     fxStart();
   } catch { /* no effect */ }
@@ -2939,11 +2953,11 @@ function fwStar(colors = Object.values(FW_COLORS), shapes = ['small', 'large', '
 }
 // A celebration: n rockets from the bottom of the window, 300 ms apart from after ms on, each with the star star(i),
 // bursting around the point around, up to spread px to either side. The pictures are waited for, up to 1.5 s, and none
-// goes up with motion reduced by then.
+// goes up with motion reduced or Effects unticked by then.
 function celebrate(around, n, star, { after = 0, spread = 320 } = {}) {
   Promise.race([fireworkAssets(), new Promise(ok => setTimeout(ok, 1500))]).then(() => {
     for (let i = 0; i < n; i++) setTimeout(() => {
-      if (calm()) return;
+      if (calm() || !effectsOn) return;
       const w = Math.min(spread, innerWidth * .35), x = Math.max(40, Math.min(innerWidth - 40, around.x + rnd(-w, w)));
       launchFirework({ x: x + rnd(-40, 40), y: innerHeight + 20 }, { x, y: Math.max(50, around.y - rnd(20, 160)) }, [star(i)]);
     }, after + i * 300);
@@ -5389,6 +5403,7 @@ setSound(soundOn);
 $('#timerToggle').checked = store.get('mwr.timer', true) !== false;
 $('#timerToggle').onchange = e => store.set('mwr.timer', e.target.checked);
 $('#motionToggle').onchange = e => setCalm(e.target.checked);
+$('#effectsToggle').onchange = e => setEffects(e.target.checked);
 $('#soundToggle').onchange = e => { setSound(e.target.checked); play('click', 0); };
 $('#btnSound').onclick = () => { setSound(!soundOn); play('click', 0); };
 $('#themeSelect').innerHTML = THEMES.map(t => `<option value="${esc(t)}">${esc(THEME_LABELS[t] || t)}</option>`).join('');

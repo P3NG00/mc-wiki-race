@@ -1493,6 +1493,12 @@ check('and comes back on the setup screen', await ev("!$('#bgCanvas').hidden && 
 await ev("$('#bgStyle').value = 'off', $('#bgStyle').dispatchEvent(new Event('change'))");
 check('Off hides the background and the facts line', await ev("$('#bgCanvas').hidden && $('#bgFacts').hidden && store.get('mwr.background').style === 'off'"));
 await ev("bgSetting('style', 'auto'), setCalm(false)");
+// Effects unticked stops the game's effects, not the items'; Reduce motion holds it unticked.
+check('Effects unticked stops the game\'s effects but not the items\', and is saved', await ev(`($('#effectsToggle').click(), fx.parts = [], effect('burst', { x: 100, y: 100 }), effect('win', { x: 100, y: 100 }),
+  fx.parts.length === 0 && store.get('mwr.effects') === false && (effect('poof', { x: 100, y: 100, colours: ['#ffffff'] }), fx.parts.length === 14))`));
+check('Reduce motion holds it unticked, and back off leaves it as it was', await ev(`(() => { $('#effectsToggle').click(); setCalm(true); const held = $('#effectsToggle').disabled && !$('#effectsToggle').checked;
+  setCalm(false); return held && $('#effectsToggle').checked && !$('#effectsToggle').disabled && store.get('mwr.effects') === true; })()`));
+await ev('fx.parts = []');
 await send('browsingContext.setViewport', { context: ctx, viewport: { width: 390, height: 844 } });
 check('Auto is the redstone map at a phone\'s width', await until("bgStyle() === 'redstone' && bg.W <= 390 && bg.grid?.W === bg.W"), await ev('JSON.stringify([bgStyle(), bg.W, bg.grid?.W])'));
 await send('browsingContext.setViewport', { context: ctx, viewport: null });

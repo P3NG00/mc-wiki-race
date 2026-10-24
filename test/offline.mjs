@@ -321,7 +321,9 @@ const relayPar = await ev("parRoute({ start: 'Diamond', vias: ['Creeper', 'Zombi
 await ev("navigate('Crafting', null)");
 check('the relay is won and recorded with both checkpoints, par over the whole chain', await until('!game.active') &&
   await ev(`(r => r.won && r.vias.join() === 'Creeper,Zombie' && r.par === ${relayPar})(store.get('mwr.history', [])[0])`), `par ${relayPar}`);
-check('a win bursts over the result', await ev("fx.parts.length >= 48 && !$('#fx').hidden"), await ev('fx.parts.length'));
+check('a win sends fireworks up over the result', await until("fx.parts.filter(p => p.land).length >= 1 && !$('#fx').hidden", 3000), await ev('fx.parts.length'));
+await ev("for (const p of fx.parts) if (p.land) p.life = 0");   // bursting now
+check('and each bursts into its sparks', await until("fx.parts.filter(p => p.life >= 2400).length >= 70", 2000), await ev('fx.parts.length'));
 await ev("closeModal(); toSetup()");
 // Swap reverses the whole chain. A third checkpoint rolls a third card; back to one, Reroll all drops the other two.
 await ev("document.querySelector('#btnSwap').click()");
@@ -1324,6 +1326,10 @@ check('a fireball taken up again comes from the ghast that is there', await ev("
   await ev("JSON.stringify([...items.things].map(t => [t.kind, Math.round(t.p.x)]))"));
 await ev('itemsReset()');
 await until("!document.querySelector('#setup [data-broke-style]')", 3000);
+// The Firework Rocket goes up from the click and bursts, on the page, breaking nothing.
+await ev("fx.parts = []; holdItem('rocket'); $('.hold').onclick({ clientX: 400, clientY: 600 }); dropItem()");
+check('a firework rocket goes up from the click, on the page, and breaks nothing', await until("fx.parts.some(p => p.land && p.on === 'page' && p.y <= 600)", 3000)
+  && await ev("!items.broken && $('#rebuildBar').classList.contains('hidden') && !document.querySelector('#setup [data-broke-style]')"));
 
 // Placed blocks sit on what they were placed on: the setup page as it scrolls, the article as it scrolls in its frame
 // (out of sight once out of it), and go with the article on a click; a broken page takes no clicks but the hotbar's.

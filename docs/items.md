@@ -2,11 +2,11 @@
 
 Part of the architecture, which is all in `index.html` (the Items section, after Advancements).
 
-Items are toys that act on the real page: they blow it up. A blast throws the pieces of the page around it, the article's included, and plays Minecraft's explosion. Things near it go off, break or are knocked away, as they would in Minecraft. The rest of the page goes on working, and several blasts can follow one another. Rebuild puts the pieces back, and in a game Give up is beside it. Using items never counts against the player.
+Items are toys that act on the real page: they blow it up, all but the Firework Rocket, which puts on a show (see [Fireworks](#fireworks)). A blast throws the pieces of the page around it, the article's included, and plays Minecraft's explosion. Things near it go off, break or are knocked away, as they would in Minecraft. The rest of the page goes on working, and several blasts can follow one another. Rebuild puts the pieces back, and in a game Give up is beside it. Using items never counts against the player.
 
 ## The hotbar and holding an item
 
-The hotbar's button is `#hudItems` in the game header, and `#btnItems` on the setup screen, fixed above the background's button `#btnBgView`, or in its place when that is hidden (the background Off). Both show the wiki's TNT picture, or say TNT if it doesn't come. `openHotbar` opens a row of Minecraft-style slots under or over the button with the six `ITEMS`, each named in a purple tooltip on hover.
+The hotbar's button is `#hudItems` in the game header, and `#btnItems` on the setup screen, fixed above the background's button `#btnBgView`, or in its place when that is hidden (the background Off). Both show the wiki's TNT picture, or say TNT if it doesn't come. `openHotbar` opens a row of Minecraft-style slots under or over the button with the seven `ITEMS`, each named in a purple tooltip on hover.
 
 Picking one calls `holdItem`. The item follows the pointer (`.ghost`) over a layer (`.hold`) that takes every click anywhere, the article included. Each click uses the item there (`ITEM_USE`), so TNT can be placed again and again. A click on something already placed uses that instead: it lights a TNT, hits a crystal or a fireball, sleeps in a bed or charges an anchor. A line at the top (`.hold-tip`, under the game header in play) says what clicks do. A right click or Escape, in the page or the article (the frame posts its keys), puts the item away (`dropItem`). Taking an item in hand also gets ready for a blast: the text in view is split into pieces now (`breaker.prepare`, and in the frame `{mwr:'arm'}`), which a blast would otherwise have to do first, and the explosion's frames and sounds start loading. The layer covers the bar and the hotbar's buttons, so a click over one of them is passed to it. A thing scrolled out of the article (out of sight) takes no clicks and no blasts.
 
@@ -27,6 +27,7 @@ A placed block (TNT, crystal, bed, anchor) sits on what it was placed on (`ancho
 - *Creeper*: walks in from the far side, facing the way it walks (its picture faces left, so it is flipped going right), and follows the pointer (`items.pointer`; over the article the frame reports it, `{mwr:'move', x, y}`, at most every 40 ms). Within 70 px it hisses, swells and flashes for 1.5 s unless the pointer gets more than 150 px away, then blows. A hit knocks it back and stops the fuse.
 - *Bed*: clicked, "You can't sleep here", and it blows at once.
 - *Respawn anchor*: each click charges it, with the wiki's picture for its charge (0 to 4). Full, the next click sets your spawn, "in the Overworld", and it blows at once.
+- *Firework Rocket*: each click launches a firework from there, 220 to 360 px up (over the article, no higher than shows its burst whole inside the frame). It breaks nothing: no blast, no Rebuild. With motion reduced, only its sounds.
 
 ## A blast
 
@@ -79,6 +80,17 @@ The Items group (see [advancements.md](advancements.md)):
 - Demolition Expert is 50 blasts.
 - Picking Up the Pieces is a win after a Rebuild.
 
+## Fireworks
+
+Fireworks are Minecraft's, as its rockets and firework stars make them. `launchFirework(from, to, stars, on)` sends a rocket (the wiki's picture of it) from one point of the window to another, rising faster and faster (30 px a second, then 450 px a second more each second), on a trail of white sparks thrown down at half its speed. There it bursts into each of its stars (`fwBurst`, `{ shape, colors, trail, twinkle }`), with Minecraft's blast sound, or its large blast for a large ball. The sparks are thrown as Minecraft throws them (`FW_SHAPES`, in blocks a tick, `FW_SPEED` px a second each):
+- a small or a large ball, on a cube's shell pulled round (`fwBall`);
+- a star or a creeper's face, along its outline, mirrored, three times turned a little about its middle (`fwShape`, `FW_STAR`, `FW_CREEPER`), facing the window more or less;
+- a burst, thrown up like a fountain.
+
+Each spark is one of the star's colours, from the dyes' firework colours but those too dark to see (`FW_COLORS`). It slows as Minecraft's do (0.91 a tick), drifts down, and lives 2.4 to 3 s, shrinking through the spark texture's 7 frames, which are white and grey and tinted by multiplying them by its colour, once for each colour (`fwFrames`). A twinkling one flickers from a third of its way, and its burst twinkles 1.2 s after (Minecraft's twinkle). A trailing one leaves a still copy of itself every 100 ms through the first half of its life (`fwTrail`), while there are fewer than 2,500 sparks. They are all on the effects canvas (see [ui.md](ui.md)), a rocket's sparks on what it went up from.
+
+`celebrate` launches a volley from below the window, bursting around a point, spread to the sides, a rocket every 300 ms: three for a win, around the result's heading; six for a new best, large balls and stars in yellow, orange and white, all twinkling; and after either, for a daily's first win (none before in `mwr.dailies`), a lime creeper in the middle with two small ones. A challenge's toast gets one, bursting below it (see [advancements.md](advancements.md)). Each waits up to 1.5 s for the pictures, and none goes up with motion reduced by then.
+
 ## Pictures and sounds from the wiki
 
-`itemPictures` asks once, in an idle moment after the page loads, for the items' pictures (`prop=pageimages`, as the cards ask), since the hotbar's buttons show TNT's. `itemAssets` asks, when the hotbar first opens, for the addresses of `ITEM_FILES` (`prop=imageinfo`). The files are the end crystal's animation, the respawn anchor at each charge, the explosion's 16 textures and Minecraft's four explosion sounds. The textures and sounds themselves only load when an item is first taken in hand. The sounds are decoded with the page's `AudioContext` (`loadItemSounds`; the wiki serves them, like its images, to any page). A picture that doesn't come shows its emoji (`ITEM_EMOJI`), and a sound that doesn't a synthesized rumble.
+`itemPictures` asks once, in an idle moment after the page loads, for the items' pictures (`prop=pageimages`, as the cards ask), since the hotbar's buttons show TNT's. `itemAssets` asks, when the hotbar first opens, for the addresses of `ITEM_FILES` (`prop=imageinfo`). The files are the end crystal's animation, the respawn anchor at each charge, the explosion's 16 textures and Minecraft's four explosion sounds, and for fireworks the rocket, the spark's 7 frames and the sounds of a launch, a blast, a large blast and a twinkle. The textures and sounds themselves only load when an item is first taken in hand, or for fireworks when one is first wanted (`fireworkAssets`), which a win asks for with the files' addresses alone (`itemFileUrls`), not the hotbar's pictures. The sounds are decoded with the page's `AudioContext` (`loadItemSounds`; the wiki serves them, like its images, to any page). A picture that doesn't come shows its emoji (`ITEM_EMOJI`), and a sound that doesn't a synthesized rumble, whoosh or pop. Without the spark's frames, fireworks are squares of their colours.

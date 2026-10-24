@@ -2278,6 +2278,8 @@ function noise(at, dur, { gain = 1, cutoff = 800, filter = 'lowpass', attack } =
   src.connect(new BiquadFilterNode(ctx, { type: filter, frequency: cutoff })).connect(envelope(t, gain, dur, attack));
   src.start(t);
 }
+// A decoded sound file (the items' Minecraft sounds), played at rate.
+function sample(b, rate) { const s = new AudioBufferSourceNode(audio.ctx, { buffer: b, playbackRate: rate }); s.connect(audio.out); s.start(); }
 // A note block's harp: a soft body and a short bright edge an octave up.
 function pling(freq, at = 0) { tone(freq, at, 0.4); tone(freq * 2, at, 0.12, { type: 'sine', gain: 0.3 }); }
 const PENTATONIC = [0, 2, 4, 7, 9];
@@ -2304,9 +2306,16 @@ const SOUNDS = {
   // The items (see Items). explode plays one of Minecraft's own explosion sounds, from the wiki, pitched down at random
   // as the game does, once they are in (itemSounds); until then, or if they don't come, a deep rumble.
   explode(big) {
-    const b = itemSounds[Math.floor(Math.random() * itemSounds.length)];
-    if (b) { const s = new AudioBufferSourceNode(audio.ctx, { buffer: b, playbackRate: 0.7 * (1 + (Math.random() - Math.random()) * 0.2) }); s.connect(audio.out); s.start(); return; }
+    const bs = EXPLOSIONS.map(k => itemSounds.get(k)).filter(Boolean), b = bs[Math.floor(Math.random() * bs.length)];
+    if (b) { sample(b, 0.7 * (1 + (Math.random() - Math.random()) * 0.2)); return; }
     noise(0, 1.6, { gain: 1.3, cutoff: big ? 300 : 420 }); noise(0, 0.25, { gain: 0.8, cutoff: 2500 }); tone(80, 0, 0.9, { type: 'sine', gain: 0.9, slide: 30 });
+  },
+  // A firework's launch, blast (large for a large ball) or twinkle, Minecraft's own once in, else a whoosh or a pop.
+  firework(k) {
+    const b = itemSounds.get(k);
+    if (b) sample(b, k === 'fwTwinkle' ? 0.9 + Math.random() * 0.25 : 0.95 + Math.random() * 0.1);
+    else if (k === 'fwLaunch') SOUNDS.whoosh();
+    else if (k !== 'fwTwinkle') { noise(0, 0.35, { gain: 0.8, cutoff: k === 'fwLarge' ? 900 : 1600 }); noise(0, 0.06, { gain: 0.6, cutoff: 4000 }); }
   },
   fuse(dur) { noise(0, dur, { gain: 0.45, cutoff: 3500, filter: 'highpass', attack: dur * 0.9 }); },
   place() { noise(0, 0.08, { gain: 0.6, cutoff: 700 }); tone(140, 0, 0.1, { type: 'square', gain: 0.15, cutoff: 500 }); },
@@ -2361,7 +2370,8 @@ const sparkColors = () => [cssColor('--accent'), cssColor('--viz-items')];
 // Restarts an element's bump animation (.bump, or the class given).
 function bump(el, cls = 'bump') { el.classList.remove(cls); void el.offsetWidth; el.classList.add(cls); }
 // Each spark is a square: flying free (velocity v in px/s, gravity g, fading) or, with to, along a curve through via
-// into to, speeding up. born and life are in ms, born possibly ahead; land runs when a spark with to gets there. A
+// into to, speeding up; or a picture's frames (frames, size), still or flying free. born and life are in ms, born
+// possibly ahead; land runs when its life is over (a spark with to gets there), step at every frame before it. A
 // spark from a point on something that scrolls (from.on: the page, or the article's frame, see Items) goes with it:
 // it keeps that scroll as it was (at), and is drawn moved by as much as it has scrolled since.
 const rnd = (a, b) => a + Math.random() * (b - a);
@@ -2399,12 +2409,18 @@ const EFFECTS = {
   poof(from) { scatter(from, 14, from.colours, 220); },   // a thing gone (see Items), in its own colours
   burst(from) { scatter(from, 24, sparkColors(), 300); },
   sparkle(from) { scatter(from, 10, sparkColors(), 160, 300); },
-  win(from) { scatter(from, 48, WIKI_DATA.topics.map(k => cssColor('--viz-' + k)), 420); },
+  // Fireworks (see Items): a win's around the result's heading, a new best's more and in gold, a daily's first win more
+  // again after them, a creeper in the middle; a challenge's toast one, bursting below it.
+  win(from) { celebrate(from, 3, () => fwStar()); if (from.daily) EFFECTS.daily(from); },
   best(from) {
-    const colors = sparkColors().reverse();   // gold first
-    scatter(from, 80, colors, 520);
-    setTimeout(() => scatter(from, 40, colors, 380), 250);
+    celebrate(from, 6, () => ({ ...fwStar([FW_COLORS.yellow, FW_COLORS.orange, FW_COLORS.white], ['large', 'star']), twinkle: true }));
+    if (from.daily) EFFECTS.daily(from);
   },
+  daily(from) {
+    celebrate(from, 1, () => ({ shape: 'creeper', colors: [FW_COLORS.lime] }), { after: 2200, spread: 0 });
+    celebrate(from, 2, () => fwStar(undefined, ['small', 'burst']), { after: 2500 });
+  },
+  challenge(from) { celebrate({ x: from.x, y: from.y + 200 }, 1, () => ({ ...fwStar(), twinkle: true }), { spread: 40 }); },
 };
 // Plays an effect from a point on the page; with no point (a navigation with no click, as Retry's) a click's just bumps
 // the count. Like play(), any error is swallowed: this runs inside navigate and finish.
@@ -2412,9 +2428,10 @@ function effect(name, from) {
   try {
     if (!from || calm()) { if (name === 'orbs') bump($('#hudClicks')); return; }
     EFFECTS[name](from);
-    if (!fx.raf) { fx.last = performance.now(); fx.raf = requestAnimationFrame(fxFrame); }
+    fxStart();
   } catch { /* no effect */ }
 }
+function fxStart() { if (!fx.raf) { fx.last = performance.now(); fx.raf = requestAnimationFrame(fxFrame); } }
 function fxFrame(t) {
   fx.raf = 0;
   const dt = Math.min(50, t - fx.last) / 1000, ctx = fxCtx;
@@ -2430,36 +2447,42 @@ function fxFrame(t) {
     const age = t - p.born;
     if (age < 0) return true;
     if (age > p.life) { p.land?.(); return false; }
-    let x, y, alpha = 1;
+    p.step?.(p, dt, age);
+    let x = p.x, y = p.y, alpha = 1;
     const dx = p.on ? p.at.x - scroll[p.on].x : 0, dy = p.on ? p.at.y - scroll[p.on].y : 0;   // scrolled since
-    // A frame of Minecraft's explosion (see blast): which by its age, drawn pixelated where it was put.
-    if (p.frames) {
-      ctx.globalAlpha = 1; ctx.imageSmoothingEnabled = false;
-      ctx.drawImage(p.frames[Math.min(15, Math.floor(age / p.life * 16))], Math.round(p.x + dx - p.size / 2), Math.round(p.y + dy - p.size / 2), p.size, p.size);
-      return true;
-    }
     if (p.to) {
       const k = (age / p.life) ** 2, j = 1 - k;
       x = j * j * p.x + 2 * j * k * p.via.x + k * k * p.to.x;
       y = j * j * p.y + 2 * j * k * p.via.y + k * k * p.to.y;
-    } else {
+    } else if (p.vx !== undefined) {
       p.vx *= 1 - 1.8 * dt; p.vy = p.vy * (1 - 1.8 * dt) + p.g * dt;
       x = p.x += p.vx * dt; y = p.y += p.vy * dt;
-      alpha = 1 - age / p.life;
+      if (!p.frames) alpha = 1 - age / p.life;
+    }
+    if (p.twinkle && age > p.life / 3 && Math.floor(age / 150) % 2) return true;   // a twinkling firework spark, out
+    // A picture's frames (Minecraft's explosion, a firework's spark) play once over its life, drawn pixelated.
+    if (p.frames) {
+      ctx.globalAlpha = alpha; ctx.imageSmoothingEnabled = false;
+      ctx.drawImage(p.frames[Math.min(p.frames.length - 1, Math.floor(age / p.life * p.frames.length))], Math.round(x + dx - p.size / 2), Math.round(y + dy - p.size / 2), p.size, p.size);
+      return true;
     }
     ctx.globalAlpha = alpha;
     ctx.fillStyle = p.color;
     ctx.fillRect(Math.round(x + dx - p.size / 2), Math.round(y + dy - p.size / 2), p.size, p.size);
     return true;
   };
-  fx.parts = fx.parts.filter(p => p.on === 'frame' || draw(p));
+  // Sparks made while these are drawn (a firework's trail, its burst) are drawn from the next frame.
+  let parts = fx.parts;
+  fx.parts = []; fx.n = parts.length;
+  parts = parts.filter(p => p.on === 'frame' || draw(p));
   // Sparks on the article are drawn only over its frame, as the things on it are seen only there.
-  if (fx.parts.some(p => p.on === 'frame')) {
+  if (parts.some(p => p.on === 'frame')) {
     const r = $('#frame').getBoundingClientRect();
     ctx.save(); ctx.beginPath(); ctx.rect(r.left, r.top, r.width, r.height); ctx.clip();
-    fx.parts = fx.parts.filter(p => p.on !== 'frame' || draw(p));
+    parts = parts.filter(p => p.on !== 'frame' || draw(p));
     ctx.restore();
   }
+  fx.parts = parts.concat(fx.parts);
   ctx.globalAlpha = 1;
   if (fx.parts.length) fx.raf = requestAnimationFrame(fxFrame);
   else fxCanvas.hidden = true;
@@ -2631,18 +2654,21 @@ const ADV_SHOWN = 3, ADV_MS = 5000;
 function advPump() {
   if (game.active && game.loading) return;
   const host = $('#advToasts'), tiers = [];
+  let challenge = null;   // a challenge's toast, for its firework
   while (advQueue.length && host.querySelectorAll('.adv-toast:not(.out)').length < ADV_SHOWN) {
     const key = advQueue.shift(), a = ADVANCEMENTS[key], el = document.createElement('div');
     el.className = 'adv-toast ' + a.tier;
     el.innerHTML = `<span class="adv-toast-icon" data-adv="${key}">${advIcon(key)}</span><div><div class="t">${ADV_TIERS[a.tier].title}</div><div class="n">${esc(a.name)}</div></div>`;
     host.append(el);
     tiers.push(a.tier);
+    if (a.tier === 'challenge') challenge = el;
     setTimeout(() => { el.classList.add('out'); setTimeout(() => { el.remove(); advPump(); }, 350); }, ADV_MS);
   }
   if (!tiers.length) return;
   const playing = !$('#game').classList.contains('hidden') && $('#modalBg').classList.contains('hidden');
   host.style.top = playing ? $('.hud').getBoundingClientRect().bottom + 12 + 'px' : '';
   play(ADV_TIERS[['challenge', 'goal', 'task'].find(t => tiers.includes(t))].sound);
+  if (challenge) effect('challenge', { x: middleOf(host).x, y: middleOf(challenge).y });   // where the toasts sit, as it slides in
   advPictures();
 }
 
@@ -2740,18 +2766,22 @@ const ITEMS = {
   creeper: { name: 'Creeper', page: 'Creeper', tip: 'Click to let a creeper loose. It follows your pointer; hit it to knock it back.' },
   bed: { name: 'Bed', page: 'Bed', tip: 'Click to place a bed, and click one to sleep in it.' },
   anchor: { name: 'Respawn Anchor', page: 'Respawn Anchor', tip: 'Click to place an anchor, click one to charge it, and once more to set your spawn.' },
+  rocket: { name: 'Firework Rocket', page: 'Firework Rocket', tip: 'Click to launch a firework.' },
 };
-const ITEM_EMOJI = { TNT: '🧨', 'End Crystal': '💎', Ghast: '👻', 'Fire Charge': '🔥', Creeper: '🟩', Bed: '🛏️', 'Respawn Anchor': '⚓' };
+const ITEM_EMOJI = { TNT: '🧨', 'End Crystal': '💎', Ghast: '👻', 'Fire Charge': '🔥', Creeper: '🟩', Bed: '🛏️', 'Respawn Anchor': '⚓', 'Firework Rocket': '🎆' };
 // Files shown as they are: the end crystal turning above its base, the respawn anchor at each charge, the explosion's 16
-// frames (white, which blast tints grey as Minecraft does) and Minecraft's four explosion sounds.
+// frames (white, which blast tints grey as Minecraft does) and Minecraft's four explosion sounds; for fireworks, the
+// rocket, the spark's 7 frames (white, which they tint) and the sounds of a launch, a blast, a large one and a twinkle.
 const ITEM_FILES = { crystal: 'End Crystal JE2.gif', ...Object.fromEntries([0, 1, 2, 3, 4].map(n => ['anchor' + n, `Respawn Anchor (${n}) JE1.png`])),
   ...Object.fromEntries(Array.from({ length: 16 }, (_, i) => ['boom' + i, `Explosion (texture ${i}) JE1.png`])),
-  ...Object.fromEntries([1, 2, 3, 4].map(n => ['sound' + n, `Explosion${n}.ogg`])) };
+  ...Object.fromEntries([1, 2, 3, 4].map(n => ['sound' + n, `Explosion${n}.ogg`])),
+  rocket: 'Firework Rocket JE2 BE2.png', ...Object.fromEntries(Array.from({ length: 7 }, (_, i) => ['spark' + i, `Spark (texture ${i}) JE1 BE1.png`])),
+  fwLaunch: 'Firework launch.ogg', fwBlast: 'Firework blast.ogg', fwLarge: 'Firework large blast.ogg', fwTwinkle: 'Firework twinkle.ogg' };
 // The items' pictures (as the cards ask), asked for in an idle moment after the page loads, since the hotbar's buttons
 // show TNT's (or say TNT if it doesn't come); the files' addresses once the hotbar first opens. The explosion's frames
 // and sounds themselves only load when an item is first taken in hand.
 const itemPics = new Map(), itemFiles = new Map();
-let picsAsked = null, filesAsked = null, boomFrames = null, itemSounds = [];
+let picsAsked = null, filesAsked = null, boomFrames = null;
 function itemPictures() {
   return picsAsked ??= api({ action: 'query', titles: [...new Set([...Object.values(ITEMS).map(i => i.page), 'Ghast'])].join('|'), redirects: '1',
     prop: 'pageimages', piprop: 'thumbnail', pithumbsize: '160', pilimit: 'max' }).then(d => {
@@ -2762,12 +2792,13 @@ function itemPictures() {
     for (const b of ['#btnItems', '#hudItems']) { setImg($(b + ' img'), itemPics.get('TNT')); $(b + ' span').classList.toggle('hidden', itemPics.has('TNT')); }
   });
 }
-function itemAssets() {
-  return Promise.all([itemPictures(), filesAsked ??= api({ action: 'query', titles: Object.values(ITEM_FILES).map(f => 'File:' + f).join('|'), prop: 'imageinfo', iiprop: 'url' })
+const itemAssets = () => Promise.all([itemPictures(), itemFileUrls()]);
+function itemFileUrls() {
+  return filesAsked ??= api({ action: 'query', titles: Object.values(ITEM_FILES).map(f => 'File:' + f).join('|'), prop: 'imageinfo', iiprop: 'url' })
     .then(d => {
       const asked = new Map([...d.query?.normalized ?? []].map(n => [n.to, n.from])), key = new Map(Object.entries(ITEM_FILES).map(([k, f]) => ['File:' + f, k]));
       for (const p of d.query?.pages ?? []) if (p.imageinfo) itemFiles.set(key.get(asked.get(p.title) ?? p.title), p.imageinfo[0].url);
-    }, () => { filesAsked = null; })]);
+    }, () => { filesAsked = null; });
 }
 const itemPic = page => itemPics.has(page) ? `<img alt="" src="${esc(itemPics.get(page))}" draggable="false">` : `<span class="emoji">${ITEM_EMOJI[page] ?? '▪️'}</span>`;
 const itemFile = (k, page) => itemFiles.has(k) ? `<img alt="" src="${esc(itemFiles.get(k))}" draggable="false">` : itemPic(page);
@@ -2790,16 +2821,133 @@ function loadBoomFrames() {
     }));
   });
 }
-// The explosion sounds, decoded when an item is first taken in hand (a click, so the AudioContext may start).
-let soundsAsked = false;
-function loadItemSounds() {
-  if (soundsAsked || !itemFiles.has('sound1')) return;
-  soundsAsked = true;
+// The items' sounds (ITEM_FILES), each decoded once when first wanted, after a click, so the AudioContext may start: the
+// explosion's when an item is first taken in hand, the fireworks' with their pictures. One that fails is asked again
+// next time.
+const itemSounds = new Map(), soundsAsked = new Set(), EXPLOSIONS = ['sound1', 'sound2', 'sound3', 'sound4'];
+function loadItemSounds(keys = EXPLOSIONS) {
   try {
     const { ctx } = audioOut();
-    Promise.all([1, 2, 3, 4].map(n => fetch(itemFiles.get('sound' + n)).then(r => r.arrayBuffer()).then(b => ctx.decodeAudioData(b)).catch(() => null)))
-      .then(bs => { itemSounds = bs.filter(Boolean); });
+    for (const k of keys) if (itemFiles.has(k) && !soundsAsked.has(k)) {
+      soundsAsked.add(k);
+      fetch(itemFiles.get(k)).then(r => r.arrayBuffer()).then(b => ctx.decodeAudioData(b)).then(b => itemSounds.set(k, b), () => soundsAsked.delete(k));
+    }
   } catch { /* no sound */ }
+}
+
+// Fireworks, as Minecraft's: a rocket rises from where it is launched on a trail of white sparks, faster and faster,
+// and bursts in one of its shapes, each spark one of the star's 1 or 2 dye colours, shrinking through the spark's frames
+// as it slows and drifts down, some twinkling once a third through, some leaving a trail. A win and a new best launch
+// a volley of them, a daily's first win more, a challenge's toast one (celebrate); the Firework Rocket item launches
+// one from a click. Their sparks and rocket are the wiki's pictures, asked for with their sounds when a firework is
+// first wanted (fireworkAssets, the files only, never the hotbar's pictures), each spark's frames tinted once for each
+// colour (fwFrames). Without them, the sparks are squares.
+const FW_COLORS = { white: '#f0f0f0', orange: '#eb8844', magenta: '#c354cd', lightBlue: '#6689d3', yellow: '#decf2a', lime: '#41cd34', pink: '#d88198',
+  cyan: '#287697', purple: '#7b2fbe', blue: '#253192', red: '#b3312c' };   // the dyes' firework colours, but those too dark to see
+const FW_SPEED = 560;   // px a second for a block a tick
+const FW_STAR = [[0, 1], [.3455, .309], [.9511, .309], [.3796, -.1265], [.6122, -.8041], [0, -.3592]];
+const FW_CREEPER = [[0, .2], [.2, .2], [.2, .6], [.6, .6], [.6, .2], [.2, .2], [.2, 0], [.4, 0], [.4, -.6], [.2, -.6], [.2, -.4], [0, -.4]];
+const gauss = () => Math.sqrt(-2 * Math.log(1 - Math.random())) * Math.cos(2 * Math.PI * Math.random());
+// Each shape's sparks as Minecraft throws them, in blocks a tick, up positive, seen from the front: a ball's on a cube's
+// shell, pulled round; a star's or creeper's along its outline, mirrored, three times turned a little about its middle;
+// a burst's thrown up like a fountain.
+const FW_SHAPES = { small: () => fwBall(.25, 2), large: () => fwBall(.5, 4), star: () => fwShape(.5, FW_STAR, .34), creeper: () => fwShape(.5, FW_CREEPER, .034),
+  burst: () => { const sx = gauss() * .05; return Array.from({ length: 70 }, () => [gauss() * .15 + sx, Math.random() * .5]); } };
+function fwBall(speed, size) {
+  const v = [], r = () => (Math.random() - Math.random()) * .5;
+  for (let i = -size; i <= size; i++) for (let j = -size; j <= size; j++) for (let k = -size; k <= size; k++) {
+    const x = j + r(), y = i + r(), z = k + r(), d = Math.hypot(x, y, z) / speed + gauss() * .05;
+    v.push([x / d, y / d]);
+    if (i !== -size && i !== size && j !== -size && j !== size) k += size * 2 - 1;   // the shell only
+  }
+  return v;
+}
+function fwShape(speed, shape, turn) {
+  const v = [[shape[0][0] * speed, shape[0][1] * speed]], f = rnd(-.3, .3);   // facing the window, more or less
+  for (let i = 0; i < 3; i++) for (let j = 1; j < shape.length; j++) for (let s = .25; s <= 1; s += .25) {
+    const [a, b] = [shape[j - 1], shape[j]], x = (a[0] + (b[0] - a[0]) * s) * speed * Math.cos(f + i * Math.PI * turn), y = (a[1] + (b[1] - a[1]) * s) * speed;
+    v.push([x, y], [-x, y]);
+  }
+  return v;
+}
+let fwPics = null, fwAsked = null;   // fwPics: the spark's frames, biggest first, and the rocket
+const fwTints = new Map();
+function fireworkAssets() {
+  return fwAsked ??= itemFileUrls().then(() => {
+    loadItemSounds(['fwLaunch', 'fwBlast', 'fwLarge', 'fwTwinkle']);
+    const keys = [...Array.from({ length: 7 }, (_, i) => 'spark' + i), 'rocket'];
+    if (!keys.every(k => itemFiles.has(k))) return [];
+    return Promise.all(keys.map(k => new Promise(ok => {
+      const im = new Image();
+      im.crossOrigin = 'anonymous'; im.onload = () => ok(im); im.onerror = () => ok(null); im.src = itemFiles.get(k);
+    })));
+  }).then(ims => {
+    if (!ims.length || ims.some(i => !i)) { fwAsked = null; return; }   // asked again next time
+    const pixels = (im, n) => { const c = Object.assign(document.createElement('canvas'), { width: n, height: n }), x = c.getContext('2d'); x.imageSmoothingEnabled = false; x.drawImage(im, 0, 0, n, n); return c; };
+    fwPics = { sparks: ims.slice(0, 7).reverse().map(im => pixels(im, 8)), rocket: pixels(ims[7], 16) };
+  });
+}
+// A colour's spark frames: the white and grey frames multiplied by it, as Minecraft tints them.
+function fwFrames(color) {
+  if (!fwPics) return undefined;
+  if (!fwTints.has(color)) fwTints.set(color, fwPics.sparks.map(s => {
+    const c = Object.assign(document.createElement('canvas'), { width: 8, height: 8 }), x = c.getContext('2d');
+    x.drawImage(s, 0, 0); x.globalCompositeOperation = 'multiply'; x.fillStyle = color; x.fillRect(0, 0, 8, 8);
+    x.globalCompositeOperation = 'destination-in'; x.drawImage(s, 0, 0);
+    return c;
+  }));
+  return fwTints.get(color);
+}
+// A firework's spark, from x, y at vx, vy px a second.
+const fwSpark = (x, y, vx, vy, color, life, more) => ({ x, y, vx, vy, g: 40, size: rnd(12, 16) | 0, color, frames: fwFrames(color), born: performance.now(), life, ...more });
+// A trailing spark leaves a still copy of itself every 100 ms through the first half of its life, while there aren't too many.
+function fwTrail(p, dt, age) {
+  if (age > p.life / 2 || age - (p.trailed ?? -1e9) < 100 || fx.n > 2500) return;
+  p.trailed = age;
+  fx.parts.push({ ...p, vx: 0, vy: 0, g: 0, born: p.born + age, life: p.life / 2, step: undefined, trailed: undefined });
+}
+// A burst at at (where its rocket got to): a star's sparks ({ shape, colors, trail, twinkle }), on what the rocket is
+// on (fxOn), with its sound, and a twinkle's after.
+function fwBurst(at, star, on) {
+  for (const [vx, vy] of FW_SHAPES[star.shape]())
+    fx.parts.push(fwSpark(at.x, at.y, vx * FW_SPEED, -vy * FW_SPEED, star.colors[Math.floor(Math.random() * star.colors.length)], rnd(2400, 3000),
+      { twinkle: star.twinkle, step: star.trail ? fwTrail : undefined, ...on }));
+  play('firework', star.shape === 'large' ? 'fwLarge' : 'fwBlast');
+  if (star.twinkle) setTimeout(() => play('firework', 'fwTwinkle'), 1200);
+}
+// A rocket from from to to (points on the window), rising faster and faster (30 px a second, then 450 px a second more
+// each second, about as Minecraft's), bursting there into its stars.
+function launchFirework(from, to, stars, on = {}) {
+  play('firework', 'fwLaunch');
+  const h = Math.max(60, from.y - to.y), s = (Math.sqrt(900 + 900 * h) - 30) / 450, vx = (to.x - from.x) / s;
+  const r = { x: from.x, y: from.y, size: fwPics ? 32 : 4, color: '#ffffff', frames: fwPics && [fwPics.rocket], born: performance.now(), life: s * 1000, ...on,
+    step(p, dt, age) {
+      const k = age / 1000;
+      p.x = from.x + vx * k; p.y = from.y - 30 * k - 225 * k * k;
+      if (age - (p.trailed ?? -1e9) < 50) return;
+      p.trailed = age;
+      fx.parts.push(fwSpark(p.x + rnd(-2, 2), p.y + 14, gauss() * 28, 60 + 450 * k * .5, FW_COLORS.white, rnd(900, 1400), { size: rnd(8, 12) | 0, ...on }));
+    },
+    land() { for (const star of stars) fwBurst(r, star, on); } };
+  fx.parts.push(r);
+  fxStart();
+}
+const fwPick = a => a[Math.floor(Math.random() * a.length)];
+// A star of chance: any of shapes (any but the creeper), in 1 or 2 of colours (any), now and then twinkling or trailing.
+function fwStar(colors = Object.values(FW_COLORS), shapes = ['small', 'large', 'star', 'burst']) {
+  return { shape: fwPick(shapes), colors: [...new Set([fwPick(colors), fwPick(colors)].slice(0, 1 + (Math.random() < .5)))], trail: Math.random() < .3, twinkle: Math.random() < .3 };
+}
+// A celebration: n rockets from the bottom of the window, 300 ms apart from after ms on, each with the star star(i),
+// bursting around the point around, up to spread px to either side. The pictures are waited for, up to 1.5 s, and none
+// goes up with motion reduced by then.
+function celebrate(around, n, star, { after = 0, spread = 320 } = {}) {
+  Promise.race([fireworkAssets(), new Promise(ok => setTimeout(ok, 1500))]).then(() => {
+    for (let i = 0; i < n; i++) setTimeout(() => {
+      if (calm()) return;
+      const w = Math.min(spread, innerWidth * .35), x = Math.max(40, Math.min(innerWidth - 40, around.x + rnd(-w, w)));
+      launchFirework({ x: x + rnd(-40, 40), y: innerHeight + 20 }, { x, y: Math.max(50, around.y - rnd(20, 160)) }, [star(i)]);
+    }, after + i * 300);
+  }).catch(() => { /* no fireworks */ });
 }
 
 // The pieces of a page, and throwing them. One function, so the article's frame gets the same code as its source
@@ -3108,7 +3256,7 @@ function holdItem(k) {
   items.holding = k;
   breaker.prepare(itemsRoot(), keepWhole);
   if (inGame()) $('#frame').contentWindow?.postMessage({ mwr: 'arm' }, '*');
-  itemAssets().then(() => { loadBoomFrames(); loadItemSounds(); });
+  itemAssets().then(() => { loadBoomFrames(); loadItemSounds(); fireworkAssets(); });
   const layer = document.body.appendChild(Object.assign(document.createElement('div'), { className: 'hold' }));
   const ghost = document.body.appendChild(Object.assign(document.createElement('div'), { className: 'ghost', innerHTML: itemPic(ITEMS[k].page) }));
   const tip = document.body.appendChild(Object.assign(document.createElement('div'), { className: 'hold-tip', textContent: ITEMS[k].tip + ' Right-click or Esc to put it away.' }));
@@ -3226,6 +3374,14 @@ function ghastLeaves(g) {
   go();
 }
 const ITEM_USE = {
+  // A firework from the click, which breaks nothing, bursting no higher than the article's top shows it whole; with
+  // motion reduced, only its sounds.
+  rocket(p) {
+    const on = fxOn({ on: anchorOf(p) }), top = on.on === 'frame' ? $('#frame').getBoundingClientRect().top + 120 : 40;
+    const to = { x: p.x + rnd(-30, 30), y: Math.max(top, p.y - rnd(220, 360)) };
+    if (calm()) { play('firework', 'fwLaunch'); setTimeout(() => play('firework', 'fwBlast'), 1200); return; }
+    fireworkAssets().then(() => launchFirework(p, to, [fwStar()], on));
+  },
   tnt(p) {
     play('place');
     const t = placeThing('tnt drop', p, itemPic('TNT'));
@@ -4394,6 +4550,7 @@ function finish(won, lost = null) {
     .reduce((b, r) => !b || beats(r, b) ? r : b, null);
   hist.unshift(rec);
   store.set('mwr.history', hist.slice(0, 50));
+  const dailyFirst = won && game.daily && !savedDailies()[game.daily]?.won;   // the daily's first win, for more fireworks
   if (game.daily) saveDaily(rec, game.onDay);
   itemsReset();
 
@@ -4443,7 +4600,7 @@ function finish(won, lost = null) {
       <button id="mSame">Retry this pair</button>
       <button class="primary" id="mNew">New game</button>
     </div></div>`, false);
-  if (won) effect(newBest ? 'best' : 'win', middleOf($('.result-head h2')));
+  if (won) effect(newBest ? 'best' : 'win', { ...middleOf($('.result-head h2')), daily: dailyFirst });
   showPar(rec, game.parReady);
   const ol = $('#mPath');
   Promise.all(path.map(p => p.measured)).then(() => {

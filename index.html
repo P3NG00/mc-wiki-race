@@ -455,11 +455,14 @@
   .hotbar .name { position: absolute; bottom: calc(100% + 8px); left: 50%; translate: -50% 0; white-space: nowrap; pointer-events: none; opacity: 0;
     background: rgba(16,0,16,.94); color: #fff; border: 2px solid #2b0d5d; border-radius: 3px; padding: 2px 6px; font-size: 13px; }
   .hotbar button:is(:hover, :focus-visible) .name { opacity: 1; }
+  .hotbar button.held { border-color: #fff; outline: 2px solid #fff; outline-offset: -1px; }   /* the item in hand, framed as Minecraft's */
   /* An item in hand: a layer over everything that takes the next click, the item under the pointer, what a click does. */
   .hold { position: fixed; inset: 0; z-index: 9; cursor: none; }
   .ghost { position: fixed; z-index: 9; width: 48px; height: 48px; pointer-events: none; translate: -50% -50%; opacity: .85; }
   .hold-tip { position: fixed; top: 16px; left: 50%; translate: -50% 0; z-index: 9; max-width: calc(100vw - 32px); pointer-events: none; text-align: center;
     background: rgba(16,0,16,.9); color: #fff; padding: 5px 12px; border-radius: 6px; font-size: 14px; }
+  .hold-tip .put { pointer-events: auto; margin-inline-start: 8px; padding: 0 8px; min-height: 0; background: rgba(255,255,255,.15); color: #fff;
+    border: 1px solid rgba(255,255,255,.4); border-radius: 4px; font-size: 14px; line-height: 1.6; }
   .item-say { position: fixed; z-index: 9; translate: -50% -100%; pointer-events: none; white-space: nowrap; background: rgba(16,0,16,.92); color: #fff; padding: 5px 10px; border-radius: 6px; font-size: 14px; }
   /* Things on the page. None of them can be selected or dragged, however often they are clicked. */
   .thing { position: fixed; z-index: 8; translate: -50% -50%; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent; }
@@ -490,9 +493,10 @@
   /* Nor, then or with an item in hand, can anything on it be selected, however fast it is clicked or dragged on, but in a window. */
   html.broken body, body:has(> .hold) { user-select: none; -webkit-user-select: none; }
   html.broken .overlay { user-select: text; -webkit-user-select: text; }
-  .rebuild-bar { position: fixed; left: 50%; bottom: 16px; translate: -50% 0; z-index: 9; display: flex; gap: 8px; }
+  .rebuild-bar { position: fixed; left: 50%; bottom: calc(16px + env(safe-area-inset-bottom, 0px)); translate: -50% 0; z-index: 9; display: flex; gap: 8px; }
   .rebuild-bar button { box-shadow: var(--shadow); white-space: nowrap; }
   @media (max-width: 720px) {
+    .rebuild-bar { bottom: calc(32px + env(safe-area-inset-bottom, 0px)); }   /* clear of a phone browser's bar at the bottom */
     .hotbar button { width: 46px; height: 46px; }
     .hotbar img, .hotbar .emoji { width: 30px; height: 30px; }
   }
@@ -2976,7 +2980,7 @@ function celebrate(around, n, star, { after = 0, spread = 320 } = {}) {
 // putBack puts every piece back, flying (or at once), and the text whole again.
 function pageBreaker() {
   const MAX = 700, BIG = 160 * 80, TEXTY = /^(P|LI|DD|DT|TD|TH|H[1-6]|DIV|SPAN|A|B|I|SMALL)$/;
-  let busy = 0, raf = 0, last = 0, until = 0, sideways = null;   // sideways: [element, its own overflow-x], while it is set
+  let busy = 0, raf = 0, last = 0, until = 0, sideways = null;   // sideways: [element, its own overflow-x], each set, while they are
   const thrown = new Map(), frozen = new Set(), emptied = new Set();   // piece: its fall; the boxes keeping their size; those hollow
   // The pieces in region ({ x, y, r }, a circle on the screen), or by default in view: taking an item in hand splits the
   // text in view ahead of a blast, and the blast finds its own pieces around it, wherever the page is scrolled.
@@ -3093,13 +3097,15 @@ function pageBreaker() {
     bx += sx; by += sy;
     // The first blast notes where the page ends, the floor, so pieces resting on it can't make the page longer, and the
     // page no longer scrolls sideways, so pieces flying off the side can't make it wider.
-    // It goes on what decides the page's scrolling: the body when <html> has no overflow of its own (the wiki's pages
-    // scroll so), since one on <html> would make the body a scrolling box of its own, back at the top.
+    // It goes on what decides the page's scrolling: the body when <html> has no overflow of its own but the body does
+    // (the wiki's pages scroll so), since one on <html> would make the body a scrolling box of its own, back at the top.
+    // When neither has (the game's own page), <html> stops it and the body clips the pieces besides, as clipping makes
+    // no scrolling box: a phone otherwise lays the page out as wide as what flies past its side, hidden or not.
     if (!thrown.size && !sideways) {
-      const html = document.documentElement, h = getComputedStyle(html), el = h.overflowX === 'visible' && h.overflowY === 'visible' ? document.body : html;
+      const html = document.documentElement, body = document.body, own = el => (c => c.overflowX !== 'visible' || c.overflowY !== 'visible')(getComputedStyle(el));
       bottom = Math.max(html.scrollHeight, innerHeight); tail = bottom - end(root);
-      sideways = [el, el.style.getPropertyValue('overflow-x'), el.style.getPropertyPriority('overflow-x')];
-      el.style.setProperty('overflow-x', 'hidden', 'important');
+      sideways = (own(html) ? [[html, 'hidden']] : own(body) ? [[body, 'hidden']] : [[html, 'hidden'], [body, 'clip']])
+        .map(([el, v]) => { const was = [el, el.style.getPropertyValue('overflow-x'), el.style.getPropertyPriority('overflow-x')]; el.style.setProperty('overflow-x', v, 'important'); return was; });
     }
     const fresh = pieces.filter(el => !thrown.has(el)), rects = fresh.map(el => el.getBoundingClientRect());
     // The inline pieces: a picture or control, or else how tall it is with all it holds, and whether it sits on the line.
@@ -3253,7 +3259,8 @@ function pageBreaker() {
   function putBack(root, atOnce) {
     cancelAnimationFrame(raf); raf = 0;
     thrown.clear(); frozen.clear(); emptied.clear(); scene = null;
-    if (sideways) { const [el, v, p] = sideways; el.style.setProperty('overflow-x', v, p); sideways = null; }
+    for (const [el, v, p] of sideways ?? []) el.style.setProperty('overflow-x', v, p);
+    sideways = null;
     const all = [...root.querySelectorAll('[data-broke-style]')];
     const restore = el => {
       if (!('brokeStyle' in el.dataset)) return;   // put back already
@@ -3277,13 +3284,14 @@ const breaker = pageBreaker();
 // What is on the page: things placed (each { el, kind, p }, p its middle), the item in hand, the pointer (the frame
 // reports it over the article, for the creeper), whether anything is broken (so Rebuild shows, and the page takes no
 // clicks), when the latest blasts were (recent, for Chain Reaction), and how far the article is scrolled (frameScroll).
-const items = { things: new Set(), holding: null, pointer: { x: innerWidth / 2, y: innerHeight / 2 }, broken: false, recent: [], frameScroll: { x: 0, y: 0 },
+const items = { things: new Set(), holding: null, pointer: { x: innerWidth / 2, y: innerHeight / 2 }, touch: matchMedia('(hover: none)').matches, broken: false, recent: [], frameScroll: { x: 0, y: 0 },
   timers: new Set(), mending: 0 };   // timers: crystals set off by a blast, going off a moment later; mending: until
                                      // when Rebuild is putting the pieces back
 const inGame = () => !$('#game').classList.contains('hidden');
 const itemsRoot = () => inGame() ? $('#game') : $('#setup');
 const keepWhole = 'iframe, #toast, .overlay, #btnBgView, #btnItems, #hudItems, .bg-facts, #setupRoom';   // a selector
-addEventListener('pointermove', e => { items.pointer = { x: e.clientX, y: e.clientY }; }, { passive: true });
+addEventListener('pointermove', e => { items.pointer = { x: e.clientX, y: e.clientY }; items.touch = e.pointerType === 'touch'; }, { passive: true });
+addEventListener('pointerdown', e => { items.touch = e.pointerType === 'touch'; }, { passive: true });
 
 function openHotbar(btn) {
   closeHotbar();
@@ -3294,12 +3302,17 @@ function openHotbar(btn) {
   const r = btn.getBoundingClientRect(), w = bar.offsetWidth;
   bar.style.left = Math.max(8, Math.min(innerWidth - w - 8, r.left + r.width / 2 - w / 2)) + 'px';
   bar.style.top = (r.top > innerHeight / 2 ? r.top - bar.offsetHeight - 10 : r.bottom + 10) + 'px';
-  for (const b of bar.querySelectorAll('[data-item]')) b.onclick = e => { e.stopPropagation(); closeHotbar(); holdItem(b.dataset.item); };
+  bar.querySelector(`[data-item="${items.holding}"]`)?.classList.add('held');
+  for (const b of bar.querySelectorAll('[data-item]')) b.onclick = e => {
+    e.stopPropagation(); closeHotbar();
+    if (items.holding === b.dataset.item) dropItem(); else holdItem(b.dataset.item);   // the one in hand, put away
+  };
   bar.querySelector('button').focus();
 }
 const closeHotbar = () => $('.hotbar')?.remove();
 
-// An item in hand: every click uses it, until a right click or Escape puts it away. A click on something already placed
+// An item in hand: every click uses it, until a right click, Escape, the ✕ on its tip (a finger has neither of the
+// others) or picking it again in the hotbar puts it away. A click on something already placed
 // uses that instead (lights a TNT, hits a crystal or a fireball). Taking one in hand also gets ready for a blast: the
 // text in view, the page's and the article's, is split into pieces now, which a blast would otherwise have to do first,
 // and the explosion's frames and sounds are loaded.
@@ -3311,18 +3324,22 @@ function holdItem(k) {
   itemAssets().then(() => { loadBoomFrames(); loadItemSounds(); fireworkAssets(); });
   const layer = document.body.appendChild(Object.assign(document.createElement('div'), { className: 'hold' }));
   const ghost = document.body.appendChild(Object.assign(document.createElement('div'), { className: 'ghost', innerHTML: itemPic(ITEMS[k].page) }));
-  const tip = document.body.appendChild(Object.assign(document.createElement('div'), { className: 'hold-tip', textContent: ITEMS[k].tip + ' Right-click or Esc to put it away.' }));
+  const tip = document.body.appendChild(Object.assign(document.createElement('div'), { className: 'hold-tip',
+    textContent: items.touch ? ITEMS[k].tip.replace(/\b([Cc])lick/g, (_, c) => c === 'C' ? 'Tap' : 'tap') + ' Tap ✕ to put it away.' : ITEMS[k].tip + ' Right-click or Esc to put it away.' }));
+  tip.append(Object.assign(document.createElement('button'), { className: 'put', textContent: '✕', title: 'Put it away', onclick: () => dropItem() }));
+  tip.lastChild.setAttribute('aria-label', 'Put it away');
   if (inGame()) tip.style.top = $('.hud').getBoundingClientRect().bottom + 10 + 'px';
-  const follow = (x, y) => Object.assign(ghost.style, { left: x + 'px', top: y + 'px' });
-  follow(items.pointer.x, items.pointer.y);
-  layer.onpointermove = e => follow(e.clientX, e.clientY);
+  // The item follows a mouse or pen; a finger has none to follow, so it isn't shown.
+  const follow = (x, y, touch) => Object.assign(ghost.style, { left: x + 'px', top: y + 'px', visibility: touch ? 'hidden' : '' });
+  follow(items.pointer.x, items.pointer.y, items.touch);
+  layer.onpointermove = layer.onpointerdown = e => follow(e.clientX, e.clientY, e.pointerType === 'touch');
   layer.oncontextmenu = e => { e.preventDefault(); dropItem(); };
   layer.onclick = e => {
     // Over the bar or a hotbar button, which the layer covers, the click is theirs; over something placed (and in sight),
     // that thing's.
     const p = { x: e.clientX, y: e.clientY }, over = el => (r => r.width && p.x >= r.left && p.x <= r.right && p.y >= r.top && p.y <= r.bottom)(el.getBoundingClientRect());
-    const button = ['#btnRebuild', '#btnBrokenGiveUp', '#hudItems', '#btnItems'].map(b => $(b)).find(b => b.offsetParent && !b.closest('.hidden') && over(b));
-    if (button) { button.click(); return; }
+    const button = ['#btnRebuild', '#btnBrokenGiveUp', '#hudItems', '#btnItems'].map(b => $(b)).find(b => !b.closest('.hidden') && over(b));   // shown: a size
+    if (button) { e.stopPropagation(); button.click(); return; }   // and not closing the hotbar it opens
     const at = [...items.things].reverse().find(t => t.el.onclick && !hiddenThing(t) && over(t.el));
     if (at) at.el.onclick(); else ITEM_USE[k](p);
   };

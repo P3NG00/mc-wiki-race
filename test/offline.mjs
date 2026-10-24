@@ -1287,6 +1287,10 @@ for (let round = 0; round < 2; round++) for (let y = 0; y < pageHeight; y += 400
 await sleep(3000);
 check('blasts all down the page and on its pieces leave it no longer', await ev(`document.documentElement.scrollHeight <= ${pageHeight} + 2 && document.querySelectorAll('#setup .brk-thrown').length > 100`),
   await ev(`JSON.stringify([document.documentElement.scrollHeight, ${pageHeight}, document.querySelectorAll('#setup .brk-thrown').length])`));
+// Pieces thrown past the side are clipped, not hidden only, so a phone doesn't lay the page out wider; it still scrolls.
+check('nor any wider, however far the pieces fly sideways, and it still scrolls down', await ev(`document.documentElement.scrollWidth <= document.documentElement.clientWidth
+  && getComputedStyle(document.body).overflowX === 'clip' && getComputedStyle(document.body).overflowY === 'visible' && (scrollTo(0, 500), scrollY === 500)`),
+  await ev("JSON.stringify([document.documentElement.scrollWidth, document.documentElement.clientWidth, getComputedStyle(document.body).overflowX, scrollY])"));
 // Made narrower in pieces, the page takes the new width and ends about where it would whole (its pieces of four words
 // can't break where words would); back as it was, it ends as before.
 const outside = "[...document.querySelectorAll('#setup *')].filter(el => !el.closest('.brk-thrown') && el.getBoundingClientRect().right > innerWidth + 1).length";
@@ -1323,7 +1327,7 @@ check('then floats off the page', await until("![...items.things].some(t => t.ki
 // A blast while Rebuild puts the pieces back breaks nothing and marks nothing broken; while an item is in hand, a click
 // on the bar is the bar's; a fireball taken up again comes from the ghast that is there, not one floating off.
 await ev("holdItem('bed'); $('.hold').onclick({ clientX: 400, clientY: 300 }); dropItem(); $('.thing.bed').click()");
-await ev("holdItem('tnt'); (r => $('.hold').onclick({ clientX: r.left + 5, clientY: r.top + 5 }))($('#btnRebuild').getBoundingClientRect())");
+await ev("holdItem('tnt'); (r => $('.hold').onclick({ clientX: r.left + 5, clientY: r.top + 5, stopPropagation() {} }))($('#btnRebuild').getBoundingClientRect())");
 check('while an item is in hand, a click on Rebuild is Rebuild\'s', await ev("!items.broken && items.holding === 'tnt' && !$('.thing.tnt')"));
 await ev("dropItem(); blast({ x: 600, y: 300 }, 1.2)");
 check('a blast while the pieces fly back breaks nothing and marks nothing broken', await ev("!items.broken && $('#rebuildBar').classList.contains('hidden')")
@@ -1337,6 +1341,15 @@ check('a fireball taken up again comes from the ghast that is there', await ev("
   await ev("JSON.stringify([...items.things].map(t => [t.kind, Math.round(t.p.x)]))"));
 await ev('itemsReset()');
 await until("!document.querySelector('#setup [data-broke-style]')", 3000);
+// The ✕ on the tip puts the item away (a finger has no right click or Escape), as does picking it again in the hotbar,
+// opened over the layer; with a finger the item doesn't show where there is no pointer, and the tip says tap.
+await ev("holdItem('tnt'); $('.hold-tip .put').click()");
+check('the ✕ on the tip puts the item away', await ev("!items.holding && !$('.hold') && !$('.ghost')"));
+await ev("holdItem('bed'); (r => $('.hold').dispatchEvent(new MouseEvent('click', { clientX: r.left + 5, clientY: r.top + 5, bubbles: true })))($('#btnItems').getBoundingClientRect())");
+check('so does picking it again in the hotbar, opened over it, which frames it', await ev("$('.hotbar .held')?.dataset.item === 'bed'") && await ev("($('.hotbar .held').click(), !items.holding && !$('.hotbar'))"));
+await ev("items.touch = true; holdItem('tnt')");
+check('with a finger the item in hand isn\'t shown, and the tip says tap', await ev("$('.ghost').style.visibility === 'hidden' && $('.hold-tip').textContent.startsWith('Tap to place TNT, and tap')"));
+await ev("dropItem(); items.touch = false; for (const t of [...items.things]) removeThing(t)");
 // The Firework Rocket goes up from the click and bursts, on the page, breaking nothing.
 await ev("fx.parts = []; holdItem('rocket'); $('.hold').onclick({ clientX: 400, clientY: 600 }); dropItem()");
 check('a firework rocket goes up from the click, on the page, and breaks nothing', await until("fx.parts.some(p => p.land && p.on === 'page' && p.y <= 600)", 3000)

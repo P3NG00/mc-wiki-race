@@ -2706,6 +2706,7 @@ const ADVANCEMENTS = Object.fromEntries([
   ['rebuilder', 'items', 'Good as New', 'Rebuild the page.', 'task', 'Bricks', '🧱'],
   ['demolition', 'items', 'Demolition Expert', 'Blow the page up 50 times.', 'goal', 'Iron Pickaxe', '⛏️', { of: 50, tally: 'blasts', unit: 'times' }],
   ['pieces', 'items', 'Picking Up the Pieces', 'Win a game after rebuilding its page.', 'goal', 'Golden Apple', '🍏'],
+  ['lightReading', 'items', 'Light Reading', 'Set off the TNT on the TNT article.', 'goal', 'TNT', '🧨', { secret: true }],
   ['herobrine', 'secret', 'He Is Watching', 'Land on Herobrine.', 'task', 'Herobrine', '👁️', { secret: true }],
   ['cake', 'secret', 'The Cake Is Real', 'Land on Cake.', 'task', 'Cake', '🎂', { secret: true }],
   ['rags', 'secret', 'Rags to Riches', 'Win from Dirt to Diamond.', 'goal', 'Diamond Ore', '⛏️', { secret: true }],
@@ -3686,7 +3687,7 @@ function blast(p, power) {
   if (!mends) breaker.breakApart(root, p.x, p.y, power, keepWhole, still);
   if (inGame() && !mends) {
     const r = $('#frame').getBoundingClientRect();
-    $('#frame').contentWindow?.postMessage({ mwr: 'boom', x: p.x - r.left, y: p.y - r.top, power, still }, '*');
+    $('#frame').contentWindow?.postMessage({ mwr: 'boom', x: p.x - r.left, y: p.y - r.top, power, still, egg: game.path.at(-1)?.title === 'TNT' }, '*');
   }
   items.recent = [...items.recent.filter(r => now - r < 3000), now];
   adv.blasts++;
@@ -3839,11 +3840,33 @@ function renderArticle(page, fragment, token, blocked = [], seen = []) {
     // reported, at most every 40 ms, for the creeper that follows it, and the scroll, a frame at a time, for the blocks
     // placed on the article; the page passes the wheel on (scrollBy) while the article can't get it.
     const breaker = (${pageBreaker})();
+    // On the TNT article (egg), a blast that reaches the infobox's big picture of TNT lights it, as a blast lights TNT in
+    // Minecraft: it hisses and flashes where it is, kept whole (.mwr-lit), for half a second to a second and a half, then
+    // the page blows it up, bigger than any item. Once, until Rebuild puts it back.
+    let eggLit = false, eggFuse = 0;
+    const eggPics = () => [...document.querySelectorAll('.infobox-imagearea img')];
+    // Rebuild puts it back unlit, a fuse burning too.
+    const unlight = () => { clearTimeout(eggFuse); eggLit = false; for (const i of eggPics()) i.classList.remove('mwr-lit', 'mwr-still'); };
+    function tntEgg(d) {
+      const img = d.egg && !eggLit && eggPics().find(i => i.offsetWidth);
+      if (!img) return;
+      const r = img.getBoundingClientRect(), off = Math.hypot(Math.max(r.left - d.x, 0, d.x - r.right), Math.max(r.top - d.y, 0, d.y - r.bottom));
+      if (off > 220 * d.power) return;
+      eggLit = true;
+      img.classList.add('mwr-lit');
+      img.classList.toggle('mwr-still', CALM);   // with motion reduced, no flashing
+      parent.postMessage({ mwr: 'tntEgg', lit: true }, '*');
+      eggFuse = setTimeout(() => {
+        img.classList.remove('mwr-lit', 'mwr-still');
+        const r = img.getBoundingClientRect();
+        parent.postMessage({ mwr: 'tntEgg', x: r.left + r.width / 2, y: r.top + r.height / 2 }, '*');
+      }, 500 + Math.random() * 1000);
+    }
     addEventListener('message', e => {
       if (e.source !== parent) return;
-      if (e.data?.mwr === 'arm') breaker.prepare(document.body, '');
-      if (e.data?.mwr === 'boom') breaker.breakApart(document.body, e.data.x, e.data.y, e.data.power, '', e.data.still);
-      if (e.data?.mwr === 'rebuild') breaker.putBack(document.body, e.data.atOnce);
+      if (e.data?.mwr === 'arm') breaker.prepare(document.body, '.mwr-lit');
+      if (e.data?.mwr === 'boom') { tntEgg(e.data); breaker.breakApart(document.body, e.data.x, e.data.y, e.data.power, '.mwr-lit', e.data.still); }
+      if (e.data?.mwr === 'rebuild') { breaker.putBack(document.body, e.data.atOnce); unlight(); }
       if (e.data?.mwr === 'scrollBy') scrollBy(e.data.x, e.data.y);
     });
     let scrolled = 0;
@@ -4267,6 +4290,8 @@ ${WIKI_STYLES.map(h => `<link rel="stylesheet" href="${esc(h)}">`).join('\n')}
   .mwr-step { position: absolute; left: 100%; top: 0; margin-left: 4px; z-index: 1; padding: 1px 6px; font: 14px/1.3 sans-serif; cursor: pointer;
     background: #f4f4f4; color: #222; border: 1px solid #999; border-radius: 4px; }
   .mwr-step.after { position: static; margin-left: 4px; vertical-align: top; }
+  img.mwr-lit:not(.mwr-still) { animation: mwr-lit .5s steps(1) infinite; }   /* the TNT easter egg, lit as a placed TNT is */
+  @keyframes mwr-lit { 50% { filter: brightness(3) saturate(0); } }
   /* Top links only: where the live links end, over the first heading and under the infobox, and the rest folded away. */
   .mwr-fold { clear: both; margin: 20px 0 4px; padding-top: 8px; border-top: 2px dashed color-mix(in srgb, currentColor 55%, transparent);
     font: 600 12px/1.4 system-ui, sans-serif; letter-spacing: .05em; text-transform: uppercase; }
@@ -4312,6 +4337,9 @@ window.addEventListener('message', e => {
   if (e.data.mwr === 'nav' || e.data.mwr === 'dead') closeHotbar();   // a click in the article
   if (e.data.mwr === 'move') { const p = fromFrame(e.data); if (p) items.pointer = p; }   // for the creeper
   if (e.data.mwr === 'scroll' && Number.isFinite(e.data.x) && Number.isFinite(e.data.y)) { items.frameScroll = { x: e.data.x, y: e.data.y }; positionThings(); }
+  // The TNT article's easter egg (the frame's tntEgg): lit, it hisses; then it goes off, bigger than any item.
+  if (e.data.mwr === 'tntEgg' && e.data.lit) play('fuse');
+  else if (e.data.mwr === 'tntEgg') { const p = fromFrame(e.data); if (p) { advEarn({ lightReading: true }); blast(p, 2.6); } }
 });
 
 // No Back takes Back away, and so does Exact clicks, since it goes back to a page already visited.

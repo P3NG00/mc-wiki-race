@@ -41,6 +41,8 @@ Its reach is `BLAST_REACH` (220 px) × power. What it reaches reacts as in Minec
 - A ghast dies unless at the very edge.
 - A respawn anchor stands, since it is blast proof.
 
+An easter egg: on the TNT article a blast that reaches the infobox's big picture of TNT lights it, as a blast lights TNT in Minecraft (the frame's `tntEgg`, told it is the TNT article by `{mwr:'boom', egg}`). It hisses and flashes where it is, kept whole (`.mwr-lit`, with motion reduced not flashing), for 0.5 to 1.5 s, then the frame posts `{mwr:'tntEgg', x, y}` and the page blows it up at power 2.6, bigger than any item, earning Light Reading. Once, until Rebuild puts it back, unlit if its fuse is still burning.
+
 Every blast counts toward the advancements (`adv.blasts`), and the times of the latest are kept (`items.recent`) for Chain Reaction. The first blast on a whole page shows `#rebuildBar` at the bottom of the screen (`items.broken`).
 
 ## Breaking the page
@@ -82,6 +84,7 @@ The Items group (see [advancements.md](advancements.md)):
 - Good as New is a Rebuild.
 - Demolition Expert is 50 blasts.
 - Picking Up the Pieces is a win after a Rebuild.
+- Light Reading, a secret, is the TNT article's own TNT set off (see [A blast](#a-blast)).
 
 ## Fireworks
 

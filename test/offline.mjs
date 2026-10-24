@@ -1419,6 +1419,19 @@ check('a broken page takes no clicks but on the hotbar\'s button', await ev(`doc
   && getComputedStyle($('#hudItems')).pointerEvents === 'auto'`));
 await ev("$('#btnRebuild').click()");
 check('and takes them again once rebuilt', await until("!document.documentElement.classList.contains('broken') && getComputedStyle($('#game')).pointerEvents === 'auto'", 3000));
+// The TNT article's easter egg: a blast that reaches its infobox's picture lights it, and it goes off, bigger, earning
+// Light Reading; on another article (egg false) the picture is only a picture.
+const tntPic = JSON.parse(await ev(`(() => { document.body.insertAdjacentHTML('afterbegin', '<div class="infobox-imagearea"><img width="150" height="150" alt="" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII="></div>');
+  const r = document.querySelector('.infobox-imagearea img').getBoundingClientRect(); return JSON.stringify({ x: r.left - 30, y: r.top + 20 }); })()`, await frameCtx()));
+const boomAt = egg => `$('#frame').contentWindow.postMessage({ mwr: 'boom', x: ${tntPic.x}, y: ${tntPic.y}, power: 1.2, still: false, egg: ${egg} }, '*')`;
+await ev(boomAt(false)); await sleep(200);
+const notLit = await ev("!document.querySelector('img.mwr-lit')", await frameCtx());
+await ev(boomAt(true)); await sleep(200);
+const lit = await ev("!!document.querySelector('img.mwr-lit')", await frameCtx());
+check('on the TNT article a blast lights its picture of TNT, which goes off bigger, earning Light Reading', notLit && lit
+  && await until('!!adv.got.lightReading && items.broken', 3000) && await ev("!document.querySelector('img.mwr-lit')", await frameCtx()), JSON.stringify([notLit, lit]));
+await ev("$('#btnRebuild').click()");
+await until("!document.documentElement.classList.contains('broken')", 3000);
 await ev("navigate('Diamond Pickaxe', null)");
 check('a click to another article takes the blocks on this one with it', await until("game.path.length === 2 && !game.loading") && await ev("![...items.things].some(t => t.kind.startsWith('tnt'))"));
 await ev('finish(false); closeModal(); toSetup()');

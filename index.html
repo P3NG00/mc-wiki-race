@@ -214,7 +214,7 @@
   #setup.busy .card.empty .desc::before { content: 'Picking an article…'; }
   @keyframes pulse { to { opacity: .25; } }
   .history { margin-top: 36px; }
-  .history-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 8px; }
+  .history-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 8px 12px; margin-bottom: 8px; }
   .history-head button.link { font-size: 13px; }
   .history h2 { font-size: 15px; margin: 0; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: .06em; }
   .history table { width: 100%; border-collapse: collapse; font-size: 13.5px; background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius-lg); overflow: hidden; }
@@ -404,6 +404,32 @@
   /* In a toast, as in Minecraft, the item alone. */
   .adv-toast-icon { --size: 40px; flex: none; width: var(--size); height: var(--size); display: grid; place-items: center; }
   .adv-toast-icon img { width: 100%; height: 100%; }
+  /* XP (see XP): Minecraft's own bar (advTextures; until it is in, a dark bar and a green fill), 182 by 5 at twice its
+     size, half beside the Advancements button, with the level in green over it. */
+  .xp { display: inline-grid; justify-items: center; vertical-align: middle; }
+  .xp .lvl { position: relative; z-index: 1; margin-bottom: -3px; font-weight: 700; font-size: 16px; line-height: 1; color: #80ff20;
+    text-shadow: 2px 0 #000, -2px 0 #000, 0 2px #000, 0 -2px #000, 2px 2px #000, -2px -2px #000, 2px -2px #000, -2px 2px #000; }
+  .xp .lvl.bump { animation: xp-bump .3s; }
+  @keyframes xp-bump { 50% { scale: 1.4; } }
+  .xp .bar { position: relative; display: block; width: 364px; height: 10px; background: #1a1a1a; box-shadow: 0 0 0 1px #000; image-rendering: pixelated; }
+  .xp .fill { position: absolute; inset: 0 auto 0 0; background: #80ff20; }
+  :root.adv-textured .xp .bar { background: var(--adv-xp-bg) 0 0 / 100% 100%; box-shadow: none; }
+  :root.adv-textured .xp .fill { background: var(--adv-xp-fill) 0 0 / 364px 10px; }
+  .xp.small .bar { width: 182px; height: 5px; } :root.adv-textured .xp.small .fill { background-size: 182px 5px; }
+  .xp.small .lvl { font-size: 13px; }
+  .result-xp { margin: 4px 0 16px; text-align: center; }
+  .xp-gains { list-style: none; padding: 0; margin: 0 auto 8px; max-width: 360px; text-align: left; font-size: 14px; }
+  .xp-gains li { display: flex; justify-content: space-between; gap: 16px; }
+  .xp-gains li b { color: var(--accent); }
+  .xp-gains li.total { border-top: 1px solid var(--line); margin-top: 3px; padding-top: 3px; font-weight: 700; }
+  .xp-gains li.none { color: var(--muted); justify-content: center; }
+  @media (max-width: 720px) {
+    .xp:not(.small) .bar { width: 260px; height: 7px; } :root.adv-textured .xp:not(.small) .fill { background-size: 260px 7px; }
+    .xp.small .bar { width: 140px; height: 4px; } :root.adv-textured .xp.small .fill { background-size: 140px 4px; }
+  }
+  :root.calm .xp .lvl.bump { animation: none; }
+  .history-head .adv-side { margin-left: auto; display: flex; flex-wrap: wrap; justify-content: flex-end; align-items: center; gap: 8px 14px; }   /* the bar and the button, together */
+  .history-head .adv-btn { white-space: nowrap; }
   .history-head .adv-btn { margin-left: auto; padding: 4px 12px; border-radius: var(--radius-pill); font-weight: 600; font-size: 14px; }
   .adv-btn .count { color: var(--muted); font-weight: 400; margin-left: 4px; }
   /* The panel: its head (the count, a bar, the one picked) stays at the top while the groups scroll under it. */
@@ -740,7 +766,8 @@ const THEMES = [...new Set(['auto', 'light', 'dark', ...Array.from(document.quer
 
   <div class="history hidden" id="history">
     <div class="history-head"><h2>Recent games</h2><button class="link" id="btnClearHistory">Clear history</button>
-      <button class="adv-btn" id="btnAdv">🏆 Advancements <span class="count mono" id="advCount"></span></button></div>
+      <span class="adv-side"><span class="xp small hidden" id="xpSetup"><span class="lvl"></span><span class="bar"><span class="fill"></span></span></span>
+      <button class="adv-btn" id="btnAdv">🏆 Advancements <span class="count mono" id="advCount"></span></button></span></div>
     <div class="history-wrap"><table><thead><tr><th>Game</th><th>Route</th><th>Result</th><th>Time</th><th>When</th></tr></thead><tbody></tbody></table></div>
   </div>
 
@@ -1929,7 +1956,8 @@ function renderHistory() {
     if (r.won && (!b || beats(r, b))) best.set(pair(r), r);
   }
   // With no games but advancements earned (after Clear history), only the heading and the Advancements button show.
-  $('#history').classList.toggle('hidden', rows.length === 0 && !advEarned());
+  $('#history').classList.toggle('hidden', rows.length === 0 && !advEarned() && !adv.xp);
+  drawXp();
   for (const el of ['.history-wrap', '#btnClearHistory']) $(el).classList.toggle('hidden', rows.length === 0);
   $('#advCount').textContent = `${advEarned()} / ${Object.keys(ADVANCEMENTS).length}`;
   $('#history tbody').innerHTML = rows.slice(0, 15).map(r => {
@@ -1960,6 +1988,8 @@ const game = {
   onDay: false,      // whether that daily started on its own day, which a streak needs
   challenge: false,  // whether it came from a challenge link (setup.challenge)
   rebuilt: false,    // whether its page was blown up and rebuilt (see Items), for an advancement
+  xp: [],            // the XP it has earned, [what, xp, an advancement's], shown with its result (see XP)
+  fresh: 0,          // the articles it has seen for the first time, an XP each
   link: '',          // a link that plays this game (gameLink), made at the start
   vias: [],          // the checkpoints (Checkpoint rule), to be reached in order before the target counts
   viaNext: 0,        // how many of them have been reached
@@ -2120,7 +2150,7 @@ function startGame() {
   const exact = r.includes('exact') ? setup.exact : null, limit = exact ? exact.length - 1 : r.includes('limit') ? CLICK_LIMIT : 0;
   Object.assign(game, { active: true, link: gameLink(), start: setup.start, goal, vias, viaNext: 0, roundTrip, turn: roundTrip && !hunt ? out + 1 : 0, hunt,
     dead: new Set(), exact, limit, celebrate: false, stuck: false, rebuilt: false, cheerRun: 0, challenge: setup.challenge, daily: setup.daily, onDay: setup.daily === today(), rules: r, content: contentInPlay(cards.map(c => c.title)), timed: $('#timerToggle').checked, path: [],
-    seen: new Map(), stack: [], elapsed: 0, runningSince: 0, loading: false, par: null });
+    seen: new Map(), stack: [], elapsed: 0, runningSince: 0, loading: false, par: null, xp: [], fresh: 0 });
   // Par shows in the header once it is known: at once when the setup screen has loaded the link graph.
   const parReady = game.parReady = cardsRoute(cards.map(c => c.title), r, kinds, back);
   parReady.then(route => { if (game.parReady === parReady) { game.par = route ? route.length - 1 : null; renderHud(); } }, () => {});
@@ -2297,13 +2327,13 @@ function noise(at, dur, { gain = 1, cutoff = 800, filter = 'lowpass', attack } =
 const ogg = (name, n) => Array.from({ length: n }, (_, i) => `${name}${i + 1}.ogg`);
 const SOUND_FILES = {
   harp: ['Note block harp.ogg'], pling: ['Note block pling.ogg'], ding: ['Successful hit.ogg'], deny: ogg('Villager deny', 3),
-  villagerDeath: ['Villager death.ogg'], challenge: ['Challenge complete.ogg'],
+  villagerDeath: ['Villager death.ogg'], challenge: ['Challenge complete.ogg'], levelup: ['Random levelup.ogg'],
   explode: ogg('Explosion', 4), grass: ogg('Grass dig', 4), wood: ogg('Wood dig', 4), stone: ogg('Stone dig', 4), fuse: ['Fuse.ogg'],
   ghastCharge: ['Ghast charge.ogg'], ghastShoot: ['Ghast fireball4.ogg'], weak: ogg('Weak attack', 4), anchorCharge: ogg('Respawn anchor charge', 3),
   creeperDeath: ['Creeper death.ogg'], ghastDeath: ['Ghast death.ogg'],
   fwLaunch: ['Firework launch.ogg'], fwBlast: ['Firework blast.ogg'], fwLarge: ['Firework large blast.ogg'], fwTwinkle: ['Firework twinkle.ogg'],
 };
-const GAME_SOUNDS = ['harp', 'pling', 'ding', 'deny', 'villagerDeath', 'challenge'];
+const GAME_SOUNDS = ['harp', 'pling', 'ding', 'deny', 'villagerDeath', 'challenge', 'levelup'];
 const ITEM_SOUNDS = ['explode', 'grass', 'wood', 'stone', 'fuse', 'ghastCharge', 'ghastShoot', 'weak', 'anchorCharge', 'creeperDeath', 'ghastDeath'];
 const soundBank = new Map(), soundsAsked = new Set(), soundStarted = new Map(), later = f => setTimeout(f, 60000);
 let soundUrls = null;
@@ -2397,6 +2427,9 @@ const SOUNDS = {
   charge(n) { if (wiki('anchorCharge')) return; tone(180 + n * 90, 0, 0.35, { type: 'square', gain: 0.2, cutoff: 1500, slide: 260 + n * 90 }); noise(0, 0.1, { gain: 0.3, cutoff: 2000 }); },
   bonk() { if (wiki('weak')) return; tone(300, 0, 0.08, { type: 'square', gain: 0.25, cutoff: 1200, slide: 160 }); noise(0, 0.06, { gain: 0.4, cutoff: 1500 }); },
   poof(kind) { if (wiki({ creeper: 'creeperDeath', ghast: 'ghastDeath', bed: 'wood' }[kind])) return; noise(0, 0.4, { gain: 0.6, cutoff: 2000, attack: 0.02 }); },
+  // An XP orb landing: Minecraft's pickup, the arrow's ding at random pitch; a new level, Minecraft's level-up.
+  orb() { if (wiki('ding', 0.55 + Math.random() * 0.7)) return; tone(1500 + Math.random() * 700, 0, 0.12, { type: 'sine', gain: 0.25 }); },
+  levelup() { if (wiki('levelup')) return; [523, 659, 784, 1047].forEach((f, i) => tone(f, i * 0.07, 0.3, { type: 'square', gain: 0.18, cutoff: 2500 })); },
   rebuild() { [262, 330, 392, 523].forEach((f, i) => tone(f, i * 0.1, 0.35, { type: 'sine', gain: 0.4 })); },
   // Distance's cheer for a click that got closer: two quick bright notes, a step higher for each click less to go, from 4,
   // on a note block's pling (F#4 at its own pitch) from C5.
@@ -2492,7 +2525,7 @@ function setCalm(on) {
   calmBox = on;
   store.set('mwr.reduceMotion', on);
   syncCalm();
-  if (calm()) fx.parts = [];   // sparks in flight go at the next frame
+  if (calm()) { fx.parts = []; xpFlying = 0; drawXp(); }   // sparks in flight go at the next frame, XP orbs landed at once
   bgPair(); bgDraw(); bgNextFact();
 }
 const fxCanvas = $('#fx'), fxCtx = fxCanvas.getContext('2d');
@@ -2540,6 +2573,15 @@ const EFFECTS = {
     scatter(from, 30 * from.power | 0, ['#e0e0e0', '#9e9e9e', '#6b6b6b', '#4a4a4a'], 650);
   },
   poof(from) { scatter(from, 14, from.colours, 220); },   // a thing gone (see Items), in its own colours
+  // A game's XP (see XP): its orbs from the total into the bar, each landing with Minecraft's pickup and filling it.
+  xp(from) {
+    const t = performance.now(), { to } = from;
+    from.orbs.forEach((v, i) => {
+      const x = from.x + rnd(-24, 8), y = from.y + rnd(-10, 10), end = { x: to.left + rnd(4, to.width - 4), y: to.top + to.height / 2 };
+      fx.parts.push({ x, y, to: end, via: { x: (x + end.x) / 2 + rnd(-160, 160), y: Math.min(y, end.y) - rnd(60, 120) }, frames: xpFrames(v), size: xpSheet ? 24 : 8,
+        color: '#80ff20', born: t + i * 70, life: rnd(550, 750), land: () => { xpFlying = Math.max(0, xpFlying - v); play('orb'); drawXp(); } });
+    });
+  },
   burst(from) { scatter(from, 24, sparkColors(), 300); },
   sparkle(from) { scatter(from, 10, sparkColors(), 160, 300); },
   // Fireworks (see Items): a win's around the result's heading, a new best's more and in gold, a daily's first win more
@@ -2716,12 +2758,12 @@ const ADVANCEMENTS = Object.fromEntries([
 ].map(([key, group, name, how, tier, icon, emoji, x]) => [key, { group, name, how, tier, icon, emoji, ...x }]));
 
 // Read through savedAdvancements, which keeps only what advancements would write: storage is open to the player.
-const advEmpty = () => ({ got: {}, wins: 0, visits: 0, blasts: 0, pages: new Set(), topics: [] });
+const advEmpty = () => ({ got: {}, wins: 0, visits: 0, blasts: 0, xp: 0, pages: new Set(), topics: [] });
 function savedAdvancements() {
   const s = store.get('mwr.advancements', null), a = advEmpty();
   if (!s || typeof s !== 'object') return a;
   for (const [k, at] of Object.entries(s.got && typeof s.got === 'object' ? s.got : {})) if (isKey(ADVANCEMENTS, k) && Number.isFinite(at)) a.got[k] = at;
-  for (const k of ['wins', 'visits', 'blasts']) if (Number.isInteger(s[k]) && s[k] >= 0) a[k] = s[k];
+  for (const k of ['wins', 'visits', 'blasts', 'xp']) if (Number.isInteger(s[k]) && s[k] >= 0) a[k] = s[k];
   if (Array.isArray(s.pages)) a.pages = new Set(s.pages.filter(t => typeof t === 'string'));
   if (Array.isArray(s.topics)) a.topics = WIKI_DATA.topics.filter(t => s.topics.includes(t));
   return a;
@@ -2733,16 +2775,102 @@ const advEarned = () => Object.keys(adv.got).length;
 
 // Earns each advancement whose check holds, and every count reached, queueing their toasts.
 const advQueue = [];
-function advEarn(checks) {
+// Each new one gives its tier's XP (ADV_XP), listed in into: a game's, shown with its result (by default the game in
+// play's), or none, outside a game, when the bar fills at once.
+function advEarn(checks, into = game.active ? game.xp : null) {
   const counts = Object.entries(ADVANCEMENTS).filter(([, a]) => a.of).map(([k, a]) => [k, advTally(a.tally) >= a.of]);
-  for (const [k, ok] of [...Object.entries(checks), ...counts]) if (ok && !adv.got[k]) { adv.got[k] = Date.now(); advQueue.push(k); }
+  for (const [k, ok] of [...Object.entries(checks), ...counts]) if (ok && !adv.got[k]) {
+    adv.got[k] = Date.now(); advQueue.push(k);
+    gainXp(into, ADVANCEMENTS[k].name, ADV_XP[ADVANCEMENTS[k].tier], true);
+  }
   saveAdv();
+  if (!into) drawXp();
+}
+
+// XP, as Minecraft's: earned at a game's end and with each advancement, never taken away, and kept with the
+// advancements (adv.xp), which Reset advancements clears. A win gives 2 × par, at par 3 more and under par 6 (not with
+// Exact clicks), 2 for each rule that makes it harder (XP_RULES; Distance helps), and the day's daily, won for the first
+// time, 10; any game an XP for each article seen for the first time. The levels are Minecraft's (xpStep). The bar is
+// Minecraft's own (advTextures), beside the Advancements button and in the result, where the game's XP flies into it as
+// orbs (EFFECTS.xp) and the bar fills as they land; xpFlying is what is still on its way, so the bar shows the rest.
+const ADV_XP = { task: 5, goal: 10, challenge: 25 };
+const XP_RULES = ['roundtrip', 'noback', 'blind', 'lead', 'limit', 'nohubs'];
+const xpStep = L => L < 16 ? 2 * L + 7 : L < 31 ? 5 * L - 38 : 9 * L - 158;   // from level L to L + 1
+function xpLevel(xp) {
+  let L = 0;
+  while (xp >= xpStep(L)) { xp -= xpStep(L); L++; }
+  return { L, into: xp, need: xpStep(L) };
+}
+// fromAdv: an advancement's, listed after the game's own.
+function gainXp(lines, what, n, fromAdv = false) { if (n > 0) { adv.xp += n; lines?.push([what, n, fromAdv]); } }
+// The orb's picture: Minecraft's sheet of its 11 sizes (grey, red at the heart), each tinted green to yellow and back
+// as the orb shimmers, as Minecraft tints them, asked for with the items' files when a result first has XP to show.
+let xpSheet = null, xpAsked = null;
+const xpTints = new Map();
+function xpOrbs() {
+  return xpAsked ??= itemFileUrls().then(() => new Promise(ok => {
+    if (!itemFiles.has('orb')) { xpAsked = null; ok(); return; }
+    const im = new Image();
+    im.crossOrigin = 'anonymous'; im.onload = () => { xpSheet = im; ok(); }; im.onerror = () => { xpAsked = null; ok(); }; im.src = itemFiles.get('orb');
+  }));
+}
+// Minecraft's orb sizes by value, and an orb's frames of that size.
+const xpSize = v => [3, 7, 17, 37, 73, 149, 307, 617, 1237, 2477].filter(n => v >= n).length;
+function xpFrames(v) {
+  if (!xpSheet) return undefined;
+  const i = xpSize(v);
+  if (!xpTints.has(i)) xpTints.set(i, [0, 64, 128, 192, 255, 192, 128, 64].map(r => {
+    const c = Object.assign(document.createElement('canvas'), { width: 16, height: 16 }), x = c.getContext('2d'), sx = i % 4 * 16, sy = Math.floor(i / 4) * 16;
+    x.imageSmoothingEnabled = false;
+    x.drawImage(xpSheet, sx, sy, 16, 16, 0, 0, 16, 16); x.globalCompositeOperation = 'multiply'; x.fillStyle = `rgb(${r},255,0)`; x.fillRect(0, 0, 16, 16);
+    x.globalCompositeOperation = 'destination-in'; x.drawImage(xpSheet, sx, sy, 16, 16, 0, 0, 16, 16);
+    return c;
+  }));
+  return xpTints.get(i);
+}
+let xpFlying = 0, xpShownLevel = null;
+const xpBar = cls => `<span class="xp ${cls}"><span class="lvl"></span><span class="bar"><span class="fill"></span></span></span>`;
+// Every bar on the page, at the XP not still flying to it; a new level plays Minecraft's level-up and bumps the number.
+function drawXp() {
+  const xp = Math.max(0, adv.xp - xpFlying), { L, into, need } = xpLevel(xp);
+  for (const b of document.querySelectorAll('.xp')) {
+    b.querySelector('.fill').style.width = into / need * 100 + '%';
+    b.querySelector('.lvl').textContent = L;
+    b.title = `Level ${L} · ${into} / ${need} XP to level ${L + 1} · ${xp} XP in all`;
+    if (xpShownLevel !== null && L > xpShownLevel) bump(b.querySelector('.lvl'));
+  }
+  if (xpShownLevel !== null && L > xpShownLevel) play('levelup');
+  xpShownLevel = L;
+  $('#xpSetup').classList.toggle('hidden', !adv.xp);
+  if (adv.xp) advTextures();
+}
+// A game's XP in its result, if it is still open: what earned it and the bar, the orbs flying in from the total (at
+// once with motion reduced or Effects off). The orbs are split as Minecraft's, at most 12, each its picture by value.
+function showXp(lines) {
+  const box = $('#mXp'), sum = lines.reduce((s, [, n]) => s + n, 0);
+  if (!box?.isConnected) { drawXp(); return; }
+  const sorted = [...lines.filter(l => !l[2]), ...lines.filter(l => l[2]).map(([w, n]) => [`Advancement: ${w}`, n])];
+  box.innerHTML = `<ul class="xp-gains">${sorted.length ? sorted.map(([w, n]) => `<li><span>${esc(w)}</span><b>+${n}</b></li>`).join('')
+    + `<li class="total"><span>XP</span><b>+${sum}</b></li>` : '<li class="none">No XP this time, and none taken away.</li>'}</ul>${xpBar('')}`;
+  box.classList.remove('hidden');
+  xpFlying += sum;   // added to, as another result's orbs may still be landing
+  drawXp();
+  const landed = () => { xpFlying = Math.max(0, xpFlying - sum); drawXp(); };   // never below none: Reduce motion may have landed them
+  if (!sum || calm() || !effectsOn) { landed(); return; }
+  const orbs = [];
+  for (let left = sum; left > 0;) { const v = orbs.length === 11 ? left : Math.max(1, Math.ceil(left / (12 - orbs.length))); orbs.push(v); left -= v; }
+  Promise.race([xpOrbs(), new Promise(ok => setTimeout(ok, 800))]).then(() => {
+    const from = middleOf(box.querySelector('.total b')), to = box.querySelector('.bar')?.getBoundingClientRect();
+    if (!from || !to || !box.isConnected || calm() || !effectsOn) { landed(); return; }
+    effect('xp', { ...from, to, orbs });
+  }).catch(landed);
 }
 // An arrival, from navigate, after its try: nothing may fail there (the game would stay loading), so it swallows its own errors.
 function advArrive(title, back) {
   try {
     const i = game.path.length - 1, topic = ARTICLES.get(title)?.topic;
     adv.visits++;
+    if (!adv.pages.has(title)) game.fresh++;   // seen for the first time, an XP
     adv.pages.add(title);
     if (topic && !adv.topics.includes(topic)) adv.topics.push(topic);
     advEarn({
@@ -2756,14 +2884,22 @@ function advArrive(title, back) {
 // game is read before the first await, since Retry this pair may start another; par and the arrivals' counts are waited
 // for. Its toasts come once the result's fanfare has played (ADV_AFTER_RESULT).
 const ADV_AFTER_RESULT = 1200;
-async function advFinish(rec, first, newBest) {
+async function advFinish(rec, first, newBest, dailyFirst) {
   const at = performance.now() + ADV_AFTER_RESULT, path = game.path, parReady = game.parReady, rules = game.rules, has = k => rules.includes(k);
+  const lines = game.xp, fresh = game.fresh;
   const g = { exact: !!game.exact, roundTrip: game.roundTrip, checkpoints: checkpoints(), timed: game.timed, challenge: game.challenge, rebuilt: game.rebuilt };
   try {
     if (rec.won) { adv.wins++; saveAdv(); }
     const par = rec.par ?? await parReady.then(route => route ? route.length - 1 : null, () => null);
     await Promise.all(path.map(p => p.measured));
     const won = rec.won, skill = won && first && par >= ADV_PAR, speed = skill && g.timed;
+    if (won) {
+      gainXp(lines, par ? `Win at par ${par}` : 'Win', 2 * Math.max(1, par ?? 1));
+      if (!g.exact && par && rec.clicks <= par) gainXp(lines, ...rec.clicks < par ? ['Under par', 6] : ['At par', 3]);
+      for (const k of XP_RULES) if (has(k)) gainXp(lines, k === 'nohubs' ? 'Hard' : RULES[k].label, 2);
+      if (dailyFirst) gainXp(lines, 'The daily, won for the first time', 10);
+    }
+    gainXp(lines, `New articles seen (${fresh})`, fresh);
     advEarn({
       hello: won, daily: !!rec.daily, relay: won && has('checkpoint'), treasure: won && has('scavenger'), measure: won && g.exact,
       thereBack: won && g.roundTrip, accepted: won && g.challenge,
@@ -2776,7 +2912,8 @@ async function advFinish(rec, first, newBest) {
       hotStreak: won && has('distance') && !g.exact && par >= 4 && path.slice(1, -1).every((p, i) => p.via || p.found || gotCloser(path, i + 1, false)),
       rags: won && rec.start === 'Dirt' && rec.goal === 'Diamond' && !rec.vias && !g.roundTrip,
       soClose: !!rec.outOfClicks && !g.exact && path.at(-1).togo === 1, scenic: won && rec.clicks >= 15,
-    });
+    }, lines);
+    showXp(lines);
   } catch { /* no advancement */ }
   setTimeout(advPump, Math.max(0, at - performance.now()));
 }
@@ -2826,7 +2963,8 @@ function advPictures() {
 // Minecraft's advancement frames and toast box, from the wiki: asked for with the pictures, and set as CSS variables
 // (--adv-plain-raw … --adv-fancy-worn, --adv-toast) once in.
 const ADV_TEXTURES = { 'plain-raw': 'Advancement-plain-raw.png', 'plain-worn': 'Advancement-plain-worn.png', 'oval-raw': 'Advancement-oval-raw.png',
-  'oval-worn': 'Advancement-oval-worn.png', 'fancy-raw': 'Advancement-fancy-raw.png', 'fancy-worn': 'Advancement-fancy-worn.png', toast: 'Toast advancement.png' };
+  'oval-worn': 'Advancement-oval-worn.png', 'fancy-raw': 'Advancement-fancy-raw.png', 'fancy-worn': 'Advancement-fancy-worn.png', toast: 'Toast advancement.png',
+  'xp-bg': 'Experience bar background.png', 'xp-fill': 'Experience bar progress.png' };   // and the XP bar's
 let advTexturesAsked = null;
 function advTextures() {
   advTexturesAsked ??= api({ action: 'query', titles: Object.values(ADV_TEXTURES).map(f => 'File:' + f).join('|'), prop: 'imageinfo', iiprop: 'url' }).then(d => {
@@ -2877,7 +3015,7 @@ function openAdvancements() {
     $('#aDetail').innerHTML = advDetail();
   };
   $('#aReset').onclick = () => {
-    openModal(`<h2>Reset advancements?</h2><p>This forgets every advancement you’ve earned and the counts toward the rest (wins, articles visited, blasts). Your history and dailies stay.</p>
+    openModal(`<h2>Reset advancements?</h2><p>This forgets every advancement you’ve earned, your XP and level, and the counts toward the rest (wins, articles visited, blasts). Your history and dailies stay.</p>
       <div class="actions"><button id="aKeep">Cancel</button><button class="primary" id="aWipe">Reset advancements</button></div>`);
     $('#aKeep').onclick = openAdvancements;
     $('#aWipe').onclick = () => { adv = advEmpty(); saveAdv(); renderHistory(); openAdvancements(); };
@@ -2908,7 +3046,8 @@ const ITEM_EMOJI = { TNT: '🧨', 'End Crystal': '💎', Ghast: '👻', 'Fire Ch
 // which they tint). Their sounds are with the game's (SOUND_FILES).
 const ITEM_FILES = { crystal: 'End Crystal JE2.gif', ...Object.fromEntries([0, 1, 2, 3, 4].map(n => ['anchor' + n, `Respawn Anchor (${n}) JE1.png`])),
   ...Object.fromEntries(Array.from({ length: 16 }, (_, i) => ['boom' + i, `Explosion (texture ${i}) JE1.png`])),
-  rocket: 'Firework Rocket JE2 BE2.png', ...Object.fromEntries(Array.from({ length: 7 }, (_, i) => ['spark' + i, `Spark (texture ${i}) JE1 BE1.png`])) };
+  rocket: 'Firework Rocket JE2 BE2.png', ...Object.fromEntries(Array.from({ length: 7 }, (_, i) => ['spark' + i, `Spark (texture ${i}) JE1 BE1.png`])),
+  orb: 'Experience Orb (texture) JE2.png' };   // and the XP orb's sizes (see XP)
 // The items' pictures (as the cards ask), asked for in an idle moment after the page loads, since the hotbar's buttons
 // show TNT's (or say TNT if it doesn't come); the files' addresses once the hotbar first opens. The explosion's frames
 // and sounds themselves only load when an item is first taken in hand.
@@ -4800,7 +4939,7 @@ function finish(won, lost = null) {
       p.stranded && '⛔'].filter(Boolean).map(w => ` <span class="note">${esc(w)}</span>`).join('') +
     (toGoText(p) ? ` <span class="note togo${worse(p, i) ? ' worse' : ''}">${toGoText(p)}</span>` : '') + '</li>').join('');
   const newBest = won && best && beats(rec, best);
-  advFinish(rec, first, !!newBest);
+  advFinish(rec, first, !!newBest, dailyFirst);
   const bestNote = !won || !best ? '' : newBest ? '<p class="best new">New personal best for this pair!</p>'
     : `<p class="best note">Your best for this pair: ${wonText(best)}.</p>`;
   // The heading: the outcome, with a loss's reason under it. Exact clicks's column holds a route of its count.
@@ -4821,6 +4960,7 @@ function finish(won, lost = null) {
       <div class="tile"><div class="v mono">${rec.clicks ? fmtTime(ms / rec.clicks) : '–'}</div><div class="k">Per click</div></div>` : ''}
     </div>
     ${bestNote}
+    <div class="result-xp hidden" id="mXp"></div>
     <div class="routes">
       <div><h3>Your path · ${clicksText(rec.clicks)}</h3><ol id="mPath">${pathHtml()}</ol>
         <p class="note hidden" id="mPathNote">Beside each page, the fewest clicks from it to what was next.${exact ? '' : ' In red, a click that got no closer.'}</p>

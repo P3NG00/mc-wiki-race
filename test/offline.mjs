@@ -324,6 +324,10 @@ check('the relay is won and recorded with both checkpoints, par over the whole c
 check('a win sends fireworks up over the result', await until("fx.parts.filter(p => p.land).length >= 1 && !$('#fx').hidden", 3000), await ev('fx.parts.length'));
 await ev("for (const p of fx.parts) if (p.land) p.life = 0");   // bursting now
 check('and each bursts into its sparks', await until("fx.parts.filter(p => p.life >= 2400).length >= 70", 2000), await ev('fx.parts.length'));
+// Its XP in the result: 2 × par, and more for the rest, flying into the bar, on Minecraft's levels.
+check('XP levels are Minecraft\'s', await ev("xpLevel(6).L === 0 && xpLevel(7).L === 1 && xpLevel(7).into === 0 && xpLevel(352).L === 16 && xpLevel(353).into === 1"));
+check('a win lists its XP in the result, filling the bar', await until("!!document.querySelector('#mXp:not(.hidden) .xp')", 5000)
+  && await ev(`$('#mXp').textContent.includes('Win at par ' + ${relayPar}) && $('#mXp').textContent.includes('+' + 2 * ${relayPar}) && adv.xp > 0`), await ev("$('#mXp').textContent"));
 await ev("closeModal(); toSetup()");
 // Swap reverses the whole chain. A third checkpoint rolls a third card; back to one, Reroll all drops the other two.
 await ev("document.querySelector('#btnSwap').click()");
@@ -1424,17 +1428,22 @@ check('and takes them again once rebuilt', await until("!document.documentElemen
 const tntPic = JSON.parse(await ev(`(() => { document.body.insertAdjacentHTML('afterbegin', '<div class="infobox-imagearea"><img width="150" height="150" alt="" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII="></div>');
   const r = document.querySelector('.infobox-imagearea img').getBoundingClientRect(); return JSON.stringify({ x: r.left - 30, y: r.top + 20 }); })()`, await frameCtx()));
 const boomAt = egg => `$('#frame').contentWindow.postMessage({ mwr: 'boom', x: ${tntPic.x}, y: ${tntPic.y}, power: 1.2, still: false, egg: ${egg} }, '*')`;
-await ev(boomAt(false)); await sleep(200);
-const notLit = await ev("!document.querySelector('img.mwr-lit')", await frameCtx());
 await ev(boomAt(true)); await sleep(200);
 const lit = await ev("!!document.querySelector('img.mwr-lit')", await frameCtx());
-check('on the TNT article a blast lights its picture of TNT, which goes off bigger, earning Light Reading', notLit && lit
-  && await until('!!adv.got.lightReading && items.broken', 3000) && await ev("!document.querySelector('img.mwr-lit')", await frameCtx()), JSON.stringify([notLit, lit]));
+check('on the TNT article a blast lights its picture of TNT, which goes off bigger, earning Light Reading', lit
+  && await until('!!adv.got.lightReading && items.broken', 3000) && await ev("!document.querySelector('img.mwr-lit')", await frameCtx()));
+await ev("$('#btnRebuild').click()");
+await until("!document.documentElement.classList.contains('broken') && !document.querySelector('#game [data-broke-style]')", 3000); await sleep(1200);
+await ev(boomAt(false)); await sleep(200);
+check('and on another article the picture is only a picture', await ev("!document.querySelector('img.mwr-lit')", await frameCtx()));
 await ev("$('#btnRebuild').click()");
 await until("!document.documentElement.classList.contains('broken')", 3000);
 await ev("navigate('Diamond Pickaxe', null)");
 check('a click to another article takes the blocks on this one with it', await until("game.path.length === 2 && !game.loading") && await ev("![...items.things].some(t => t.kind.startsWith('tnt'))"));
-await ev('finish(false); closeModal(); toSetup()');
+await ev('finish(false)');
+check('a game given up lists only its new articles\' XP, or none', await until("!!document.querySelector('#mXp:not(.hidden) .xp')", 5000)
+  && await ev("!$('#mXp').textContent.includes('Win') && ($('#mXp').textContent.includes('New articles seen') || $('#mXp').textContent.includes('No XP this time'))"), await ev("$('#mXp').textContent"));
+await ev('closeModal(); toSetup()');
 
 // Advancements: a par 3+ pair's first game, won at par from a challenge link, earns the firsts, Par for the Course,
 // Accepted and the speed ones, with toasts; the same pair again earns no skill one, nor does a par 1 pair; landing on
@@ -1500,12 +1509,13 @@ await ev('closeModal()');
 await ev("localStorage.setItem('mwr.advancements', JSON.stringify({ got: { hello: 1, nope: 2, par: 'x' }, wins: -1, visits: 4, pages: ['A', 3], topics: ['mobs', 'zz'] }))");
 check('stored advancements keep only what would be written', await ev(`(a => JSON.stringify([a.got, a.wins, a.visits, [...a.pages], a.topics]))(savedAdvancements())`)
   === JSON.stringify([{ hello: 1 }, 0, 4, ['A'], ['mobs']]), await ev(`(a => JSON.stringify([a.got, a.wins, a.visits, [...a.pages], a.topics]))(savedAdvancements())`));
+check('and XP only as a whole number of none or more', await ev(`[-1, 2.5, 'x', 12].map(xp => (localStorage.setItem('mwr.advancements', JSON.stringify({ xp })), savedAdvancements().xp)).join() === '0,0,0,12'`));
 await ev('saveAdv()');   // back to the earned ones
 await ev("$('#btnClearHistory').click(); $('#hClear').click()");
 check('Clear history leaves them, the heading and the button still there with no table', await ev(`advEarned() === ${earnedN} && savedGames().length === 0
   && !$('#history').classList.contains('hidden') && $('.history-wrap').classList.contains('hidden') && $('#btnClearHistory').classList.contains('hidden')`));
 await ev("$('#btnAdv').click(); $('#aReset').click(); $('#aWipe').click()");
-check('Reset advancements forgets them and the counts', await ev(`advEarned() === 0 && adv.wins === 0 && adv.pages.size === 0 && JSON.stringify(store.get('mwr.advancements').got) === '{}'
+check('Reset advancements forgets them and the counts', await ev(`advEarned() === 0 && adv.wins === 0 && adv.xp === 0 && adv.pages.size === 0 && JSON.stringify(store.get('mwr.advancements').got) === '{}'
   && $('#advCount').textContent.startsWith('0 / ') && document.querySelectorAll('.adv-tile.got').length === 0 && $('#history').classList.contains('hidden')`));
 await ev('closeModal()');
 

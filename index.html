@@ -5168,16 +5168,25 @@ const gotCloser = (path, i, exact) => !exact && i > 0 && !path[i].via && !path[i
 // more than taking the page's own shortcut (its next, measured with its count) would have, until a page as close as that
 // was reached, or a checkpoint or find, or else to the end of the game. Only a detour of SHORTCUT_MIN or more is worth
 // showing, since a sideways step or two is how anyone plays, and none from the start or a checkpoint, whose way on the
-// shortest route beside it already shows. { from, next, aim, togo: next's count } or null.
+// shortest route beside it already shows. Being the tip that route can't give, it may lie inside the start's own detour,
+// so it says why its page was picked: how often the player was on it going for the same objective, and how many clicks
+// quicker the shortcut was. { from, next, aim, togo: next's count, times, quicker: null if nothing as close was reached
+// again } or null.
 const SHORTCUT_MIN = 2;
 function missedShortcut(path, exact) {
   let best = null, most = SHORTCUT_MIN - 1;
+  // The checkpoints and finds reached by path[k]: arrivals with the same number were going for the same objective.
+  const leg = k => path.slice(1, k + 1).filter(q => q.via || q.found).length;
   path.forEach((p, i) => {
     const from = path[i - 1];
     if (i < 2 || from.via || !noCloser(path, i, exact) || !from.next) return;
     const j = path.findIndex((q, k) => k > i && (q.via || q.found || Number.isInteger(q.togo) && q.togo < from.togo));
     const extra = j < 0 ? path.length - i : j - i + 1 - (from.togo - (path[j].via || path[j].found ? 0 : path[j].togo));
-    if (extra > most) { most = extra; best = { from: from.title, next: from.next, aim: from.aim, togo: from.togo - 1 }; }
+    if (extra > most) {
+      most = extra;
+      const times = path.filter((q, k) => q.title === from.title && leg(k) === leg(i - 1)).length;
+      best = { from: from.title, next: from.next, aim: from.aim, togo: from.togo - 1, times, quicker: j < 0 ? null : extra };
+    }
   });
   return best;
 }
@@ -5355,8 +5364,12 @@ function finish(won, lost = null) {
     // Folded away, so it is there for whoever wants it rather than one more mark against the game; never in Share.
     const s = missedShortcut(path, exact);
     $('#mShortcut').classList.toggle('hidden', !s);
-    if (s) $('#mShortcutText').innerHTML = s.togo ? `From <b>${esc(s.from)}</b>, <b>${esc(s.next)}</b> was ${clicksText(s.togo)} from <b>${esc(s.aim)}</b>.`
-      : `<b>${esc(s.from)}</b> linked straight to <b>${esc(s.next)}</b>.`;
+    if (s) {
+      const on = `<b>${esc(s.from)}</b>${s.times > 1 ? ` (visited ${s.times} times)` : ''}`, next = `<b>${esc(s.next)}</b>`;
+      const quicker = s.quicker ? `: ${s.quicker} clicks quicker` : '';
+      $('#mShortcutText').innerHTML = s.togo ? `From ${on}, ${next} was ${clicksText(s.togo)} from <b>${esc(s.aim)}</b>${quicker}.`
+        : `${on} linked straight to ${next}${quicker}.`;
+    }
   });
   // Share's text is made on the click, since showPar may only have rec.par by then.
   const copy = async (id, text) => {

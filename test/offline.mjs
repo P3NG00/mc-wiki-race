@@ -272,6 +272,31 @@ await until('game.path.length === 2 && !game.loading');
 await ev('finish(false)');
 check('a path where every click got closer has no shortcut', await until("document.querySelectorAll('#mPath .togo').length === 2")
   && await ev("!document.querySelector('#mPath .worse') && document.querySelector('#mShortcut').classList.contains('hidden')"), await ev("document.querySelector('#mPath').textContent"));
+await ev("closeModal(); toSetup()");
+// A detour that got as close again, there and back and there again, then the shortcut: the result says how often its
+// page was visited and how many clicks quicker the shortcut was. On a pair at par 3 or more, so the shortcut is a page on
+// the way rather than the target itself.
+const deep = JSON.parse(await ev(`(async () => {
+  for (const start of POOL_TITLES) for (const goal of POOL_TITLES) {
+    const route = await parRoute({ start, goal, rules: [] });
+    if (route?.length >= 4) return JSON.stringify(route);
+  }
+  return 'null';
+})()`));
+check('the snapshot has a pair at par 3 or more', !!deep, String(deep));
+await open(`#start=${encodeURIComponent(deep[0])}&target=${encodeURIComponent(deep.at(-1))}`);
+await play();
+for (const [n, title] of [deep[1], deep[0], deep[1]].entries()) {
+  await ev(`navigate(${JSON.stringify(title)}, null)`);
+  await until(`game.path.length === ${n + 2} && 'togo' in game.path.at(-1) && !game.loading`);
+}
+const missedNext = await ev('game.path.at(-1).next'), deepPar = deep.length - 1;
+await ev(`navigate(${JSON.stringify(missedNext)}, null)`);
+await until("game.path.length === 5 && 'togo' in game.path.at(-1) && !game.loading");
+await ev('finish(false)');
+const quickerText = `From ${deep[1]} (visited 2 times), ${missedNext} was ${deepPar - 2} click${deepPar === 3 ? '' : 's'} from ${deep.at(-1)}: 2 clicks quicker.`;
+check('the shortcut of a detour that got as close again says how often its page was visited and how many clicks quicker it was',
+  await until(`document.querySelector('#mShortcutText').textContent === ${JSON.stringify(quickerText)}`), await ev("document.querySelector('#mShortcutText').textContent"));
 // Which detour's shortcut shows: the one that took the most clicks more than the shortcut would have, from two up, a
 // checkpoint reached counting as getting there, none from the start or a checkpoint, and none for Exact clicks.
 check('the shortcut is the costliest detour of two clicks or more, a checkpoint ending one, not from the start', await ev(`(() => {
@@ -283,6 +308,14 @@ check('the shortcut is the costliest detour of two clicks or more, a checkpoint 
   return names(sideways) === null && s.from === 'B' && s.next === 'B+' && s.togo === 1 && names(long, true) === null
     && names(viaEnds) === 'X' && names([at('A', 1), at('B', 2), at('C', 3)]) === null && names([at('S', 2), at('A', 1), at('B', 2), at('C', 3)]) === 'A'
     && names([at('S', 2), at('V', 1, { via: 1 }), at('B', 2), at('C', 3)]) === null;
+})()`));
+// Its page's visits are counted going for the same objective, a checkpoint starting a new count, and inside the start's
+// own detour the next costliest shows (a game played, Zoglin to Cooked Cod).
+check('the shortcut says how many clicks quicker it was and how often its page was visited', await ev(`(() => {
+  const at = (title, togo, more) => ({ title, togo, next: title + '+', aim: 'T', ...more }), pick = path => (s => s && [s.from, s.times, s.quicker])(missedShortcut(path));
+  const zoglin = [at('Zoglin', 2), at('Mob', 2), at('Mob (disambiguation)', 3), at('Mob', 2), at('Entity', 2), at('Mob', 2), at('Cod', 1), at('Cooked Cod', 0)];
+  const legs = [at('S', 3), at('B', 3), at('V', 2, { via: 1 }), at('B', 2), at('C', 2), at('D', 3), at('E', 4), at('F', 5)];
+  return JSON.stringify([pick(zoglin), pick(legs)]) === JSON.stringify([['Mob', 3, 4], ['B', 1, null]]);
 })()`));
 await ev("closeModal(); toSetup()");
 

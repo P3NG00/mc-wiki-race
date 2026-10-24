@@ -1008,6 +1008,18 @@ const shuffled = arr => arr.map(x => [Math.random(), x]).sort((a, b) => a[0] - b
 // Resolves once the page has been drawn, so what a click changed shows before a search that holds the page up (once the
 // link graph is in, waiting for it doesn't let the page be drawn). A hidden tab draws no frames, so a timeout resolves it.
 const painted = () => new Promise(r => { requestAnimationFrame(() => setTimeout(r)); setTimeout(r, 200); });
+// For a search that takes long: a function that, awaited now and then, gives the page a turn once SLICE_MS have gone by
+// since the last, so it draws and takes clicks meanwhile. Not in a hidden tab, which draws nothing and whose timers wait
+// a second or more, so each turn would.
+const SLICE_MS = 30;
+function slicer() {
+  let until = performance.now() + SLICE_MS;
+  return async () => {
+    if (document.hidden || performance.now() < until) return;
+    await new Promise(r => setTimeout(r));
+    until = performance.now() + SLICE_MS;
+  };
+}
 
 const store = {
   get(k, d) { try { const v = localStorage.getItem(k); return v == null ? d : JSON.parse(v); } catch { return d; } },
@@ -4934,13 +4946,19 @@ function distancesFrom(graph, title, usable = routeUsable({ keep: [], rules: rul
 // too, which rollOne checks next). The target can't be from the start's group, unless a topic is chosen or in Chaos. It
 // is one search for every start at once: each page's bitset of the targets it reaches within k clicks is its links'
 // within k - 1, for k up to PAR_TOP - 1. Searching from each start in turn took seconds when few have a target at the
-// par. Kept per settings, which are all read before the graph is waited for, so a change meanwhile can't mix them.
+// par. Kept per settings (the search under way, so two rolls share it, and none once it fails), which are all read before
+// the graph is waited for, so a change meanwhile can't mix them. A large pool takes up to a second (every page in Chaos
+// with all the Content), so it stops every SLICE_MS to let the page draw.
 const startParsCache = new Map();
-async function startPars(topic) {
-  const key = pairKey(''), r = rules(), usable = routeUsable({ keep: [], rules: r, content: contentInPlay([]) });
+function startPars(topic) {
+  const key = pairKey('');
+  if (!startParsCache.has(key)) startParsCache.set(key, searchStartPars(topic).catch(e => { startParsCache.delete(key); throw e; }));
+  return startParsCache.get(key);
+}
+async function searchStartPars(topic) {
+  const r = rules(), usable = routeUsable({ keep: [], rules: r, content: contentInPlay([]) });
   const aims = candidates(topic, true), starts = candidates(null, false), group = topic || mode() === 'chaos' ? null : groupOf;
-  if (startParsCache.has(key)) return startParsCache.get(key);
-  const graph = await linkGraph(r), n = graph.links.length, W = Math.ceil(aims.length / 32);
+  const graph = await linkGraph(r), n = graph.links.length, W = Math.ceil(aims.length / 32), breathe = slicer();
   const set = (bits, at, i) => { bits[at + (i >> 5)] |= 1 << (i & 31); };
   const own = new Uint32Array(n * W), web = distancesFrom(graph, WEB_HEART, usable), far = new Uint32Array(W), groups = new Map();
   aims.forEach((t, i) => {
@@ -4956,18 +4974,27 @@ async function startPars(topic) {
     const at = PAGE_IDS.get(s) * W, same = group && groups.get(group(s));
     for (let w = 0; w < W; w++) if (reach(at, w) & ~within[at + w] & ~(same?.[w] ?? 0)) { pars.set(s, pars.get(s) | 1 << k - 1); break; }
   });
-  for (let k = 1; k < PAR_TOP; k++) {
-    const next = own.slice(), boxes = graph.boxes && new Uint32Array(graph.boxes.length * W);
-    graph.boxes?.forEach((ms, b) => { for (const m of ms) if (usable(m)) for (let w = 0; w < W; w++) boxes[b * W + w] |= within[m * W + w]; });
-    for (let v = 0; v < n; v++) {
+  // Each navbox's targets, and each page's, from b and v up to the end of their range: the work comes in ranges, the page
+  // given a turn between them, and in functions of their own, since the same loops in an async function took twice as long.
+  let next, boxes;
+  const boxRows = (b0, b1) => {
+    for (let b = b0; b < b1; b++) for (const m of graph.boxes[b]) if (usable(m)) for (let w = 0; w < W; w++) boxes[b * W + w] |= within[m * W + w];
+  };
+  const pageRows = (v0, v1) => {
+    for (let v = v0; v < v1; v++) {
       for (const u of graph.links[v]) if (usable(u)) for (let w = 0; w < W; w++) next[v * W + w] |= within[u * W + w];
       for (const b of graph.carries?.[v] ?? []) for (let w = 0; w < W; w++) next[v * W + w] |= boxes[b * W + w];
     }
+  };
+  const inRanges = async (count, size, rows) => { for (let i = 0; i < count; i += size) { await breathe(); rows(i, Math.min(count, i + size)); } };
+  for (let k = 1; k < PAR_TOP; k++) {
+    next = own.slice(); boxes = graph.boxes && new Uint32Array(graph.boxes.length * W);
+    if (boxes) await inRanges(graph.boxes.length, Math.ceil(2048 / W), boxRows);   // fewer the more words a row has
+    await inRanges(n, Math.ceil(8192 / W), pageRows);
     mark(k, (at, w) => next[at + w]);
     within = next;
   }
   mark(PAR_TOP, (at, w) => far[w]);
-  startParsCache.set(key, pars);
   return pars;
 }
 

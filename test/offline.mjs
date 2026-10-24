@@ -1277,6 +1277,9 @@ check('Rebuild puts every piece back', await until("!items.broken && !document.q
 await ev("$('#rules').scrollIntoView(); window.sizes = new Map([...document.querySelectorAll('#setup *')].map(el => [el, el.getBoundingClientRect().height]))");
 await ev("holdItem('crystal'); dropItem()");
 check('taking an item in hand, the text in view split into pieces, moves nothing', await ev("document.querySelector('#rules .brk-word') && [...sizes].every(([el, h]) => Math.abs(el.getBoundingClientRect().height - h) < .5)"));
+await send('browsingContext.setViewport', { context: ctx, viewport: { width: 800, height: 800 } }); await sleep(300);
+const narrowHeight = await ev('document.documentElement.scrollHeight');   // the page whole at 800 px, for after
+await send('browsingContext.setViewport', { context: ctx, viewport: null }); await sleep(300);
 for (let round = 0; round < 2; round++) for (let y = 0; y < pageHeight; y += 400) {
   await ev(`scrollTo(0, ${y}); for (const x of [200, 500, 800]) { holdItem('crystal'); $('.hold').onclick({ clientX: x, clientY: Math.min(innerHeight - 20, ${y} + 300 - scrollY) }); dropItem(); $('.thing.crystal').click(); }`);
   await sleep(150);
@@ -1284,6 +1287,14 @@ for (let round = 0; round < 2; round++) for (let y = 0; y < pageHeight; y += 400
 await sleep(3000);
 check('blasts all down the page and on its pieces leave it no longer', await ev(`document.documentElement.scrollHeight <= ${pageHeight} + 2 && document.querySelectorAll('#setup .brk-thrown').length > 100`),
   await ev(`JSON.stringify([document.documentElement.scrollHeight, ${pageHeight}, document.querySelectorAll('#setup .brk-thrown').length])`));
+// Made narrower in pieces, the page takes the new width and ends about where it would whole (its pieces of four words
+// can't break where words would); back as it was, it ends as before.
+const outside = "[...document.querySelectorAll('#setup *')].filter(el => !el.closest('.brk-thrown') && el.getBoundingClientRect().right > innerWidth + 1).length";
+await send('browsingContext.setViewport', { context: ctx, viewport: { width: 800, height: 800 } }); await sleep(1500);
+check('made narrower in pieces, the page takes the new width and ends about where it would whole', await ev(`document.documentElement.scrollHeight <= ${narrowHeight} * 1.05 && ${outside} === 0`),
+  await ev(`JSON.stringify([document.documentElement.scrollHeight, ${narrowHeight}, ${outside}])`));
+await send('browsingContext.setViewport', { context: ctx, viewport: null }); await sleep(1500);
+check('and made wide again, where it did', await ev(`document.documentElement.scrollHeight <= ${pageHeight} + 2`), await ev('document.documentElement.scrollHeight'));
 // Dragged across and clicked fast, in pieces and with an item in hand, the page selects nothing; put back, it does.
 const drag = (x, y) => send('input.performActions', { context: ctx, actions: [{ type: 'pointer', id: 'mouse', parameters: { pointerType: 'mouse' }, actions: [
   { type: 'pointerMove', x: 5, y: 150 }, { type: 'pointerDown', button: 0 }, { type: 'pointerMove', x, y, duration: 150 }, { type: 'pointerUp', button: 0 },

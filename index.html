@@ -3051,7 +3051,7 @@ function pageBreaker() {
   // whole. Below
   // them all, the bottom of the page. Found again at every blast, since a blast takes surfaces away.
   const COL = 32, SOLID = /^(IMG|INPUT|BUTTON|SELECT|TEXTAREA|CANVAS|SVG|VIDEO|HR|PROGRESS|METER)$/i;
-  let surfaces = new Map(), bottom = 0;   // bottom: the page's, as it was before the first blast
+  let surfaces = new Map(), bottom = 0;   // bottom: the page's end, as it was before the first blast (or since resized)
   function findSurfaces(root, keep) {
     const sx = scrollX, sy = scrollY, cols = new Map();
     for (const el of root.querySelectorAll('*')) {
@@ -3089,6 +3089,7 @@ function pageBreaker() {
     if (now < busy) return 0;   // being put back
     getSelection().removeAllRanges();   // or what was selected would fly highlighted
     const reach = 220 * power, { pieces, boxes, kept } = prepare(root, keep, { x: bx, y: by, r: reach + 40 }), sx = scrollX, sy = scrollY;
+    scene = [root, keep];
     bx += sx; by += sy;
     // The first blast notes where the page ends, the floor, so pieces resting on it can't make the page longer, and the
     // page no longer scrolls sideways, so pieces flying off the side can't make it wider.
@@ -3096,7 +3097,7 @@ function pageBreaker() {
     // scroll so), since one on <html> would make the body a scrolling box of its own, back at the top.
     if (!thrown.size && !sideways) {
       const html = document.documentElement, h = getComputedStyle(html), el = h.overflowX === 'visible' && h.overflowY === 'visible' ? document.body : html;
-      bottom = Math.max(html.scrollHeight, innerHeight);
+      bottom = Math.max(html.scrollHeight, innerHeight); tail = bottom - end(root);
       sideways = [el, el.style.getPropertyValue('overflow-x'), el.style.getPropertyPriority('overflow-x')];
       el.style.setProperty('overflow-x', 'hidden', 'important');
     }
@@ -3155,8 +3156,7 @@ function pageBreaker() {
     for (const [b, r, display, own] of sizes) if (b.querySelector('.brk-thrown')) {
       save(b); frozen.add(b);
       if (own) b.style.setProperty('display', 'flow-root', 'important');
-      if (/^(inline|contents|table.*)$/.test(display)) continue;
-      for (const [k, v] of [['box-sizing', 'border-box'], ['width', r.width + 'px'], ['height', r.height + 'px'], ['flex', '0 0 auto']]) b.style.setProperty(k, v, 'important');
+      freeze(b, r, display);
     }
     // A box once every piece it holds is thrown: hollow, and it may no longer clip, scroll or clamp them (a clamped
     // box's ellipsis would stay behind). Important, since some of the wiki's own styles are. A table's collapsed borders
@@ -3175,16 +3175,54 @@ function pageBreaker() {
     }
     // Laid out again, a piece made an inline block may have moved (its line wraps differently): where each piece is now
     // before its throw (a turned piece's middle is where it would be unturned), and its size, so it lands right.
-    if (!still) for (const s of thrown.values()) {
+    if (!still) settle(root, keep, false);
+    until = now + 8000;
+    return hit;
+  }
+  // Where each piece is now before its throw, as above, those moved falling again (all: every one), and the surfaces.
+  function settle(root, keep, all) {
+    const sx = scrollX, sy = scrollY;
+    for (const s of thrown.values()) {
       if (s.still) continue;
       const r = s.el.getBoundingClientRect(), cx = (r.left + r.right) / 2 + sx - s.x, cy = (r.top + r.bottom) / 2 + sy - s.y;
       if (!s.rot) { s.w = r.width; s.h = r.height; }   // unturned, its box is its size
-      if (Math.abs(cx - s.cx) > .5 || Math.abs(cy - s.cy) > .5) Object.assign(s, { cx, cy, rest: false });
+      if (all || Math.abs(cx - s.cx) > .5 || Math.abs(cy - s.cy) > .5) Object.assign(s, { cx, cy, rest: false });
     }
-    if (!still) findSurfaces(root, keep);
-    until = now + 8000;
-    if (!still && !raf) { last = now; raf = requestAnimationFrame(frame); }
-    return hit;
+    findSurfaces(root, keep);
+    if (!raf) { last = performance.now(); raf = requestAnimationFrame(frame); }
+  }
+  // A box keeps its size: not one shown inline, with no size of its own, nor a table's (see breakApart).
+  const FREEZE = ['box-sizing', 'width', 'height', 'flex'];
+  function freeze(b, r, display) {
+    if (/^(inline|contents|table.*)$/.test(display)) return;
+    for (const [k, v] of [['box-sizing', 'border-box'], ['width', r.width + 'px'], ['height', r.height + 'px'], ['flex', '0 0 auto']]) b.style.setProperty(k, v, 'important');
+  }
+  // Where the page's content ends, its root's children laid out as they are, so not by pieces thrown past it (and the
+  // page's end, a blast's floor, is this and what was below it at the first blast, tail).
+  const end = root => Math.max(0, ...[...root.children].filter(el => !el.classList.contains('brk-thrown') && getComputedStyle(el).position !== 'fixed')
+    .map(el => el.getBoundingClientRect().bottom)) + scrollY;
+  // The window made wider or narrower while in pieces: the boxes kept at their size take the new width (their sizes as
+  // they were put back first) and keep the size they have then, the page's end is noted again, and the pieces fall
+  // again onto what is there now. A change of height alone (a phone's address bar showing or hiding) changes nothing.
+  let scene = null, tail = 0, wide = innerWidth, resized = 0;
+  addEventListener('resize', () => {
+    if (innerWidth === wide) return;
+    wide = innerWidth; clearTimeout(resized);
+    resized = setTimeout(relayout, 200);
+  });
+  function relayout() {
+    if (!thrown.size || !scene || performance.now() < busy) return;
+    const [root, keep] = scene, was = document.createElement('i').style;
+    const back = (b, ks) => { was.cssText = b.dataset.brokeStyle ?? ''; for (const k of ks) b.style.setProperty(k, was.getPropertyValue(k), was.getPropertyPriority(k)); };
+    // A hollow box is measured clamped and clipping as it was, so it takes no more room than it would have.
+    const CLAMP = ['overflow', '-webkit-line-clamp', 'line-clamp'];
+    for (const b of frozen) back(b, FREEZE);
+    for (const b of emptied) back(b, CLAMP);
+    for (const [b, r, display] of [...frozen].map(b => [b, b.getBoundingClientRect(), getComputedStyle(b).display])) freeze(b, r, display);
+    for (const b of emptied) for (const [k, v] of [['overflow', 'visible'], ['-webkit-line-clamp', 'none'], ['line-clamp', 'none']]) b.style.setProperty(k, v, 'important');
+    bottom = Math.max(innerHeight, end(root) + tail);
+    settle(root, keep, true);
+    until = performance.now() + 8000;
   }
   // A frame of the fall: each piece under gravity, landing on the first surface below it (or the bottom of the page),
   // bouncing a little and coming to rest. Turned as it is, a piece reaches out half of ext's width and height from
@@ -3214,7 +3252,7 @@ function pageBreaker() {
   }
   function putBack(root, atOnce) {
     cancelAnimationFrame(raf); raf = 0;
-    thrown.clear(); frozen.clear(); emptied.clear();
+    thrown.clear(); frozen.clear(); emptied.clear(); scene = null;
     if (sideways) { const [el, v, p] = sideways; el.style.setProperty('overflow-x', v, p); sideways = null; }
     const all = [...root.querySelectorAll('[data-broke-style]')];
     const restore = el => {

@@ -1330,6 +1330,20 @@ await ev("$('.hold').onclick({ clientX: 300, clientY: 500 }); dropItem()");
 await sleep(600);
 check('put away, the ghast waits while its fireball flies and a moment after', await ev("(g => !!g && g.leaving && g.p.x > 0)([...items.things].find(t => t.kind === 'ghast'))"));
 check('then floats off the page', await until("![...items.things].some(t => t.kind === 'ghast')", 15000));
+// A ghast on the right floats off the right, facing that way; taken up again it comes back, the same one, and a blast
+// reaches it where it has got to.
+const ghasts = "[...items.things].filter(t => t.kind === 'ghast')";
+await ev("items.pointer = { x: 100, y: 400 }; holdItem('fireball')"); await sleep(800);
+await ev("dropItem()"); await sleep(500);
+check('a ghast on the right floats off the right, facing it', await ev(`(gs => gs.length === 1 && gs[0].leaving && whereNow(gs[0]).x > innerWidth - 90 && gs[0].el.classList.contains('right'))(${ghasts})`),
+  await ev(`JSON.stringify(${ghasts}.map(g => [whereNow(g).x, g.leaving]))`));
+await ev("holdItem('fireball')"); await sleep(900);
+check('taken up again it comes back, the same one', await ev(`(gs => gs.length === 1 && !gs[0].leaving && Math.abs(whereNow(gs[0]).x - (innerWidth - 90)) < 2)(${ghasts})`));
+await ev("dropItem()"); await sleep(500);
+await ev(`(p => blast({ x: p.x - 40, y: p.y }, 1.2))(whereNow(${ghasts}[0]))`);
+check('and a blast reaches it on its way off', await ev(`${ghasts}.length === 0`));
+await ev('itemsReset()');
+await until("!document.querySelector('#setup [data-broke-style]')", 3000);
 
 // A blast while Rebuild puts the pieces back breaks nothing and marks nothing broken; while an item is in hand, a click
 // on the bar is the bar's; a fireball taken up again comes from the ghast that is there, not one floating off.

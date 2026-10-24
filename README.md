@@ -4,6 +4,8 @@ A wiki race (like [The Wiki Game](https://www.thewikigame.com/)) through [minecr
 
 Play it at **[mcwikirace.com](https://mcwikirace.com/)**.
 
+> **Spoiler warning:** this repository gives away the whole game. This README, the docs and the code spell out how everything works, including every advancement and how to earn it, the hidden ones too, and anything else meant to be found by playing. To discover them for yourself, play first and read later.
+
 The whole game is one `index.html`, with no build step and no dependencies. Next to it are `wiki-data.js`, what the game knows about the wiki (which articles it can roll, how well linked they are), and `wiki-links.js`, `wiki-navboxes.js` and `wiki-lead.js`, the links between its pages, which the game uses to work out par, Distance and Target par, all generated from the wiki's offline copy by `tools/wikidata/`, the icon (`favicon.ico`, `apple-touch-icon.png`) and the link-preview image (`og-image.png`). Articles are fetched live from the minecraft.wiki API.
 
 ## Playing

@@ -586,6 +586,9 @@
   html.broken :is(#btnItems, #hudItems, #btnNotes, #hudNotes, .note-box, .overlay) { pointer-events: auto; }
   /* Nor, then or with an item in hand, can anything on it be selected, however fast it is clicked or dragged on, but in a window. */
   html.broken body, body:has(> .hold) { user-select: none; -webkit-user-select: none; }
+  /* Nor does the setup screen's text keep its halo, as a thrown piece doesn't: blurred shadows drawn again around every
+     piece falling past took most of each frame, until Rebuild. */
+  html.broken #setup * { text-shadow: none; }
   html.broken .overlay { user-select: text; -webkit-user-select: text; }
   .rebuild-bar { position: fixed; left: 50%; bottom: calc(16px + env(safe-area-inset-bottom, 0px)); translate: -50% 0; z-index: 9; display: flex; gap: 8px; }
   .rebuild-bar button { box-shadow: var(--shadow); white-space: nowrap; }
@@ -3485,8 +3488,7 @@ function pageBreaker() {
   // Where thrown pieces land: the top of every intact surface on the page, in the page's own coordinates (so it holds
   // however the page is scrolled), by columns COL px wide, each column's tops sorted. A surface is an element with
   // text of its own, or a picture or control (but a faded picture behind things), not thrown and not in what is kept
-  // whole. Below
-  // them all, the bottom of the page. Found again at every blast, since a blast takes surfaces away.
+  // whole. Below them all, the bottom of the page. Found again at every blast, since a blast takes surfaces away.
   const COL = 32, SOLID = /^(IMG|INPUT|BUTTON|SELECT|TEXTAREA|CANVAS|SVG|VIDEO|HR|PROGRESS|METER)$/i;
   let surfaces = new Map(), bottom = 0;   // bottom: the page's end, as it was before the first blast (or since resized)
   function findSurfaces(root, keep) {

@@ -1495,8 +1495,8 @@ async function reroll(which, atStart = false) {
     await painted();
     if (!targets.some(current)) return;
     // With a target par the start rolls first, only if some target is at that par from it (or the target kept, when only
-    // the start rolls), then the other cards in the topics it leaves, then a target at the par from it (under Blind
-    // target not until Start). notice: what the roll couldn't keep to, and why.
+    // the start rolls), then a target at the par from it (under Blind target not until Start), then the other cards in
+    // the topics they leave. notice: what the roll couldn't keep to, and why.
     const kept = !targets.includes('goal') && !hidden.includes('goal') && PAGE_IDS.has(setup.goal?.title) && setup.goal;
     let par = (targets.includes('goal') || targets.includes('start') && (hidden.includes('goal') || kept)) && reach() !== 'any'
       && REACHES[reach()].fits, notice = '';
@@ -1564,6 +1564,26 @@ async function reroll(which, atStart = false) {
         par = false;
       }
     }
+    // With a target par, the target next, before the checkpoints: it has only the start's few at the par to draw from
+    // (in Popular on Relaxed a start can have one), and a checkpoint can take any of its topic's, so it goes round the
+    // target. Drawn by the start's whole search, since a start typed in hasn't been checked to join the web of links,
+    // and not one another card holds. One with no target at the par (typed in, or kept through another difficulty or
+    // Content, or its only one a checkpoint kept) gets one at the nearest par it has.
+    let unreached = null;
+    if (par && targets.includes('goal') && setup.start && current('goal')) {
+      const s = setup.start.title, dist = distancesFrom(graph, s), parOf = t => dist[PAGE_IDS.get(t)] ?? -1;
+      const held = cardKeys().filter(w => w !== 'goal').map(w => setup[w]?.title);
+      const reached = aims.filter(t => apart(s, t) && parOf(t) > 0 && !held.includes(t));
+      let titles = reached.filter(t => par(parOf(t)));
+      if (!titles.length && reached.length) {
+        const off = t => Math.abs(parOf(t) - REACHES[reach()].near), least = Math.min(...reached.map(off));
+        titles = reached.filter(t => off(t) === least);
+        notice = `${s} has no ${aims.some(t => held.includes(t) && par(parOf(t))) ? 'other ' : ''}target at ${what}, so this one is par ${parOf(titles[0])}.`;
+      }
+      const goal = await rollOne('goal', topic, undefined, titles);
+      if (current('goal')) { setup.goal = goal; renderCard('goal'); if (!goal) unreached = s; }   // unless rolled again since
+      plan = planGroups(targets.filter(w => w !== 'start' && w !== 'goal'));   // the checkpoints round the target's topic too
+    }
     // allSettled, so one card failing doesn't end the busy state while the other is still rolling.
     let unjoined = false;
     const results = await Promise.allSettled(targets.filter(w => !par || (w !== 'start' && w !== 'goal')).map(async w => {
@@ -1572,22 +1592,7 @@ async function reroll(which, atStart = false) {
     }));
     const failed = results.find(r => r.status === 'rejected');
     if (failed) throw failed.reason;
-    if (par && targets.includes('goal')) {
-      if (!setup.start || !current('goal')) return;
-      // Drawn by the start's whole search, since a start typed in hasn't been checked to join the web of links. One with
-      // no target at the par (typed in, or kept through another difficulty or Content) gets one at the nearest par it has.
-      const s = setup.start.title, dist = distancesFrom(graph, s), parOf = t => dist[PAGE_IDS.get(t)] ?? -1;
-      const reached = aims.filter(t => apart(s, t) && parOf(t) > 0);
-      let titles = reached.filter(t => par(parOf(t)));
-      if (!titles.length && reached.length) {
-        const off = t => Math.abs(parOf(t) - REACHES[reach()].near), least = Math.min(...reached.map(off));
-        titles = reached.filter(t => off(t) === least);
-        notice = `${s} has no target at ${what}, so this one is par ${parOf(titles[0])}.`;
-      }
-      setup.goal = await rollOne('goal', topic, undefined, titles);
-      renderCard('goal');
-      if (!setup.goal) { setStatus(`No target can be reached from ${s}. Reroll the start, or type another.`, true); return; }
-    }
+    if (unreached) { setStatus(`No target can be reached from ${unreached}. Reroll the start, or type another.`, true); return; }
     if (which === 'all' && huntMode() === 'kinds' && !isBlind()) setKinds(rollKinds());   // after the start, which they mustn't hold
     if (unjoined) setStatus('No article came up with a way in and out on this difficulty. Reroll, or change the difficulty or Content.', true);
     else if (targets.every(current)) setStatus([notice, left && LEFT_DAILY].filter(Boolean).join(' '));

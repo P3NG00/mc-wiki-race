@@ -41,4 +41,5 @@ Read the one that covers what you are changing; keep it up to date with the code
 - [docs/rules.md](docs/rules.md): the `game` object, difficulty, every game and extra rule, leaving the page, the clock, `navToken`, the parse cache.
 - [docs/ui.md](docs/ui.md): themes (host themes too), pictures, sounds, effects (sparks, Distance's cheer), Reduce motion, the background (constellation, redstone map, facts line), the game header, the phone layout.
 - [docs/advancements.md](docs/advancements.md): the advancements, what earns each, their toasts, icons, the panel and `mwr.advancements`.
+- [docs/items.md](docs/items.md): the hotbar of items that blow the page up, breaking a page (and the article) into pieces, blown-up games, Rebuild.
 - [docs/persistence.md](docs/persistence.md): `localStorage` keys, history records, `isRecord`, personal bests, the Recent games table.

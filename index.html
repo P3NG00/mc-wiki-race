@@ -372,11 +372,13 @@
   .hint.closer { background: var(--accent-soft); color: var(--accent); animation: bump .4s ease-out; }
   /* Reduce motion (calm(): the box, or the system's setting) */
   :root.calm :is(.toast, .toast.stay, .hud .goal.reached, #setup.busy .card.empty .title, .stat .v.bump, .hint.closer) { animation: none; }
+  :root.calm :is(.thing.tnt.drop, .thing.ghast, .thing.tnt.lit img) { animation: none; }
   :root.calm .adv-toast { animation-name: adv-fade-in; } :root.calm .adv-toast.out { animation-name: adv-fade-out; }
   :root.calm :is(#setup.busy .status:not(.err, :empty), .setup-par.working)::before, :root.calm #setup.busy .card.empty .tag::after { animation-duration: 3s; }
 
   /* ---------- Advancements ---------- */
-  /* The toasts keep Minecraft's dark box in every theme: the tier's heading in yellow, a challenge's in purple. */
+  /* The toasts are Minecraft's own box (advTextures; until it is in, a dark box like it) in every theme, at twice its
+     160 by 32: the tier's heading in yellow, a challenge's in purple. */
   .adv-toasts { position: fixed; top: 16px; right: 16px; z-index: 12; display: flex; flex-direction: column; gap: 8px; width: 320px; max-width: calc(100vw - 32px); pointer-events: none; }
   .adv-toast { display: flex; gap: 12px; align-items: center; padding: 10px 14px 10px 10px; border-radius: 6px; color: #fff;
     background: #212121; border: 2px solid #4a4a4a; box-shadow: 0 0 0 2px #0b0b0b, 0 8px 24px rgba(0,0,0,.35); animation: adv-in .35s cubic-bezier(.2,.9,.3,1.2) both; }
@@ -388,20 +390,20 @@
   .adv-toast .t { font-size: 13px; font-weight: 700; color: #ffd84a; }
   .adv-toast.challenge .t { color: #d98bff; }
   .adv-toast .n { font-size: 15px; font-weight: 600; line-height: 1.25; }
-  /* Frames: a task's square, a goal's rounded, a challenge's spiky; gold once earned. */
-  .adv-frame { --size: 52px; --frame: var(--line); --frame-in: var(--bg); position: relative; flex: none; width: var(--size); height: var(--size); display: grid; place-items: center; }
-  .adv-frame::before, .adv-frame::after { content: ''; position: absolute; }
-  .adv-frame::before { inset: 0; background: var(--frame); }
-  .adv-frame::after { inset: 3px; background: var(--frame-in); }
-  .adv-frame.task::before { border-radius: 4px; } .adv-frame.task::after { border-radius: 2px; }
-  .adv-frame.goal::before { border-radius: 40%; } .adv-frame.goal::after { border-radius: 38%; }
-  .adv-frame.challenge::before, .adv-frame.challenge::after { clip-path: polygon(50.0% 0.0%, 58.0% 9.8%, 69.1% 3.8%, 72.8% 15.9%, 85.4% 14.6%, 84.1% 27.2%, 96.2% 30.9%, 90.2% 42.0%, 100.0% 50.0%, 90.2% 58.0%, 96.2% 69.1%, 84.1% 72.8%, 85.4% 85.4%, 72.8% 84.1%, 69.1% 96.2%, 58.0% 90.2%, 50.0% 100.0%, 42.0% 90.2%, 30.9% 96.2%, 27.2% 84.1%, 14.6% 85.4%, 15.9% 72.8%, 3.8% 69.1%, 9.8% 58.0%, 0.0% 50.0%, 9.8% 42.0%, 3.8% 30.9%, 15.9% 27.2%, 14.6% 14.6%, 27.2% 15.9%, 30.9% 3.8%, 42.0% 9.8%); }
-  .adv-frame.challenge::after { inset: 4px; }
-  .adv-frame img, .adv-frame .emoji { position: relative; z-index: 1; width: 60%; height: 60%; object-fit: contain; image-rendering: pixelated; }
-  .adv-frame .emoji { display: grid; place-items: center; font-size: calc(var(--size) * .36); line-height: 1; color: var(--muted); }
-  .adv-frame.got { --frame: var(--viz-items); --frame-in: color-mix(in srgb, var(--viz-items) 16%, var(--panel)); }
-  .adv-toast .adv-frame { --size: 44px; --frame: #c9a227; --frame-in: #3b3220; }
-  .adv-toast.challenge .adv-frame { --frame: #b46be0; --frame-in: #33223e; }
+  :root.adv-textured .adv-toast { height: 64px; padding: 0 16px 0 12px; border: 0; border-radius: 0; box-shadow: 0 8px 24px rgba(0,0,0,.35);
+    background: var(--adv-toast) center / 100% 100% no-repeat; image-rendering: pixelated; }
+  /* Frames: Minecraft's own (advTextures), a task's plain, a goal's oval and a challenge's fancy, grey until earned and
+     gold once it is; no frame until they are in. */
+  .adv-frame { --size: 52px; position: relative; flex: none; width: var(--size); height: var(--size); display: grid; place-items: center;
+    background: var(--adv-frame) center / 100% 100% no-repeat; image-rendering: pixelated; }
+  .adv-frame.task { --adv-frame: var(--adv-plain-raw); } .adv-frame.task.got { --adv-frame: var(--adv-plain-worn); }
+  .adv-frame.goal { --adv-frame: var(--adv-oval-raw); } .adv-frame.goal.got { --adv-frame: var(--adv-oval-worn); }
+  .adv-frame.challenge { --adv-frame: var(--adv-fancy-raw); } .adv-frame.challenge.got { --adv-frame: var(--adv-fancy-worn); }
+  .adv-frame img, .adv-frame .emoji, .adv-toast-icon img, .adv-toast-icon .emoji { width: 60%; height: 60%; object-fit: contain; image-rendering: pixelated; }
+  .adv-frame .emoji, .adv-toast-icon .emoji { display: grid; place-items: center; font-size: calc(var(--size) * .36); line-height: 1; color: var(--muted); }
+  /* In a toast, as in Minecraft, the item alone. */
+  .adv-toast-icon { --size: 40px; flex: none; width: var(--size); height: var(--size); display: grid; place-items: center; }
+  .adv-toast-icon img { width: 100%; height: 100%; }
   .history-head .adv-btn { margin-left: auto; padding: 4px 12px; border-radius: var(--radius-pill); font-weight: 600; font-size: 14px; }
   .adv-btn .count { color: var(--muted); font-weight: 400; margin-left: 4px; }
   /* The panel: its head (the count, a bar, the one picked) stays at the top while the groups scroll under it. */
@@ -414,7 +416,6 @@
   .adv-panel .bar i, .adv-tile .mini i { display: block; height: 100%; background: var(--accent); border-radius: inherit; }
   .adv-panel .detail { display: flex; gap: 14px; align-items: center; margin-top: 12px; min-height: 64px; padding: 10px 12px; border-radius: var(--radius); background: var(--bg); }
   .adv-panel .detail .adv-frame { --size: 56px; }
-  .adv-panel .detail .adv-frame:not(.got) { --frame-in: var(--panel); }
   .adv-panel .detail .name { font-weight: 700; font-size: 16px; }
   .adv-panel .detail .tier { font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); margin-left: 6px; }
   .adv-panel .detail p { margin: 2px 0 0; }
@@ -435,6 +436,62 @@
   @media (max-width: 720px) {
     .adv-toasts { left: 8px; right: 8px; top: 8px; width: auto; max-width: none; }
     .adv-grid { grid-template-columns: repeat(auto-fill, minmax(78px, 1fr)); }
+  }
+
+  /* ---------- Items ---------- */
+  /* The hotbar's button: in the game header, and on the setup screen above the background's (or in its place). */
+  .items-btn { display: grid; place-items: center; width: 40px; height: 40px; padding: 0; font-size: 18px; }
+  .items-btn img { width: 26px; height: 26px; object-fit: contain; image-rendering: pixelated; }
+  .items-btn span { font-size: 11px; font-weight: 800; letter-spacing: .04em; }
+  .hud .items-btn { width: 38px; height: 38px; }
+  #btnItems { position: fixed; right: 16px; bottom: 64px; z-index: 5; border-radius: 50%; box-shadow: var(--shadow); }
+  #btnBgView[hidden] + #btnItems { bottom: 16px; }
+  /* The hotbar, as Minecraft's: grey slots with a bevel, each item's name in the purple tooltip on hover. */
+  .hotbar { position: fixed; z-index: 12; display: flex; gap: 2px; padding: 3px; background: #3c3c3c; border: 2px solid #1b1b1b; border-radius: 3px; box-shadow: 0 6px 24px rgba(0,0,0,.35); }
+  .hotbar button { position: relative; width: 52px; height: 52px; padding: 0; border-radius: 0; display: grid; place-items: center;
+    background: #8b8b8b; border: 3px solid; border-color: #373737 #fff #fff #373737; }
+  .hotbar button:hover:not(:disabled), .hotbar button:focus-visible { background: #a5a5a5; border-color: #373737 #fff #fff #373737; outline: none; }
+  .hotbar img, .hotbar .emoji { width: 36px; height: 36px; object-fit: contain; image-rendering: pixelated; font-size: 26px; display: grid; place-items: center; }
+  .hotbar .name { position: absolute; bottom: calc(100% + 8px); left: 50%; translate: -50% 0; white-space: nowrap; pointer-events: none; opacity: 0;
+    background: rgba(16,0,16,.94); color: #fff; border: 2px solid #2b0d5d; border-radius: 3px; padding: 2px 6px; font-size: 13px; }
+  .hotbar button:is(:hover, :focus-visible) .name { opacity: 1; }
+  /* An item in hand: a layer over everything that takes the next click, the item under the pointer, what a click does. */
+  .hold { position: fixed; inset: 0; z-index: 9; cursor: none; }
+  .ghost { position: fixed; z-index: 9; width: 48px; height: 48px; pointer-events: none; translate: -50% -50%; opacity: .85; }
+  .hold-tip { position: fixed; top: 16px; left: 50%; translate: -50% 0; z-index: 9; max-width: calc(100vw - 32px); pointer-events: none; text-align: center;
+    background: rgba(16,0,16,.9); color: #fff; padding: 5px 12px; border-radius: 6px; font-size: 14px; }
+  .item-say { position: fixed; z-index: 9; translate: -50% -100%; pointer-events: none; white-space: nowrap; background: rgba(16,0,16,.92); color: #fff; padding: 5px 10px; border-radius: 6px; font-size: 14px; }
+  /* Things on the page. None of them can be selected or dragged, however often they are clicked. */
+  .thing { position: fixed; z-index: 8; translate: -50% -50%; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent; }
+  .thing img, .ghost img { width: 100%; height: 100%; object-fit: contain; display: block; image-rendering: pixelated; -webkit-user-drag: none; }
+  .thing .emoji, .ghost .emoji { display: grid; place-items: center; width: 100%; height: 100%; font-size: 36px; }
+  .thing.tnt { width: 64px; height: 64px; }
+  .thing.tnt.lit img { animation: tnt-lit .5s steps(1) infinite; }
+  @keyframes tnt-lit { 50% { filter: brightness(3) saturate(0); } }
+  .thing.tnt.drop { animation: tnt-drop .35s cubic-bezier(.4,1.8,.6,1) both; }
+  @keyframes tnt-drop { from { margin-top: -70px; } }
+  .thing.crystal { width: 80px; height: 126px; cursor: pointer; }
+  .thing.bed { width: 90px; height: 70px; cursor: pointer; }
+  .thing.anchor { width: 72px; height: 72px; cursor: pointer; }
+  .thing.creeper { width: 60px; height: 92px; cursor: pointer; transform-origin: 50% 100%; }
+  .thing:is(.creeper, .ghast).right img { scale: -1 1; }   /* their pictures face left */
+  .thing.ghast { width: 120px; height: 120px; animation: ghast 3s ease-in-out infinite; }
+  @keyframes ghast { 50% { translate: -50% calc(-50% - 10px); } }
+  .thing.fireball { width: 44px; height: 44px; cursor: pointer; filter: drop-shadow(0 0 12px rgba(255,140,30,.9)); }
+  /* A blast: a flash and a shake. */
+  .blast-flash { position: fixed; inset: 0; z-index: 11; background: #fff; pointer-events: none; animation: blast-flash .45s ease-out forwards; }
+  @keyframes blast-flash { from { opacity: .85; } to { opacity: 0; } }
+  .blast-shake { animation: blast-shake .5s; }
+  @keyframes blast-shake { 10%, 50%, 90% { translate: -10px 4px; } 30%, 70% { translate: 9px -5px; } }
+  /* Once anything is broken the page takes no clicks but on the hotbar's buttons (the things on it, the hotbar and the
+     bar are outside it): Rebuild, and in a game Give up, at the bottom, out of the way. */
+  html.broken :is(#setup, #game) { pointer-events: none; }
+  html.broken :is(#btnItems, #hudItems, .overlay) { pointer-events: auto; }
+  .rebuild-bar { position: fixed; left: 50%; bottom: 16px; translate: -50% 0; z-index: 9; display: flex; gap: 8px; }
+  .rebuild-bar button { box-shadow: var(--shadow); white-space: nowrap; }
+  @media (max-width: 720px) {
+    .hotbar button { width: 46px; height: 46px; }
+    .hotbar img, .hotbar .emoji { width: 30px; height: 30px; }
   }
 
   /* ---------- Modal ---------- */
@@ -681,6 +738,7 @@ const THEMES = [...new Set(['auto', 'light', 'dark', ...Array.from(document.quer
 
   <p class="bg-facts" id="bgFacts" hidden></p>
   <button class="bg-view-btn" id="btnBgView" aria-pressed="false" hidden></button>
+  <button class="items-btn" id="btnItems" title="Items" aria-label="Items" aria-haspopup="menu"><img alt="" class="hidden"><span class="hidden">TNT</span></button>
 
   <footer class="site-foot">
     <p>Made and run by <a href="https://BryantF.xyz">BryantF.xyz</a> · Contact: <a href="mailto:BryantF.xyz+mcwikirace@gmail.com">BryantF.xyz+mcwikirace@gmail.com</a> · Discord: <a href="https://discord.com/users/784846796618727494">p3ng00</a></p>
@@ -707,6 +765,7 @@ const THEMES = [...new Set(['auto', 'light', 'dark', ...Array.from(document.quer
     <div class="stat" id="hudParStat"><div class="v mono" id="hudPar">–</div><div class="k">Par</div></div>
     <div class="stat" id="hudTimeStat"><div class="v mono" id="hudTime">0:00</div><div class="k">Time</div></div>
     <div class="btns">
+      <button class="items-btn" id="hudItems" title="Items" aria-label="Items" aria-haspopup="menu"><img alt="" class="hidden"><span class="hidden">TNT</span></button>
       <button id="btnSound" aria-label="Sound"></button>
       <button id="btnBack" title="Go back to the previous article (counts as a click)" aria-label="Back">←<span class="word"> Back</span></button>
       <button id="btnGiveUp">Give up</button>
@@ -731,6 +790,7 @@ const THEMES = [...new Set(['auto', 'light', 'dark', ...Array.from(document.quer
 <div class="modal-bg hidden" id="modalBg"><div class="modal" id="modal" role="dialog" aria-modal="true"></div></div>
 <canvas id="fx" aria-hidden="true" hidden></canvas>
 <div class="adv-toasts" id="advToasts" role="status"></div>
+<div class="rebuild-bar hidden" id="rebuildBar"><button class="primary" id="btnRebuild">🧱 Rebuild</button><button id="btnBrokenGiveUp">Give up</button></div>
 
 <script src="wiki-data.js"></script>
 <script>
@@ -1886,6 +1946,7 @@ const game = {
   daily: null,       // the date, if this is that day's daily pair
   onDay: false,      // whether that daily started on its own day, which a streak needs
   challenge: false,  // whether it came from a challenge link (setup.challenge)
+  rebuilt: false,    // whether its page was blown up and rebuilt (see Items), for an advancement
   link: '',          // a link that plays this game (gameLink), made at the start
   vias: [],          // the checkpoints (Checkpoint rule), to be reached in order before the target counts
   viaNext: 0,        // how many of them have been reached
@@ -1934,6 +1995,7 @@ function renderHud() {
   $('#hudTime').textContent = fmtTime(now());
   $('#btnBack').disabled = game.stack.length < 2 || game.loading || !game.active;
   $('#btnGiveUp').disabled = game.loading || !game.active;
+  $('#hudItems').disabled = !game.active;
   $('#pathList').innerHTML = game.path.map((p, i) =>
     `<li class="${i === game.path.length - 1 ? 'cur' : ''} ${p.back ? 'back' : ''} ${p.via || p.found ? 'via' : ''}">${esc(p.title)}${p.back ? ' (back)' : ''}${p.via ? ' ✓ ' + viaName(p.via).toLowerCase() : ''}${p.found ? ' ✓ ' + esc(p.found.join(', ')) : ''}${p.stranded ? ` <span title="${STRANDED}">⛔</span>` : ''}${distance && toGoText(p) ? ` <span class="note">${toGoText(p)}</span>` : ''}</li>`).join('');
   scrollPathToEnd();
@@ -2044,11 +2106,12 @@ function startGame() {
   const vias = roundTrip && !hunt ? [...cps.slice(0, out), setup.goal, ...cps.slice(out)] : cps, goal = roundTrip ? setup.start : hunt ? null : setup.goal;
   const exact = r.includes('exact') ? setup.exact : null, limit = exact ? exact.length - 1 : r.includes('limit') ? CLICK_LIMIT : 0;
   Object.assign(game, { active: true, link: gameLink(), start: setup.start, goal, vias, viaNext: 0, roundTrip, turn: roundTrip && !hunt ? out + 1 : 0, hunt,
-    dead: new Set(), exact, limit, celebrate: false, stuck: false, cheerRun: 0, challenge: setup.challenge, daily: setup.daily, onDay: setup.daily === today(), rules: r, content: contentInPlay(cards.map(c => c.title)), timed: $('#timerToggle').checked, path: [],
+    dead: new Set(), exact, limit, celebrate: false, stuck: false, rebuilt: false, cheerRun: 0, challenge: setup.challenge, daily: setup.daily, onDay: setup.daily === today(), rules: r, content: contentInPlay(cards.map(c => c.title)), timed: $('#timerToggle').checked, path: [],
     seen: new Map(), stack: [], elapsed: 0, runningSince: 0, loading: false, par: null });
   // Par shows in the header once it is known: at once when the setup screen has loaded the link graph.
   const parReady = game.parReady = cardsRoute(cards.map(c => c.title), r, kinds, back);
   parReady.then(route => { if (game.parReady === parReady) { game.par = route ? route.length - 1 : null; renderHud(); } }, () => {});
+  itemsReset();
   $('#btnBack').classList.toggle('hidden', !canGoBack());
   $('#btnPeek').classList.toggle('hidden', game.rules.includes('blind'));
   $('#hudTimeStat').classList.toggle('hidden', !game.timed);
@@ -2080,6 +2143,9 @@ function cacheParse(keys, page) {
 async function navigate(title, fragment, { back = false, from = null } = {}) {
   if (!game.active || game.loading) return;
   const token = ++game.navToken;
+  // Blocks placed on the article go with it (see Items); the next one starts unscrolled.
+  for (const t of [...items.things]) if (t.anchor?.on === 'frame') removeThing(t);
+  items.frameScroll = { x: 0, y: 0 };
   if (game.path.length) { play(back ? 'back' : 'click', game.path.length - 1); effect('orbs', from); }
   game.loading = true;   // stays set until the frame reports it has rendered (frameReady)
   pauseClock();
@@ -2174,18 +2240,18 @@ function audioOut() {
   if (audio.ctx.state === 'suspended') audio.ctx.resume().catch(() => {});
   return audio;
 }
-// A quick attack, then an exponential decay over dur seconds.
-function envelope(t, gain, dur) {
+// A quick attack (or one of attack seconds), then an exponential decay over dur seconds.
+function envelope(t, gain, dur, attack = 0.008) {
   const g = new GainNode(audio.ctx);
   g.gain.setValueAtTime(0.0001, t);
-  g.gain.exponentialRampToValueAtTime(gain, t + 0.008);
+  g.gain.exponentialRampToValueAtTime(gain, t + attack);
   g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
   g.connect(audio.out);
   return g;
 }
 // One note, starting at seconds from now. slide glides the pitch to that frequency, vibrato wobbles it by that many Hz,
-// cutoff low-passes it (takes the buzz off square and sawtooth waves).
-function tone(freq, at, dur, { type = 'triangle', gain = 1, slide, vibrato, cutoff } = {}) {
+// cutoff low-passes it (takes the buzz off square and sawtooth waves), attack slows its start.
+function tone(freq, at, dur, { type = 'triangle', gain = 1, slide, vibrato, cutoff, attack } = {}) {
   const { ctx } = audio, t = ctx.currentTime + at;
   const o = new OscillatorNode(ctx, { type, frequency: freq });
   if (slide) o.frequency.exponentialRampToValueAtTime(slide, t + dur);
@@ -2194,18 +2260,19 @@ function tone(freq, at, dur, { type = 'triangle', gain = 1, slide, vibrato, cuto
     lfo.connect(new GainNode(ctx, { gain: vibrato })).connect(o.frequency);
     lfo.start(t); lfo.stop(t + dur);
   }
-  const g = envelope(t, gain, dur);
+  const g = envelope(t, gain, dur, attack);
   if (cutoff) o.connect(new BiquadFilterNode(ctx, { type: 'lowpass', frequency: cutoff })).connect(g);
   else o.connect(g);
   o.start(t); o.stop(t + dur + 0.05);
 }
-function noise(at, dur, { gain = 1, cutoff = 800 } = {}) {
+// filter: the BiquadFilterNode type cutoff is for, low-pass unless said.
+function noise(at, dur, { gain = 1, cutoff = 800, filter = 'lowpass', attack } = {}) {
   const { ctx } = audio, t = ctx.currentTime + at;
   const buffer = ctx.createBuffer(1, Math.ceil(ctx.sampleRate * dur), ctx.sampleRate);
   const d = buffer.getChannelData(0);
   for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
   const src = new AudioBufferSourceNode(ctx, { buffer });
-  src.connect(new BiquadFilterNode(ctx, { type: 'lowpass', frequency: cutoff })).connect(envelope(t, gain, dur));
+  src.connect(new BiquadFilterNode(ctx, { type: filter, frequency: cutoff })).connect(envelope(t, gain, dur, attack));
   src.start(t);
 }
 // A note block's harp: a soft body and a short bright edge an octave up.
@@ -2231,6 +2298,22 @@ const SOUNDS = {
     tone(330, 0.9, 1, { type: 'sawtooth', gain: 0.4, cutoff: 1100, slide: 300, vibrato: 6 });
   },
   giveUp() { tone(262, 0, 0.25); tone(196, 0.18, 0.6); },
+  // The items (see Items). explode plays one of Minecraft's own explosion sounds, from the wiki, pitched down at random
+  // as the game does, once they are in (itemSounds); until then, or if they don't come, a deep rumble.
+  explode(big) {
+    const b = itemSounds[Math.floor(Math.random() * itemSounds.length)];
+    if (b) { const s = new AudioBufferSourceNode(audio.ctx, { buffer: b, playbackRate: 0.7 * (1 + (Math.random() - Math.random()) * 0.2) }); s.connect(audio.out); s.start(); return; }
+    noise(0, 1.6, { gain: 1.3, cutoff: big ? 300 : 420 }); noise(0, 0.25, { gain: 0.8, cutoff: 2500 }); tone(80, 0, 0.9, { type: 'sine', gain: 0.9, slide: 30 });
+  },
+  fuse(dur) { noise(0, dur, { gain: 0.45, cutoff: 3500, filter: 'highpass', attack: dur * 0.9 }); },
+  place() { noise(0, 0.08, { gain: 0.6, cutoff: 700 }); tone(140, 0, 0.1, { type: 'square', gain: 0.15, cutoff: 500 }); },
+  ghast() { tone(800 + Math.random() * 200, 0, 0.9, { type: 'sawtooth', gain: 0.3, vibrato: 40, cutoff: 2400, slide: 420 }); },
+  whoosh() { noise(0, 0.6, { gain: 0.5, cutoff: 1500, attack: 0.2 }); },
+  hum() { tone(220, 0, 0.5, { type: 'sine', gain: 0.4, vibrato: 4 }); },
+  charge(n) { tone(180 + n * 90, 0, 0.35, { type: 'square', gain: 0.2, cutoff: 1500, slide: 260 + n * 90 }); noise(0, 0.1, { gain: 0.3, cutoff: 2000 }); },
+  bonk() { tone(300, 0, 0.08, { type: 'square', gain: 0.25, cutoff: 1200, slide: 160 }); noise(0, 0.06, { gain: 0.4, cutoff: 1500 }); },
+  poof() { noise(0, 0.4, { gain: 0.6, cutoff: 2000, attack: 0.02 }); },
+  rebuild() { [262, 330, 392, 523].forEach((f, i) => tone(f, i * 0.1, 0.35, { type: 'sine', gain: 0.4 })); },
   // Distance's cheer for a click that got closer: two quick bright notes, a step higher for each click less to go, from 4.
   closer(togo) {
     const f = 1047 * 2 ** (PENTATONIC[4 - Math.min(togo, 4)] / 12);
@@ -2297,6 +2380,15 @@ const EFFECTS = {
     }
   },
   puff(from) { scatter(from, 7, [cssColor('--muted')], 90, 0); },
+  // Minecraft's explosion (see Items), as its emitter makes it: puffs around the blast for 8 ticks, each playing the 16
+  // frames once in 6 to 10 ticks (a tick is 50 ms), and grey debris. Without the frames, the debris only.
+  blast(from) {
+    const t = performance.now(), r = 70 * from.power;
+    if (boomFrames) for (let tick = 0; tick < 8; tick++) for (let i = 0; i < 6 * from.power; i++)
+      fx.parts.push({ x: from.x + rnd(-r, r), y: from.y + rnd(-r, r) * .8, size: rnd(64, 128) * Math.sqrt(from.power) | 0, frames: boomFrames[Math.floor(rnd(0, 4))],
+        born: t + tick * 50, life: rnd(300, 500) });
+    scatter(from, 30 * from.power | 0, ['#e0e0e0', '#9e9e9e', '#6b6b6b', '#4a4a4a'], 650);
+  },
   burst(from) { scatter(from, 24, sparkColors(), 300); },
   sparkle(from) { scatter(from, 10, sparkColors(), 160, 300); },
   win(from) { scatter(from, 48, WIKI_DATA.topics.map(k => cssColor('--viz-' + k)), 420); },
@@ -2331,6 +2423,12 @@ function fxFrame(t) {
     if (age < 0) return true;
     if (age > p.life) { p.land?.(); return false; }
     let x, y, alpha = 1;
+    // A frame of Minecraft's explosion (see blast): which by its age, drawn pixelated where it was put.
+    if (p.frames) {
+      ctx.globalAlpha = 1; ctx.imageSmoothingEnabled = false;
+      ctx.drawImage(p.frames[Math.min(15, Math.floor(age / p.life * 16))], Math.round(p.x - p.size / 2), Math.round(p.y - p.size / 2), p.size, p.size);
+      return true;
+    }
     if (p.to) {
       const k = (age / p.life) ** 2, j = 1 - k;
       x = j * j * p.x + 2 * j * k * p.via.x + k * k * p.to.x;
@@ -2368,8 +2466,8 @@ function cheer(entry) {
 // ---------------------------------------------------------------- Advancements
 // Minecraft-style advancements, each a task, goal or challenge (ADV_TIERS), earned once and announced by a toast with
 // its tier's heading and sound. mwr.advancements keeps what is earned (got: key to when) and what some count toward:
-// wins, articles visited, the different articles visited (pages, by title, so a new snapshot keeps them) and the topics
-// seen. They are checked as a page arrives (advArrive), as a game ends (advFinish) and as Distance cheers (cheer). Skill
+// wins, articles visited, the different articles visited (pages, by title, so a new snapshot keeps them), the topics
+// seen and the blasts that broke the page (see Items). They are checked as a page arrives (advArrive), as a game ends (advFinish) and as Distance cheers (cheer). Skill
 // and speed ones need par ADV_PAR or more and the pair's first game, none of it in the history before, so a typed easy
 // pair or Retry this pair doesn't earn them; speed ones also need the Timer.
 const ADV_PAR = 3;
@@ -2384,6 +2482,7 @@ const ADV_GROUPS = {
   speed: { label: 'Speed', note: `Timer on, par ${ADV_PAR} or more, on a pair’s first game.` },
   keep: { label: 'Keeping at it' },
   explore: { label: 'Exploring' },
+  items: { label: 'Items' },
   secret: { label: 'Secret', note: 'Hidden until you find them.' },
 };
 // icon: the article whose picture it shows (the emoji until that loads, or if it doesn't). A count is of tally
@@ -2426,6 +2525,14 @@ const ADVANCEMENTS = Object.fromEntries([
   ['aprilFools', 'explore', 'April Fools!', 'Visit an April Fools page.', 'task', 'Poisonous Potato', '🥔'],
   ['onARoll', 'explore', 'On a Roll', 'Have Distance cheer 3 clicks in a row.', 'goal', 'Fire Charge', '🎳'],
   ['hotStreak', 'explore', 'Hot Streak', 'Win a par 4+ game with Distance cheering every click.', 'challenge', 'Blaze Powder', '🔥'],
+  ['kaboom', 'items', 'Kaboom!', 'Blow the page up.', 'task', 'TNT', '💥'],
+  ['intentional', 'items', 'Intentional Game Design', 'Sleep in a bed, or set your spawn at a respawn anchor.', 'goal', 'Bed', '🛏️'],
+  ['returnSender', 'items', 'Return to Sender', 'Send a ghast’s fireball back at it.', 'goal', 'Ghast', '👻'],
+  ['shoo', 'items', 'Shoo!', 'Knock a hissing creeper back.', 'task', 'Creeper Head', '🟩'],
+  ['chain', 'items', 'Chain Reaction', 'Set off three blasts within three seconds.', 'challenge', 'End Crystal', '💎'],
+  ['rebuilder', 'items', 'Good as New', 'Rebuild the page.', 'task', 'Bricks', '🧱'],
+  ['demolition', 'items', 'Demolition Expert', 'Blow the page up 50 times.', 'goal', 'Iron Pickaxe', '⛏️', { of: 50, tally: 'blasts', unit: 'times' }],
+  ['pieces', 'items', 'Picking Up the Pieces', 'Win a game after rebuilding its page.', 'goal', 'Golden Apple', '🍏'],
   ['herobrine', 'secret', 'He Is Watching', 'Land on Herobrine.', 'task', 'Herobrine', '👁️', { secret: true }],
   ['cake', 'secret', 'The Cake Is Real', 'Land on Cake.', 'task', 'Cake', '🎂', { secret: true }],
   ['rags', 'secret', 'Rags to Riches', 'Win from Dirt to Diamond.', 'goal', 'Diamond Ore', '⛏️', { secret: true }],
@@ -2435,12 +2542,12 @@ const ADVANCEMENTS = Object.fromEntries([
 ].map(([key, group, name, how, tier, icon, emoji, x]) => [key, { group, name, how, tier, icon, emoji, ...x }]));
 
 // Read through savedAdvancements, which keeps only what advancements would write: storage is open to the player.
-const advEmpty = () => ({ got: {}, wins: 0, visits: 0, pages: new Set(), topics: [] });
+const advEmpty = () => ({ got: {}, wins: 0, visits: 0, blasts: 0, pages: new Set(), topics: [] });
 function savedAdvancements() {
   const s = store.get('mwr.advancements', null), a = advEmpty();
   if (!s || typeof s !== 'object') return a;
   for (const [k, at] of Object.entries(s.got && typeof s.got === 'object' ? s.got : {})) if (isKey(ADVANCEMENTS, k) && Number.isFinite(at)) a.got[k] = at;
-  for (const k of ['wins', 'visits']) if (Number.isInteger(s[k]) && s[k] >= 0) a[k] = s[k];
+  for (const k of ['wins', 'visits', 'blasts']) if (Number.isInteger(s[k]) && s[k] >= 0) a[k] = s[k];
   if (Array.isArray(s.pages)) a.pages = new Set(s.pages.filter(t => typeof t === 'string'));
   if (Array.isArray(s.topics)) a.topics = WIKI_DATA.topics.filter(t => s.topics.includes(t));
   return a;
@@ -2477,7 +2584,7 @@ function advArrive(title, back) {
 const ADV_AFTER_RESULT = 1200;
 async function advFinish(rec, first, newBest) {
   const at = performance.now() + ADV_AFTER_RESULT, path = game.path, parReady = game.parReady, rules = game.rules, has = k => rules.includes(k);
-  const g = { exact: !!game.exact, roundTrip: game.roundTrip, checkpoints: checkpoints(), timed: game.timed, challenge: game.challenge };
+  const g = { exact: !!game.exact, roundTrip: game.roundTrip, checkpoints: checkpoints(), timed: game.timed, challenge: game.challenge, rebuilt: game.rebuilt };
   try {
     if (rec.won) { adv.wins++; saveAdv(); }
     const par = rec.par ?? await parReady.then(route => route ? route.length - 1 : null, () => null);
@@ -2491,7 +2598,7 @@ async function advFinish(rec, first, newBest) {
       longWay: skill && g.exact && rec.exact - par >= 5, grandTour: skill && g.roundTrip && g.checkpoints === 3 && !has('scavenger'),
       kinds: skill && !!rec.kinds, fullKit: skill && has('nohubs') && has('noback') && has('blind'),
       quick: speed && rec.ms < 60000, speedrunner: speed && rec.ms < 30000, sprinter: speed && par >= 4 && rec.ms < 45000,
-      selfImprovement: newBest,
+      selfImprovement: newBest, pieces: won && g.rebuilt,
       hotStreak: won && has('distance') && !g.exact && par >= 4 && path.slice(1, -1).every((p, i) => p.via || p.found || gotCloser(path, i + 1, false)),
       rags: won && rec.start === 'Dirt' && rec.goal === 'Diamond' && !rec.vias && !g.roundTrip,
       soClose: !!rec.outOfClicks && !g.exact && path.at(-1).togo === 1, scenic: won && rec.clicks >= 15,
@@ -2510,7 +2617,7 @@ function advPump() {
   while (advQueue.length && host.querySelectorAll('.adv-toast:not(.out)').length < ADV_SHOWN) {
     const key = advQueue.shift(), a = ADVANCEMENTS[key], el = document.createElement('div');
     el.className = 'adv-toast ' + a.tier;
-    el.innerHTML = `${advFrame(key)}<div><div class="t">${ADV_TIERS[a.tier].title}</div><div class="n">${esc(a.name)}</div></div>`;
+    el.innerHTML = `<span class="adv-toast-icon" data-adv="${key}">${advIcon(key)}</span><div><div class="t">${ADV_TIERS[a.tier].title}</div><div class="n">${esc(a.name)}</div></div>`;
     host.append(el);
     tiers.push(a.tier);
     setTimeout(() => { el.classList.add('out'); setTimeout(() => { el.remove(); advPump(); }, 350); }, ADV_MS);
@@ -2526,13 +2633,31 @@ function advPump() {
 // or if they don't come, the emoji. Each frame shown then gets its picture.
 const advPics = new Map();
 let advPicsAsked = null;
+// The API takes 50 titles a request, so they go in batches of that many.
 function advPictures() {
-  advPicsAsked ??= api({ action: 'query', titles: [...new Set(Object.values(ADVANCEMENTS).map(a => a.icon))].join('|'), redirects: '1',
-    prop: 'pageimages', piprop: 'thumbnail', pithumbsize: '96', pilimit: 'max' }).then(d => {
-    const asked = new Map([...d.query?.normalized ?? [], ...d.query?.redirects ?? []].map(n => [n.to, n.from]));
-    for (const p of d.query?.pages ?? []) if (p.thumbnail) advPics.set(asked.get(p.title) ?? p.title, p.thumbnail.source);
-    for (const el of document.querySelectorAll('.adv-frame[data-adv]')) el.innerHTML = advIcon(el.dataset.adv, el.classList.contains('secret'));
+  const icons = [...new Set(Object.values(ADVANCEMENTS).map(a => a.icon))];
+  advPicsAsked ??= Promise.all(Array.from({ length: Math.ceil(icons.length / 50) }, (_, i) => api({ action: 'query', titles: icons.slice(i * 50, i * 50 + 50).join('|'),
+    redirects: '1', prop: 'pageimages', piprop: 'thumbnail', pithumbsize: '96', pilimit: 'max' }))).then(ds => {
+    for (const d of ds) {
+      const asked = new Map([...d.query?.normalized ?? [], ...d.query?.redirects ?? []].map(n => [n.to, n.from]));
+      for (const p of d.query?.pages ?? []) if (p.thumbnail) advPics.set(asked.get(p.title) ?? p.title, p.thumbnail.source);
+    }
+    for (const el of document.querySelectorAll('[data-adv]')) el.innerHTML = advIcon(el.dataset.adv, el.classList.contains('secret'));
   }, () => { advPicsAsked = null; });
+  advTextures();
+}
+// Minecraft's advancement frames and toast box, from the wiki: asked for with the pictures, and set as CSS variables
+// (--adv-plain-raw … --adv-fancy-worn, --adv-toast) once in.
+const ADV_TEXTURES = { 'plain-raw': 'Advancement-plain-raw.png', 'plain-worn': 'Advancement-plain-worn.png', 'oval-raw': 'Advancement-oval-raw.png',
+  'oval-worn': 'Advancement-oval-worn.png', 'fancy-raw': 'Advancement-fancy-raw.png', 'fancy-worn': 'Advancement-fancy-worn.png', toast: 'Toast advancement.png' };
+let advTexturesAsked = null;
+function advTextures() {
+  advTexturesAsked ??= api({ action: 'query', titles: Object.values(ADV_TEXTURES).map(f => 'File:' + f).join('|'), prop: 'imageinfo', iiprop: 'url' }).then(d => {
+    const asked = new Map([...d.query?.normalized ?? []].map(n => [n.to, n.from])), key = new Map(Object.entries(ADV_TEXTURES).map(([k, f]) => ['File:' + f, k]));
+    const root = document.documentElement;
+    for (const p of d.query?.pages ?? []) if (p.imageinfo) root.style.setProperty('--adv-' + key.get(asked.get(p.title) ?? p.title), `url("${p.imageinfo[0].url}")`);
+    root.classList.toggle('adv-textured', !!root.style.getPropertyValue('--adv-toast'));
+  }, () => { advTexturesAsked = null; });
 }
 const advIcon = (key, hidden) => hidden ? '<span class="emoji" aria-hidden="true">?</span>' : advPics.has(ADVANCEMENTS[key].icon)
   ? `<img alt="" src="${esc(advPics.get(ADVANCEMENTS[key].icon))}">` : `<span class="emoji" aria-hidden="true">${ADVANCEMENTS[key].emoji}</span>`;
@@ -2575,12 +2700,610 @@ function openAdvancements() {
     $('#aDetail').innerHTML = advDetail();
   };
   $('#aReset').onclick = () => {
-    openModal(`<h2>Reset advancements?</h2><p>This forgets every advancement you’ve earned and the counts toward the rest (wins, articles visited). Your history and dailies stay.</p>
+    openModal(`<h2>Reset advancements?</h2><p>This forgets every advancement you’ve earned and the counts toward the rest (wins, articles visited, blasts). Your history and dailies stay.</p>
       <div class="actions"><button id="aKeep">Cancel</button><button class="primary" id="aWipe">Reset advancements</button></div>`);
     $('#aKeep').onclick = openAdvancements;
     $('#aWipe').onclick = () => { adv = advEmpty(); saveAdv(); renderHistory(); openAdvancements(); };
   };
   advPictures();
+}
+
+// ---------------------------------------------------------------- Items
+// Things to blow the page up with, from a hotbar (openHotbar: the game header's button in play, the one above the
+// background's on the setup screen): TNT, an end crystal, a ghast's fireball, a creeper, a bed and a respawn anchor
+// (ITEMS). One taken in hand (holdItem) follows the pointer, over a layer that takes every click, each using it
+// (ITEM_USE) until it is put away. A blast (blast) throws the pieces of the page around it (pageBreaker, which the
+// article's frame runs on its own pieces too) with Minecraft's explosion, and sets off or breaks what is near. The rest
+// of the page goes on working; Rebuild puts the pieces back, and in a game Give up is there too. Nothing counts against
+// the player.
+const ITEMS = {
+  tnt: { name: 'TNT', page: 'TNT', tip: 'Click to place TNT, and click a placed one to light it.' },
+  crystal: { name: 'End Crystal', page: 'End Crystal', tip: 'Click to place a crystal, and hit one to set it off.' },
+  fireball: { name: 'Ghast Fireball', page: 'Fire Charge', tip: 'Click where the ghast should aim. Hit a fireball in flight to send it back.' },
+  creeper: { name: 'Creeper', page: 'Creeper', tip: 'Click to let a creeper loose. It follows your pointer; hit it to knock it back.' },
+  bed: { name: 'Bed', page: 'Bed', tip: 'Click to place a bed, and click one to sleep in it.' },
+  anchor: { name: 'Respawn Anchor', page: 'Respawn Anchor', tip: 'Click to place an anchor, click one to charge it, and once more to set your spawn.' },
+};
+const ITEM_EMOJI = { TNT: '🧨', 'End Crystal': '💎', Ghast: '👻', 'Fire Charge': '🔥', Creeper: '🟩', Bed: '🛏️', 'Respawn Anchor': '⚓' };
+// Files shown as they are: the end crystal turning above its base, the respawn anchor at each charge, the explosion's 16
+// frames (white, which blast tints grey as Minecraft does) and Minecraft's four explosion sounds.
+const ITEM_FILES = { crystal: 'End Crystal JE2.gif', ...Object.fromEntries([0, 1, 2, 3, 4].map(n => ['anchor' + n, `Respawn Anchor (${n}) JE1.png`])),
+  ...Object.fromEntries(Array.from({ length: 16 }, (_, i) => ['boom' + i, `Explosion (texture ${i}) JE1.png`])),
+  ...Object.fromEntries([1, 2, 3, 4].map(n => ['sound' + n, `Explosion${n}.ogg`])) };
+// The items' pictures (as the cards ask), asked for in an idle moment after the page loads, since the hotbar's buttons
+// show TNT's (or say TNT if it doesn't come); the files' addresses once the hotbar first opens. The explosion's frames
+// and sounds themselves only load when an item is first taken in hand.
+const itemPics = new Map(), itemFiles = new Map();
+let picsAsked = null, filesAsked = null, boomFrames = null, itemSounds = [];
+function itemPictures() {
+  return picsAsked ??= api({ action: 'query', titles: [...new Set([...Object.values(ITEMS).map(i => i.page), 'Ghast'])].join('|'), redirects: '1',
+    prop: 'pageimages', piprop: 'thumbnail', pithumbsize: '160', pilimit: 'max' }).then(d => {
+    const asked = new Map([...d.query?.normalized ?? [], ...d.query?.redirects ?? []].map(n => [n.to, n.from]));
+    for (const p of d.query?.pages ?? []) if (p.thumbnail) itemPics.set(asked.get(p.title) ?? p.title, p.thumbnail.source);
+    for (const i of document.querySelectorAll('.hotbar img[data-item-pic]')) i.src = itemPics.get(i.dataset.itemPic) ?? '';
+  }, () => { picsAsked = null; }).then(() => {
+    for (const b of ['#btnItems', '#hudItems']) { setImg($(b + ' img'), itemPics.get('TNT')); $(b + ' span').classList.toggle('hidden', itemPics.has('TNT')); }
+  });
+}
+function itemAssets() {
+  return Promise.all([itemPictures(), filesAsked ??= api({ action: 'query', titles: Object.values(ITEM_FILES).map(f => 'File:' + f).join('|'), prop: 'imageinfo', iiprop: 'url' })
+    .then(d => {
+      const asked = new Map([...d.query?.normalized ?? []].map(n => [n.to, n.from])), key = new Map(Object.entries(ITEM_FILES).map(([k, f]) => ['File:' + f, k]));
+      for (const p of d.query?.pages ?? []) if (p.imageinfo) itemFiles.set(key.get(asked.get(p.title) ?? p.title), p.imageinfo[0].url);
+    }, () => { filesAsked = null; })]);
+}
+const itemPic = page => itemPics.has(page) ? `<img alt="" src="${esc(itemPics.get(page))}" draggable="false">` : `<span class="emoji">${ITEM_EMOJI[page] ?? '▪️'}</span>`;
+const itemFile = (k, page) => itemFiles.has(k) ? `<img alt="" src="${esc(itemFiles.get(k))}" draggable="false">` : itemPic(page);
+// The explosion's frames at 16 px, each in four greys (Minecraft tints each puff a random grey). The wiki's images let a
+// canvas read them; without them a blast is grey debris only.
+let boomAsked = false;
+function loadBoomFrames() {
+  if (boomAsked || !itemFiles.has('boom0')) return;
+  boomAsked = true;
+  Promise.all(Array.from({ length: 16 }, (_, i) => new Promise(ok => {
+    const im = new Image();
+    im.crossOrigin = 'anonymous'; im.onload = () => ok(im); im.onerror = () => ok(null); im.src = itemFiles.get('boom' + i) ?? '';
+  }))).then(ims => {
+    if (ims.some(i => !i)) { boomAsked = false; return; }   // asked again next time
+    boomFrames = [.6, .72, .86, 1].map(g => ims.map(im => {
+      const c = Object.assign(document.createElement('canvas'), { width: 16, height: 16 }), x = c.getContext('2d'), v = Math.round(g * 255);
+      x.imageSmoothingEnabled = false; x.drawImage(im, 0, 0, 16, 16);
+      x.globalCompositeOperation = 'source-in'; x.fillStyle = `rgb(${v},${v},${v})`; x.fillRect(0, 0, 16, 16);
+      return c;
+    }));
+  });
+}
+// The explosion sounds, decoded when an item is first taken in hand (a click, so the AudioContext may start).
+let soundsAsked = false;
+function loadItemSounds() {
+  if (soundsAsked || !itemFiles.has('sound1')) return;
+  soundsAsked = true;
+  try {
+    const { ctx } = audioOut();
+    Promise.all([1, 2, 3, 4].map(n => fetch(itemFiles.get('sound' + n)).then(r => r.arrayBuffer()).then(b => ctx.decodeAudioData(b)).catch(() => null)))
+      .then(bs => { itemSounds = bs.filter(Boolean); });
+  } catch { /* no sound */ }
+}
+
+// The pieces of a page, and throwing them. One function, so the article's frame gets the same code as its source
+// (renderArticle) and runs it on its own pieces. prepare finds the pieces in a region: from the root down, any box too
+// big to be one piece, or holding something to keep whole (keep, a selector), gives its children, and the too big its
+// text as pieces of four words, up to MAX. The boxes are all measured before the text is split, so the page is laid out
+// once. breakApart throws the pieces a blast reaches, by their nearest edge, harder the nearer, as the shockwave gets to
+// them, and they fall onto what is left of the page below them (or its bottom); pieces already thrown it throws again,
+// and those at rest fall further if what they rested on is gone. A thrown piece takes no clicks and loses its text
+// shadow (costly to repaint as it moves), and a box with nothing left to see loses its background, border and shadow,
+// so no empty shell is left. With motion reduced (still) the pieces fade where they are instead. putBack puts every
+// piece back, flying (or at once), and the text whole again.
+function pageBreaker() {
+  const MAX = 700, BIG = 160 * 80, TEXTY = /^(P|LI|DD|DT|TD|TH|H[1-6]|DIV|SPAN|A|B|I|SMALL)$/;
+  let busy = 0, raf = 0, last = 0, until = 0, sideways = null;   // sideways: [element, its own overflow-x], while it is set
+  const thrown = new Map();   // piece: its fall
+  // The pieces in region ({ x, y, r }, a circle on the screen), or by default in view: taking an item in hand splits the
+  // text in view ahead of a blast, and the blast finds its own pieces around it, wherever the page is scrolled.
+  function prepare(root, keep, region) {
+    const pieces = [], hollow = [];
+    const within = r => region ? near(r, region.x, region.y) <= region.r : r.bottom > 0 && r.top < innerHeight;
+    (function walk(node) {
+      for (const el of node.children) {
+        if (pieces.length >= MAX || (keep && el.matches(keep)) || /^(SCRIPT|STYLE|LINK|META|BR|TEMPLATE)$/.test(el.tagName)) continue;
+        const r = el.getBoundingClientRect();
+        if (!(r.width > 0 && r.height > 0 && within(r))) continue;
+        if (keep && el.querySelector(keep)) walk(el);   // what holds something kept whole gives its other pieces
+        else if (r.width * r.height > BIG && (el.children.length || TEXTY.test(el.tagName))) { hollow.push(el); walk(el); }
+        else pieces.push(el);
+      }
+    })(root);
+    for (const el of hollow) pieces.push(...words(el));
+    return { pieces, boxes: hollow };
+  }
+  // A box's text as pieces of four words, the spaces between pieces left out of them (a piece's own edge spaces would
+  // collapse once it is an inline block).
+  function words(el) {
+    const made = [];
+    for (const n of [...el.childNodes]) {
+      if (n.nodeType !== 3 || !n.textContent.trim()) continue;
+      const f = document.createDocumentFragment(), parts = n.textContent.split(/(\s+)/).filter(Boolean);
+      let group = [], count = 0;
+      const flush = () => {
+        if (!group.length) return;
+        const s = document.createElement('span');
+        s.className = 'brk-word'; s.textContent = group.join(''); f.append(s); made.push(s); group = []; count = 0;
+      };
+      parts.forEach((part, i) => {
+        if (!/^\s+$/.test(part)) { group.push(part); count++; }
+        else if (count >= 4 || !group.length || i === parts.length - 1) { flush(); f.append(part); }
+        else group.push(part);
+      });
+      flush();
+      n.replaceWith(f);
+    }
+    return made;
+  }
+  const save = el => { if (!('brokeStyle' in el.dataset)) el.dataset.brokeStyle = el.getAttribute('style') ?? ''; };
+  const near = (r, x, y) => Math.hypot(Math.max(r.left - x, 0, x - r.right), Math.max(r.top - y, 0, y - r.bottom));
+  // Where thrown pieces land: the top of every intact surface on the page, in the page's own coordinates (so it holds
+  // however the page is scrolled), by columns COL px wide, each column's tops sorted. A surface is an element with
+  // text of its own, or a picture or control (but a faded picture behind things), not thrown and not in what is kept
+  // whole. Below
+  // them all, the bottom of the page. Found again at every blast, since a blast takes surfaces away.
+  const COL = 32, SOLID = /^(IMG|INPUT|BUTTON|SELECT|TEXTAREA|CANVAS|SVG|VIDEO|HR|PROGRESS|METER)$/i;
+  let surfaces = new Map(), bottom = 0;   // bottom: the page's, as it was before the first blast
+  function findSurfaces(root, keep) {
+    const sx = scrollX, sy = scrollY, cols = new Map();
+    for (const el of root.querySelectorAll('*')) {
+      if (/^(SCRIPT|STYLE|LINK|META|BR|TEMPLATE)$/.test(el.tagName) || el.closest('.brk-thrown') || (keep && el.closest(keep))) continue;
+      const text = [...el.childNodes].some(n => n.nodeType === 3 && n.textContent.trim());
+      if (!text && (el.children.length || !SOLID.test(el.tagName))) continue;   // an empty box is no surface
+      if (el.tagName === 'IMG' && +getComputedStyle(el).opacity < .5) continue;   // nor a faded picture behind things
+      const r = el.getBoundingClientRect();
+      if (!r.width || !r.height) continue;
+      for (let c = Math.floor((r.left + sx) / COL); c <= Math.floor((r.right + sx) / COL); c++) (cols.get(c) ?? cols.set(c, []).get(c)).push(r.top + sy);
+    }
+    for (const tops of cols.values()) tops.sort((a, b) => a - b);
+    surfaces = cols;
+  }
+  // Whether a box still holds anything to see: text, a picture or a control, not thrown.
+  const intact = box => [...box.childNodes].some(n => n.nodeType === 3 && n.textContent.trim())
+    || [...box.querySelectorAll('*')].some(el => !el.closest('.brk-thrown') && (SOLID.test(el.tagName) || [...el.childNodes].some(n => n.nodeType === 3 && n.textContent.trim()))
+      && el.getClientRects().length > 0);
+  // The first surface at or below y under a piece from left to right, or the bottom of the page.
+  function landing(left, right, y) {
+    let best = bottom;
+    for (let c = Math.floor(left / COL); c <= Math.floor(right / COL); c++) {
+      const tops = surfaces.get(c);
+      if (!tops) continue;
+      let lo = 0, hi = tops.length;
+      while (lo < hi) { const m = (lo + hi) >> 1; if (tops[m] < y - .5) lo = m + 1; else hi = m; }
+      if (lo < tops.length && tops[lo] < best) best = tops[lo];
+    }
+    return best;
+  }
+  // Throws what the blast at (bx, by) on the screen, of power, reaches; returns how many pieces it threw. Everything
+  // is worked out in the page's coordinates.
+  function breakApart(root, bx, by, power, keep, still) {
+    const now = performance.now();
+    if (now < busy) return 0;   // being put back
+    const reach = 220 * power, { pieces, boxes } = prepare(root, keep, { x: bx, y: by, r: reach + 40 }), sx = scrollX, sy = scrollY;
+    bx += sx; by += sy;
+    // The first blast notes where the page ends, the floor, so pieces resting on it can't make the page longer, and the
+    // page no longer scrolls sideways, so pieces flying off the side can't make it wider.
+    // It goes on what decides the page's scrolling: the body when <html> has no overflow of its own (the wiki's pages
+    // scroll so), since one on <html> would make the body a scrolling box of its own, back at the top.
+    if (!thrown.size && !sideways) {
+      const html = document.documentElement, h = getComputedStyle(html), el = h.overflowX === 'visible' && h.overflowY === 'visible' ? document.body : html;
+      bottom = Math.max(html.scrollHeight, innerHeight);
+      sideways = [el, el.style.getPropertyValue('overflow-x'), el.style.getPropertyPriority('overflow-x')];
+      el.style.setProperty('overflow-x', 'hidden', 'important');
+    }
+    const fresh = pieces.filter(el => !thrown.has(el)), rects = fresh.map(el => el.getBoundingClientRect());
+    const inline = fresh.map(el => getComputedStyle(el).display === 'inline');
+    // A kick away from the blast, by how near it came, after the shockwave gets there (6 px a millisecond).
+    const kick = (s, cx, cy, d) => {
+      const k = Math.max(0, 1 - d / reach), dx = cx - bx, dy = cy - by, n = Math.hypot(dx, dy) || 1, v = k * 1400 * Math.sqrt(power) + 60;
+      Object.assign(s, { vx: s.vx + dx / n * v + (Math.random() - .5) * 80, vy: s.vy + dy / n * v - k * 600, spin: s.spin + (Math.random() - .5) * (k * 900 + 120),
+        t0: Math.max(s.t0, now + d / 6 + Math.random() * 40), rest: false });
+    };
+    let hit = 0;
+    fresh.forEach((el, i) => {
+      const v = rects[i], r = { left: v.left + sx, right: v.right + sx, top: v.top + sy, bottom: v.bottom + sy }, d = near(r, bx, by);
+      if (d > reach) return;
+      save(el);
+      el.classList.add('brk-thrown');
+      el.style.setProperty('pointer-events', 'none', 'important');
+      el.style.setProperty('text-shadow', 'none', 'important');
+      if (inline[i]) el.style.display = 'inline-block';
+      if (still) { el.style.transition = 'opacity .6s'; el.style.opacity = '0.12'; }
+      else el.style.transition = 'none';
+      const s = { el, x: 0, y: 0, vx: 0, vy: 0, rot: 0, spin: 0, t0: 0, w: r.right - r.left, h: r.bottom - r.top, cx: (r.left + r.right) / 2, cy: (r.top + r.bottom) / 2, rest: false, still };
+      kick(s, s.cx, s.cy, d);
+      thrown.set(el, s);
+      hit++;
+    });
+    // Pieces already thrown: kicked again if it reaches them, and those at rest check what they rest on is still there.
+    if (!still) for (const s of thrown.values()) {
+      if (s.t0 > now || s.still) continue;   // just thrown, or faded
+      const cx = s.cx + s.x, cy = s.cy + s.y, d = Math.hypot(cx - bx, cy - by);
+      if (d < reach) kick(s, cx, cy, d);
+      else s.rest = false;
+    }
+    // A box once every piece it holds is thrown: hollow, and it may no longer clip, scroll or clamp them (a clamped
+    // box's ellipsis would stay behind). Important, since some of the wiki's own styles are.
+    for (const box of boxes) {
+      if (box.style.getPropertyValue('border-color') === 'transparent' || intact(box)) continue;
+      save(box);
+      for (const [k, v] of [['background', 'transparent'], ['border-color', 'transparent'], ['box-shadow', 'none'], ['outline-color', 'transparent'],
+        ['overflow', 'visible'], ['contain', 'none'], ['clip-path', 'none'], ['-webkit-line-clamp', 'none'], ['line-clamp', 'none'], ['text-overflow', 'clip'],
+        ...box.tagName === 'TABLE' ? [['border-collapse', 'separate'], ['border-spacing', '0']] : []]) box.style.setProperty(k, v, 'important');
+    }
+    // The boxes the thrown pieces are in can't keep them in either.
+    for (const box of boxes) if (box.querySelector('.brk-thrown')) {
+      save(box);
+      for (const [k, v] of [['overflow', 'visible'], ['contain', 'none'], ['clip-path', 'none']]) box.style.setProperty(k, v, 'important');
+    }
+    if (!still) findSurfaces(root, keep);
+    until = now + 8000;
+    if (!still && !raf) { last = now; raf = requestAnimationFrame(frame); }
+    return hit;
+  }
+  // A frame of the fall: each piece under gravity, landing on the first surface below it (or the bottom of the page),
+  // bouncing a little and coming to rest. Turned as it is, a piece reaches out half of ext's width and height from
+  // its middle, so even a corner doesn't go into what it lands on.
+  const ext = s => { const a = s.rot * Math.PI / 180, c = Math.abs(Math.cos(a)), n = Math.abs(Math.sin(a)); return [(s.w * c + s.h * n) / 2, (s.w * n + s.h * c) / 2]; };
+  function frame(t) {
+    raf = 0;
+    const dt = Math.min(.04, (t - last) / 1000);
+    let moving = false;
+    last = t;
+    for (const [el, s] of thrown) {
+      if (!el.isConnected) { thrown.delete(el); continue; }   // re-rendered since
+      if (s.still || s.rest) continue;
+      if (t < s.t0) { moving = true; continue; }
+      const was = s.cy + s.y + ext(s)[1];
+      s.vy += 2000 * dt; s.x += s.vx * dt; s.y += s.vy * dt; s.rot += s.spin * dt;
+      const [hw, hh] = ext(s), cx = s.cx + s.x, floor = s.vy > 0 ? landing(cx - hw, cx + hw, was) : Infinity;
+      if (s.cy + s.y + hh >= floor) {
+        s.y = floor - s.cy - hh; s.vy *= -.28; s.vx *= .75; s.spin *= .6;
+        if (Math.abs(s.vy) < 60) { s.vy = 0; s.spin = 0; s.vx *= .5; if (Math.abs(s.vx) < 8) { s.rest = true; s.vx = 0; } }
+      }
+      s.el.style.transform = 'translate(' + s.x.toFixed(1) + 'px,' + s.y.toFixed(1) + 'px) rotate(' + s.rot.toFixed(1) + 'deg)';
+      moving = true;
+    }
+    if (moving && t < until) raf = requestAnimationFrame(frame);
+  }
+  function putBack(root, atOnce) {
+    cancelAnimationFrame(raf); raf = 0;
+    thrown.clear();
+    if (sideways) { const [el, v, p] = sideways; el.style.setProperty('overflow-x', v, p); sideways = null; }
+    const all = [...root.querySelectorAll('[data-broke-style]')];
+    const restore = el => {
+      if (!('brokeStyle' in el.dataset)) return;   // put back already
+      if (el.dataset.brokeStyle) el.setAttribute('style', el.dataset.brokeStyle); else el.removeAttribute('style');
+      delete el.dataset.brokeStyle; el.classList.remove('brk-thrown');
+    };
+    const whole = () => { for (const s of root.querySelectorAll('.brk-word')) s.replaceWith(s.textContent); root.normalize(); };
+    if (atOnce) { all.forEach(restore); whole(); return; }
+    // Only the pieces that moved fly back; everything is restored together once they are in (one layout, not hundreds).
+    busy = performance.now() + 1000;
+    for (const el of all) if (el.style.transform || el.style.opacity) {
+      el.style.transition = 'transform .6s cubic-bezier(.3,1.3,.5,1) ' + (Math.random() * .3).toFixed(2) + 's, opacity .5s';
+      el.style.transform = ''; el.style.opacity = '';
+    }
+    setTimeout(() => { all.forEach(restore); whole(); }, 1000);
+  }
+  return { prepare, breakApart, putBack };
+}
+const breaker = pageBreaker();
+
+// What is on the page: things placed (each { el, kind, p }, p its middle), the item in hand, the pointer (the frame
+// reports it over the article, for the creeper), whether anything is broken (so Rebuild shows, and the page takes no
+// clicks), when the latest blasts were (recent, for Chain Reaction), and how far the article is scrolled (frameScroll).
+const items = { things: new Set(), holding: null, pointer: { x: innerWidth / 2, y: innerHeight / 2 }, broken: false, recent: [], frameScroll: { x: 0, y: 0 },
+  timers: new Set(), mending: 0 };   // timers: crystals set off by a blast, going off a moment later; mending: until
+                                     // when Rebuild is putting the pieces back
+const inGame = () => !$('#game').classList.contains('hidden');
+const itemsRoot = () => inGame() ? $('#game') : $('#setup');
+const keepWhole = 'iframe, #toast, .overlay, #btnBgView, #btnItems, #hudItems, .bg-facts, #setupRoom';   // a selector
+addEventListener('pointermove', e => { items.pointer = { x: e.clientX, y: e.clientY }; }, { passive: true });
+
+function openHotbar(btn) {
+  closeHotbar();
+  itemAssets();
+  const bar = document.body.appendChild(Object.assign(document.createElement('div'), { className: 'hotbar', role: 'menu' }));
+  bar.innerHTML = Object.entries(ITEMS).map(([k, it]) => `<button role="menuitem" data-item="${k}" aria-label="${esc(it.name)}">`
+    + (itemPics.has(it.page) ? itemPic(it.page) : `<img alt="" data-item-pic="${esc(it.page)}" draggable="false">`) + `<span class="name">${esc(it.name)}</span></button>`).join('');
+  const r = btn.getBoundingClientRect(), w = bar.offsetWidth;
+  bar.style.left = Math.max(8, Math.min(innerWidth - w - 8, r.left + r.width / 2 - w / 2)) + 'px';
+  bar.style.top = (r.top > innerHeight / 2 ? r.top - bar.offsetHeight - 10 : r.bottom + 10) + 'px';
+  for (const b of bar.querySelectorAll('[data-item]')) b.onclick = e => { e.stopPropagation(); closeHotbar(); holdItem(b.dataset.item); };
+  bar.querySelector('button').focus();
+}
+const closeHotbar = () => $('.hotbar')?.remove();
+
+// An item in hand: every click uses it, until a right click or Escape puts it away. A click on something already placed
+// uses that instead (lights a TNT, hits a crystal or a fireball). Taking one in hand also gets ready for a blast: the
+// text in view, the page's and the article's, is split into pieces now, which a blast would otherwise have to do first,
+// and the explosion's frames and sounds are loaded.
+function holdItem(k) {
+  dropItem();
+  items.holding = k;
+  breaker.prepare(itemsRoot(), keepWhole);
+  if (inGame()) $('#frame').contentWindow?.postMessage({ mwr: 'arm' }, '*');
+  itemAssets().then(() => { loadBoomFrames(); loadItemSounds(); });
+  const layer = document.body.appendChild(Object.assign(document.createElement('div'), { className: 'hold' }));
+  const ghost = document.body.appendChild(Object.assign(document.createElement('div'), { className: 'ghost', innerHTML: itemPic(ITEMS[k].page) }));
+  const tip = document.body.appendChild(Object.assign(document.createElement('div'), { className: 'hold-tip', textContent: ITEMS[k].tip + ' Right-click or Esc to put it away.' }));
+  if (inGame()) tip.style.top = $('.hud').getBoundingClientRect().bottom + 10 + 'px';
+  const follow = (x, y) => Object.assign(ghost.style, { left: x + 'px', top: y + 'px' });
+  follow(items.pointer.x, items.pointer.y);
+  layer.onpointermove = e => follow(e.clientX, e.clientY);
+  layer.oncontextmenu = e => { e.preventDefault(); dropItem(); };
+  layer.onclick = e => {
+    // Over the bar or a hotbar button, which the layer covers, the click is theirs; over something placed (and in sight),
+    // that thing's.
+    const p = { x: e.clientX, y: e.clientY }, over = el => (r => r.width && p.x >= r.left && p.x <= r.right && p.y >= r.top && p.y <= r.bottom)(el.getBoundingClientRect());
+    const button = ['#btnRebuild', '#btnBrokenGiveUp', '#hudItems', '#btnItems'].map(b => $(b)).find(b => b.offsetParent && !b.closest('.hidden') && over(b));
+    if (button) { button.click(); return; }
+    const at = [...items.things].reverse().find(t => t.el.onclick && !hiddenThing(t) && over(t.el));
+    if (at) at.el.onclick(); else ITEM_USE[k](p);
+  };
+  if (k === 'fireball') spawnGhast();
+}
+// Putting the fireball away sends the ghast drifting off to the left.
+function dropItem() {
+  if (items.holding === 'fireball') for (const t of items.things) if (t.kind === 'ghast') ghastLeaves(t);
+  items.holding = null;
+  for (const s of ['.hold', '.ghost', '.hold-tip']) $(s)?.remove();
+}
+
+function placeThing(kind, p, html) {
+  const el = document.body.appendChild(Object.assign(document.createElement('div'), { className: 'thing ' + kind, innerHTML: html }));
+  Object.assign(el.style, { left: p.x + 'px', top: p.y + 'px' });
+  el.addEventListener('pointerdown', e => e.preventDefault());   // no text selection from clicking it again and again
+  const t = { el, kind, p, gone: false };
+  items.things.add(t);
+  anchorThing(t);
+  return t;
+}
+function removeThing(t) { t.gone = true; t.el.remove(); items.things.delete(t); clearTimeout(t.timer); cancelAnimationFrame(t.raf); }
+// A thing moved to p over ms (knocked back, or drifting off), then removed if it is off the screen.
+function moveThing(t, p, ms) {
+  t.p = p;
+  anchorThing(t);
+  t.el.style.transition = `left ${ms}ms ease-out, top ${ms}ms ease-out`;
+  Object.assign(t.el.style, { left: p.x + 'px', top: p.y + 'px' });
+  const move = t.move = (t.move ?? 0) + 1;
+  setTimeout(() => { if (t.move === move) t.el.style.transition = ''; }, ms);   // so scrolling moves it at once
+  if (p.x < -60 || p.x > innerWidth + 60) setTimeout(() => removeThing(t), ms);
+}
+// A placed block sits on what it was placed on: on the setup screen the page, as it scrolls; over the article the
+// article, as it scrolls in its frame (which reports its scroll, items.frameScroll), out of sight once scrolled out of
+// the frame; elsewhere the screen. Creatures and fireballs move about the screen.
+const ANCHORED = /^(tnt|crystal|bed|anchor)\b/;
+function anchorThing(t) {
+  t.anchor = null;
+  if (!ANCHORED.test(t.kind)) return;
+  if (!inGame()) { t.anchor = { on: 'page', x: t.p.x + scrollX, y: t.p.y + scrollY }; return; }
+  const r = $('#frame').getBoundingClientRect();
+  if (t.p.x >= r.left && t.p.x <= r.right && t.p.y >= r.top && t.p.y <= r.bottom)
+    t.anchor = { on: 'frame', x: t.p.x - r.left + items.frameScroll.x, y: t.p.y - r.top + items.frameScroll.y };
+}
+function positionThings() {
+  const r = inGame() && $('#frame').getBoundingClientRect();
+  for (const t of items.things) {
+    const a = t.anchor;
+    if (!a) continue;
+    t.p = a.on === 'page' ? { x: a.x - scrollX, y: a.y - scrollY } : { x: r.left + a.x - items.frameScroll.x, y: r.top + a.y - items.frameScroll.y };
+    Object.assign(t.el.style, { left: t.p.x + 'px', top: t.p.y + 'px',
+      visibility: a.on === 'frame' && (t.p.y < r.top || t.p.y > r.bottom || t.p.x < r.left || t.p.x > r.right) ? 'hidden' : '' });
+  }
+}
+const hiddenThing = t => t.el.style.visibility === 'hidden';   // scrolled out of the article
+let thingsPlaced = 0;
+addEventListener('scroll', () => { thingsPlaced ||= requestAnimationFrame(() => { thingsPlaced = 0; positionThings(); }); }, { passive: true });
+// While an item is in hand or the page is in pieces, the article doesn't get the wheel itself, so it is passed on.
+addEventListener('wheel', e => {
+  if (!inGame() || !(items.holding || items.broken)) return;
+  const r = $('#frame').getBoundingClientRect(), k = e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? r.height : 1;
+  if (e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom)
+    $('#frame').contentWindow?.postMessage({ mwr: 'scrollBy', x: e.deltaX * k, y: e.deltaY * k }, '*');
+}, { passive: true });
+function itemSay(p, text) {
+  const b = document.body.appendChild(Object.assign(document.createElement('div'), { className: 'item-say', textContent: text }));
+  Object.assign(b.style, { left: p.x + 'px', top: p.y - 50 + 'px' });
+  setTimeout(() => b.remove(), 1600);
+}
+// A thing gone in a puff, as a mob dies, or a block breaks, in its own colours.
+function poofThing(t, colours) {
+  removeThing(t); play('poof');
+  if (!calm()) { scatter(t.p, 14, colours, 220); if (!fx.raf) { fx.last = performance.now(); fx.raf = requestAnimationFrame(fxFrame); } }
+}
+function lightTnt(t, ms) {
+  if (t.lit) return;
+  t.lit = true; t.el.classList.add('lit'); play('fuse', ms / 1000);
+  t.timer = setTimeout(() => { removeThing(t); blast(t.p, 1.2); }, ms);
+}
+function spawnGhast() {
+  const there = [...items.things].find(t => t.kind === 'ghast' && t.p.x > -60);   // not one already floating off
+  if (there) { there.leaving = false; clearTimeout(there.timer); there.el.classList.toggle('right', there.p.x < innerWidth / 2); return there; }
+  const left = items.pointer.x > innerWidth / 2, at = { x: left ? 90 : innerWidth - 90, y: Math.max(180, innerHeight * .3) };
+  const g = placeThing('ghast', { x: left ? -80 : innerWidth + 80, y: at.y }, itemPic('Ghast'));
+  g.p = at;   // where it fires from, while it floats in
+  g.el.classList.toggle('right', left);   // facing the page it fires at (the picture faces left)
+  requestAnimationFrame(() => moveThing(g, at, 600));
+  play('ghast');
+  return g;
+}
+// It waits while a fireball is in flight (one sent back has to find it there) and 1.5 s after its last shot, then floats
+// off at 160 px a second; taking a fireball in hand again keeps it.
+function ghastLeaves(g) {
+  clearTimeout(g.timer);
+  g.leaving = true;
+  const go = () => {
+    if (!g.leaving || g.gone) return;
+    if ([...items.things].some(t => t.kind === 'fireball') || performance.now() - (g.shot ?? 0) < 1500) { g.timer = setTimeout(go, 200); return; }
+    g.el.classList.remove('right');   // the way it goes
+    moveThing(g, { x: -160, y: g.p.y - 40 }, Math.max(600, (g.p.x + 160) / .16));
+  };
+  go();
+}
+const ITEM_USE = {
+  tnt(p) {
+    play('place');
+    const t = placeThing('tnt drop', p, itemPic('TNT'));
+    t.el.onclick = () => lightTnt(t, 4000);
+  },
+  crystal(p) {
+    play('hum');
+    const t = placeThing('crystal', p, itemFile('crystal', 'End Crystal'));
+    t.el.onclick = () => { removeThing(t); blast(t.p, 1.6); };
+  },
+  // The ghast fires from its side of the screen at 900 px a second (a new ghast comes if the last one died). A fireball
+  // hit in flight goes back at 1200 px a second and blows up on the ghast.
+  fireball(p) {
+    const g = spawnGhast();   // the one here, not one already leaving
+    play('ghast'); setTimeout(() => play('whoosh'), 150);
+    g.shot = performance.now();
+    const from = { x: g.p.x + (g.p.x > innerWidth / 2 ? -40 : 40), y: g.p.y + 20 }, f = placeThing('fireball', from, itemPic('Fire Charge')), t0 = performance.now();
+    const dur = Math.max(150, Math.hypot(p.x - from.x, p.y - from.y) / .9);
+    let back = null;
+    f.el.onclick = () => {
+      if (back || g.gone) return;
+      back = { from: { ...f.p }, at: performance.now(), dur: Math.max(150, Math.hypot(g.p.x - f.p.x, g.p.y - f.p.y) / 1.2) };
+      play('bonk'); itemSay(f.p, 'Return to sender!');
+    };
+    const step = t => {
+      if (f.gone) return;
+      const [a, b, k] = back ? [back.from, g.p, Math.min(1, (t - back.at) / back.dur)] : [from, p, Math.min(1, (t - t0) / dur)];
+      f.p = { x: a.x + (b.x - a.x) * k, y: a.y + (b.y - a.y) * k };
+      Object.assign(f.el.style, { left: f.p.x + 'px', top: f.p.y + 'px' });
+      if (!calm()) fx.parts.push({ x: f.p.x + rnd(-6, 6), y: f.p.y + rnd(-6, 6), vx: rnd(-30, 30), vy: rnd(-30, 30), g: -60, size: rnd(4, 8) | 0,
+        color: ['#ffb02e', '#ff6a00', '#ffe28a'][Math.floor(rnd(0, 3))], born: t, life: 350 });
+      if (!fx.raf) { fx.last = t; fx.raf = requestAnimationFrame(fxFrame); }
+      if (k < 1) { f.raf = requestAnimationFrame(step); return; }
+      removeThing(f);
+      if (back) { advEarn({ returnSender: true }); blast(g.p, 1); }
+      else blast(p, 1);
+    };
+    f.raf = requestAnimationFrame(step);
+  },
+  // It walks at the pointer; caught, it hisses and swells for 1.5 s unless the pointer gets away, then blows. A hit
+  // knocks it back and stops the fuse.
+  creeper(p) {
+    const c = placeThing('creeper', { x: p.x > innerWidth / 2 ? -40 : innerWidth + 40, y: innerHeight - 120 }, itemPic('Creeper'));
+    let fuse = 0, last = performance.now();
+    c.knock = (from, by) => {
+      const d = Math.hypot(c.p.x - from.x, c.p.y - from.y) || 1;
+      c.p = { x: c.p.x + (c.p.x - from.x) / d * by, y: c.p.y + (c.p.y - from.y) / d * by };
+      fuse = 0;
+    };
+    c.el.onclick = () => {
+      if (fuse > 0) { advEarn({ shoo: true }); advPump(); }
+      c.knock(items.pointer, 220); play('bonk');
+    };
+    const step = t => {
+      if (c.gone) return;
+      const dt = Math.min(.05, (t - last) / 1000), dx = items.pointer.x - c.p.x, dy = items.pointer.y - c.p.y, d = Math.hypot(dx, dy) || 1;
+      last = t;
+      if (d < 70 || (fuse > 0 && d < 150)) { if (fuse === 0) play('fuse', 1.5); fuse += dt; }
+      else { fuse = Math.max(0, fuse - dt * 2); c.p = { x: c.p.x + dx / d * 130 * dt, y: c.p.y + dy / d * 130 * dt }; }
+      const k = fuse / 1.5;
+      if (Math.abs(dx) > 4 && fuse === 0) c.el.classList.toggle('right', dx > 0);   // the picture faces left
+      Object.assign(c.el.style, { left: c.p.x + 'px', top: c.p.y + 'px', scale: calm() ? '' : String(1 + .3 * k * k),
+        filter: !calm() && k > 0 && Math.sin(t / (130 - 90 * k)) > 0 ? `brightness(${1 + 2 * k})` : '' });
+      if (fuse >= 1.5) { removeThing(c); blast(c.p, 1.1); return; }
+      c.raf = requestAnimationFrame(step);
+    };
+    c.raf = requestAnimationFrame(step);
+  },
+  bed(p) {
+    play('place');
+    const t = placeThing('bed', p, itemPic('Bed'));
+    t.el.onclick = () => { itemSay(t.p, 'You can’t sleep here'); removeThing(t); advEarn({ intentional: true }); blast(t.p, 1.3); };
+  },
+  // Its picture shows its charge, 0 to 4; full, the next click sets your spawn, which outside the Nether is a blast.
+  anchor(p) {
+    play('place');
+    const t = placeThing('anchor', p, itemFile('anchor0', 'Respawn Anchor'));
+    let charge = 0;
+    t.el.onclick = () => {
+      if (charge === 4) { itemSay(t.p, 'Respawn point set… in the Overworld'); removeThing(t); advEarn({ intentional: true }); blast(t.p, 1.4); return; }
+      play('charge', ++charge);
+      const img = t.el.querySelector('img');
+      if (img && itemFiles.has('anchor' + charge)) img.src = itemFiles.get('anchor' + charge);
+    };
+  },
+};
+
+// A blast at p, of power (TNT 1.2, a crystal 1.6): Minecraft's explosion and sound, a flash and a shake, the page broken
+// around it (the article too), and what is near, as in Minecraft: TNT is lit, sooner the nearer the blast, and lit TNT is
+// knocked away; a crystal goes off at once; a bed breaks; a creeper or ghast dies, or further off is knocked back; a
+// respawn anchor stands, being blast proof.
+const BLAST_REACH = 220;
+function blast(p, power) {
+  play('explode', power > 1.3);
+  effect('blast', { ...p, power });
+  if (!calm()) {
+    const f = document.body.appendChild(Object.assign(document.createElement('div'), { className: 'blast-flash' }));
+    setTimeout(() => f.remove(), 500);
+    // The shake moves the page's own content, not the body: a moved element holds the fixed ones in it to itself, so
+    // the toys, the buttons, the bar and the explosion would jump to the top of a scrolled page while it shook.
+    for (const el of itemsRoot().children) if (getComputedStyle(el).position !== 'fixed') bump(el, 'blast-shake');
+  }
+  const reach = BLAST_REACH * power;
+  for (const t of [...items.things]) {
+    const d = Math.hypot(t.p.x - p.x, t.p.y - p.y), k = 1 - d / reach;
+    if (k <= 0 || t.gone || hiddenThing(t)) continue;
+    const away = (by, ms) => { const n = d || 1; moveThing(t, { x: t.p.x + (t.p.x - p.x) / n * by * k, y: t.p.y + (t.p.y - p.y) / n * by * k }, ms); };
+    if (t.kind.startsWith('tnt')) { if (t.lit) away(120, 300); else lightTnt(t, 300 + 1500 * (1 - k)); }
+    else if (t.kind === 'crystal') { removeThing(t); items.timers.add(setTimeout(() => blast(t.p, 1.6), 50)); }
+    else if (t.kind === 'bed') poofThing(t, ['#c0392b', '#e8e8e8', '#8b5a2b']);
+    else if (t.kind === 'creeper') { if (k > .4) poofThing(t, ['#4caf50', '#2e7d32', '#1b1b1b']); else t.knock(p, 200 * k + 60); }
+    else if (t.kind === 'ghast') { if (k > .2) poofThing(t, ['#f5f5f5', '#d0d0d0', '#9e9e9e']); else away(150, 400); }
+  }
+  // The page around it, and the article (not while Rebuild puts them back); a blast counts, and three within 3 s are a
+  // chain reaction.
+  const now = performance.now(), still = calm(), root = itemsRoot(), mends = now < items.mending;
+  if (!mends) breaker.breakApart(root, p.x, p.y, power, keepWhole, still);
+  if (inGame() && !mends) {
+    const r = $('#frame').getBoundingClientRect();
+    $('#frame').contentWindow?.postMessage({ mwr: 'boom', x: p.x - r.left, y: p.y - r.top, power, still }, '*');
+  }
+  items.recent = [...items.recent.filter(r => now - r < 3000), now];
+  adv.blasts++;
+  advEarn({ kaboom: true, chain: items.recent.length >= 3 });
+  advPump();
+  if (!items.broken && !mends) {
+    items.broken = true;
+    document.documentElement.classList.add('broken');
+    $('#rebuildBar').classList.remove('hidden');
+    $('#btnBrokenGiveUp').classList.toggle('hidden', !inGame() || !game.active);
+  }
+}
+// Rebuild: every piece flies back, the article's too.
+function rebuild() {
+  if (!items.broken) return;
+  $('#rebuildBar').classList.add('hidden');
+  items.broken = false;
+  items.mending = performance.now() + 1000;
+  play('rebuild');
+  breaker.putBack(itemsRoot());
+  setTimeout(() => { if (!items.broken) document.documentElement.classList.remove('broken'); }, 1000);   // once the pieces are in
+  if (inGame()) { $('#frame').contentWindow?.postMessage({ mwr: 'rebuild' }, '*'); if (game.active) game.rebuilt = true; }
+  advEarn({ rebuilder: true }); advPump();
+}
+// Everything on the page gone, and any pieces back at once: when a game ends or starts, or the setup screen comes back.
+function itemsReset() {
+  closeHotbar(); dropItem();
+  for (const t of [...items.things]) removeThing(t);
+  for (const id of items.timers) clearTimeout(id);
+  items.timers.clear();
+  if (!items.broken) return;
+  breaker.putBack($('#game'), true); breaker.putBack($('#setup'), true);
+  $('#frame').contentWindow?.postMessage({ mwr: 'rebuild', atOnce: true }, '*');
+  document.documentElement.classList.remove('broken');
+  $('#rebuildBar').classList.add('hidden');
+  items.broken = false;
 }
 
 // ---------------------------------------------------------------- Themes
@@ -2692,6 +3415,25 @@ function renderArticle(page, fragment, token, blocked = [], seen = []) {
     }, true);
     document.addEventListener('submit', e => e.preventDefault(), true);
     document.addEventListener('keydown', e => parent.postMessage({ mwr: 'key', key: e.key }, '*'));
+    // Blowing the article up (see Items): the page's own pageBreaker, run on the article's pieces. The pointer is
+    // reported, at most every 40 ms, for the creeper that follows it, and the scroll, a frame at a time, for the blocks
+    // placed on the article; the page passes the wheel on (scrollBy) while the article can't get it.
+    const breaker = (${pageBreaker})();
+    addEventListener('message', e => {
+      if (e.source !== parent) return;
+      if (e.data?.mwr === 'arm') breaker.prepare(document.body, '');
+      if (e.data?.mwr === 'boom') breaker.breakApart(document.body, e.data.x, e.data.y, e.data.power, '', e.data.still);
+      if (e.data?.mwr === 'rebuild') breaker.putBack(document.body, e.data.atOnce);
+      if (e.data?.mwr === 'scrollBy') scrollBy(e.data.x, e.data.y);
+    });
+    let scrolled = 0;
+    const tellScroll = () => parent.postMessage({ mwr: 'scroll', x: scrollX, y: scrollY }, '*');
+    addEventListener('scroll', () => { scrolled ||= requestAnimationFrame(() => { scrolled = 0; tellScroll(); }); }, { passive: true });
+    tellScroll();
+    let moved = 0;
+    document.addEventListener('pointermove', e => {
+      if (e.timeStamp - moved > 40) { moved = e.timeStamp; parent.postMessage({ mwr: 'move', x: e.clientX, y: e.clientY }, '*'); }
+    }, { passive: true });
     addEventListener('message', e => {
       if (e.source !== parent || e.data?.mwr !== 'theme') return;
       for (const c of WGL.dark) document.body.classList.toggle(c, e.data.dark);
@@ -3125,6 +3867,10 @@ window.addEventListener('message', e => {
   if (e.data.mwr === 'dead' && game.active && !game.loading) { play('dead'); effect('puff', fromFrame(e.data)); }
   if (e.data.mwr === 'ready') { syncFrameTheme(); frameReady(e.data.token, e.data.live); }
   if (e.data.mwr === 'key' && e.data.key === 'Escape' && modalDismissable) closeModal();
+  if (e.data.mwr === 'key' && e.data.key === 'Escape') { closeHotbar(); dropItem(); }
+  if (e.data.mwr === 'nav' || e.data.mwr === 'dead') closeHotbar();   // a click in the article
+  if (e.data.mwr === 'move') { const p = fromFrame(e.data); if (p) items.pointer = p; }   // for the creeper
+  if (e.data.mwr === 'scroll' && Number.isFinite(e.data.x) && Number.isFinite(e.data.y)) { items.frameScroll = { x: e.data.x, y: e.data.y }; positionThings(); }
 });
 
 // No Back takes Back away, and so does Exact clicks, since it goes back to a page already visited.
@@ -3571,6 +4317,7 @@ function finish(won, lost = null) {
   hist.unshift(rec);
   store.set('mwr.history', hist.slice(0, 50));
   if (game.daily) saveDaily(rec, game.onDay);
+  itemsReset();
 
   const route = routeText(rec);
   // Your path, each page marked with what it was to the game (back, a checkpoint, a find, the target, stranded) and, once
@@ -3663,6 +4410,7 @@ function shareText(rec, link, steps = []) {
 
 function toSetup() {
   game.active = false;
+  itemsReset();
   removeEventListener('beforeunload', guardLeaving);
   clearInterval(game.timer);
   parseCache.clear();
@@ -4294,6 +5042,12 @@ function closeModal() {
 }
 $('#modalBg').addEventListener('click', e => { if (e.target === $('#modalBg') && modalDismissable) closeModal(); });
 document.addEventListener('keydown', e => { if (e.key === 'Escape' && modalDismissable) closeModal(); });
+document.addEventListener('keydown', e => { if (e.key === 'Escape') { closeHotbar(); dropItem(); } });
+(window.requestIdleCallback ?? setTimeout)(() => itemPictures());
+$('#btnItems').onclick = $('#hudItems').onclick = e => { e.stopPropagation(); openHotbar(e.currentTarget); };
+document.addEventListener('click', e => { if (!e.target.closest('.hotbar')) closeHotbar(); });   // a click anywhere else
+$('#btnRebuild').onclick = rebuild;
+$('#btnBrokenGiveUp').onclick = () => { if (game.active && !game.loading) { $('#rebuildBar').classList.add('hidden'); finish(false); } };
 
 // ---------------------------------------------------------------- Wiring
 $('#games').innerHTML = Object.entries(GAMES).map(([k, g]) => `<label><input type="radio" name="game" value="${k}"${k === 'race' ? ' checked' : ''}>
@@ -4406,13 +5160,13 @@ $('#themeSelect').innerHTML = THEMES.map(t => `<option value="${esc(t)}">${esc(T
 $('#themeSelect').value = document.documentElement.dataset.theme || 'auto';
 $('#themeSelect').onchange = e => setTheme(e.target.value);
 matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => { syncFrameTheme(); bgTheme(); });
-// The Background box (see the Background section). Any change on the setup screen outside it and Reduce motion turns Roll
-// by itself off, and it stays off (saved) until it is ticked again.
+// The Background box (see the Background section). Any change on the setup screen outside it, Reduce motion and the items
+// turns Roll by itself off, and it stays off (saved) until it is ticked again.
 bgControls();
 $('#bgStyle').onchange = e => bgSetting('style', e.target.value);
 for (const [k, sel] of Object.entries(BG_BOXES)) $(sel).onchange = e => bgSetting(k, e.target.checked);
 for (const type of ['click', 'change', 'input']) $('#setup').addEventListener(type, e => {
-  if (!bgSet.roll || e.target.closest('#bgOpts, #btnBgView, #motionLabel') || (type === 'click' && !e.target.closest('button, a, input, select'))) return;
+  if (!bgSet.roll || e.target.closest('#bgOpts, #btnBgView, #motionLabel, #btnItems') || (type === 'click' && !e.target.closest('button, a, input, select'))) return;
   bgSetting('roll', false);
 }, true);
 document.addEventListener('click', e => { if (!e.target.closest('#bgOpts, #btnBgView')) $('#bgOpts').open = false; });

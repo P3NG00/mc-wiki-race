@@ -1199,6 +1199,143 @@ for (let i = 0; i < 8; i++) {
 }
 check('Random game sets the settings at random and fills the cards they use', randoms.every(Boolean) && new Set(randoms).size > 4, randoms.join(' ; '));
 
+// Items: one taken in hand gets the page and the article ready to break, and stays in hand, every click placing one,
+// until Escape. TNT is placed unlit and lit by a click; a crystal hit blows up the page around it, the article too,
+// leaving the rest working and the game going on, with Rebuild (and Give up) at the bottom; a blast lights TNT near it,
+// sooner the nearer, sets off a crystal, breaks a bed and leaves a respawn anchor standing. Rebuild puts every piece back,
+// Give up gives up. On the setup screen the anchor's four charges and its fifth click; with motion reduced the pieces
+// only fade. The ghast leaves when the fireball is put away. The blasts and rebuilds earn the item advancements.
+await ev("['mwr.history', 'mwr.dailies', 'mwr.advancements'].forEach(k => localStorage.removeItem(k)); adv = advEmpty()");
+await open('#start=Diamond&target=Crafting&rules=nonav');
+await play();
+const frameBroken = async () => JSON.parse(await ev("JSON.stringify(document.querySelectorAll('[data-broke-style]').length)", await frameCtx()));
+const viewer = "$('#frame').getBoundingClientRect()";
+check('the hotbar buttons show TNT\'s picture, or say TNT without it, and the files wait for the hotbar', await until("!$('#hudItems span').classList.contains('hidden') || !$('#hudItems img').classList.contains('hidden')", 5000)
+  && await ev("$('#hudItems span').textContent === 'TNT' && !filesAsked"));
+await ev("holdItem('tnt')");
+check('an item in hand follows the pointer over a layer that takes the clicks, the article ready to break', await ev("items.holding === 'tnt' && !!$('.hold') && !!$('.ghost') && !!$('.hold-tip')")
+  && JSON.parse(await ev("JSON.stringify(document.querySelectorAll('.brk-word').length)", await frameCtx())) > 0);
+await ev(`(r => { $('.hold').onclick({ clientX: r.left + 60, clientY: r.top + 60 }); $('.hold').onclick({ clientX: r.left + 160, clientY: r.top + 60 }); $('.hold').onclick({ clientX: r.right - 60, clientY: r.bottom - 60 }); })(${viewer})`);
+check('each click places one, unlit, and it stays in hand', await ev("items.holding === 'tnt' && document.querySelectorAll('.thing.tnt').length === 3 && !document.querySelector('.thing.tnt.lit')"));
+await ev("document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))");
+check('Escape puts it away', await ev("!items.holding && !$('.hold')"));
+await ev(`(r => { holdItem('bed'); $('.hold').onclick({ clientX: r.left + 110, clientY: r.top + 150 }); holdItem('anchor'); $('.hold').onclick({ clientX: r.left + 60, clientY: r.top + 170 });
+  holdItem('crystal'); $('.hold').onclick({ clientX: r.left + 110, clientY: r.top + 110 }); dropItem(); })(${viewer})`);
+const clockAt = await ev('now()');
+await ev("$('.thing.crystal').click()");
+check('hitting the crystal blows up the page around it, the article too, and the game goes on', await ev(`game.active && !$('#btnGiveUp').disabled && document.querySelectorAll('#game [data-broke-style]').length > 0 && !$('.thing.crystal')`)
+  && await frameBroken() > 0 && await ev("!$('#rebuildBar').classList.contains('hidden') && !$('#btnBrokenGiveUp').classList.contains('hidden')"));
+check('the blast lights the TNT near it, sooner the nearer, leaves the far one, breaks the bed and leaves the anchor standing', await ev(`(t => t.length === 3 && t.filter(x => x.lit).length === 2)([...items.things].filter(t => t.kind.startsWith('tnt')))
+  && !$('.thing.bed') && !!$('.thing.anchor') && !!adv.got.kaboom`));
+check('the clock runs on', await until(`now() > ${clockAt} + 500`, 3000));
+await until("[...items.things].filter(t => t.kind.startsWith('tnt')).length === 1", 4000);
+check('the lit TNT goes off, a chain reaction', await ev("!!adv.got.chain && adv.blasts === 3"), await ev('adv.blasts'));
+await ev("$('.thing.tnt').click()");
+check('a click lights a placed TNT', await ev("!!document.querySelector('.thing.tnt.lit')"));
+await until("!$('.thing.tnt')", 6000);
+await ev("$('#btnRebuild').click()");
+// The article's are put back a moment after the page's, so both are waited for.
+const frameWhole = async () => { for (let t = Date.now(); Date.now() - t < 3000; await sleep(200)) if (await frameBroken() === 0) return true; return false; };
+check('Rebuild puts every piece back, the article\'s too', await until("!items.broken && !document.querySelector('#game [data-broke-style]')", 4000)
+  && await frameWhole() && await ev("!!adv.got.rebuilder && game.rebuilt && $('#rebuildBar').classList.contains('hidden')"));
+await ev("navigate('Crafting', null)");
+check('and the game goes on to a win', await until('!game.active', 8000) && await ev("savedGames()[0].won && !!adv.got.pieces"), await ev('JSON.stringify(Object.keys(adv.got))'));
+await ev('closeModal(); toSetup()');
+await open('#start=Diamond&target=Crafting&rules=nonav');
+await play();
+await ev(`(r => { holdItem('bed'); $('.hold').onclick({ clientX: r.left + 100, clientY: r.top + 100 }); dropItem(); $('.thing.bed').click(); })(${viewer})`);
+check('a bed slept in blows at once', await ev("items.broken && !!adv.got.intentional"));
+await ev("$('#btnBrokenGiveUp').click()");
+check('Give up gives up, the page whole again under the result', await until('!game.active', 3000)
+  && await ev("(r => !r.won && !Object.keys(LOSSES).some(k => r[k]))(savedGames()[0]) && !items.broken && !document.querySelector('#game [data-broke-style]') && $('.result-head h2').textContent === 'Game over'"));
+await ev('closeModal(); toSetup()');
+// The setup screen: the respawn anchor's four charges, then its blast; Rebuild.
+const pageHeight = await ev('document.documentElement.scrollHeight');
+await ev("holdItem('anchor'); $('.hold').onclick({ clientX: 400, clientY: 300 }); dropItem(); for (let i = 0; i < 4; i++) $('.thing.anchor').click()");
+check('a respawn anchor takes four charges', await ev("!!$('.thing.anchor') && !items.broken"));
+await ev("$('.thing.anchor').click()");
+check('and the fifth click blows up the setup screen around it, with no Give up', await ev("items.broken && document.querySelectorAll('#setup [data-broke-style]').length > 0 && $('#btnBrokenGiveUp').classList.contains('hidden')")
+  && await ev("!!document.querySelector('#setup .site-foot') && !document.querySelector('#setup .site-foot[data-broke-style]')"));
+await sleep(2500);
+check('the pieces come to rest on what is left of the page below them, not the bottom of the window', await ev(`(els => els.length > 0 && els.some(el => el.getBoundingClientRect().bottom < innerHeight - 20)
+  && els.every(el => el.getBoundingClientRect().bottom <= document.documentElement.scrollHeight - scrollY + 2))([...document.querySelectorAll('#setup .brk-thrown')])`));
+check('and the page grows neither longer nor wider for them', await ev(`document.documentElement.scrollHeight <= ${pageHeight} + 1 && (scrollTo(600, scrollY), scrollX === 0)`),
+  await ev(`JSON.stringify([document.documentElement.scrollHeight, ${pageHeight}, scrollX])`));
+// Scrolled down, a blast there breaks the page there too.
+await ev("scrollTo(0, document.documentElement.scrollHeight)");
+await ev("holdItem('crystal'); $('.hold').onclick({ clientX: 300, clientY: innerHeight - 200 }); dropItem(); $('.thing.crystal').click()");
+check('scrolled down, a blast breaks the page there too', await ev("[...document.querySelectorAll('#setup .brk-thrown')].some(el => el.closest('.site-foot, .history'))"));
+check('and its shake leaves what is fixed on the screen where it is', await ev("getComputedStyle(document.body).translate === 'none' && !document.body.classList.contains('blast-shake') && Math.abs($('#btnItems').getBoundingClientRect().bottom - (innerHeight - 64)) < 2"),
+  await ev("JSON.stringify([getComputedStyle(document.body).translate, $('#btnItems').getBoundingClientRect().bottom, innerHeight])"));
+await ev('scrollTo(0, 0)');
+await ev("$('#btnRebuild').click()");
+check('Rebuild puts every piece back', await until("!items.broken && !document.querySelector('#setup [data-broke-style], #setup .brk-word, #setup .brk-thrown')", 4000));
+await ev("setCalm(true); holdItem('bed'); $('.hold').onclick({ clientX: 400, clientY: 300 }); dropItem(); $('.thing.bed').click()");
+check('with motion reduced the pieces fade where they are', await ev("(els => els.some(el => el.style.opacity === '0.12') && els.every(el => !el.style.transform))([...document.querySelectorAll('#setup [data-broke-style]')])"));
+await ev("$('#btnRebuild').click(); setCalm(false)");
+await until("!document.querySelector('#setup [data-broke-style]')", 4000);
+await ev("holdItem('fireball')");
+check('the fireball brings a ghast', await ev("[...items.things].some(t => t.kind === 'ghast')"));
+await ev("$('.hold').onclick({ clientX: 300, clientY: 500 }); dropItem()");
+await sleep(600);
+check('put away, the ghast waits while its fireball flies and a moment after', await ev("(g => !!g && g.leaving && g.p.x > 0)([...items.things].find(t => t.kind === 'ghast'))"));
+check('then floats off the page', await until("![...items.things].some(t => t.kind === 'ghast')", 15000));
+
+// A blast while Rebuild puts the pieces back breaks nothing and marks nothing broken; while an item is in hand, a click
+// on the bar is the bar's; a fireball taken up again comes from the ghast that is there, not one floating off.
+await ev("holdItem('bed'); $('.hold').onclick({ clientX: 400, clientY: 300 }); dropItem(); $('.thing.bed').click()");
+await ev("holdItem('tnt'); (r => $('.hold').onclick({ clientX: r.left + 5, clientY: r.top + 5 }))($('#btnRebuild').getBoundingClientRect())");
+check('while an item is in hand, a click on Rebuild is Rebuild\'s', await ev("!items.broken && items.holding === 'tnt' && !$('.thing.tnt')"));
+await ev("dropItem(); blast({ x: 600, y: 300 }, 1.2)");
+check('a blast while the pieces fly back breaks nothing and marks nothing broken', await ev("!items.broken && $('#rebuildBar').classList.contains('hidden')")
+  && await until("!document.documentElement.classList.contains('broken')", 2000));
+await until("!document.querySelector('#setup [data-broke-style]')", 3000);
+await ev("holdItem('fireball')");
+await ev("dropItem(); [...items.things].find(t => t.kind === 'ghast').shot = 0");
+await sleep(400);
+await ev("holdItem('fireball'); $('.hold').onclick({ clientX: 600, clientY: 600 })");
+check('a fireball taken up again comes from the ghast that is there', await ev("(f => !!f && f.p.x > 0 && f.p.x < innerWidth)([...items.things].find(t => t.kind === 'fireball'))"),
+  await ev("JSON.stringify([...items.things].map(t => [t.kind, Math.round(t.p.x)]))"));
+await ev('itemsReset()');
+await until("!document.querySelector('#setup [data-broke-style]')", 3000);
+
+// Placed blocks sit on what they were placed on: the setup page as it scrolls, the article as it scrolls in its frame
+// (out of sight once out of it), and go with the article on a click; a broken page takes no clicks but the hotbar's.
+await ev("scrollTo(0, 0); holdItem('tnt'); $('.hold').onclick({ clientX: 300, clientY: 500 }); dropItem()");
+await ev("scrollTo(0, 200)");
+check('a block on the setup screen scrolls with the page', await until("(t => t.p.y === 300 && t.el.style.top === '300px')([...items.things][0])", 2000), await ev("[...items.things][0].p.y"));
+await ev('scrollTo(0, 0); itemsReset()');
+await open('#start=Diamond&target=Crafting&rules=nonav');
+await play();
+await ev(`(r => { holdItem('tnt'); $('.hold').onclick({ clientX: r.left + 100, clientY: r.top + 100 }); dropItem(); })($('#frame').getBoundingClientRect())`);
+const fy = await ev("$('#frame').getBoundingClientRect().top + 100");
+await ev("document.body.style.minHeight = '4000px'; scrollTo(0, 60)", await frameCtx());
+check('a block on the article scrolls with it', await until(`(t => t.p.y === ${fy} - 60 && t.el.style.visibility === '')([...items.things][0])`, 2000), await ev("[...items.things][0].p.y"));
+await ev("scrollTo(0, 400)", await frameCtx());
+check('out of sight once scrolled out of the frame', await until("[...items.things][0].el.style.visibility === 'hidden'", 2000));
+// The wiki's pages scroll through their body (overflow on it, none on <html>): a blast on a scrolled article leaves it
+// where it was, and the wheel, passed on, scrolls it while it is in pieces.
+await ev("document.body.style.overflowY = 'scroll'; scrollTo(0, 300)", await frameCtx());
+await ev(`(r => { holdItem('crystal'); $('.hold').onclick({ clientX: r.left + 200, clientY: r.top + 200 }); dropItem(); $('.thing.crystal').click(); })($('#frame').getBoundingClientRect())`);
+await sleep(300);
+check('a blast on a scrolled article leaves it scrolled where it was, and unable to scroll sideways', await ev("scrollY === 300 && document.scrollingElement.scrollHeight > innerHeight && getComputedStyle(document.body).overflowX === 'hidden'", await frameCtx()),
+  await ev("JSON.stringify([scrollY, document.scrollingElement.scrollHeight, innerHeight])", await frameCtx()));
+await ev("dispatchEvent(new WheelEvent('wheel', { deltaY: 120, clientX: $('#frame').getBoundingClientRect().left + 100, clientY: $('#frame').getBoundingClientRect().top + 100 }))");
+check('and the wheel, passed on, scrolls it while it is in pieces', await ev("new Promise(r => setTimeout(() => r(scrollY === 420), 300))", await frameCtx()), await ev('scrollY', await frameCtx()));
+await ev("$('#btnRebuild').click()");
+await until("!document.documentElement.classList.contains('broken')", 3000);
+check('Rebuild gives the article its own overflow back', await ev("!document.body.style.overflowX", await frameCtx()));
+await ev("document.body.style.overflowY = ''; scrollTo(0, 0)", await frameCtx());
+await ev("scrollTo(0, 0)", await frameCtx());
+await ev("holdItem('crystal'); $('.hold').onclick({ clientX: 30, clientY: 30 }); dropItem(); $('.thing.crystal').click()");
+check('a broken page takes no clicks but on the hotbar\'s button', await ev(`document.documentElement.classList.contains('broken') && getComputedStyle($('#game')).pointerEvents === 'none'
+  && getComputedStyle($('#hudItems')).pointerEvents === 'auto'`));
+await ev("$('#btnRebuild').click()");
+check('and takes them again once rebuilt', await until("!document.documentElement.classList.contains('broken') && getComputedStyle($('#game')).pointerEvents === 'auto'", 3000));
+await ev("navigate('Diamond Pickaxe', null)");
+check('a click to another article takes the blocks on this one with it', await until("game.path.length === 2 && !game.loading") && await ev("![...items.things].some(t => t.kind.startsWith('tnt'))"));
+await ev('finish(false); closeModal(); toSetup()');
+
 // Advancements: a par 3+ pair's first game, won at par from a challenge link, earns the firsts, Par for the Course,
 // Accepted and the speed ones, with toasts; the same pair again earns no skill one, nor does a par 1 pair; landing on
 // Cake and back on the start earn their secrets once the article shows; the panel, its counts and a count's progress;
@@ -1425,7 +1562,7 @@ await ev('closeModal(); toSetup()');
 check('markup titles run nothing anywhere a title shows', peeked === true && frameClean === true && await ev(injected)
   && await ev(`document.querySelector('#history tbody').textContent.includes(${JSON.stringify(payloads[2])})`), JSON.stringify([peeked, frameClean]));
 
-check('only page info, advancements\' pictures and articles are asked for', [...requests.keys()].every(k => ['query prop=pageprops|pageimages|extracts', 'query prop=pageimages', 'parse prop=text|displaytitle|categories'].includes(k)),
+check('only page info, the advancements\' and items\' pictures and articles are asked for', [...requests.keys()].every(k => ['query prop=pageprops|pageimages|extracts', 'query prop=pageimages', 'query prop=imageinfo', 'parse prop=text|displaytitle|categories'].includes(k)),
   JSON.stringify(Object.fromEntries(requests)));
 check('no uncaught errors', jsErrors.length === 0, jsErrors.slice(0, 3).join(' | '));
 console.log(failures ? `${failures} check(s) failed` : 'All checks passed');

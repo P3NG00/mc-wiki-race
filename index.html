@@ -4201,11 +4201,13 @@ function renderArticle(page, fragment, token, blocked = [], seen = []) {
     const SEEN = new Set(${js(seen)});
     const NO_NAV = ${noNav};
     let CALM = ${calm()};   // the page's Reduce motion, sent again when it changes ({mwr:'calm'})
-    // Top links only: the article's first section heading, below which every link is dead (a page with none is all top),
-    // as tools/wikidata/extract.py finds it. The live wiki's table of contents, which the ZIM lacks, has a heading of its
-    // own above the first section. Navboxes are dead too, even on a page with no heading.
-    const FIRST_HEADING = ${lead} && document.querySelector('.mw-parser-output :is(.mw-heading, h2, h3, h4, h5, h6):not(.toc *, #toc *)');
-    const belowTop = a => ${lead} && (!!a.closest('.navbox') || !!FIRST_HEADING && !!(FIRST_HEADING.compareDocumentPosition(a) & Node.DOCUMENT_POSITION_FOLLOWING));
+    // The article's first section heading (none on a page with no sections), as tools/wikidata/extract.py finds it. The
+    // live wiki's table of contents, which the ZIM lacks, has a heading of its own above the first section.
+    const FIRST_SECTION = document.querySelector('.mw-parser-output :is(.mw-heading, h2, h3, h4, h5, h6):not(.toc *, #toc *)');
+    const belowFirstSection = el => !!FIRST_SECTION && !!(FIRST_SECTION.compareDocumentPosition(el) & Node.DOCUMENT_POSITION_FOLLOWING);
+    // Top links only: every link below it is dead (a page with none is all top), and navboxes too, even on a page with no heading.
+    const FIRST_HEADING = ${lead} && FIRST_SECTION;
+    const belowTop = a => ${lead} && (!!a.closest('.navbox') || belowFirstSection(a));
     function classify(a) {
       // Navboxes are hidden too; this keeps them dead whatever the CSS does. An advancement's list of what it asks for
       // (.hlist.searchaux: "Kill one of these 41 monsters", folded behind [show]) is a navbox in all but looks: the same
@@ -4324,22 +4326,29 @@ function renderArticle(page, fragment, token, blocked = [], seen = []) {
     // next child, and a child that is an .animated-subframe also moves on to its own next child. Without it every
     // crafting slot stays on the frame the parse output marked, often a different one per slot.
     const animated = [...document.querySelectorAll('#mw-content-text .animated')];
-    // Each animation is kept as tall as its tallest frame, so the text below doesn't jump.
-    for (const el of animated) el.classList.add('animated-visible');
-    const minHeights = animated.map(el => {
-      const hs = [...el.querySelectorAll(':scope > :not(.animated-subframe), :scope > .animated-subframe > *')].map(f => f.offsetHeight);
-      return hs.length && Math.min(...hs) !== Math.max(...hs) ? Math.max(...hs) + 'px' : '';
-    });
-    animated.forEach((el, i) => { el.style.minHeight = minHeights[i]; el.classList.remove('animated-visible'); });
-    // The hidden frames' images are lazy, so each would only start loading when its turn came.
-    const eager = new IntersectionObserver(entries => {
-      for (const e of entries) {
-        if (!e.isIntersecting) continue;
-        for (const img of e.target.querySelectorAll('img')) img.loading = 'eager';
-        eager.unobserve(e.target);
+    // Each animation is kept as tall as its tallest frame, so the text below doesn't jump: measured with all its frames
+    // shown. Those above the first section heading (an infobox's picture) are measured now, before the article shows;
+    // the rest once they come within a screen of the window, since measuring hundreds at once (Crafting's grids) held
+    // the article up by a tenth of a second. Their hidden frames' images, which are lazy and would each only start
+    // loading when its turn came, are made eager then too.
+    const holdHeights = els => {
+      for (const el of els) el.classList.add('animated-visible');
+      const minHeights = els.map(el => {
+        const hs = [...el.querySelectorAll(':scope > :not(.animated-subframe), :scope > .animated-subframe > *')].map(f => f.offsetHeight);
+        return hs.length && Math.min(...hs) !== Math.max(...hs) ? Math.max(...hs) + 'px' : '';
+      });
+      els.forEach((el, i) => { el.style.minHeight = minHeights[i]; el.classList.remove('animated-visible'); });
+    };
+    holdHeights(animated.filter(el => !belowFirstSection(el)));
+    const nearing = new IntersectionObserver(entries => {
+      const near = entries.filter(e => e.isIntersecting).map(e => e.target);
+      for (const el of near) {
+        nearing.unobserve(el);
+        for (const img of el.querySelectorAll('img')) img.loading = 'eager';
       }
-    });
-    for (const el of animated) eager.observe(el);
+      holdHeights(near.filter(belowFirstSection));
+    }, { root: document, rootMargin: '100% 0px' });   // the frame's own window: a cross-origin frame's margin is ignored otherwise
+    for (const el of animated) nearing.observe(el);
     const advance = el => {
       const cur = el.querySelector(':scope > .animated-active');
       cur?.classList.remove('animated-active');

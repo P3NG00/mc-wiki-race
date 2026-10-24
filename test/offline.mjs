@@ -1282,8 +1282,20 @@ for (let round = 0; round < 2; round++) for (let y = 0; y < pageHeight; y += 400
 await sleep(3000);
 check('blasts all down the page and on its pieces leave it no longer', await ev(`document.documentElement.scrollHeight <= ${pageHeight} + 2 && document.querySelectorAll('#setup .brk-thrown').length > 100`),
   await ev(`JSON.stringify([document.documentElement.scrollHeight, ${pageHeight}, document.querySelectorAll('#setup .brk-thrown').length])`));
-await ev("scrollTo(0, 0); $('#btnRebuild').click()");
+// Dragged across and clicked fast, in pieces and with an item in hand, the page selects nothing; put back, it does.
+const drag = (x, y) => send('input.performActions', { context: ctx, actions: [{ type: 'pointer', id: 'mouse', parameters: { pointerType: 'mouse' }, actions: [
+  { type: 'pointerMove', x: 5, y: 150 }, { type: 'pointerDown', button: 0 }, { type: 'pointerMove', x, y, duration: 150 }, { type: 'pointerUp', button: 0 },
+  ...[0, 1, 2].flatMap(() => [{ type: 'pointerDown', button: 0 }, { type: 'pointerUp', button: 0 }])] }] });
+const selected = "getSelection().toString().length";
+await ev('scrollTo(0, 0)'); await drag(700, 600);
+check('dragged across and clicked fast, the page in pieces selects nothing', await ev(selected) === 0, await ev(selected));
+await ev("$('#btnRebuild').click()");
 await until("!items.broken && !document.querySelector('#setup [data-broke-style]')", 4000); await sleep(100);
+await ev("holdItem('tnt')"); await drag(700, 600);   // placing a TNT and lighting it, taken away before it goes off
+check('nor, put back, with an item in hand', await ev(selected) === 0, await ev(selected));
+await ev("dropItem(); for (const t of [...items.things]) removeThing(t)"); await drag(700, 600);
+check('and put down, it selects again', await ev(selected) > 0);
+await ev('getSelection().removeAllRanges()');
 await ev("setCalm(true); holdItem('bed'); $('.hold').onclick({ clientX: 400, clientY: 300 }); dropItem(); $('.thing.bed').click()");
 check('with motion reduced the pieces fade where they are', await ev("(els => els.some(el => el.style.opacity === '0.12') && els.every(el => !el.style.transform))([...document.querySelectorAll('#setup [data-broke-style]')])"));
 await ev("$('#btnRebuild').click(); setCalm(false)");

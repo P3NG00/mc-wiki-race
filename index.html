@@ -487,6 +487,9 @@
      bar are outside it): Rebuild, and in a game Give up, at the bottom, out of the way. */
   html.broken :is(#setup, #game) { pointer-events: none; }
   html.broken :is(#btnItems, #hudItems, .overlay) { pointer-events: auto; }
+  /* Nor, then or with an item in hand, can anything on it be selected, however fast it is clicked or dragged on, but in a window. */
+  html.broken body, body:has(> .hold) { user-select: none; -webkit-user-select: none; }
+  html.broken .overlay { user-select: text; -webkit-user-select: text; }
   .rebuild-bar { position: fixed; left: 50%; bottom: 16px; translate: -50% 0; z-index: 9; display: flex; gap: 8px; }
   .rebuild-bar button { box-shadow: var(--shadow); white-space: nowrap; }
   @media (max-width: 720px) {
@@ -2908,6 +2911,7 @@ function pageBreaker() {
   function breakApart(root, bx, by, power, keep, still) {
     const now = performance.now();
     if (now < busy) return 0;   // being put back
+    getSelection().removeAllRanges();   // or what was selected would fly highlighted
     const reach = 220 * power, { pieces, boxes, kept } = prepare(root, keep, { x: bx, y: by, r: reach + 40 }), sx = scrollX, sy = scrollY;
     bx += sx; by += sy;
     // The first blast notes where the page ends, the floor, so pieces resting on it can't make the page longer, and the

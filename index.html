@@ -475,25 +475,39 @@
   #btnNotes { position: fixed; right: 16px; bottom: 112px; z-index: 5; border-radius: 50%; box-shadow: var(--shadow); }
   #btnBgView[hidden] ~ #btnNotes { bottom: 64px; }
   :is(#btnNotes, #hudNotes)[aria-expanded="true"] { outline: 2px solid var(--accent); outline-offset: 1px; }
-  /* The hotbar, as Minecraft's: grey slots with a bevel, each item's name in the purple tooltip on hover. */
-  .hotbar { position: fixed; z-index: 12; display: flex; gap: 2px; padding: 3px; background: #3c3c3c; border: 2px solid #1b1b1b; border-radius: 3px; box-shadow: 0 6px 24px rgba(0,0,0,.35); }
-  :is(.hotbar, .nb-slots) button { position: relative; width: 52px; height: 52px; padding: 0; border-radius: 0; display: grid; place-items: center;
-    background: #8b8b8b; border: 3px solid; border-color: #373737 #fff #fff #373737; }
-  :is(.hotbar, .nb-slots) button:hover:not(:disabled), :is(.hotbar, .nb-slots) button:focus-visible { background: #a5a5a5; border-color: #373737 #fff #fff #373737; outline: none; }
-  .hotbar img, .hotbar .emoji { width: 36px; height: 36px; object-fit: contain; image-rendering: pixelated; font-size: 26px; display: grid; place-items: center; }
-  :is(.hotbar, .nb-slots) .name { position: absolute; bottom: calc(100% + 8px); left: 50%; translate: -50% 0; white-space: nowrap; pointer-events: none; opacity: 0;
-    z-index: 1; background: rgba(16,0,16,.94); color: #fff; border: 2px solid #2b0d5d; border-radius: 3px; padding: 2px 6px; font-size: 13px; line-height: 1.35; }
+  /* The hotbar, as Minecraft's, in its pixels (--px): its slots, the item in hand in its selection frame, each item's name
+     in Minecraft's tooltip on hover or focus, which also lights the slot as a container's does. The textures are the
+     wiki's (guiTextures, :root.gui-textured); until they are in, plain. */
+  .hotbar { --px: 3px; position: fixed; z-index: 12; display: flex; padding: 0 var(--px); background: rgba(0,0,0,.75); box-shadow: 0 6px 24px rgba(0,0,0,.35); image-rendering: pixelated; }
+  :root.gui-textured .hotbar { background: var(--gui-hotbar) 0 0 / calc(182 * var(--px)) 100%; }
+  :root.gui-textured .hotbar::after { content: ''; position: absolute; top: 0; right: 0; width: var(--px); height: 100%; background: var(--gui-hotbar) 100% 0 / calc(182 * var(--px)) 100%; }
+  .hotbar button { position: relative; width: calc(20 * var(--px)); height: calc(22 * var(--px)); padding: 0; border: 0; border-radius: 0; background: none; }
+  .hotbar :is(img, .emoji), .hotbar button::before { position: absolute; left: calc(2 * var(--px)); top: calc(3 * var(--px)); width: calc(16 * var(--px)); height: calc(16 * var(--px)); }
+  .hotbar :is(img, .emoji) { object-fit: contain; display: grid; place-items: center; font-size: calc(12 * var(--px)); }
+  :is(.hotbar, .nb-slots) button:is(:hover, :focus-visible):not(:disabled)::before { content: ''; z-index: 1; background: rgba(255,255,255,.5); pointer-events: none; }
+  :is(.hotbar, .nb-slots) button:focus-visible { outline: none; }
+  :is(.hotbar, .nb-slots) .name { position: absolute; z-index: 3; bottom: calc(100% + 8px); left: 50%; translate: -50% 0; white-space: nowrap; pointer-events: none; opacity: 0;
+    background: rgba(16,0,16,.94); color: #fff; border: 6px solid transparent; border-radius: 3px; padding: 0 2px; font-size: 13px; line-height: 1.35; image-rendering: pixelated; }
+  :root.gui-textured :is(.hotbar, .nb-slots) .name { background: none; border-radius: 0; border-image: var(--gui-tip) 12 fill / 24px / 18px; }
+  :root.gui-textured :is(.hotbar, .nb-slots) .name::before { content: ''; position: absolute; inset: -6px; z-index: -1; border: 6px solid transparent; border-image: var(--gui-tip-frame) 12 / 24px / 18px; }
   :is(.hotbar, .nb-slots) button:is(:hover, :focus-visible) .name { opacity: 1; }
-  :is(.hotbar, .nb-slots) button.held { border-color: #fff; outline: 2px solid #fff; outline-offset: -1px; }   /* the item in hand, framed as Minecraft's */
-  /* The note block's window, as a Minecraft container: light grey with a bevel, its slots the hotbar's, smaller. Under the
-     header's button, beside the corner's or over them (openNoteBox). The note block stands on the block picked, a head on top. */
-  .note-box { position: fixed; z-index: 12; width: 446px; max-width: calc(100% - 32px); padding: 10px 12px 12px;
-    background: #c6c6c6; color: #3f3f3f; border: 3px solid; border-color: #fff #555 #555 #fff; border-radius: 4px; box-shadow: 0 0 0 2px #000, 0 10px 30px rgba(0,0,0,.35);
+  /* What is in hand, or picked in the note block's window: white-framed, or in the hotbar's selection frame. */
+  :is(.hotbar, .nb-slots) button.held { outline: 2px solid #fff; outline-offset: -2px; }
+  :root.gui-textured :is(.hotbar, .nb-slots) button.held { outline: 0; }
+  :root.gui-textured :is(.hotbar, .nb-slots) button.held::after { content: ''; position: absolute; z-index: 2; background: var(--gui-selection) 0 0 / 100% 100%; pointer-events: none; }
+  :root.gui-textured .hotbar button.held::after { left: calc(-2 * var(--px)); top: calc(-1 * var(--px)); width: calc(24 * var(--px)); height: calc(23 * var(--px)); }
+  /* The note block's window, as a Minecraft container (the wiki's panel and slots, at twice their size, or plain until they
+     are in, as the hotbar). Under the header's button, beside the corner's or over them (openNoteBox). The note block
+     stands on the block picked, a head on top. */
+  .note-box { position: fixed; z-index: 12; width: 446px; max-width: calc(100% - 32px); padding: 5px 7px 7px;
+    background: #c6c6c6; color: #3f3f3f; border: 8px solid #c6c6c6; box-shadow: 0 0 0 1px #000, 0 10px 30px rgba(0,0,0,.35);
     font-size: 13px; line-height: 1.4; }
+  :root.gui-textured .note-box { background: none; border-image: var(--gui-panel) 4 fill / 8px; box-shadow: 0 10px 30px rgba(0,0,0,.35); image-rendering: pixelated; }
   .note-box .nb-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; font-size: 15px; font-weight: 700; }
   .note-box .nb-x { border: 0; background: none; padding: 0 4px; font-size: 16px; color: inherit; box-shadow: none; }
   .note-box .nb-body { display: grid; grid-template-columns: 116px 1fr; gap: 12px; }
-  .nb-stage { position: relative; height: 200px; background: #8b8b8b; border: 3px solid; border-color: #373737 #fff #fff #373737; overflow: hidden; }
+  .nb-stage { position: relative; height: 200px; background: #8b8b8b; border: 2px solid #8b8b8b; overflow: hidden; }
+  :root.gui-textured :is(.nb-stage, .nb-slots button) { background: none; border-image: var(--gui-slot) 1 fill / 2px; }
   .nb-stage img { position: absolute; left: 50%; translate: -50% 0; width: 84px; image-rendering: pixelated; pointer-events: none; }
   .nb-stage .under { top: 108px; }
   .nb-stage .block { top: 66px; z-index: 1; }
@@ -512,8 +526,11 @@
   .note-box .nb-what b { display: block; font-size: 14px; }
   .note-box .nb-label { margin: 0 0 3px; font-size: 12px; font-weight: 700; }
   .note-box .nb-label span { font-weight: 400; }
-  .nb-slots { display: grid; grid-template-columns: repeat(7, 38px); gap: 2px; margin-bottom: 8px; }
-  .nb-slots button { width: 38px; height: 38px; }
+  .nb-slots { display: grid; grid-template-columns: repeat(7, 36px); margin-bottom: 8px; }
+  .nb-slots button { position: relative; width: 36px; height: 36px; padding: 0; border: 2px solid #c6c6c6; border-radius: 0; display: grid; place-items: center; background: #8b8b8b; }
+  .nb-slots button::before { position: absolute; inset: 0; }
+  .nb-slots button:hover:not(:disabled) { border-color: #c6c6c6; }
+  :root.gui-textured .nb-slots button.held::after { left: -8px; top: -7px; width: 48px; height: 46px; }
   .nb-slots img { width: 26px; height: 26px; object-fit: contain; image-rendering: pixelated; }
   .nb-slots.heads img { width: 32px; height: 32px; }
   .nb-slots .none { color: #e8e8e8; font-size: 15px; }
@@ -531,7 +548,7 @@
     .nb-stage { height: 170px; }
     .note-box .nb-what { height: 36px; }   /* a line each, the width of the window */
     .nb-stage .under { top: 92px; } .nb-stage :is(.block, .hit) { top: 50px; } .nb-stage .head { top: 24px; } .nb-stage canvas { top: 42px; }
-    .nb-slots { grid-template-columns: repeat(auto-fill, 38px); }
+    .nb-slots { grid-template-columns: repeat(auto-fill, 36px); }
   }
   /* An item in hand: a layer over everything that takes the next click, the item under the pointer, what a click does. */
   .hold { position: fixed; inset: 0; z-index: 9; cursor: none; }
@@ -574,8 +591,7 @@
   .rebuild-bar button { box-shadow: var(--shadow); white-space: nowrap; }
   @media (max-width: 720px) {
     .rebuild-bar { bottom: calc(32px + env(safe-area-inset-bottom, 0px)); }   /* clear of a phone browser's bar at the bottom */
-    .hotbar button { width: 46px; height: 46px; }
-    .hotbar img, .hotbar .emoji { width: 30px; height: 30px; }
+    .hotbar { --px: 2px; }
   }
 
   /* ---------- Modal ---------- */
@@ -2326,8 +2342,8 @@ function frameReady(token, live) {
 }
 
 // ---------------------------------------------------------------- Sounds
-// Minecraft's own sounds from the wiki where it has one (SOUND_FILES), and short blips synthesized with Web Audio for
-// the rest, and in place of those until they are in. The AudioContext is made on first use, which always follows a
+// Minecraft's own sounds from the wiki (SOUND_FILES), and short blips synthesized with Web Audio in place of each until
+// it is in, or if it doesn't come. The AudioContext is made on first use, which always follows a
 // click or key press, as browsers require.
 let audio;
 let soundOn = store.get('mwr.sound', true) !== false;
@@ -2410,20 +2426,20 @@ const NOTE_COLORS = ('59E800 82CE00 ACAC00 CE8400 E85900 F92E00 FF0606 F9002E E8
 const SOUND_FILES = {
   ...Object.fromEntries(Object.entries(NOTE_UNDER).map(([k, n]) => [k, [`Note block ${n.sound ?? n.name.toLowerCase()}.ogg`]])),
   ...Object.fromEntries(Object.entries(NOTE_HEADS).map(([k, h]) => [k + 'Head', h.sound])),
-  ding: ['Successful hit.ogg'], deny: ogg('Villager deny', 3),
+  ding: ['Successful hit.ogg'], deny: ogg('Villager deny', 3), toast: ['Toast.ogg'], anvil: ['Anvil use.ogg'],
   villagerDeath: ['Villager death.ogg'], challenge: ['Challenge complete.ogg'], levelup: ['Random levelup.ogg'],
   explode: ogg('Explosion', 4), grass: ogg('Grass dig', 4), wood: ogg('Wood dig', 4), stone: ogg('Stone dig', 4), fuse: ['Fuse.ogg'],
   ghastCharge: ['Ghast charge.ogg'], ghastShoot: ['Ghast fireball4.ogg'], weak: ogg('Weak attack', 4), anchorCharge: ogg('Respawn anchor charge', 3),
   creeperDeath: ['Creeper death.ogg'], ghastDeath: ['Ghast death.ogg'],
   fwLaunch: ['Firework launch.ogg'], fwBlast: ['Firework blast.ogg'], fwLarge: ['Firework large blast.ogg'], fwTwinkle: ['Firework twinkle.ogg'],
 };
-const GAME_SOUNDS = ['pling', 'ding', 'deny', 'villagerDeath', 'challenge', 'levelup'];
-const ITEM_SOUNDS = ['explode', 'grass', 'wood', 'stone', 'fuse', 'ghastCharge', 'ghastShoot', 'weak', 'anchorCharge', 'creeperDeath', 'ghastDeath'];
+const GAME_SOUNDS = ['pling', 'ding', 'deny', 'villagerDeath', 'challenge', 'levelup', 'toast'];
+const ITEM_SOUNDS = ['explode', 'grass', 'wood', 'stone', 'fuse', 'ghastCharge', 'ghastShoot', 'weak', 'anchorCharge', 'creeperDeath', 'ghastDeath', 'anvil'];
 const soundBank = new Map(), soundsAsked = new Map(), soundStarted = new Map(), later = f => setTimeout(f, 60000);
 let soundUrls = null;
 function loadSounds(keys) {
   if (!soundOn) return Promise.resolve();
-  const want = keys.filter(k => !soundsAsked.has(k));
+  const want = [...new Set(keys)].filter(k => !soundsAsked.has(k));
   if (!want.length) return Promise.all(keys.map(k => soundsAsked.get(k)));
   const files = [...new Set(Object.values(SOUND_FILES).flat())].map(f => 'File:' + f);
   // The API takes 50 titles a request.
@@ -2470,6 +2486,8 @@ function note(k, at = 0) {
   if (!wiki(noteSound(), noteBlock.head ? 1 : 2 ** (k / 12), at)) pling(370 * 2 ** (k / 12), at);
   else if (!noteBlock.head) advHeard(noteBlock.under);
 }
+// The same on the instrument under the note block, a mob head on top or not.
+function chime(k, at = 0) { if (!wiki(noteBlock.under, 2 ** (k / 12), at)) pling(370 * 2 ** (k / 12), at); }
 // The n-th click's note (see click), and a note's colour, none for a mob head, which Minecraft shows no note for.
 const scaleNote = n => 12 * Math.floor(n % 10 / 5) + PENTATONIC[n % 5];
 const noteColor = k => noteBlock.head ? null : NOTE_COLORS[(12 + k) % 24];
@@ -2482,10 +2500,10 @@ const SOUNDS = {
   back() { note(5); if (!noteBlock.head) note(0, 0.08); },
   dead() { if (wiki('deny')) return; tone(140, 0, 0.14, { type: 'sine', slide: 55 }); noise(0, 0.07, { gain: 0.5, cutoff: 500 }); },
   checkpoint() { if (wiki('ding', 0.5)) return; [1319, 1661, 1976].forEach((f, i) => tone(f, i * 0.07, 0.3, { type: 'sine', gain: 0.6 })); },
-  win() {
-    [523, 659, 784, 1047].forEach((f, i) => tone(f, i * 0.09, i === 3 ? 0.9 : 0.2, { type: 'square', gain: 0.25, cutoff: 2500 }));
-    [523, 659, 784].forEach(f => tone(f, 0.27, 1, { gain: 0.35 }));
-  },
+  // A win: a fanfare on the note block's instrument, up its middle F#'s major chord and the chord at the top. A goal's
+  // toast: Minecraft's toast coming in, or the fanfare until it is.
+  win() { [0, 4, 7, 12].forEach((k, i) => chime(k, i * 0.09)); [0, 4, 7].forEach(k => chime(k, 0.27)); },
+  toast() { if (!wiki('toast')) SOUNDS.win(); },
   // A new best (and a challenge's toast): Minecraft's challenge fanfare, once at a time.
   best() {
     if (wiki('challenge', 1, 0, 7000)) return;
@@ -2512,8 +2530,8 @@ const SOUNDS = {
     else if (k !== 'fwTwinkle') { noise(0, 0.35, { gain: 0.8, cutoff: k === 'fwLarge' ? 900 : 1600 }); noise(0, 0.06, { gain: 0.6, cutoff: 4000 }); }
   },
   // As Minecraft has them: TNT's fuse, a creeper's half as high; a block placed by its own sound (TNT's grass, a bed's
-  // wood, an anchor's stone) at 0.8; the ghast's warning and its shot; a weak hit; an anchor charging; a mob dying or a
-  // bed breaking.
+  // wood, an anchor's stone) at 0.8, an end crystal without one; the ghast's warning and its shot; a weak hit; an anchor
+  // charging; a mob dying or a bed breaking; Rebuild an anvil's repair.
   fuse(dur, creeper) { if (wiki('fuse', creeper ? 0.5 : 1)) return; noise(0, dur, { gain: 0.45, cutoff: 3500, filter: 'highpass', attack: dur * 0.9 }); },
   place(kind) {
     if (wiki({ tnt: 'grass', bed: 'wood', anchor: 'stone' }[kind], 0.8)) return;
@@ -2521,14 +2539,13 @@ const SOUNDS = {
   },
   ghast() { if (wiki('ghastCharge')) return; tone(800 + Math.random() * 200, 0, 0.9, { type: 'sawtooth', gain: 0.3, vibrato: 40, cutoff: 2400, slide: 420 }); },
   whoosh() { if (wiki('ghastShoot')) return; noise(0, 0.6, { gain: 0.5, cutoff: 1500, attack: 0.2 }); },
-  hum() { tone(220, 0, 0.5, { type: 'sine', gain: 0.4, vibrato: 4 }); },
   charge(n) { if (wiki('anchorCharge')) return; tone(180 + n * 90, 0, 0.35, { type: 'square', gain: 0.2, cutoff: 1500, slide: 260 + n * 90 }); noise(0, 0.1, { gain: 0.3, cutoff: 2000 }); },
   bonk() { if (wiki('weak')) return; tone(300, 0, 0.08, { type: 'square', gain: 0.25, cutoff: 1200, slide: 160 }); noise(0, 0.06, { gain: 0.4, cutoff: 1500 }); },
   poof(kind) { if (wiki({ creeper: 'creeperDeath', ghast: 'ghastDeath', bed: 'wood' }[kind])) return; noise(0, 0.4, { gain: 0.6, cutoff: 2000, attack: 0.02 }); },
   // An XP orb landing: Minecraft's pickup, the arrow's ding at random pitch; a new level, Minecraft's level-up.
   orb() { if (wiki('ding', 0.55 + Math.random() * 0.7)) return; tone(1500 + Math.random() * 700, 0, 0.12, { type: 'sine', gain: 0.25 }); },
   levelup() { if (wiki('levelup')) return; [523, 659, 784, 1047].forEach((f, i) => tone(f, i * 0.07, 0.3, { type: 'square', gain: 0.18, cutoff: 2500 })); },
-  rebuild() { [262, 330, 392, 523].forEach((f, i) => tone(f, i * 0.1, 0.35, { type: 'sine', gain: 0.4 })); },
+  rebuild() { if (wiki('anvil')) return; [262, 330, 392, 523].forEach((f, i) => tone(f, i * 0.1, 0.35, { type: 'sine', gain: 0.4 })); },
   // Distance's cheer for a click that got closer: two quick bright notes, a step higher for each click less to go, from 4,
   // on a note block's pling (F#4 at its own pitch) from C5.
   closer(togo) {
@@ -2541,7 +2558,7 @@ const SOUNDS = {
 // Unplayable audio (no Web Audio, a blocked context) just means silence.
 function play(name, ...args) {
   if (!soundOn) return;
-  try { audioOut(); loadSounds([...GAME_SOUNDS, noteSound()]); SOUNDS[name](...args); } catch { /* no sound */ }
+  try { audioOut(); loadSounds([...GAME_SOUNDS, noteSound(), noteBlock.under]); SOUNDS[name](...args); } catch { /* no sound */ }
 }
 
 // ---------------------------------------------------------------- Effects
@@ -2786,7 +2803,7 @@ function cheer(entry) {
 const ADV_PAR = 3;
 const ADV_TIERS = {
   task: { label: 'Task', title: 'Advancement Made!', sound: 'checkpoint' },
-  goal: { label: 'Goal', title: 'Goal Reached!', sound: 'win' },
+  goal: { label: 'Goal', title: 'Goal Reached!', sound: 'toast' },
   challenge: { label: 'Challenge', title: 'Challenge Complete!', sound: 'best' },
 };
 const ADV_GROUPS = {
@@ -3179,6 +3196,38 @@ function itemFileUrls() {
       const asked = new Map([...d.query?.normalized ?? []].map(n => [n.to, n.from])), key = new Map(Object.entries(ITEM_FILES).map(([k, f]) => ['File:' + f, k]));
       for (const p of d.query?.pages ?? []) if (p.imageinfo) itemFiles.set(key.get(asked.get(p.title) ?? p.title), p.imageinfo[0].url);
     }, () => { filesAsked = null; });
+}
+// Minecraft's own GUI, from the wiki, for the hotbar and the note block's window: the hotbar (at twice its size there,
+// drawn back at its own) and its selection frame, the tooltip's background and frame, and a container's panel and slot,
+// cut from the large chest's window, each down to its corners, edges and middle (nineSlice). Asked for when the hotbar
+// or the window first opens, and set as CSS variables (--gui-hotbar … --gui-slot) once all are in (:root.gui-textured);
+// until then, or if any doesn't come, both are plain, and asked again at the next opening.
+const GUI_FILES = { hotbar: 'Hotbar.png', selection: 'Hotbar selection.png', tip: 'Tooltip background.png', 'tip-frame': 'Tooltip frame.png',
+  chest: 'Generic 54 gui.png' };
+let guiAsked = null;
+function guiTextures() {
+  guiAsked ??= api({ action: 'query', titles: Object.values(GUI_FILES).map(f => 'File:' + f).join('|'), prop: 'imageinfo', iiprop: 'url' }).then(d => {
+    const asked = new Map([...d.query?.normalized ?? []].map(n => [n.to, n.from])), urls = new Map();
+    for (const p of d.query?.pages ?? []) if (p.imageinfo) urls.set(asked.get(p.title) ?? p.title, p.imageinfo[0].url);
+    return Promise.all(Object.values(GUI_FILES).map(f => new Promise((ok, no) => {
+      const im = new Image();
+      im.crossOrigin = 'anonymous'; im.onload = () => ok(im); im.onerror = no; im.src = urls.get('File:' + f) ?? '';
+    })));
+  }).then(([hotbar, selection, tip, tipFrame, chest]) => {
+    const canvas = (w, h) => { const c = Object.assign(document.createElement('canvas'), { width: w, height: h }), x = c.getContext('2d'); x.imageSmoothingEnabled = false; return [c, x]; };
+    const [bar, bx] = canvas(182, 22);
+    bx.drawImage(hotbar, 0, 0, 182, 22);
+    const nineSlice = (x, y, w, h, b) => {
+      const [c, cx] = canvas(2 * b + 1, 2 * b + 1);
+      for (const [sx, dx, sw] of [[x, 0, b], [x + b, b, 1], [x + w - b, b + 1, b]])
+        for (const [sy, dy, sh] of [[y, 0, b], [y + b, b, 1], [y + h - b, b + 1, b]]) cx.drawImage(chest, sx, sy, sw, sh, dx, dy, sw, sh);
+      return c;
+    };
+    const root = document.documentElement;
+    for (const [k, v] of Object.entries({ hotbar: bar.toDataURL(), selection: selection.src, tip: tip.src, 'tip-frame': tipFrame.src,
+      panel: nineSlice(0, 0, 176, 222, 4).toDataURL(), slot: nineSlice(7, 17, 18, 18, 1).toDataURL() })) root.style.setProperty('--gui-' + k, `url("${v}")`);
+    root.classList.add('gui-textured');
+  }).catch(() => { guiAsked = null; });
 }
 const itemPic = page => itemPics.has(page) ? `<img alt="" src="${esc(itemPics.get(page))}" draggable="false">` : `<span class="emoji">${ITEM_EMOJI[page] ?? '▪️'}</span>`;
 const itemFile = (k, page) => itemFiles.has(k) ? `<img alt="" src="${esc(itemFiles.get(k))}" draggable="false">` : itemPic(page);
@@ -3644,7 +3693,7 @@ addEventListener('pointerdown', e => { items.touch = e.pointerType === 'touch'; 
 
 function openHotbar(btn) {
   closeHotbar(); closeNoteBox();
-  itemAssets();
+  itemAssets(); guiTextures();
   const bar = document.body.appendChild(Object.assign(document.createElement('div'), { className: 'hotbar', role: 'menu' }));
   bar.innerHTML = Object.entries(ITEMS).map(([k, it]) => `<button role="menuitem" data-item="${k}" aria-label="${esc(it.name)}">`
     + (itemPics.has(it.page) ? itemPic(it.page) : `<img alt="" data-item-pic="${esc(it.page)}" draggable="false">`) + `<span class="name">${esc(it.name)}</span></button>`).join('');
@@ -3818,7 +3867,6 @@ const ITEM_USE = {
     t.el.onclick = () => lightTnt(t, 4000);
   },
   crystal(p) {
-    play('hum');
     const t = placeThing('crystal', p, itemFile('crystal', 'End Crystal'));
     t.el.onclick = () => { removeThing(t); blast(t.p, 1.6); };
   },
@@ -4003,7 +4051,7 @@ function noteBoxPictures() {
 }
 function openNoteBox(btn) {
   closeHotbar(); closeNoteBox();
-  itemPictures(); noteBoxPictures();
+  itemPictures(); noteBoxPictures(); guiTextures();
   if (soundOn) try { audioOut(); loadSounds(Object.keys(NOTE_UNDER)); } catch { /* no sound */ }
   const box = itemsRoot().appendChild(Object.assign(document.createElement('div'), { className: 'note-box', role: 'dialog' }));
   box.setAttribute('aria-label', 'Note block');

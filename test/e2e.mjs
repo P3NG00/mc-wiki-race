@@ -108,7 +108,8 @@ check('challenge pair loads', await until("!document.querySelector('#btnPlay').d
 await shot('1-setup');
 
 // Every sound the game names is a file on the wiki (a renamed one would quietly play the synthesized one instead), and
-// the note block's window gets a picture for every block and head, and the note.
+// the note block's window gets a picture for every block and head, the note, and Minecraft's GUI (a renamed texture
+// would quietly leave the window and the hotbar plain).
 const noSound = JSON.parse(await ev(`(async () => {
   const files = [...new Set(Object.values(SOUND_FILES).flat())].map(f => 'File:' + f);
   const ds = await Promise.all(Array.from({ length: Math.ceil(files.length / 50) }, (_, i) =>
@@ -119,8 +120,9 @@ const noSound = JSON.parse(await ev(`(async () => {
 })()`));
 check('every sound the game plays is a file on the wiki', !noSound.length, noSound.join(', '));
 await ev("document.querySelector('#btnNotes').click()");
-check('the note block\'s window has a picture for every block and head, and the note', await until("document.querySelectorAll('.note-box .nb-slots img:not(.hidden)').length === 26 && !!noteTexture"),
-  await ev("JSON.stringify([document.querySelectorAll('.note-box .nb-slots img:not(.hidden)').length, !!noteTexture])"));
+const noteBoxIn = "[document.querySelectorAll('.note-box .nb-slots img:not(.hidden)').length, !!noteTexture, document.documentElement.classList.contains('gui-textured')]";
+check('the note block\'s window has a picture for every block and head, the note, and the GUI textures', await until(`JSON.stringify(${noteBoxIn}) === '[26,true,true]'`),
+  await ev(`JSON.stringify(${noteBoxIn})`));
 await ev("document.body.click()");
 
 await ev("document.querySelector('#btnPlay').click()");

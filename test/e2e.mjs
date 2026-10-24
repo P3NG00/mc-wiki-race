@@ -107,6 +107,22 @@ check('challenge pair loads', await until("!document.querySelector('#btnPlay').d
   await ev("setup.start?.title + ' -> ' + setup.goal?.title"));
 await shot('1-setup');
 
+// Every sound the game names is a file on the wiki (a renamed one would quietly play the synthesized one instead), and
+// the note block's window gets a picture for every block and head, and the note.
+const noSound = JSON.parse(await ev(`(async () => {
+  const files = [...new Set(Object.values(SOUND_FILES).flat())].map(f => 'File:' + f);
+  const ds = await Promise.all(Array.from({ length: Math.ceil(files.length / 50) }, (_, i) =>
+    api({ action: 'query', titles: files.slice(i * 50, i * 50 + 50).join('|'), prop: 'imageinfo', iiprop: 'url' })));
+  const named = new Map(ds.flatMap(d => d.query?.normalized ?? []).map(n => [n.from, n.to]));
+  const have = new Set(ds.flatMap(d => d.query?.pages ?? []).filter(p => p.imageinfo).map(p => p.title));
+  return JSON.stringify(files.filter(f => !have.has(named.get(f) ?? f)));
+})()`));
+check('every sound the game plays is a file on the wiki', !noSound.length, noSound.join(', '));
+await ev("document.querySelector('#btnNotes').click()");
+check('the note block\'s window has a picture for every block and head, and the note', await until("document.querySelectorAll('.note-box .nb-slots img:not(.hidden)').length === 26 && !!noteTexture"),
+  await ev("JSON.stringify([document.querySelectorAll('.note-box .nb-slots img:not(.hidden)').length, !!noteTexture])"));
+await ev("document.body.click()");
+
 await ev("document.querySelector('#btnPlay').click()");
 check('start article renders', await until("document.querySelector('#overlay').classList.contains('hidden') && game.path.length === 1"));
 await sleep(2000);

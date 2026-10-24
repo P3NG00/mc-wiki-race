@@ -472,16 +472,67 @@
   .hud .items-btn { width: 38px; height: 38px; }
   #btnItems { position: fixed; right: 16px; bottom: 64px; z-index: 5; border-radius: 50%; box-shadow: var(--shadow); }
   #btnBgView[hidden] + #btnItems { bottom: 16px; }
+  #btnNotes { position: fixed; right: 16px; bottom: 112px; z-index: 5; border-radius: 50%; box-shadow: var(--shadow); }
+  #btnBgView[hidden] ~ #btnNotes { bottom: 64px; }
+  :is(#btnNotes, #hudNotes)[aria-expanded="true"] { outline: 2px solid var(--accent); outline-offset: 1px; }
   /* The hotbar, as Minecraft's: grey slots with a bevel, each item's name in the purple tooltip on hover. */
   .hotbar { position: fixed; z-index: 12; display: flex; gap: 2px; padding: 3px; background: #3c3c3c; border: 2px solid #1b1b1b; border-radius: 3px; box-shadow: 0 6px 24px rgba(0,0,0,.35); }
-  .hotbar button { position: relative; width: 52px; height: 52px; padding: 0; border-radius: 0; display: grid; place-items: center;
+  :is(.hotbar, .nb-slots) button { position: relative; width: 52px; height: 52px; padding: 0; border-radius: 0; display: grid; place-items: center;
     background: #8b8b8b; border: 3px solid; border-color: #373737 #fff #fff #373737; }
-  .hotbar button:hover:not(:disabled), .hotbar button:focus-visible { background: #a5a5a5; border-color: #373737 #fff #fff #373737; outline: none; }
+  :is(.hotbar, .nb-slots) button:hover:not(:disabled), :is(.hotbar, .nb-slots) button:focus-visible { background: #a5a5a5; border-color: #373737 #fff #fff #373737; outline: none; }
   .hotbar img, .hotbar .emoji { width: 36px; height: 36px; object-fit: contain; image-rendering: pixelated; font-size: 26px; display: grid; place-items: center; }
-  .hotbar .name { position: absolute; bottom: calc(100% + 8px); left: 50%; translate: -50% 0; white-space: nowrap; pointer-events: none; opacity: 0;
-    background: rgba(16,0,16,.94); color: #fff; border: 2px solid #2b0d5d; border-radius: 3px; padding: 2px 6px; font-size: 13px; }
-  .hotbar button:is(:hover, :focus-visible) .name { opacity: 1; }
-  .hotbar button.held { border-color: #fff; outline: 2px solid #fff; outline-offset: -1px; }   /* the item in hand, framed as Minecraft's */
+  :is(.hotbar, .nb-slots) .name { position: absolute; bottom: calc(100% + 8px); left: 50%; translate: -50% 0; white-space: nowrap; pointer-events: none; opacity: 0;
+    z-index: 1; background: rgba(16,0,16,.94); color: #fff; border: 2px solid #2b0d5d; border-radius: 3px; padding: 2px 6px; font-size: 13px; line-height: 1.35; }
+  :is(.hotbar, .nb-slots) button:is(:hover, :focus-visible) .name { opacity: 1; }
+  :is(.hotbar, .nb-slots) button.held { border-color: #fff; outline: 2px solid #fff; outline-offset: -1px; }   /* the item in hand, framed as Minecraft's */
+  /* The note block's window, as a Minecraft container: light grey with a bevel, its slots the hotbar's, smaller. Under the
+     header's button, beside the corner's or over them (openNoteBox). The note block stands on the block picked, a head on top. */
+  .note-box { position: fixed; z-index: 12; width: 446px; max-width: calc(100% - 32px); padding: 10px 12px 12px;
+    background: #c6c6c6; color: #3f3f3f; border: 3px solid; border-color: #fff #555 #555 #fff; border-radius: 4px; box-shadow: 0 0 0 2px #000, 0 10px 30px rgba(0,0,0,.35);
+    font-size: 13px; line-height: 1.4; }
+  .note-box .nb-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; font-size: 15px; font-weight: 700; }
+  .note-box .nb-x { border: 0; background: none; padding: 0 4px; font-size: 16px; color: inherit; box-shadow: none; }
+  .note-box .nb-body { display: grid; grid-template-columns: 116px 1fr; gap: 12px; }
+  .nb-stage { position: relative; height: 200px; background: #8b8b8b; border: 3px solid; border-color: #373737 #fff #fff #373737; overflow: hidden; }
+  .nb-stage img { position: absolute; left: 50%; translate: -50% 0; width: 84px; image-rendering: pixelated; pointer-events: none; }
+  .nb-stage .under { top: 108px; }
+  .nb-stage .block { top: 66px; z-index: 1; }
+  .nb-stage .head { top: 40px; width: 56px; z-index: 2; }
+  .nb-stage .hit { position: absolute; left: 14px; right: 14px; top: 66px; height: 84px; z-index: 3; padding: 0; border: 0; border-radius: 0; background: none; box-shadow: none; }
+  .nb-stage .hit:focus-visible { outline: 2px solid #fff; }
+  .nb-stage .drop { animation: nb-drop .22s cubic-bezier(.4,1.6,.6,1); }
+  @keyframes nb-drop { from { translate: -50% -14px; opacity: .3; } }
+  .nb-stage .bounce { animation: nb-bounce .15s; }
+  @keyframes nb-bounce { 50% { scale: 1.06 .94; } }
+  .nb-stage canvas { position: absolute; z-index: 4; left: 50%; top: 58px; width: 20px; height: 20px; margin-left: -10px; image-rendering: pixelated; pointer-events: none; animation: nb-rise 1s ease-out forwards; }
+  @keyframes nb-rise { to { translate: var(--dx) -54px; opacity: 0; } }
+  :root.calm .nb-stage :is(.drop, .bounce) { animation: none; }
+  /* What is picked, always as tall (two lines for its name, two for what it is on or plays), so no pick moves the slots. */
+  .note-box .nb-what { margin: 6px 0 0; height: 72px; overflow: hidden; text-align: center; line-height: 18px; }
+  .note-box .nb-what b { display: block; font-size: 14px; }
+  .note-box .nb-label { margin: 0 0 3px; font-size: 12px; font-weight: 700; }
+  .note-box .nb-label span { font-weight: 400; }
+  .nb-slots { display: grid; grid-template-columns: repeat(7, 38px); gap: 2px; margin-bottom: 8px; }
+  .nb-slots button { width: 38px; height: 38px; }
+  .nb-slots img { width: 26px; height: 26px; object-fit: contain; image-rendering: pixelated; }
+  .nb-slots.heads img { width: 32px; height: 32px; }
+  .nb-slots .none { color: #e8e8e8; font-size: 15px; }
+  .nb-slots.off button:not(.held) img { opacity: .45; }   /* a head on top: the block below plays nothing */
+  .nb-slots .name small { display: block; color: #aaa; font-size: 12px; }
+  @media (hover: none) { .nb-slots .name { display: none; } }
+  .note-box .nb-foot { margin: 2px 0 0; font-size: 12px; }
+  .note-box .nb-off { margin: 8px 0 0; font-weight: 600; }
+  .note-box .nb-off button { font: inherit; }
+  /* Over the buttons it scrolls if it must; a finger gets no tooltips, which stick after a tap (and would be cut off),
+     but what is picked shows under the note block. */
+  @media (max-width: 560px) {
+    .note-box { overflow: hidden auto; }
+    .note-box .nb-body { grid-template-columns: 1fr; }
+    .nb-stage { height: 170px; }
+    .note-box .nb-what { height: 36px; }   /* a line each, the width of the window */
+    .nb-stage .under { top: 92px; } .nb-stage :is(.block, .hit) { top: 50px; } .nb-stage .head { top: 24px; } .nb-stage canvas { top: 42px; }
+    .nb-slots { grid-template-columns: repeat(auto-fill, 38px); }
+  }
   /* An item in hand: a layer over everything that takes the next click, the item under the pointer, what a click does. */
   .hold { position: fixed; inset: 0; z-index: 9; cursor: none; }
   .ghost { position: fixed; z-index: 9; width: 48px; height: 48px; pointer-events: none; translate: -50% -50%; opacity: .85; }
@@ -515,7 +566,7 @@
   /* Once anything is broken the page takes no clicks but on the hotbar's buttons (the things on it, the hotbar and the
      bar are outside it): Rebuild, and in a game Give up, at the bottom, out of the way. */
   html.broken :is(#setup, #game) { pointer-events: none; }
-  html.broken :is(#btnItems, #hudItems, .overlay) { pointer-events: auto; }
+  html.broken :is(#btnItems, #hudItems, #btnNotes, #hudNotes, .note-box, .overlay) { pointer-events: auto; }
   /* Nor, then or with an item in hand, can anything on it be selected, however fast it is clicked or dragged on, but in a window. */
   html.broken body, body:has(> .hold) { user-select: none; -webkit-user-select: none; }
   html.broken .overlay { user-select: text; -webkit-user-select: text; }
@@ -774,6 +825,7 @@ const THEMES = [...new Set(['auto', 'light', 'dark', ...Array.from(document.quer
   <p class="bg-facts" id="bgFacts" hidden></p>
   <button class="bg-view-btn" id="btnBgView" aria-pressed="false" hidden></button>
   <button class="items-btn" id="btnItems" title="Items" aria-label="Items" aria-haspopup="menu"><img alt="" class="hidden"><span class="hidden">TNT</span></button>
+  <button class="items-btn" id="btnNotes" title="Note block" aria-label="Note block" aria-haspopup="dialog" aria-expanded="false"><img alt="" class="hidden"><span class="hidden">♪</span></button>
 
   <footer class="site-foot">
     <p>Made and run by <a href="https://BryantF.xyz">BryantF.xyz</a> · Contact: <a href="mailto:BryantF.xyz+mcwikirace@gmail.com">BryantF.xyz+mcwikirace@gmail.com</a> · Discord: <a href="https://discord.com/users/784846796618727494">p3ng00</a></p>
@@ -801,6 +853,7 @@ const THEMES = [...new Set(['auto', 'light', 'dark', ...Array.from(document.quer
     <div class="stat" id="hudTimeStat"><div class="v mono" id="hudTime">0:00</div><div class="k">Time</div></div>
     <div class="btns">
       <button class="items-btn" id="hudItems" title="Items" aria-label="Items" aria-haspopup="menu"><img alt="" class="hidden"><span class="hidden">TNT</span></button>
+      <button class="items-btn" id="hudNotes" title="Note block" aria-label="Note block" aria-haspopup="dialog" aria-expanded="false"><img alt="" class="hidden"><span class="hidden">♪</span></button>
       <button id="btnSound" aria-label="Sound"></button>
       <button id="btnBack" title="Go back to the previous article (counts as a click)" aria-label="Back">←<span class="word"> Back</span></button>
       <button id="btnGiveUp">Give up</button>
@@ -2189,7 +2242,10 @@ async function navigate(title, fragment, { back = false, from = null } = {}) {
   // Blocks placed on the article go with it (see Items); the next one starts unscrolled.
   for (const t of [...items.things]) if (t.anchor?.on === 'frame') removeThing(t);
   items.frameScroll = { x: 0, y: 0 };
-  if (game.path.length) { play(back ? 'back' : 'click', game.path.length - 1); effect('orbs', from); }
+  if (game.path.length) {
+    const n = game.path.length - 1, color = noteColor(back ? 0 : scaleNote(n));   // the sparks in the colour of the note just played
+    play(back ? 'back' : 'click', n); effect('orbs', from && color ? { ...from, colors: [color] } : from);
+  }
   game.loading = true;   // stays set until the frame reports it has rendered (frameReady)
   pauseClock();
   hideToast();
@@ -2323,25 +2379,52 @@ function noise(at, dur, { gain = 1, cutoff = 800, filter = 'lowpass', attack } =
 // played at random, as the game does. Their addresses are asked for once, in one request, when a sound is first wanted;
 // each is decoded the first time its key is (loadSounds: the game's on the first sound, the items' when one is taken in
 // hand, the fireworks' with their pictures), and until then, or if it doesn't come, the sound is synthesized. Nothing
-// is fetched with Sound off. One that fails is asked again a minute later, not at every sound.
+// is fetched with Sound off. One that fails is asked again a minute later, not at every sound. loadSounds says when
+// the keys it is given are in, or have failed, as a picked note block's first note waits for its instrument.
 const ogg = (name, n) => Array.from({ length: n }, (_, i) => `${name}${i + 1}.ogg`);
+// The note block's instruments, as Minecraft's (see Note block): by the block under it (block; pic, its picture's page
+// or file when that is another's), its sound "Note block <sound>.ogg" (the name, unless said), each its instrument's
+// middle F# at its own pitch, so a scale is the same on any; also: what else under it plays the same. A mob head on top
+// plays its mob's sound instead, one of them at random, at its own pitch whatever the note (so a creeper head's hiss is
+// higher than a creeper's, which hisses at half). A note shows in its pitch's colour, from the Note Block article's
+// pitch table: one for each of the 24 steps from F#3 (the 25th, F#5, is the first's again).
+const NOTE_UNDER = {
+  harp: { name: 'Harp', block: 'Dirt', also: 'any other block' }, bass: { name: 'Bass', block: 'Oak Planks', pic: 'Planks', also: 'any wood' },
+  bassDrum: { name: 'Bass drum', block: 'Stone', sound: 'bd', also: 'any stone' }, snare: { name: 'Snare drum', block: 'Sand', sound: 'snare', also: 'sand or gravel' },
+  hat: { name: 'Hat', block: 'Glass', also: 'any glass' }, bell: { name: 'Bell', block: 'Block of Gold' }, flute: { name: 'Flute', block: 'Clay' },
+  chime: { name: 'Chime', block: 'Packed Ice', sound: 'icechime' }, guitar: { name: 'Guitar', block: 'White Wool', pic: 'Wool', also: 'any wool' },
+  xylophone: { name: 'Xylophone', block: 'Bone Block', sound: 'xylobone' }, ironXylophone: { name: 'Iron xylophone', block: 'Block of Iron' },
+  cowBell: { name: 'Cow bell', block: 'Soul Sand' }, didgeridoo: { name: 'Didgeridoo', block: 'Pumpkin' }, bit: { name: 'Bit', block: 'Block of Emerald' },
+  banjo: { name: 'Banjo', block: 'Hay Bale' }, pling: { name: 'Pling', block: 'Glowstone' }, trumpet: { name: 'Trumpet', block: 'Block of Copper' },
+  ...Object.fromEntries(['Exposed', 'Weathered', 'Oxidized'].map(a => ['trumpet' + a,
+    { name: a + ' trumpet', block: a + ' Copper', pic: `File:${a} Copper JE1 BE1.png`, sound: 'trumpet ' + a.toLowerCase() }])),
+};
+const NOTE_HEADS = {
+  skeleton: { block: 'Skeleton Skull', plays: 'a skeleton’s rattle', sound: ogg('Skeleton idle', 3) },
+  witherSkeleton: { block: 'Wither Skeleton Skull', plays: 'a wither skeleton’s rattle', sound: ogg('Wither skeleton idle', 3) },
+  zombie: { block: 'Zombie Head', plays: 'a zombie’s moan', sound: ogg('Zombie idle', 3) }, creeper: { block: 'Creeper Head', plays: 'a creeper’s hiss', sound: ['Creeper fuse.ogg'] },
+  piglin: { block: 'Piglin Head', plays: 'a piglin’s snort', sound: ogg('Piglin idle', 5) }, dragon: { block: 'Dragon Head', plays: 'the ender dragon’s roar', sound: ogg('Ender dragon idle', 4) },
+};
+const NOTE_COLORS = ('59E800 82CE00 ACAC00 CE8400 E85900 F92E00 FF0606 F9002E E80059 CE0082 AC00AC 8200CE 5900E8 2E00F9 0606FF 002EF9 '
+  + '0059E8 0082CE 00ACAC 00CE82 00E859 00F92E 06FF06 2EF900').split(' ').map(c => '#' + c);
 const SOUND_FILES = {
-  harp: ['Note block harp.ogg'], pling: ['Note block pling.ogg'], ding: ['Successful hit.ogg'], deny: ogg('Villager deny', 3),
+  ...Object.fromEntries(Object.entries(NOTE_UNDER).map(([k, n]) => [k, [`Note block ${n.sound ?? n.name.toLowerCase()}.ogg`]])),
+  ...Object.fromEntries(Object.entries(NOTE_HEADS).map(([k, h]) => [k + 'Head', h.sound])),
+  ding: ['Successful hit.ogg'], deny: ogg('Villager deny', 3),
   villagerDeath: ['Villager death.ogg'], challenge: ['Challenge complete.ogg'], levelup: ['Random levelup.ogg'],
   explode: ogg('Explosion', 4), grass: ogg('Grass dig', 4), wood: ogg('Wood dig', 4), stone: ogg('Stone dig', 4), fuse: ['Fuse.ogg'],
   ghastCharge: ['Ghast charge.ogg'], ghastShoot: ['Ghast fireball4.ogg'], weak: ogg('Weak attack', 4), anchorCharge: ogg('Respawn anchor charge', 3),
   creeperDeath: ['Creeper death.ogg'], ghastDeath: ['Ghast death.ogg'],
   fwLaunch: ['Firework launch.ogg'], fwBlast: ['Firework blast.ogg'], fwLarge: ['Firework large blast.ogg'], fwTwinkle: ['Firework twinkle.ogg'],
 };
-const GAME_SOUNDS = ['harp', 'pling', 'ding', 'deny', 'villagerDeath', 'challenge', 'levelup'];
+const GAME_SOUNDS = ['pling', 'ding', 'deny', 'villagerDeath', 'challenge', 'levelup'];
 const ITEM_SOUNDS = ['explode', 'grass', 'wood', 'stone', 'fuse', 'ghastCharge', 'ghastShoot', 'weak', 'anchorCharge', 'creeperDeath', 'ghastDeath'];
-const soundBank = new Map(), soundsAsked = new Set(), soundStarted = new Map(), later = f => setTimeout(f, 60000);
+const soundBank = new Map(), soundsAsked = new Map(), soundStarted = new Map(), later = f => setTimeout(f, 60000);
 let soundUrls = null;
 function loadSounds(keys) {
-  if (!soundOn) return;
+  if (!soundOn) return Promise.resolve();
   const want = keys.filter(k => !soundsAsked.has(k));
-  if (!want.length) return;
-  for (const k of want) soundsAsked.add(k);
+  if (!want.length) return Promise.all(keys.map(k => soundsAsked.get(k)));
   const files = [...new Set(Object.values(SOUND_FILES).flat())].map(f => 'File:' + f);
   // The API takes 50 titles a request.
   soundUrls ??= Promise.all(Array.from({ length: Math.ceil(files.length / 50) }, (_, i) => api({ action: 'query', titles: files.slice(i * 50, i * 50 + 50).join('|'),
@@ -2353,13 +2436,14 @@ function loadSounds(keys) {
     }
     return urls;
   }, () => { later(() => { soundUrls = null; }); return null; });
-  const again = k => later(() => soundsAsked.delete(k));
-  soundUrls.then(urls => {
-    if (!urls) { want.forEach(again); return; }
+  const again = k => { later(() => soundsAsked.delete(k)); };
+  for (const k of want) soundsAsked.set(k, soundUrls.then(urls => {
+    if (!urls) return again(k);
     const { ctx } = audioOut();
-    for (const k of want) Promise.all(SOUND_FILES[k].map(f => urls.has(f) ? fetch(urls.get(f)).then(r => r.arrayBuffer()).then(b => ctx.decodeAudioData(b)).catch(() => null) : null))
+    return Promise.all(SOUND_FILES[k].map(f => urls.has(f) ? fetch(urls.get(f)).then(r => r.arrayBuffer()).then(b => ctx.decodeAudioData(b)).catch(() => null) : null))
       .then(bs => { bs = bs.filter(Boolean); if (bs.length) soundBank.set(k, bs); else again(k); });
-  }).catch(() => want.forEach(again));
+  }).catch(() => again(k)));
+  return Promise.all(keys.map(k => soundsAsked.get(k)));
 }
 // A decoded sound played at rate, at seconds from now.
 function sample(b, rate, at = 0) { const s = new AudioBufferSourceNode(audio.ctx, { buffer: b, playbackRate: rate }); s.connect(audio.out); s.start(audio.ctx.currentTime + at); }
@@ -2375,13 +2459,27 @@ function wiki(key, rate = 1, at = 0, gap = 0) {
 }
 // A note block's harp: a soft body and a short bright edge an octave up.
 function pling(freq, at = 0) { tone(freq, at, 0.4); tone(freq * 2, at, 0.12, { type: 'sine', gain: 0.3 }); }
+// The note block's choice (mwr.noteBlock: under, a NOTE_UNDER key, and head, a NOTE_HEADS key or null), each kept only
+// if it is one; harp with nothing on top, as Minecraft's on any other block.
+const noteChoice = s => ({ under: isKey(NOTE_UNDER, s?.under) ? s.under : 'harp', head: isKey(NOTE_HEADS, s?.head) ? s.head : null });
+const noteBlock = noteChoice(store.get('mwr.noteBlock', null));
+const noteSound = () => noteBlock.head ? noteBlock.head + 'Head' : noteBlock.under;
+// A note of the note block, k semitones over its middle F#, at seconds from now: a mob head's sound at its own pitch;
+// until it is in, the synthesized harp. Each instrument heard counts toward Sound of Music.
+function note(k, at = 0) {
+  if (!wiki(noteSound(), noteBlock.head ? 1 : 2 ** (k / 12), at)) pling(370 * 2 ** (k / 12), at);
+  else if (!noteBlock.head) advHeard(noteBlock.under);
+}
+// The n-th click's note (see click), and a note's colour, none for a mob head, which Minecraft shows no note for.
+const scaleNote = n => 12 * Math.floor(n % 10 / 5) + PENTATONIC[n % 5];
+const noteColor = k => noteBlock.head ? null : NOTE_COLORS[(12 + k) % 24];
 const PENTATONIC = [0, 2, 4, 7, 9];
 const SOUNDS = {
-  // Each click of a game plays the next note of a pentatonic scale up from F#4, back to the bottom after two octaves, on
-  // a note block's harp, which sounds F#4 at its own pitch; Back two notes down. A dead link gets a villager's "hrmm",
+  // Each click of a game plays the next note of a pentatonic scale up from the note block's middle F# (see Note block),
+  // back to the bottom after two octaves; Back two notes down, or a mob head's sound once. A dead link gets a villager's "hrmm",
   // a checkpoint or find (and a task's toast) an arrow's ding, as heard in the game, at about half its pitch.
-  click(n) { const k = 12 * Math.floor(n % 10 / 5) + PENTATONIC[n % 5]; if (!wiki('harp', 2 ** (k / 12))) pling(370 * 2 ** (k / 12)); },
-  back() { if (wiki('harp', 2 ** (5 / 12))) { wiki('harp', 1, 0.08); return; } pling(494); pling(370, 0.08); },
+  click(n) { note(scaleNote(n)); },
+  back() { note(5); if (!noteBlock.head) note(0, 0.08); },
   dead() { if (wiki('deny')) return; tone(140, 0, 0.14, { type: 'sine', slide: 55 }); noise(0, 0.07, { gain: 0.5, cutoff: 500 }); },
   checkpoint() { if (wiki('ding', 0.5)) return; [1319, 1661, 1976].forEach((f, i) => tone(f, i * 0.07, 0.3, { type: 'sine', gain: 0.6 })); },
   win() {
@@ -2443,7 +2541,7 @@ const SOUNDS = {
 // Unplayable audio (no Web Audio, a blocked context) just means silence.
 function play(name, ...args) {
   if (!soundOn) return;
-  try { audioOut(); loadSounds(GAME_SOUNDS); SOUNDS[name](...args); } catch { /* no sound */ }
+  try { audioOut(); loadSounds([...GAME_SOUNDS, noteSound()]); SOUNDS[name](...args); } catch { /* no sound */ }
 }
 
 // ---------------------------------------------------------------- Effects
@@ -2553,13 +2651,13 @@ function scatter(from, n, colors, speed, g = 700) {
 }
 const EFFECTS = {
   orbs(from) {
-    const to = middleOf($('#hudClicks')), t = performance.now(), colors = sparkColors();
+    const to = middleOf($('#hudClicks')), t = performance.now(), colors = from.colors ?? sparkColors();
     let landed = false;
     const land = () => { if (!landed) { landed = true; bump($('#hudClicks')); } };
     for (let i = 0; i < 7; i++) {
       const x = from.x + rnd(-8, 8), y = from.y + rnd(-8, 8);
       fx.parts.push({ x, y, to, via: { x: (x + to.x) / 2 + rnd(-140, 140), y: Math.min(y, to.y) - rnd(20, 120) }, size: rnd(4, 6) | 0,
-        color: colors[i % 2], born: t + i * 25, life: rnd(450, 600), land });
+        color: colors[i % colors.length], born: t + i * 25, life: rnd(450, 600), land });
     }
   },
   puff(from) { scatter(from, 7, [cssColor('--muted')], 90, 0); },
@@ -2682,7 +2780,7 @@ function cheer(entry) {
 // Minecraft-style advancements, each a task, goal or challenge (ADV_TIERS), earned once and announced by a toast with
 // its tier's heading and sound. mwr.advancements keeps what is earned (got: key to when) and what some count toward:
 // wins, articles visited, the different articles visited (pages, by title, so a new snapshot keeps them), the topics
-// seen and the blasts that broke the page (see Items). They are checked as a page arrives (advArrive), as a game ends (advFinish) and as Distance cheers (cheer). Skill
+// seen, the blasts that broke the page (see Items) and the note block's instruments heard (see Note block). They are checked as a page arrives (advArrive), as a game ends (advFinish) and as Distance cheers (cheer). Skill
 // and speed ones need par ADV_PAR or more and the pair's first game, none of it in the history before, so a typed easy
 // pair or Retry this pair doesn't earn them; speed ones also need the Timer.
 const ADV_PAR = 3;
@@ -2740,6 +2838,8 @@ const ADVANCEMENTS = Object.fromEntries([
   ['aprilFools', 'explore', 'April Fools!', 'Visit an April Fools page.', 'task', 'Poisonous Potato', '🥔'],
   ['onARoll', 'explore', 'On a Roll', 'Have Distance cheer 3 clicks in a row.', 'goal', 'Fire Charge', '🎳'],
   ['hotStreak', 'explore', 'Hot Streak', 'Win a par 4+ game with Distance cheering every click.', 'challenge', 'Blaze Powder', '🔥'],
+  ['soundOfMusic', 'explore', 'Sound of Music', 'Hear all 20 of the note block’s instruments.', 'goal', 'Note Block', '🎵',
+    { of: Object.keys(NOTE_UNDER).length, tally: 'instruments', unit: 'instruments' }],
   ['kaboom', 'items', 'Kaboom!', 'Blow the page up.', 'task', 'TNT', '💥'],
   ['intentional', 'items', 'Intentional Game Design', 'Sleep in a bed, or set your spawn at a respawn anchor.', 'goal', 'Bed', '🛏️'],
   ['returnSender', 'items', 'Return to Sender', 'Send a ghast’s fireball back at it.', 'goal', 'Ghast', '👻'],
@@ -2758,20 +2858,27 @@ const ADVANCEMENTS = Object.fromEntries([
 ].map(([key, group, name, how, tier, icon, emoji, x]) => [key, { group, name, how, tier, icon, emoji, ...x }]));
 
 // Read through savedAdvancements, which keeps only what advancements would write: storage is open to the player.
-const advEmpty = () => ({ got: {}, wins: 0, visits: 0, blasts: 0, xp: 0, pages: new Set(), topics: [] });
+const advEmpty = () => ({ got: {}, wins: 0, visits: 0, blasts: 0, xp: 0, pages: new Set(), topics: [], instruments: new Set() });
 function savedAdvancements() {
   const s = store.get('mwr.advancements', null), a = advEmpty();
   if (!s || typeof s !== 'object') return a;
   for (const [k, at] of Object.entries(s.got && typeof s.got === 'object' ? s.got : {})) if (isKey(ADVANCEMENTS, k) && Number.isFinite(at)) a.got[k] = at;
   for (const k of ['wins', 'visits', 'blasts', 'xp']) if (Number.isInteger(s[k]) && s[k] >= 0) a[k] = s[k];
   if (Array.isArray(s.pages)) a.pages = new Set(s.pages.filter(t => typeof t === 'string'));
+  if (Array.isArray(s.instruments)) a.instruments = new Set(s.instruments.filter(k => isKey(NOTE_UNDER, k)));
   if (Array.isArray(s.topics)) a.topics = WIKI_DATA.topics.filter(t => s.topics.includes(t));
   return a;
 }
 let adv = savedAdvancements();
-const saveAdv = () => store.set('mwr.advancements', { ...adv, pages: [...adv.pages] });
-const advTally = t => t === 'streak' ? dailyStreaks(savedDailies()).now : t === 'pages' ? adv.pages.size : adv[t];
+const saveAdv = () => store.set('mwr.advancements', { ...adv, pages: [...adv.pages], instruments: [...adv.instruments] });
+const advTally = t => t === 'streak' ? dailyStreaks(savedDailies()).now : adv[t] instanceof Set ? adv[t].size : adv[t];
 const advEarned = () => Object.keys(adv.got).length;
+// A note block instrument heard (see Sounds), for Sound of Music.
+function advHeard(k) {
+  if (adv.instruments.has(k)) return;
+  adv.instruments.add(k);
+  advEarn({}); advPump();
+}
 
 // Earns each advancement whose check holds, and every count reached, queueing their toasts.
 const advQueue = [];
@@ -3015,7 +3122,7 @@ function openAdvancements() {
     $('#aDetail').innerHTML = advDetail();
   };
   $('#aReset').onclick = () => {
-    openModal(`<h2>Reset advancements?</h2><p>This forgets every advancement you’ve earned, your XP and level, and the counts toward the rest (wins, articles visited, blasts). Your history and dailies stay.</p>
+    openModal(`<h2>Reset advancements?</h2><p>This forgets every advancement you’ve earned, your XP and level, and the counts toward the rest (wins, articles visited, blasts, instruments heard). Your history and dailies stay.</p>
       <div class="actions"><button id="aKeep">Cancel</button><button class="primary" id="aWipe">Reset advancements</button></div>`);
     $('#aKeep').onclick = openAdvancements;
     $('#aWipe').onclick = () => { adv = advEmpty(); saveAdv(); renderHistory(); openAdvancements(); };
@@ -3054,13 +3161,15 @@ const ITEM_FILES = { crystal: 'End Crystal JE2.gif', ...Object.fromEntries([0, 1
 const itemPics = new Map(), itemFiles = new Map();
 let picsAsked = null, filesAsked = null, boomFrames = null;
 function itemPictures() {
-  return picsAsked ??= api({ action: 'query', titles: [...new Set([...Object.values(ITEMS).map(i => i.page), 'Ghast'])].join('|'), redirects: '1',
+  return picsAsked ??= api({ action: 'query', titles: [...new Set([...Object.values(ITEMS).map(i => i.page), 'Ghast', 'Note Block'])].join('|'), redirects: '1',
     prop: 'pageimages', piprop: 'thumbnail', pithumbsize: '160', pilimit: 'max' }).then(d => {
     const asked = new Map([...d.query?.normalized ?? [], ...d.query?.redirects ?? []].map(n => [n.to, n.from]));
     for (const p of d.query?.pages ?? []) if (p.thumbnail) itemPics.set(asked.get(p.title) ?? p.title, p.thumbnail.source);
     for (const i of document.querySelectorAll('.hotbar img[data-item-pic]')) i.src = itemPics.get(i.dataset.itemPic) ?? '';
   }, () => { picsAsked = null; }).then(() => {
     for (const b of ['#btnItems', '#hudItems']) { setImg($(b + ' img'), itemPics.get('TNT')); $(b + ' span').classList.toggle('hidden', itemPics.has('TNT')); }
+    for (const b of ['#btnNotes', '#hudNotes']) { setImg($(b + ' img'), itemPics.get('Note Block')); $(b + ' span').classList.toggle('hidden', itemPics.has('Note Block')); }
+    drawNoteBox();
   });
 }
 const itemAssets = () => Promise.all([itemPictures(), itemFileUrls()]);
@@ -3529,12 +3638,12 @@ const items = { things: new Set(), holding: null, pointer: { x: innerWidth / 2, 
                                      // when Rebuild is putting the pieces back
 const inGame = () => !$('#game').classList.contains('hidden');
 const itemsRoot = () => inGame() ? $('#game') : $('#setup');
-const keepWhole = 'iframe, #toast, .overlay, #btnBgView, #btnItems, #hudItems, .bg-facts, #setupRoom';   // a selector
+const keepWhole = 'iframe, #toast, .overlay, #btnBgView, #btnItems, #hudItems, #btnNotes, #hudNotes, .note-box, .bg-facts, #setupRoom';   // a selector
 addEventListener('pointermove', e => { items.pointer = { x: e.clientX, y: e.clientY }; items.touch = e.pointerType === 'touch'; }, { passive: true });
 addEventListener('pointerdown', e => { items.touch = e.pointerType === 'touch'; }, { passive: true });
 
 function openHotbar(btn) {
-  closeHotbar();
+  closeHotbar(); closeNoteBox();
   itemAssets();
   const bar = document.body.appendChild(Object.assign(document.createElement('div'), { className: 'hotbar', role: 'menu' }));
   bar.innerHTML = Object.entries(ITEMS).map(([k, it]) => `<button role="menuitem" data-item="${k}" aria-label="${esc(it.name)}">`
@@ -3853,7 +3962,7 @@ function rebuild() {
 }
 // Everything on the page gone, and any pieces back at once: when a game ends or starts, or the setup screen comes back.
 function itemsReset() {
-  closeHotbar(); dropItem();
+  closeHotbar(); closeNoteBox(); dropItem();
   for (const t of [...items.things]) removeThing(t);
   for (const id of items.timers) clearTimeout(id);
   items.timers.clear();
@@ -3864,6 +3973,126 @@ function itemsReset() {
   $('#rebuildBar').classList.add('hidden');
   items.broken = false;
 }
+
+// ---------------------------------------------------------------- Note block
+// The note block in the setup screen's corner, above the items' button (#btnNotes), and in the game header beside theirs
+// (#hudNotes), each the wiki's Note Block picture, or ♪: its window picks what the game's clicks play (noteBlock, see
+// Sounds) as Minecraft's note block does, by the block under it, or a mob head on top. The note block stands on the block picked, a head on it, and a click on it plays the
+// next note of the clicks' scale, with Minecraft's note rising over it in that pitch's colour (none for a head, as in
+// Minecraft, nor with the effects off). The blocks' and heads' pictures and the note's are asked for when it first
+// opens, and the instruments' sounds; a head's when it is picked, and a pick's first note waits for its sound.
+const NOTE_TEXTURE = 'File:Note (texture) JE1 BE1.png';
+const notePics = new Map();
+let notePicsAsked = null, noteTexture = null, noteRung = 0;
+const notePic = b => notePics.get(b.pic ?? b.block);
+function noteBoxPictures() {
+  const pics = [...Object.values(NOTE_UNDER), ...Object.values(NOTE_HEADS)].map(b => b.pic ?? b.block), file = t => t.startsWith('File:');
+  return notePicsAsked ??= Promise.all([
+    api({ action: 'query', titles: pics.filter(t => !file(t)).join('|'), redirects: '1', prop: 'pageimages', piprop: 'thumbnail', pithumbsize: '160', pilimit: 'max' }),
+    api({ action: 'query', titles: [...pics.filter(file), NOTE_TEXTURE].join('|'), prop: 'imageinfo', iiprop: 'url', iiurlwidth: '160' }),
+  ]).then(([d, f]) => {
+    const asked = new Map([...d.query?.normalized ?? [], ...d.query?.redirects ?? [], ...f.query?.normalized ?? []].map(n => [n.to, n.from]));
+    for (const p of d.query?.pages ?? []) if (p.thumbnail) notePics.set(asked.get(p.title) ?? p.title, p.thumbnail.source);
+    for (const p of f.query?.pages ?? []) if (p.imageinfo) notePics.set(asked.get(p.title) ?? p.title, p.imageinfo[0].thumburl ?? p.imageinfo[0].url);
+    if (notePics.has(NOTE_TEXTURE)) {
+      const im = new Image();
+      im.crossOrigin = 'anonymous'; im.onload = () => { noteTexture = im; }; im.src = notePics.get(NOTE_TEXTURE);
+    }
+    drawNoteBox();
+  }, () => { notePicsAsked = null; });
+}
+function openNoteBox(btn) {
+  closeHotbar(); closeNoteBox();
+  itemPictures(); noteBoxPictures();
+  if (soundOn) try { audioOut(); loadSounds(Object.keys(NOTE_UNDER)); } catch { /* no sound */ }
+  const box = itemsRoot().appendChild(Object.assign(document.createElement('div'), { className: 'note-box', role: 'dialog' }));
+  box.setAttribute('aria-label', 'Note block');
+  box.innerHTML = `<div class="nb-head">Note Block<button class="nb-x" aria-label="Close">✕</button></div>
+    <div class="nb-body"><div><div class="nb-stage"><img alt="" class="head hidden"><img alt="" class="block hidden"><img alt="" class="under hidden">
+      <button class="hit" aria-label="Play the note block"></button></div><p class="nb-what" aria-live="polite"></p></div>
+    <div><p class="nb-label">On top <span>(a mob head plays its mob)</span></p><div class="nb-slots heads"></div>
+      <p class="nb-label">Underneath <span>(picks the instrument)</span></p><div class="nb-slots unders"></div>
+      <p class="nb-foot">Links play it as you click them, a step up the scale each time; Back plays two notes going down.</p>
+      <p class="nb-off">Sound is off. <button class="link">Turn it on</button></p></div></div>`;
+  box.querySelector('.heads').innerHTML = noteSlot('head', '', null, 'Nothing', 'plays the block below')
+    + Object.entries(NOTE_HEADS).map(([k, h]) => noteSlot('head', k, h, h.block, `plays ${h.plays}, at one pitch`)).join('');
+  box.querySelector('.unders').innerHTML = Object.entries(NOTE_UNDER).map(([k, u]) => noteSlot('under', k, u, u.block, u.name + (u.also ? ` (${u.also})` : ''))).join('');
+  drawNoteBox();
+  // Under the header's button; beside the corner's buttons, or over them where there's no room.
+  const r = btn.getBoundingClientRect(), w = box.offsetWidth, W = document.documentElement.clientWidth;
+  if (r.top < innerHeight / 2) Object.assign(box.style, { top: r.bottom + 10 + 'px', right: Math.max(16, Math.min(W - r.right, W - w - 16)) + 'px', maxHeight: innerHeight - r.bottom - 26 + 'px' });
+  else if (r.left - 12 - w >= 16) Object.assign(box.style, { right: W - r.left + 12 + 'px', bottom: '16px' });
+  else Object.assign(box.style, { right: '16px', bottom: innerHeight - r.top + 10 + 'px', maxHeight: r.top - 26 + 'px' });
+  btn.setAttribute('aria-expanded', 'true');
+  box.onclick = e => {
+    e.stopPropagation();   // a click in it isn't one outside it
+    const b = e.target.closest('.nb-slots button');
+    if (b) {
+      if (b.dataset.kind === 'head') noteBlock.head = b.dataset.k || null;
+      else { noteBlock.under = b.dataset.k; noteBlock.head = null; }
+      store.set('mwr.noteBlock', noteBlock);
+      noteRung = 0; drawNoteBox(true); ringNote();
+    } else if (e.target.closest('.hit')) ringNote();
+    else if (e.target.closest('.nb-off button')) { setSound(true); drawNoteBox(); ringNote(); }
+    else if (e.target.closest('.nb-x')) closeNoteBox();
+  };
+  (box.querySelector('.nb-slots button.held') ?? box.querySelector('.hit')).focus();
+}
+function closeNoteBox() {
+  $('.note-box')?.remove();
+  for (const b of ['#btnNotes', '#hudNotes']) $(b).setAttribute('aria-expanded', 'false');
+}
+// A slot: b's picture (drawNoteBox puts it in once it comes), or ∅ for none on top.
+const noteSlot = (kind, k, b, label, sub) => `<button data-kind="${kind}" data-k="${k}">`
+  + (b ? `<img alt="" class="hidden" data-pic="${esc(b.pic ?? b.block)}" draggable="false">` : '<span class="none">∅</span>')
+  + `<span class="name">${esc(label)}<small>${esc(sub)}</small></span></button>`;
+// What is picked: the slots held, the note block on its block, what it plays; and the pictures that are in. dropped:
+// the pick lands, as placed.
+function drawNoteBox(dropped) {
+  const box = $('.note-box');
+  if (!box) return;
+  const u = NOTE_UNDER[noteBlock.under], h = NOTE_HEADS[noteBlock.head];
+  for (const b of box.querySelectorAll('.nb-slots button')) {
+    const on = b.dataset.kind === 'head' ? b.dataset.k === (noteBlock.head ?? '') : b.dataset.k === noteBlock.under;
+    b.classList.toggle('held', on); b.setAttribute('aria-pressed', String(on));
+  }
+  box.querySelector('.unders').classList.toggle('off', !!h);
+  for (const img of box.querySelectorAll('.nb-slots img.hidden')) setImg(img, notePics.get(img.dataset.pic));
+  const stage = box.querySelector('.nb-stage');
+  for (const [sel, src] of [['.under', notePic(u)], ['.block', itemPics.get('Note Block')], ['.head', h && notePic(h)]]) {
+    const img = stage.querySelector(sel), was = img.getAttribute('src');
+    setImg(img, src);
+    if (dropped && src && was !== src) bump(img, 'drop');
+  }
+  box.querySelector('.nb-what').innerHTML = h ? `<b>${esc(h.block)}</b>${esc(h.plays)}` : `<b>${esc(u.name)}</b>on ${esc(u.block)}`;
+  box.querySelector('.nb-off').classList.toggle('hidden', soundOn);
+}
+// The note block played: the next note of the clicks' scale, once its sound is in (if it is still the one picked), the
+// block bouncing and the note rising.
+function ringNote() {
+  const box = $('.note-box'), n = noteRung++, k = scaleNote(n), key = noteSound();
+  if (box) bump(box.querySelector('.nb-stage .block'), 'bounce');
+  if (box && noteTexture && !noteBlock.head && effectsOn && !calm()) {
+    const t = noteTexture, c = Object.assign(document.createElement('canvas'), { width: t.naturalWidth, height: t.naturalHeight }), x = c.getContext('2d');
+    x.drawImage(t, 0, 0); x.globalCompositeOperation = 'multiply'; x.fillStyle = noteColor(k); x.fillRect(0, 0, c.width, c.height);
+    x.globalCompositeOperation = 'destination-in'; x.drawImage(t, 0, 0);
+    c.style.setProperty('--dx', rnd(-15, 15) + 'px'); c.onanimationend = () => c.remove();
+    box.querySelector('.nb-stage').append(c);
+  }
+  if (!soundOn) return;
+  try { audioOut(); } catch { return; }
+  loadSounds([key]).then(() => { if (noteSound() === key) play('click', n); });
+}
+$('#btnNotes').onclick = $('#hudNotes').onclick = e => {
+  e.stopPropagation();
+  const was = e.currentTarget.getAttribute('aria-expanded') === 'true';
+  closeNoteBox(); if (!was) openNoteBox(e.currentTarget);
+};
+document.addEventListener('click', closeNoteBox);   // a click anywhere else
+document.addEventListener('keydown', e => {
+  if (e.key !== 'Escape' || !$('.note-box')) return;
+  closeNoteBox(); $(inGame() ? '#hudNotes' : '#btnNotes').focus();
+});
 
 // ---------------------------------------------------------------- Themes
 // Auto (no data-theme attribute) follows the OS. The page serving the game can add themes with
@@ -4475,8 +4704,8 @@ window.addEventListener('message', e => {
   if (e.data.mwr === 'dead' && game.active && !game.loading) { play('dead'); effect('puff', fromFrame(e.data)); }
   if (e.data.mwr === 'ready') { syncFrameTheme(); frameReady(e.data.token, e.data.live); }
   if (e.data.mwr === 'key' && e.data.key === 'Escape' && modalDismissable) closeModal();
-  if (e.data.mwr === 'key' && e.data.key === 'Escape') { closeHotbar(); dropItem(); }
-  if (e.data.mwr === 'nav' || e.data.mwr === 'dead') closeHotbar();   // a click in the article
+  if (e.data.mwr === 'key' && e.data.key === 'Escape') { closeHotbar(); closeNoteBox(); dropItem(); }
+  if (e.data.mwr === 'nav' || e.data.mwr === 'dead') { closeHotbar(); closeNoteBox(); }   // a click in the article
   if (e.data.mwr === 'move') { const p = fromFrame(e.data); if (p) items.pointer = p; }   // for the creeper
   if (e.data.mwr === 'scroll' && Number.isFinite(e.data.x) && Number.isFinite(e.data.y)) { items.frameScroll = { x: e.data.x, y: e.data.y }; positionThings(); }
   // The TNT article's easter egg (the frame's tntEgg): lit, it hisses; then it goes off, bigger than any item.
@@ -5780,7 +6009,7 @@ bgControls();
 $('#bgStyle').onchange = e => bgSetting('style', e.target.value);
 for (const [k, sel] of Object.entries(BG_BOXES)) $(sel).onchange = e => bgSetting(k, e.target.checked);
 for (const type of ['click', 'change', 'input']) $('#setup').addEventListener(type, e => {
-  if (!bgSet.roll || e.target.closest('#bgOpts, #btnBgView, #motionLabel, #btnItems') || (type === 'click' && !e.target.closest('button, a, input, select'))) return;
+  if (!bgSet.roll || e.target.closest('#bgOpts, #btnBgView, #motionLabel, #btnItems, #btnNotes, .note-box') || (type === 'click' && !e.target.closest('button, a, input, select'))) return;
   bgSetting('roll', false);
 }, true);
 document.addEventListener('click', e => { if (!e.target.closest('#bgOpts, #btnBgView')) $('#bgOpts').open = false; });

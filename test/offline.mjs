@@ -1571,6 +1571,46 @@ check('with motion reduced a moving picture of the game\'s is caught to be still
   setCalm(true); const img = Object.assign(new Image(), { src: 'https://minecraft.wiki/images/Chest.gif' }); $('#cardStart').append(img);
   await new Promise(r => setTimeout(r, 50)); const caught = img.dataset.moving === img.src;
   setCalm(false); const back = img.getAttribute('src') === 'https://minecraft.wiki/images/Chest.gif' && !('moving' in img.dataset); img.remove(); return caught && back; })()`));
+// The note block: a pick is saved and is what a click and Back play, a head its mob once at its own pitch; Nothing takes
+// the head off; what is saved is kept only if it is a block and a head.
+const notes = await ev(`(() => {
+  const heard = [], was = sample; sample = (b, rate) => heard.push(b + ' ' + rate.toFixed(3));
+  soundBank.set('bell', ['bell']); soundBank.set('zombieHead', ['zombie']); soundBank.set('creeperHead', ['creeper']);
+  $('#btnNotes').click(); const slot = k => document.querySelector('.note-box [data-k="' + k + '"]');
+  slot('bell').click(); heard.length = 0; SOUNDS.click(1); SOUNDS.back(); const bell = heard.join();
+  const saved = JSON.stringify(store.get('mwr.noteBlock'));
+  slot('zombie').click(); heard.length = 0; SOUNDS.click(3); SOUNDS.back(); const zombie = heard.join();
+  const shown = document.querySelector('.nb-what').textContent.startsWith('Zombie Head') && document.querySelector('.nb-slots.unders.off') !== null;
+  slot('creeper').click(); heard.length = 0; SOUNDS.click(0); const creeper = heard.join();
+  slot('').click(); const off = noteBlock.head === null && document.querySelector('.nb-stage .head').classList.contains('hidden') && !document.querySelector('.nb-slots.unders.off');
+  const sizes = new Set([...document.querySelectorAll('.note-box .nb-slots button')].map(b => (b.click(),
+    [document.querySelector('.note-box').offsetHeight, document.querySelector('.unders').offsetTop, document.querySelector('.nb-what').scrollHeight <= document.querySelector('.nb-what').clientHeight].join())));
+  slot('harp').click(); sample = was; ['bell', 'zombieHead', 'creeperHead'].forEach(k => soundBank.delete(k));
+  document.body.click(); const closed = !document.querySelector('.note-box') && $('#btnNotes').getAttribute('aria-expanded') === 'false';
+  return bell === 'bell 1.122,bell 1.335,bell 1.000' && saved === '{"under":"bell","head":null}' && zombie === 'zombie 1.000,zombie 1.000' && creeper === 'creeper 1.000'
+    && shown && off && sizes.size === 1 && [...sizes][0].endsWith('true') && closed || JSON.stringify([bell, saved, zombie, creeper, shown, off, [...sizes], closed]);
+})()`);
+check('the note block picks what clicks and Back play, and a mob head on top plays its mob once, at its own pitch', notes === true, notes);
+// A click's sparks take its note's colour (none for a mob head); Sound of Music is every instrument heard, counted, and
+// the count is kept only for instruments.
+check('a click\'s sparks are its note\'s colour, and with a mob head the game\'s own', await ev(`(() => {
+  fx.parts = []; effect('orbs', { x: 100, y: 100, colors: [noteColor(scaleNote(1))] }); const one = [...new Set(fx.parts.map(p => p.color))].join();
+  noteBlock.head = 'zombie'; const none = noteColor(0); noteBlock.head = null; fx.parts = [];
+  return one === '#0606FF' && none === null; })()`));
+const music = await ev(`(() => {
+  const was = sample, under = noteBlock.under; sample = () => {}; adv.instruments.clear(); delete adv.got.soundOfMusic;
+  const keys = Object.keys(NOTE_UNDER);
+  for (const k of keys.slice(0, -1)) { soundBank.set(k, ['x']); noteBlock.under = k; note(0); note(0); }
+  const before = !adv.got.soundOfMusic && advTally('instruments') === keys.length - 1;
+  soundBank.set(keys.at(-1), ['x']); noteBlock.under = keys.at(-1); note(0);
+  const after = !!adv.got.soundOfMusic && store.get('mwr.advancements').instruments.length === keys.length;
+  keys.forEach(k => soundBank.delete(k)); noteBlock.under = under; sample = was;
+  const s = store.get('mwr.advancements'); store.set('mwr.advancements', { ...s, instruments: ['bell', 'bell', 'steve', 7] });
+  const kept = [...savedAdvancements().instruments].join(); store.set('mwr.advancements', s);
+  return keys.length === 20 && before && after && kept === 'bell' || JSON.stringify([keys.length, before, after, kept]);
+})()`);
+check('Sound of Music is earned on hearing the 20th instrument, and only instruments are kept toward it', music === true, music);
+check('a saved note block that isn\'t one is the harp with nothing on top', await ev(`[noteChoice({ under: 'bedrock', head: 'steve' }), noteChoice('x'), noteChoice({ under: 'bell', head: 'dragon' })].map(c => c.under + ' ' + c.head).join() === 'harp null,harp null,bell dragon'`));
 check('with Sound off no sound is fetched', await ev("(() => { const was = soundOn; setSound(false); soundsAsked.clear(); play('click', 0); loadSounds(ITEM_SOUNDS); const none = soundsAsked.size === 0; setSound(was); return none; })()"));
 await send('browsingContext.setViewport', { context: ctx, viewport: { width: 390, height: 844 } });
 check('Auto is the redstone map at a phone\'s width', await until("bgStyle() === 'redstone' && bg.W <= 390 && bg.grid?.W === bg.W"), await ev('JSON.stringify([bgStyle(), bg.W, bg.grid?.W])'));

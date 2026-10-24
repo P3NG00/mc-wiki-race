@@ -1415,9 +1415,17 @@ async function setupPar() {
 }
 
 // A shortest route for the cards' titles, in cardKeys order, and Scavenger's kinds if it has them, under rules, with
-// back of the checkpoints after the target.
-const cardsRoute = (titles, rules, kinds = null, back = 0) =>
-  parRoute({ start: titles[0], vias: titles.slice(1, -1), goal: titles.at(-1), back, kinds, rules, content: contentInPlay(titles) });
+// back of the checkpoints after the target. The last search is kept by all it went by (lastRoute), so Start and Retry this
+// pair take the route the setup screen has just found rather than searching again; one that fails isn't kept.
+let lastRoute = { key: null, route: null };
+function cardsRoute(titles, rules, kinds = null, back = 0) {
+  const content = contentInPlay(titles), key = JSON.stringify([titles, rules, kinds, back, content]);
+  if (lastRoute.key === key) return lastRoute.route;
+  const route = parRoute({ start: titles[0], vias: titles.slice(1, -1), goal: titles.at(-1), back, kinds, rules, content });
+  route.catch(() => { if (lastRoute.route === route) lastRoute = { key: null, route: null }; });
+  lastRoute = { key, route };
+  return route;
+}
 
 // Enables Start only for different articles on every card in use, with no lookup in flight. Under Blind target only
 // the start is shown, and Start picks the rest itself (pickHidden).
@@ -2255,12 +2263,15 @@ function startGame() {
 }
 
 // Parse results by requested and resolved title, so Back and "Retry this pair" don't refetch.
-// The API marks parse responses uncacheable, so the browser cache doesn't help here. Cleared on return to setup.
+// The API marks parse responses uncacheable, so the browser cache doesn't help here. Cleared on return to setup. At most
+// PARSE_CACHE_MAX titles, and PARSE_CACHE_TEXT characters of articles in all (a long one is over a million, so 40 could
+// hold tens of megabytes on a phone), the oldest going first, but never the page just cached.
 const parseCache = new Map();
-const PARSE_CACHE_MAX = 40;
+const PARSE_CACHE_MAX = 40, PARSE_CACHE_TEXT = 10e6;
 function cacheParse(keys, page) {
   for (const k of keys) { parseCache.delete(k); parseCache.set(k, page); }
-  while (parseCache.size > PARSE_CACHE_MAX) parseCache.delete(parseCache.keys().next().value);
+  const text = () => [...new Set(parseCache.values())].reduce((n, p) => n + (p.text?.length ?? 0), 0);
+  while (parseCache.size > new Set(keys).size && (parseCache.size > PARSE_CACHE_MAX || text() > PARSE_CACHE_TEXT)) parseCache.delete(parseCache.keys().next().value);
 }
 // An article from the wiki. A reply without one fails here, so it fails inside navigate's try.
 const askParse = title => api({ action: 'parse', page: title, prop: 'text|displaytitle|categories', redirects: '1', disableeditsection: '1', disablelimitreport: '1' })

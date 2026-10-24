@@ -39,6 +39,9 @@ def page(title, ns, content, cats=(), hidden=()):
 NAVBOX = ('<table class="navbox hlist collapsible"><tr><td><a href="Creeper">Creeper</a>'
           '<table class="navbox-inner"><tr><td><a href="Block">Block</a></td></tr></table>'
           '<a href="Diamond_Pickaxe">again in a navbox</a></td></tr></table>')
+# An advancement's list of what it asks for, folded, with divs inside it, and a link after it that is the page's again.
+REQUIRED = ('<table class="wikitable"><tr><td>Kill one of these: <div class="collapsible collapsed"><div class="hlist searchaux">'
+            '<ul><li><div class="nowrap"><a href="Creeper">Creeper</a></div></li></ul></div></div> <a href="Breaking">after it</a></td></tr></table>')
 # A navbox both its pages carry, each showing itself as plain text, as mwoffliner does: build.py stores it once.
 family = lambda own: '<table class="navbox"><tr><td>' + ' '.join(
     f'<b>{t}</b>' if t == own else f'<a href="{t.replace(" ", "_")}">{t}</a>' for t in ('Charcoal', 'Iron Ingot')) + '</td></tr></table>'
@@ -48,7 +51,7 @@ PAGES = {
                    '<a href="https://example.com/">external</a>, <a class="new" href="Nope">red link</a>, '
                    '<a href="Diamond">itself</a>, <a href="Village_%26_Pillage">encoded</a>, <a href="Village_&amp;_Pillage">escaped</a></p>'
                    '<div class="mw-heading mw-heading2"><h2 id="Obtaining">Obtaining</h2></div>'
-                   '<map><area href="Breaking" shape="rect"></map>' + NAVBOX, ['Items'], ['Pages with sound tables']),
+                   '<map><area href="Breaking" shape="rect"></map>' + REQUIRED + NAVBOX, ['Items'], ['Pages with sound tables']),
     'Diamond Pickaxe': (0, '<a href="Diamond">diamond</a> <a href="Block">block</a>', ['Items', 'Tools']),
     'Creeper': (0, '<a href="Diamond">diamond</a> <a href="Dungeons%3ACreeper">in Dungeons</a> <a href="1.0">a version</a>',
                 ['Hostile mobs', 'Entities']),
@@ -142,7 +145,7 @@ with tempfile.TemporaryDirectory() as tmp:
     d = snap.pages['Diamond']
     check('links outside navboxes, image maps included, the page header left out',
           d['body'] == ['Breaking', 'Diamond', 'Diamond Pickaxe', 'Iron ingot', 'Tutorial:Mining', 'Village & Pillage'], d['body'])
-    check('links in navboxes, nested tables included', d['nav'] == ['Block', 'Creeper', 'Diamond Pickaxe'], d['nav'])
+    check('links in navboxes, nested tables included, and in a requirement list up to its end', d['nav'] == ['Block', 'Creeper', 'Diamond Pickaxe'], d['nav'])
     check('links above the first heading, outside navboxes, or the whole page with no heading',
           d['lead'] == ['Diamond', 'Diamond Pickaxe', 'Iron ingot', 'Tutorial:Mining', 'Village & Pillage']
           and snap.pages['Iron Ingot']['lead'] == ['Diamond'], (d['lead'], snap.pages['Iron Ingot']['lead']))
@@ -250,7 +253,7 @@ with tempfile.TemporaryDirectory() as tmp:
           names(links[number['Diamond']]) == ['Breaking', 'Diamond Pickaxe', 'Iron Ingot', 'Village & Pillage'], names(links[number['Diamond']]))
     check('the graph: a navbox two pages carry is stored once, with both',
           carries[number['Charcoal']] == carries[number['Iron Ingot']] and [names(boxes[b]) for b in carries[number['Charcoal']]] == [['Charcoal', 'Iron Ingot']]
-          and [names(boxes[b]) for b in carries[number['Diamond']]] == [['Block', 'Creeper', 'Diamond', 'Diamond Pickaxe']], [names(b) for b in boxes])
+          and [names(boxes[b]) for b in carries[number['Diamond']]] == [['Block', 'Creeper', 'Diamond', 'Diamond Pickaxe'], ['Creeper', 'Diamond']], [names(b) for b in boxes])
     check('the graph: links above the first heading by page number', names(lead[number['Diamond']]) == ['Diamond Pickaxe', 'Iron Ingot', 'Village & Pillage'],
           names(lead[number['Diamond']]))
     graph_files = render_graph(data, links, boxes, carries, lead)

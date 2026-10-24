@@ -3918,7 +3918,10 @@ function renderArticle(page, fragment, token, blocked = [], seen = []) {
     const FIRST_HEADING = ${lead} && document.querySelector('.mw-parser-output :is(.mw-heading, h2, h3, h4, h5, h6):not(.toc *, #toc *)');
     const belowTop = a => ${lead} && (!!a.closest('.navbox') || !!FIRST_HEADING && !!(FIRST_HEADING.compareDocumentPosition(a) & Node.DOCUMENT_POSITION_FOLLOWING));
     function classify(a) {
-      if (NO_NAV && a.closest('.navbox')) return null;   // hidden too; this keeps them dead whatever the CSS does
+      // Navboxes are hidden too; this keeps them dead whatever the CSS does. An advancement's list of what it asks for
+      // (.hlist.searchaux: "Kill one of these 41 monsters", folded behind [show]) is a navbox in all but looks: the same
+      // list on every page it concerns, which the snapshot counts as a navbox (see docs/wiki-data.md). It stays in sight, dead.
+      if (NO_NAV && a.closest('.navbox, .hlist.searchaux')) return null;
       const href = a.getAttribute('href') || '';
       if (href.startsWith('#')) { try { return { kind: 'anchor', id: decodeURIComponent(href.slice(1)) }; } catch (e) { return null; } }
       if (!href.startsWith('/w/') || a.classList.contains('new')) return null;

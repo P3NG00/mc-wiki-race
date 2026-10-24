@@ -7,7 +7,9 @@ the pages' body classes). Then {"page": title, "ns", "cats", "body", "lead", "bo
 titles it links to outside navbox tables, lead those of them above its first heading (the intro, its infobox and
 hatnotes: the whole page if it has no heading), for Top links only, and boxes its navboxes, each the titles it links to. A
 navbox shows the page it is on as plain text, so that title is added back: every copy of a navbox then has the same
-titles, and build.py stores each once.
+titles, and build.py stores each once. An advancement's or achievement's list of what it asks for (div.hlist.searchaux:
+"Kill one of these 41 monsters", "Eat each of these foods", folded behind [show] on most pages) counts as a navbox too:
+the same list on every page it concerns, it would otherwise put every mob one click from every other.
 Then {"redirect": title, "to": title} for every redirect. Titles are in display form (spaces, no fragment). build.py and
 report.py read this file, so the ZIM is only scanned once, which takes about a minute.
 """
@@ -19,8 +21,8 @@ DEFAULT_OUT = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'cache')
 
 NS = re.compile(r'<body[^>]*\bclass="[^"]*\bns-(-?\d+)\b')
 REFRESH = re.compile(r'<meta http-equiv="refresh" content="0;URL=\'([^\']*)\'')
-# Table starts and ends, and links (image maps have <area> links), in document order.
-TOKEN = re.compile(r'<(/?)(table|a|area)\b([^>]*)>')
+# Table and div starts and ends, and links (image maps have <area> links), in document order.
+TOKEN = re.compile(r'<(/?)(table|a|area|div)\b([^>]*)>')
 CLASS = re.compile(r'\bclass="([^"]*)"')
 HREF = re.compile(r'\bhref="([^"]*)"')
 CATEGORY = re.compile(r'\btitle="Category:([^"]+)"')
@@ -40,16 +42,26 @@ def link_title(href, page):
 
 def page_links(doc, page):
     """Titles linked outside navbox tables, those of them above the first heading, and each navbox (an outermost .navbox
-    table, nested tables included) as the titles it links to plus the page's own. From the parser output only, not the
-    page's header or footer."""
+    table, nested tables included, or a requirement list, div.hlist.searchaux, outside one) as the titles it links to
+    plus the page's own. From the parser output only, not the page's header or footer."""
     start = doc.find('mw-parser-output')
     end = doc.find('id="catlinks"')
     region = doc[max(start, 0):end if end >= 0 else len(doc)]
     heading = HEADING.search(region)
     lead_end = heading.start() if heading else len(region)
     body, lead, boxes, tables = set(), set(), [], []   # tables: for each open table, whether it or one around it is a navbox
+    listed = 0   # how many divs deep inside a requirement list, 0 outside one
     for m in TOKEN.finditer(region):
         close, tag, attrs = m.groups()
+        if tag == 'div':
+            if listed:
+                listed += -1 if close else 1
+            elif not close and not (tables and tables[-1]):
+                cls = CLASS.search(attrs)
+                if cls and {'hlist', 'searchaux'} <= set(cls.group(1).split()):
+                    listed = 1
+                    boxes.append({page.replace('_', ' ')})
+            continue
         if tag == 'table':
             if close:
                 if tables:
@@ -69,7 +81,7 @@ def page_links(doc, page):
             continue
         title = link_title(href.group(1), page)
         if title:
-            if tables and tables[-1]:
+            if listed or (tables and tables[-1]):
                 boxes[-1].add(title)
             else:
                 body.add(title)

@@ -1699,6 +1699,28 @@ await send('input.performActions', { context: ctx, actions: [{ type: 'wheel', id
 check('scrolling lets go', await until("!keep && !$('#setup').classList.contains('keeping')"));
 await ev('renderHistory()');
 
+// A live link pressed with the mouse is asked for at the press, and its click takes that request rather than making
+// another; one pressed and let go elsewhere is still asked for once when it is clicked later.
+await open('#start=Diamond&target=Crafting');
+await play();
+const framePoint = async href => JSON.parse(await ev(`(() => { const r = document.querySelector('a[href="${href}"]').getBoundingClientRect();
+  return JSON.stringify({ x: Math.round(r.left + r.width / 2), y: Math.round(r.top + r.height / 2) }); })()`, await frameCtx()));
+const pointer = actions => send('input.performActions', { context: ctx, actions: [{ type: 'pointer', id: 'mouse', parameters: { pointerType: 'mouse' }, actions }] });
+const frameAt = JSON.parse(await ev("(r => JSON.stringify({ x: Math.round(r.left), y: Math.round(r.top) }))($('#frame').getBoundingClientRect())"));
+const parses = () => requests.get('parse prop=text|displaytitle|categories') ?? 0;
+let before = parses(), at = await framePoint('/w/Diamond_Pickaxe');
+await pointer([{ type: 'pointerMove', x: frameAt.x + at.x, y: frameAt.y + at.y }, { type: 'pointerDown', button: 0 }, { type: 'pause', duration: 120 }, { type: 'pointerUp', button: 0 }]);
+check('a link pressed and clicked is asked for once, at the press, and arrives', await until("game.path.length === 2 && !game.loading") && parses() - before === 1,
+  JSON.stringify([parses() - before, await ev('game.path.map(p => p.title).join()')]));
+before = parses(); at = await framePoint('/w/Gold_Ingot');
+await pointer([{ type: 'pointerMove', x: frameAt.x + at.x, y: frameAt.y + at.y }, { type: 'pointerDown', button: 0 }, { type: 'pointerMove', x: 5, y: 5, duration: 50 }, { type: 'pointerUp', button: 0 }]);
+await sleep(300);
+const pressedOnly = parses() - before;
+await ev(`document.querySelector('a[href="/w/Gold_Ingot"]').click()`, await frameCtx());
+check('one pressed and let go elsewhere is asked for at the press, and its later click asks no more', await until("game.path.length === 3 && !game.loading")
+  && pressedOnly === 1 && parses() - before === 1, JSON.stringify([pressedOnly, parses() - before]));
+await ev('closeModal(); toSetup()');
+
 // Injection: a link can carry any text, so a sealed one whose titles are markup and script, with a junk kind (sealing
 // leaves its junk rules and back out), is played through every place a title shows (cards, header, path, a frame link,
 // the banner, the peek, the result, the history). The made-up wiki takes the titles as real pages, which the live one never would, so it is the stricter

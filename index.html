@@ -2250,11 +2250,25 @@ function cacheParse(keys, page) {
   for (const k of keys) { parseCache.delete(k); parseCache.set(k, page); }
   while (parseCache.size > PARSE_CACHE_MAX) parseCache.delete(parseCache.keys().next().value);
 }
+// An article from the wiki. A reply without one fails here, so it fails inside navigate's try.
+const askParse = title => api({ action: 'parse', page: title, prop: 'text|displaytitle|categories', redirects: '1', disableeditsection: '1', disablelimitreport: '1' })
+  .then(d => d.parse || Promise.reject(new Error('The wiki sent no article')));
+// A live link pressed with a mouse or pen (the frame posts {mwr:'press'}): its article is asked for at once, the request
+// its click would make, sent the 50 to 150 ms sooner that a click comes after the press. The next navigation takes it if
+// it goes there, else drops it, as does going back to setup. A failure is the click's to show, as its own would be.
+let pressed = null;   // { title, reply }
+function pressLink(title) {
+  if (!game.active || game.loading || parseCache.has(title) || pressed?.title === title) return;
+  const reply = askParse(title);
+  reply.catch(() => {});
+  pressed = { title, reply };
+}
 
 // from: where the click was on the page, for its sparks (effect).
 async function navigate(title, fragment, { back = false, from = null } = {}) {
   if (!game.active || game.loading) return;
-  const token = ++game.navToken;
+  const token = ++game.navToken, early = pressed?.title === title ? pressed.reply : null;
+  pressed = null;
   // Blocks placed on the article go with it (see Items); the next one starts unscrolled.
   for (const t of [...items.things]) if (t.anchor?.on === 'frame') removeThing(t);
   items.frameScroll = { x: 0, y: 0 };
@@ -2272,9 +2286,7 @@ async function navigate(title, fragment, { back = false, from = null } = {}) {
   try {
     // A reply without an article has to fail here, where Retry is offered: past this point the game would stay
     // loading, with Give up disabled.
-    page = await (parseCache.get(title) ||
-      api({ action: 'parse', page: title, prop: 'text|displaytitle|categories', redirects: '1', disableeditsection: '1', disablelimitreport: '1' })
-        .then(d => d.parse || Promise.reject(new Error('The wiki sent no article'))));
+    page = await (parseCache.get(title) || early || askParse(title));
   } catch (e) {
     if (token !== game.navToken) return;
     game.loading = false;
@@ -4253,6 +4265,13 @@ function renderArticle(page, fragment, token, blocked = [], seen = []) {
       if (c.kind === 'anchor') scrollToId(c.id);
       else parent.postMessage({ mwr: 'nav', title: c.title, frag: c.frag, ...at }, '*');
     }, true);
+    // A live link pressed with a mouse or pen, so the parent can ask for its article ahead of the click. Not a finger's
+    // press, which may only be the start of a scroll.
+    document.addEventListener('pointerdown', e => {
+      if (e.button !== 0 || e.pointerType === 'touch') return;
+      const a = e.target.closest('a, area'), c = a && classify(a);
+      if (c?.kind === 'article') parent.postMessage({ mwr: 'press', title: c.title }, '*');
+    }, { capture: true, passive: true });
     document.addEventListener('submit', e => e.preventDefault(), true);
     document.addEventListener('keydown', e => parent.postMessage({ mwr: 'key', key: e.key }, '*'));
     // Blowing the article up (see Items): the page's own pageBreaker, run on the article's pieces. The pointer is
@@ -4748,6 +4767,7 @@ function fromFrame({ x, y }) {
 }
 window.addEventListener('message', e => {
   if (e.source !== $('#frame').contentWindow || !e.data) return;
+  if (e.data.mwr === 'press' && typeof e.data.title === 'string') pressLink(e.data.title);
   if (e.data.mwr === 'nav') navigate(e.data.title, e.data.frag, { from: fromFrame(e.data) });
   if (e.data.mwr === 'dead' && game.active && !game.loading) { play('dead'); effect('puff', fromFrame(e.data)); }
   if (e.data.mwr === 'ready') { syncFrameTheme(); frameReady(e.data.token, e.data.live); }
@@ -5304,6 +5324,7 @@ function toSetup() {
   removeEventListener('beforeunload', guardLeaving);
   clearInterval(game.timer);
   parseCache.clear();
+  pressed = null;
   $('#frame').srcdoc = '';
   $('#game').classList.add('hidden');
   $('#setup').classList.remove('hidden');

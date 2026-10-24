@@ -196,6 +196,17 @@ check('a hovered slot shows a Minecraft-style tooltip, with a note on a link to 
   slotTip[1].startsWith('Minecraft') && !slotTip[3] && tipGone && seenTip === 'Diamond\nAlready on your path|Already on your path', JSON.stringify([...slotTip, tipGone, seenTip]));
 await ev("document.querySelector('#minetip-tooltip')?.remove()", f);
 await send('input.releaseActions', { context: ctx });
+// With motion reduced the slots don't cycle by themselves, and the button beside the grid moves them on once.
+await ev('setCalm(true)');
+const calmFrom = await ev(shownItem, f);
+await sleep(4500);
+const calmStill = await ev(shownItem, f);
+await ev(`(s => (s.closest('.animated-container, .mcui').querySelector(':scope > .mwr-step') ?? s.nextElementSibling).click())(${outputSlot})`, f);
+await sleep(200);
+const calmStepped = await ev(shownItem, f);
+await ev('setCalm(false)');
+check('with motion reduced the slots hold still, and the button beside the grid moves them on', !!calmFrom && calmStill === calmFrom && calmStepped !== calmFrom
+  && await until("!document.querySelector('.mwr-step')", 2000, f), `${calmFrom} -> ${calmStill} -> ${calmStepped}`);
 // The infobox's tabs (Wooden, Golden, Stone…) show one picture at a time, and clicking a tab switches to it.
 const tabState = `JSON.stringify((t => ({ tabs: [...t.querySelectorAll('.tabbernav li')].map(li => (li.classList.contains('tabberactive') ? '*' : '') + li.textContent),
   shown: [...t.querySelectorAll(':scope > .tabbertab')].filter(p => p.offsetHeight).map(p => p.dataset.title) }))(document.querySelector('.infobox .tabber')))`;

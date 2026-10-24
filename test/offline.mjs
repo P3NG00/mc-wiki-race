@@ -1544,6 +1544,10 @@ check('Effects unticked stops the game\'s effects but not the items\', and is sa
 check('Reduce motion holds it unticked, and back off leaves it as it was', await ev(`(() => { $('#effectsToggle').click(); setCalm(true); const held = $('#effectsToggle').disabled && !$('#effectsToggle').checked;
   setCalm(false); return held && $('#effectsToggle').checked && !$('#effectsToggle').disabled && store.get('mwr.effects') === true; })()`));
 await ev('fx.parts = []');
+check('with motion reduced a moving picture of the game\'s is caught to be stilled, and put back after', await ev(`(async () => {
+  setCalm(true); const img = Object.assign(new Image(), { src: 'https://minecraft.wiki/images/Chest.gif' }); $('#cardStart').append(img);
+  await new Promise(r => setTimeout(r, 50)); const caught = img.dataset.moving === img.src;
+  setCalm(false); const back = img.getAttribute('src') === 'https://minecraft.wiki/images/Chest.gif' && !('moving' in img.dataset); img.remove(); return caught && back; })()`));
 check('with Sound off no sound is fetched', await ev("(() => { const was = soundOn; setSound(false); soundsAsked.clear(); play('click', 0); loadSounds(ITEM_SOUNDS); const none = soundsAsked.size === 0; setSound(was); return none; })()"));
 await send('browsingContext.setViewport', { context: ctx, viewport: { width: 390, height: 844 } });
 check('Auto is the redstone map at a phone\'s width', await until("bgStyle() === 'redstone' && bg.W <= 390 && bg.grid?.W === bg.W"), await ev('JSON.stringify([bgStyle(), bg.W, bg.grid?.W])'));

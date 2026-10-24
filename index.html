@@ -5336,9 +5336,10 @@ const BG_PHONE = matchMedia('(max-width: 720px)');
 const bgStyle = () => bgSet.style === 'auto' ? (BG_PHONE.matches ? 'redstone' : 'constellation') : bgSet.style;
 const bgCanvas = $('#bgCanvas'), bgCtx = bgCanvas.getContext('2d');
 // shown: whether the setup screen is. pair: what is marked (bgPair). sky and grid: the two pictures, made when first
-// needed (skyWait: the sky's is under way). colors: from the theme (bgTheme). links: the link graph's, once it is in.
-// linkFacts and sampled: the facts counted from it, sampled per difficulty (sampling: under way).
-const bg = { shown: true, W: 0, H: 0, dpr: 1, raf: 0, last: 0, colors: null, sky: null, skyWait: false, grid: null, pulses: [], nextPulse: 0,
+// needed (skyWait: the sky's is under way), and nebulae, the sky's still part (skyNebulae). colors: from the theme
+// (bgTheme). links: the link graph's, once it is in. linkFacts and sampled: the facts counted from it, sampled per
+// difficulty (sampling: under way).
+const bg = { shown: true, W: 0, H: 0, dpr: 1, raf: 0, last: 0, colors: null, sky: null, skyWait: false, grid: null, nebulae: null, pulses: [], nextPulse: 0,
   pair: null, pairToken: 0, nextRoll: 0, links: null, linkFacts: null, facts: [], pairFacts: [], factsToken: 0, factTurn: 0, factTimer: 0,
   fadeTimer: 0, sampled: new Map(), sampling: false, cursor: { x: 0, y: 0, in: false }, glow: 0 };
 const bgNow = () => performance.now();
@@ -5438,6 +5439,28 @@ function skySpot(page) {
   const avg = k => near.reduce((s, v) => s + nodes[at.get(v)][k], 0) / near.length;
   return [avg('x') + (h % 100 - 50) / 1200, avg('y') + ((h >>> 8) % 100 - 50) / 1200];
 }
+// A faint nebula behind each topic's cluster, where its stars sit when still. Drawn once for the canvas's size and the
+// theme (bg.nebulae) and copied in at every frame: the gradients took more than all the rest of a frame.
+function skyNebulae() {
+  const { nodes } = bg.sky, c = bg.colors, key = [bgCanvas.width, bgCanvas.height, bg.dpr].join();
+  if (bg.nebulae?.colors === c && bg.nebulae.key === key) return bg.nebulae.canvas;
+  const canvas = Object.assign(document.createElement('canvas'), { width: bgCanvas.width, height: bgCanvas.height }), ctx = canvas.getContext('2d');
+  const P = nodes.map(n => skyPlace(n.x, n.y));
+  ctx.setTransform(bg.dpr, 0, 0, bg.dpr, 0, 0);
+  WIKI_DATA.topics.forEach((k, ti) => {
+    const m = nodes.flatMap((n, i) => n.topic === ti ? [i] : []);
+    if (!m.length) return;
+    const cx = m.reduce((a, i) => a + P[i][0], 0) / m.length, cy = m.reduce((a, i) => a + P[i][1], 0) / m.length;
+    const rad = Math.sqrt(m.reduce((a, i) => a + (P[i][0] - cx) ** 2 + (P[i][1] - cy) ** 2, 0) / m.length) * 1.5 || 1;
+    const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, rad);
+    g.addColorStop(0, bgRgba(c.topic[ti], .1 * c.strength));
+    g.addColorStop(1, bgRgba(c.topic[ti], 0));
+    ctx.fillStyle = g;
+    ctx.fillRect(cx - rad, cy - rad, 2 * rad, 2 * rad);
+  });
+  bg.nebulae = { canvas, colors: c, key };
+  return canvas;
+}
 // A pulse plays a game along the links: from a random star to one at least three clicks away.
 function skyPulse(t) {
   const { nodes, ahead } = bg.sky;
@@ -5458,20 +5481,11 @@ function skyPulse(t) {
 function drawSky(t) {
   const { nodes, lines, labelled } = bg.sky, c = bg.colors, s = c.strength, ctx = bgCtx, P = nodes.map(n => skyStar(n, t));
   bgLens(P);
-  // a faint nebula behind each topic's cluster
-  WIKI_DATA.topics.forEach((k, ti) => {
-    const m = nodes.flatMap((n, i) => n.topic === ti ? [i] : []);
-    if (!m.length) return;
-    const cx = m.reduce((a, i) => a + P[i][0], 0) / m.length, cy = m.reduce((a, i) => a + P[i][1], 0) / m.length;
-    const rad = Math.sqrt(m.reduce((a, i) => a + (P[i][0] - cx) ** 2 + (P[i][1] - cy) ** 2, 0) / m.length) * 1.5 || 1;
-    const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, rad);
-    g.addColorStop(0, bgRgba(c.topic[ti], .1 * s));
-    g.addColorStop(1, bgRgba(c.topic[ti], 0));
-    ctx.fillStyle = g;
-    ctx.fillRect(cx - rad, cy - rad, 2 * rad, 2 * rad);
-  });
-  ctx.lineWidth = 1;
-  ctx.strokeStyle = bgRgba(c.ink, (c.dark ? .08 : .12) * s);
+  ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.drawImage(skyNebulae(), 0, 0); ctx.restore();
+  // The links a device pixel wide, as strong as two would be: a wider line takes several times as long to draw where
+  // the canvas has no GPU (27 ms a frame at twice the pixels, against 5).
+  ctx.lineWidth = 1 / bg.dpr;
+  ctx.strokeStyle = bgRgba(c.ink, Math.min(1, (c.dark ? .08 : .12) * s * bg.dpr));
   ctx.beginPath();
   for (const [a, b] of lines) { ctx.moveTo(...P[a]); ctx.lineTo(...P[b]); }
   ctx.stroke();
@@ -5840,8 +5854,11 @@ function bgNextFact() {
 }
 
 // ---- Drawing, about 30 times a second while the setup screen shows and the page is in view; once a change when still.
+// The canvas's pixels for each of the page's, as many as the screen's up to 2. A window moved to a screen with other
+// pixels may keep its size, so bgPaint checks it at every frame.
+const bgDpr = () => Math.min(2, devicePixelRatio || 1);
 function bgSize() {
-  bg.dpr = Math.min(2, devicePixelRatio || 1);
+  bg.dpr = bgDpr();
   bg.W = bgCanvas.clientWidth; bg.H = bgCanvas.clientHeight;
   bgCanvas.width = Math.round(bg.W * bg.dpr); bgCanvas.height = Math.round(bg.H * bg.dpr);
 }
@@ -5860,6 +5877,7 @@ const bgLive = () => bg.shown && bgStyle() !== 'off' && !document.hidden;
 const bgSchedule = () => { if (!bg.raf && bgLive() && !calm()) bg.raf = requestAnimationFrame(bgFrame); };
 function bgPaint(t) {
   const style = bgStyle();
+  if (bgDpr() !== bg.dpr) bgSize();
   bgCtx.setTransform(bg.dpr, 0, 0, bg.dpr, 0, 0);
   bgCtx.clearRect(0, 0, bg.W, bg.H);
   if (!bg.W || !bg.H || !bg.colors) return;

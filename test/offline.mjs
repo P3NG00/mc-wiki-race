@@ -1330,6 +1330,15 @@ await until("!document.querySelector('#setup [data-broke-style]')", 3000);
 await ev("scrollTo(0, 0); holdItem('tnt'); $('.hold').onclick({ clientX: 300, clientY: 500 }); dropItem()");
 await ev("scrollTo(0, 200)");
 check('a block on the setup screen scrolls with the page', await until("(t => t.p.y === 300 && t.el.style.top === '300px')([...items.things][0])", 2000), await ev("[...items.things][0].p.y"));
+// So do sparks: one on the page is drawn moved up as far as the page scrolled since.
+const red = (x, y) => `(d => d[0] > 200 && d[1] < 60)(fxCtx.getImageData(${x} * fx.dpr, ${y} * fx.dpr, 1, 1).data)`;
+await ev("fx.parts = [{ x: 100, y: 400, vx: 0, vy: 0, g: 0, size: 8, color: '#ff0000', born: performance.now(), life: 5000, ...fxOn({ on: 'page' }) }]; fx.last = performance.now(); fx.raf ||= requestAnimationFrame(fxFrame); scrollTo(0, 300)");
+await ev("new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)))");
+check('and a spark on it as well', await ev(`${red(100, 300)} && !${red(100, 400)}`));
+await ev("fx.parts = []; holdItem('bed'); $('.hold').onclick({ clientX: 400, clientY: 300 }); dropItem(); $('.thing.bed').click()");
+check('as a blast\'s are', await ev("fx.parts.length > 0 && fx.parts.every(p => p.on === 'page' && p.at.y === 300)"));
+await ev("$('#btnRebuild').click()");
+await until("!items.broken && !document.querySelector('#setup [data-broke-style]')", 4000);
 await ev('scrollTo(0, 0); itemsReset()');
 await open('#start=Diamond&target=Crafting&rules=nonav');
 await play();
@@ -1343,6 +1352,7 @@ check('out of sight once scrolled out of the frame', await until("[...items.thin
 // where it was, and the wheel, passed on, scrolls it while it is in pieces.
 await ev("document.body.style.overflowY = 'scroll'; scrollTo(0, 300)", await frameCtx());
 await ev(`(r => { holdItem('crystal'); $('.hold').onclick({ clientX: r.left + 200, clientY: r.top + 200 }); dropItem(); $('.thing.crystal').click(); })($('#frame').getBoundingClientRect())`);
+check('a blast on the article has its sparks go with the article', await ev("fx.parts.length > 0 && fx.parts.every(p => p.on === 'frame' && p.at.y === items.frameScroll.y)"));
 await sleep(300);
 check('a blast on a scrolled article leaves it scrolled where it was, and unable to scroll sideways', await ev("scrollY === 300 && document.scrollingElement.scrollHeight > innerHeight && getComputedStyle(document.body).overflowX === 'hidden'", await frameCtx()),
   await ev("JSON.stringify([scrollY, document.scrollingElement.scrollHeight, innerHeight])", await frameCtx()));

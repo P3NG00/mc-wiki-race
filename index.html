@@ -2361,14 +2361,18 @@ const sparkColors = () => [cssColor('--accent'), cssColor('--viz-items')];
 // Restarts an element's bump animation (.bump, or the class given).
 function bump(el, cls = 'bump') { el.classList.remove(cls); void el.offsetWidth; el.classList.add(cls); }
 // Each spark is a square: flying free (velocity v in px/s, gravity g, fading) or, with to, along a curve through via
-// into to, speeding up. born and life are in ms, born possibly ahead; land runs when a spark with to gets there.
+// into to, speeding up. born and life are in ms, born possibly ahead; land runs when a spark with to gets there. A
+// spark from a point on something that scrolls (from.on: the page, or the article's frame, see Items) goes with it:
+// it keeps that scroll as it was (at), and is drawn moved by as much as it has scrolled since.
 const rnd = (a, b) => a + Math.random() * (b - a);
+const fxScroll = () => ({ page: { x: scrollX, y: scrollY }, frame: items.frameScroll });
+const fxOn = from => from.on ? { on: from.on, at: { ...fxScroll()[from.on] } } : {};
 function scatter(from, n, colors, speed, g = 700) {
-  const t = performance.now();
+  const t = performance.now(), on = fxOn(from);
   for (let i = 0; i < n; i++) {
     const a = rnd(0, 2 * Math.PI), v = rnd(speed * .35, speed);
     fx.parts.push({ x: from.x, y: from.y, vx: Math.cos(a) * v, vy: Math.sin(a) * v - speed * .45, g, size: rnd(3, 6) | 0,
-      color: colors[i % colors.length], born: t + rnd(0, 60), life: rnd(650, 1100) });
+      color: colors[i % colors.length], born: t + rnd(0, 60), life: rnd(650, 1100), ...on });
   }
 }
 const EFFECTS = {
@@ -2386,12 +2390,13 @@ const EFFECTS = {
   // Minecraft's explosion (see Items), as its emitter makes it: puffs around the blast for 8 ticks, each playing the 16
   // frames once in 6 to 10 ticks (a tick is 50 ms), and grey debris. Without the frames, the debris only.
   blast(from) {
-    const t = performance.now(), r = 70 * from.power;
+    const t = performance.now(), r = 70 * from.power, on = fxOn(from);
     if (boomFrames) for (let tick = 0; tick < 8; tick++) for (let i = 0; i < 6 * from.power; i++)
       fx.parts.push({ x: from.x + rnd(-r, r), y: from.y + rnd(-r, r) * .8, size: rnd(64, 128) * Math.sqrt(from.power) | 0, frames: boomFrames[Math.floor(rnd(0, 4))],
-        born: t + tick * 50, life: rnd(300, 500) });
+        born: t + tick * 50, life: rnd(300, 500), ...on });
     scatter(from, 30 * from.power | 0, ['#e0e0e0', '#9e9e9e', '#6b6b6b', '#4a4a4a'], 650);
   },
+  poof(from) { scatter(from, 14, from.colours, 220); },   // a thing gone (see Items), in its own colours
   burst(from) { scatter(from, 24, sparkColors(), 300); },
   sparkle(from) { scatter(from, 10, sparkColors(), 160, 300); },
   win(from) { scatter(from, 48, WIKI_DATA.topics.map(k => cssColor('--viz-' + k)), 420); },
@@ -2421,15 +2426,16 @@ function fxFrame(t) {
   }
   ctx.setTransform(fx.dpr, 0, 0, fx.dpr, 0, 0);
   ctx.clearRect(0, 0, fx.W, fx.H);
-  fx.parts = fx.parts.filter(p => {
+  const scroll = fxScroll(), draw = p => {
     const age = t - p.born;
     if (age < 0) return true;
     if (age > p.life) { p.land?.(); return false; }
     let x, y, alpha = 1;
+    const dx = p.on ? p.at.x - scroll[p.on].x : 0, dy = p.on ? p.at.y - scroll[p.on].y : 0;   // scrolled since
     // A frame of Minecraft's explosion (see blast): which by its age, drawn pixelated where it was put.
     if (p.frames) {
       ctx.globalAlpha = 1; ctx.imageSmoothingEnabled = false;
-      ctx.drawImage(p.frames[Math.min(15, Math.floor(age / p.life * 16))], Math.round(p.x - p.size / 2), Math.round(p.y - p.size / 2), p.size, p.size);
+      ctx.drawImage(p.frames[Math.min(15, Math.floor(age / p.life * 16))], Math.round(p.x + dx - p.size / 2), Math.round(p.y + dy - p.size / 2), p.size, p.size);
       return true;
     }
     if (p.to) {
@@ -2443,9 +2449,17 @@ function fxFrame(t) {
     }
     ctx.globalAlpha = alpha;
     ctx.fillStyle = p.color;
-    ctx.fillRect(Math.round(x - p.size / 2), Math.round(y - p.size / 2), p.size, p.size);
+    ctx.fillRect(Math.round(x + dx - p.size / 2), Math.round(y + dy - p.size / 2), p.size, p.size);
     return true;
-  });
+  };
+  fx.parts = fx.parts.filter(p => p.on === 'frame' || draw(p));
+  // Sparks on the article are drawn only over its frame, as the things on it are seen only there.
+  if (fx.parts.some(p => p.on === 'frame')) {
+    const r = $('#frame').getBoundingClientRect();
+    ctx.save(); ctx.beginPath(); ctx.rect(r.left, r.top, r.width, r.height); ctx.clip();
+    fx.parts = fx.parts.filter(p => p.on !== 'frame' || draw(p));
+    ctx.restore();
+  }
   ctx.globalAlpha = 1;
   if (fx.parts.length) fx.raf = requestAnimationFrame(fxFrame);
   else fxCanvas.hidden = true;
@@ -3145,13 +3159,12 @@ function moveThing(t, p, ms) {
 // article, as it scrolls in its frame (which reports its scroll, items.frameScroll), out of sight once scrolled out of
 // the frame; elsewhere the screen. Creatures and fireballs move about the screen.
 const ANCHORED = /^(tnt|crystal|bed|anchor)\b/;
+const inFrame = (p, r) => p.x >= r.left && p.x <= r.right && p.y >= r.top && p.y <= r.bottom;
+const anchorOf = p => !inGame() ? 'page' : inFrame(p, $('#frame').getBoundingClientRect()) ? 'frame' : null;   // what p is on
 function anchorThing(t) {
-  t.anchor = null;
-  if (!ANCHORED.test(t.kind)) return;
-  if (!inGame()) { t.anchor = { on: 'page', x: t.p.x + scrollX, y: t.p.y + scrollY }; return; }
-  const r = $('#frame').getBoundingClientRect();
-  if (t.p.x >= r.left && t.p.x <= r.right && t.p.y >= r.top && t.p.y <= r.bottom)
-    t.anchor = { on: 'frame', x: t.p.x - r.left + items.frameScroll.x, y: t.p.y - r.top + items.frameScroll.y };
+  const on = ANCHORED.test(t.kind) ? anchorOf(t.p) : null, r = on === 'frame' && $('#frame').getBoundingClientRect();
+  t.anchor = !on ? null : on === 'page' ? { on, x: t.p.x + scrollX, y: t.p.y + scrollY }
+    : { on, x: t.p.x - r.left + items.frameScroll.x, y: t.p.y - r.top + items.frameScroll.y };
 }
 function positionThings() {
   const r = inGame() && $('#frame').getBoundingClientRect();
@@ -3160,7 +3173,7 @@ function positionThings() {
     if (!a) continue;
     t.p = a.on === 'page' ? { x: a.x - scrollX, y: a.y - scrollY } : { x: r.left + a.x - items.frameScroll.x, y: r.top + a.y - items.frameScroll.y };
     Object.assign(t.el.style, { left: t.p.x + 'px', top: t.p.y + 'px',
-      visibility: a.on === 'frame' && (t.p.y < r.top || t.p.y > r.bottom || t.p.x < r.left || t.p.x > r.right) ? 'hidden' : '' });
+      visibility: a.on === 'frame' && !inFrame(t.p, r) ? 'hidden' : '' });
   }
 }
 const hiddenThing = t => t.el.style.visibility === 'hidden';   // scrolled out of the article
@@ -3181,7 +3194,7 @@ function itemSay(p, text) {
 // A thing gone in a puff, as a mob dies, or a block breaks, in its own colours.
 function poofThing(t, colours) {
   removeThing(t); play('poof');
-  if (!calm()) { scatter(t.p, 14, colours, 220); if (!fx.raf) { fx.last = performance.now(); fx.raf = requestAnimationFrame(fxFrame); } }
+  effect('poof', { ...t.p, on: t.anchor?.on, colours });
 }
 function lightTnt(t, ms) {
   if (t.lit) return;
@@ -3307,7 +3320,7 @@ const ITEM_USE = {
 const BLAST_REACH = 220;
 function blast(p, power) {
   play('explode', power > 1.3);
-  effect('blast', { ...p, power });
+  effect('blast', { ...p, power, on: anchorOf(p) });
   if (!calm()) {
     const f = document.body.appendChild(Object.assign(document.createElement('div'), { className: 'blast-flash' }));
     setTimeout(() => f.remove(), 500);

@@ -1,12 +1,140 @@
-# Wiki data
+# The wiki snapshot
 
-`wiki-data.js` is generated from the English Kiwix ZIM of minecraft.wiki, which is linked from [Minecraft Wiki:Offline use](https://minecraft.wiki/w/Minecraft_Wiki:Offline_use) and rebuilt quarterly. That dump is the only source: the data is never updated by crawling the wiki. Its date (`snapshot`, the ZIM's own) shows in the setup screen's footer and the result's par line. Don't edit it by hand. The ZIM (1.9 GB) is downloaded by hand from `https://download.kiwix.org/zim/other/` into the repo root. `.gitignore` keeps it out of git and only its checksum is committed (`sha256sum -c minecraft.wiki_en_all_2026-08.zim.sha256`). The tools in `tools/wikidata/` are Python, run in an ignored venv (`python3 -m venv .venv && .venv/bin/pip install -r tools/wikidata/requirements.txt`), always with `.venv/bin/python -I`:
-- `extract.py <zim>` scans the ZIM (about a minute) into an ignored snapshot, `tools/wikidata/cache/<name>.jsonl.gz`. It holds every page's namespace (from mwoffliner's `ns-N` body class, since main-namespace titles can contain colons), visible categories and links. Links are split into those outside `.navbox` tables and requirement lists (with, as `lead`, those of them above the first section heading, a `div.mw-heading` or bare `h2`–`h6`, or the whole page without one, for Top links only) and each navbox's own (an outermost navbox table, nested tables included, or, outside one, an advancement's or achievement's list of what it asks for, `div.hlist.searchaux`, as `boxes`; the page's own title is added to each, since a navbox shows the page it is on as plain text, so every copy of a navbox has the same titles; `Snapshot` derives `nav`, their union, from them), taken from the parser output only, and resolved against the page's own path as a browser would, since a subpage links to `../Diamond`. A requirement list ("Kill one of these 41 monsters", "Eat each of these foods", the biomes of Adventuring Time: 621 lists on 346 pages of the 2026-08 snapshot, most folded behind [show]) is the same list on every page it concerns, so it counts as a navbox, not as the article's own links: before, it made 39% of mob pairs and 41% of world pairs one click apart on Normal, through a link nobody would think to unfold (17% and 14% after). Only those lists: `searchaux` alone also marks hatnotes and message boxes, which are the article's. Redirects include mwoffliner's forwarding pages for redirects to a section.
-- `build.py <snapshot> [-o folder]` writes `wiki-data.js`, `wiki-links.js`, `wiki-navboxes.js` and `wiki-lead.js` (to the repo root by default) from the snapshot and `config.json`, which holds the hand-picked inputs: the topics (each a list of categories; an article goes to the first it is in), the categories and titles that aren't game content (other editions, list and set index pages), the Popular and Deep cuts shares, the Content families by category (`joke`, `removed`, `education`, `fiction`, `variants`, `mechanics`; the pool leaves their articles out), the spin-off namespaces, the disambiguation categories, the version categories, the list pages, the hubs and the core namespaces the ZIM doesn't hold, and Scavenger's kinds (`kinds`: hand-picked categories, approved 2026-10-21, each with the name the game shows and the members it leaves out). A kind's members are the pool articles in its category linked well enough to be a target, less its exclusions; the build stops if an excluded title has left its category or a kind has fewer than `MIN_KIND` (5) members, so a new snapshot gets the list looked at again. It also stops if a category the config names (a topic's, a family's, a kind, or a not-content or disambiguation category) is on no page, such as one renamed on the wiki, which would otherwise move its articles without a word, or if a not-content title is no longer an article (gone, or a redirect left by a rename, which would let the page under its new title into the pool). Every article and every spin-off page is listed but the left-out pages, which are left out altogether: the version pages, the list pages and the subpages of either. Version pages are the articles and spin-off pages in a category ending in " versions" or in `version_categories` (Versions, Development version lists), but those with a topic or a family (the removed and unused features lists): almost every article links to some from its history, and they link to most of the pool, so with them nearly any pair was two clicks through one. List pages are the hand-picked `list_titles` (Closed captions, the data values pages, Block sound type, Creative inventory, Instant mining…), tables of game data that many articles link to and that link to much of the pool, left out even from a family; the build stops if one is no longer an article. Their links don't count and the graph doesn't go through them, and `left_out` lists their titles with the redirects to them that a page links to, for the game to kill links to them (a redirect nothing links to is left out, like a page newer than the snapshot, since the list goes into every article the game shows). A pool-mode roll may only pick content: not a subpage, a disambiguation page or a page that isn't game content. Such content gets its topic, or its family or spin-off instead, and the pool's articles get their tiers: Popular is the best-linked share of the pool, Deep cuts the least-linked share of each topic among articles linked well enough to be a target (`tiers` in `build.py`, which `report.py` also uses). Education is its four exact categories (blocks, items, entities, mobs), since the broad Minecraft Education category also holds Brewing, Charcoal and Dye. Links are counted per linking page, through redirects: an article's count only has links from articles, and a spin-off page's also has links from its own namespace, which are live when that spin-off is on. The same snapshot always gives the same bytes, one entry per line, so a new snapshot reads as a git diff.
-- `report.py <snapshot>` writes a Markdown report (about 3 minutes): pool sizes, what moved to a Content family, each family's and spin-off's size and possible targets, link-count quartiles, Scavenger's kinds with every member (to read through before shipping a new snapshot), dead ends (articles with no route to the most linked one, so a game starting there can't be won), the pool designs compared, and hub candidates. The pool designs come from `config.json`'s `research` section (topics, categories that aren't game content, variant groups, Famous and Deep cuts shares), which only the report reads. Each design is measured on random pairs (`--pairs`, 200 by default, seeded by its name) with all links, without navboxes, and without navboxes or hubs: fewest clicks, good first clicks (links on the start page that begin a shortest route), the sweet spot and how familiar the ends are. [`RESEARCH.md`](../tools/wikidata/RESEARCH.md) records what the first run found.
-- `diff.py <old> <new>` compares two `wiki-data.js` files, such as `<(git show HEAD:wiki-data.js) wiki-data.js`: pages added and removed, pool, family, spin-off and kind members that joined or left, link counts that moved, and hub, left-out page and namespace changes.
-- `test.py` writes a small ZIM in mwoffliner's shape and checks the other tools against it, in a few seconds.
+MC Wiki Race plays on the live minecraft.wiki, but picks its articles and works out par from an offline copy of it.
+This page is about that copy and the four files built from it: what they hold, the scripts that make them, and how to update them.
+If you came here from the header of a generated file, the steps are under [Updating the snapshot](#updating-the-snapshot).
+Never edit those files by hand; rebuild them.
 
-The link graph numbers pages by their place in `wiki-data.js`'s `articles` and goes through redirects. `wiki-links.js` (`WIKI_LINKS`) lists each page's links outside navboxes: about 320,000 links, 0.92 MB, 0.36 MB gzipped. `wiki-navboxes.js` (`WIKI_NAVBOXES`) lists each distinct navbox once (about 930) and each page's navboxes: a ninth of the 1.8 million links every page's own list would hold, 0.56 MB, 34 KB gzipped. Normal and Hard only need the first, so Relaxed's navboxes are a file of their own. `wiki-lead.js` (`WIKI_LEAD`) lists each page's links above its first heading, for Top links only: about 65,000, 0.30 MB, 97 KB gzipped, loaded only when that rule is on. Each entry is page numbers as the gaps between them in base 36, one entry per line, and every graph file carries the ZIM's sha256, which the game checks against `wiki-data.js`'s.
+## What comes from the snapshot, and what is live
 
-To update: download the new ZIM, replace the `.sha256` file, run extract, build, diff and the test, then both game suites (`test/run-e2e.sh --offline` and `test/run-e2e.sh`; the pre-commit hook only runs the offline one, so the live one has to be run by hand, and the hook says so when a commit changes the generated files or the checksum), whose checks lean on the snapshot (named pages, par routes, the kinds and the dailies; the offline suite's first checks say which named facts changed, and a changed one means picking another page that has it), play a few games, and commit the four generated files with the checksum.
+Everything you read in a game is fetched live from the minecraft.wiki API while you play: the articles, their pictures and the cards' descriptions.
+Everything the game has to know about the whole wiki at once comes from the snapshot instead: which articles a roll can pick, their topics and link counts, the hubs and the pages left out, the wiki's namespaces, the Scavenger hunt's kinds, and the links between all 13,177 pages that par is worked out on.
+The snapshot's date shows in the setup screen's footer ("Which articles come up, and par, go by the wiki’s offline copy from …") and in the result's par line.
+Between snapshots the live wiki moves on, so a page newer than the snapshot can't be rolled, and par can be off where an article has changed.
+
+## Why the data is never crawled
+
+The data comes from one dump of the wiki and nothing else: it is never updated by crawling minecraft.wiki.
+That keeps all of it as of one date, from a file anyone can download and check against the committed checksum.
+The same dump always builds the same bytes, one entry per line, so a new snapshot reads as an ordinary git diff.
+
+## The ZIM
+
+The dump is the English Kiwix ZIM (Kiwix's single-file offline archive of a website) of minecraft.wiki, linked from [Minecraft Wiki:Offline use](https://minecraft.wiki/w/Minecraft_Wiki:Offline_use) and rebuilt quarterly.
+The current one is `minecraft.wiki_en_all_2026-08.zim`, dated 2026-08-21.
+
+- It is about 1.9 GB, downloaded by hand from `https://download.kiwix.org/zim/other/` into the repo root.
+- `.gitignore` keeps it out of git; only its checksum, `minecraft.wiki_en_all_2026-08.zim.sha256`, is committed.
+- To check a downloaded copy: `sha256sum -c minecraft.wiki_en_all_2026-08.zim.sha256`.
+- Every generated file names the ZIM it came from in its header, and the game checks that the graph files carry the same ZIM sha256 as `wiki-data.js`.
+
+Details: [internal/wiki-data.md](internal/wiki-data.md#the-zim)
+
+## The generated files
+
+All four are made by `tools/wikidata/build.py` and sit in the repo root beside `index.html`.
+
+| File | Defines | What it holds | Size (gzipped) | Loaded |
+|---|---|---|---|---|
+| `wiki-data.js` | `WIKI_DATA` | The snapshot's date and ZIM, the namespaces, topics, Content families and spin-offs, then every page with its link counts, topic, families and tiers, plus the hubs, the left-out pages and the Scavenger hunt's kinds | 1.0 MB (150 KB) | Always, by a script tag |
+| `wiki-links.js` | `WIKI_LINKS` | Each page's links outside navboxes, about 310,000 | 0.9 MB (350 KB) | As the page loads, for the background and the cards' checks |
+| `wiki-navboxes.js` | `WIKI_NAVBOXES` | Each distinct navbox once (about 1,100), and which navboxes each page carries | 0.6 MB (37 KB) | Only on **Relaxed**, where navboxes are on |
+| `wiki-lead.js` | `WIKI_LEAD` | Each page's links above its first heading, about 65,000 | 0.3 MB (95 KB) | Only with **Top links only** |
+
+The three graph files number pages by their place in `wiki-data.js`, and the game refuses one whose sha256 doesn't match, since that would give wrong routes.
+All four are JavaScript rather than JSON so that `index.html` can load them from `file://`.
+
+Details: [internal/wiki-data.md](internal/wiki-data.md#the-link-graph-files)
+
+## The tools
+
+The scripts in `tools/wikidata/` are Python. Set up a virtual environment once (the `.venv` folder is ignored by git):
+
+```sh
+python3 -m venv .venv && .venv/bin/pip install -r tools/wikidata/requirements.txt
+```
+
+Then run each one with `.venv/bin/python -I tools/wikidata/<script>`.
+
+| File | What it does |
+|---|---|
+| `extract.py <zim>` | Scans the ZIM (about a minute) into an extract, `tools/wikidata/cache/<name>.jsonl.gz`: each page's namespace, categories and links, split into the article's own, those above its first heading, and each navbox's. It also lists every redirect. The cache is ignored by git. |
+| `build.py <extract>` | Writes the four generated files from the extract and `config.json`, to the repo root unless given `-o folder`. It stops with an error when the config no longer fits the wiki (see below). |
+| `report.py <extract>` | Writes a Markdown report (about 3 minutes): pool sizes, Content families and spin-offs, link counts, every Scavenger hunt kind with its members, dead ends, the pool designs compared, and hub candidates. |
+| `diff.py <old> <new>` | Compares two `wiki-data.js` files: pages added and removed, pool, family, spin-off and kind members that joined or left, link counts that moved, and hub, left-out page and namespace changes. |
+| `test.py` | Writes a small ZIM shaped like the real one and checks the other scripts against it, in a few seconds. |
+| `common.py` | Loads an extract and the link graph built from it, and reads a `wiki-data.js` back, for the other scripts. |
+| `config.json` | The hand-picked inputs to the build (next section). |
+| `requirements.txt` | The one dependency, `libzim`, which reads the ZIM. |
+
+A navbox here is a navbox table at the foot of an article, or an advancement's or achievement's list of what it asks for ("Kill one of these 41 monsters"), which is the same list on every page it concerns.
+
+Details: [internal/wiki-data.md](internal/wiki-data.md#the-tools)
+
+## What config.json controls
+
+Everything in `wiki-data.js` comes from the ZIM except what `config.json` picks by hand.
+
+| Key | What it picks |
+|---|---|
+| `topics` | The pool's five topics, each a list of wiki categories; an article goes to the first topic it is in |
+| `not_content_categories`, `not_content_titles` | Pages in game categories that aren't game content: other editions, list and set index pages |
+| `popular_share`, `deep_cuts_share` | How much of the pool is Popular (0.3) and of each topic Deep cuts (0.33) |
+| `families` | The Content families, by category; their articles leave the pool unless turned on |
+| `spinoffs` | The spin-off games' namespaces, each a Spin-offs checkbox |
+| `kinds` | The Scavenger hunt's kinds: a category, the name the game shows ("a hostile mob") and the members it leaves out |
+| `disambiguation_categories` | Disambiguation pages, which only **Chaos** rolls |
+| `version_categories`, `list_titles` | Version pages and list pages, left out of the data altogether |
+| `hubs` | The big overview pages whose links are dead in **Hard** |
+| `core_namespaces` | The wiki's namespaces the ZIM doesn't hold, so the game knows to disable links into them |
+| `research` | Only `report.py` reads it: the other shares its pool designs compare, and the sweet spot's range |
+
+The build stops rather than quietly moving articles when the wiki has changed under the config: a category it names is on no page, a left-out or not-content title is no longer an article, an excluded title has left its kind, a kind has fewer than 5 members, a hub is no longer an article, a spin-off's namespace is gone, or a topic, family, spin-off or tier ends up empty.
+
+Details: [internal/wiki-data.md](internal/wiki-data.md#buildpy)
+
+## Pools, topics and tiers
+
+The pool is the game content, split into five topics by category.
+Rolls draw a topic, then an article, and never take the start and target from the same topic.
+
+| Topic | Articles (2026-08) |
+|---|---|
+| Blocks | 478 |
+| Items | 273 |
+| Mobs | 93 |
+| Biomes & structures | 94 |
+| Enchantments & effects | 82 |
+
+The build tags the pool's articles with tiers by how many articles link to them from outside navboxes. **Popular** is the best-linked 30% of the pool, and **Deep cuts** the least-linked third of each topic, among articles linked from at least 5 others, the least a target needs. **Everyday** is the whole pool, and **Chaos** every article in the data, with the pages of each spin-off that is on.
+
+Articles in a Content family (**April Fools**, **Removed & unused**, **Education**, **Books & comics**, **Variants**, **Mechanics**) and spin-off pages (Dungeons, Dungeons II, Legends, Earth, Story Mode, Movie) are out of the pool until their checkbox is on.
+Version pages and a few list pages (Closed captions, the data values pages, Creative inventory…) are left out of the data altogether, since almost every article links to them and they link to most of the pool, which would put nearly any pair two clicks apart.
+
+Details: [internal/picking.md](internal/picking.md#pools)
+
+## Updating the snapshot
+
+When Kiwix publishes a newer ZIM:
+
+1. Download it from `https://download.kiwix.org/zim/other/` into the repo root.
+2. Replace the old `.sha256` file with the new ZIM's: `sha256sum minecraft.wiki_en_all_<date>.zim > minecraft.wiki_en_all_<date>.zim.sha256`, then delete the old one.
+3. Extract it: `.venv/bin/python -I tools/wikidata/extract.py minecraft.wiki_en_all_<date>.zim`.
+4. Build: `.venv/bin/python -I tools/wikidata/build.py tools/wikidata/cache/minecraft.wiki_en_all_<date>.jsonl.gz`. If it stops, fix `config.json` as its message says and build again.
+5. See what changed: `.venv/bin/python -I tools/wikidata/diff.py <(git show HEAD:wiki-data.js) wiki-data.js`.
+6. Run the scripts' own tests: `.venv/bin/python -I tools/wikidata/test.py`.
+7. Write the report and read its Scavenger hunt kinds through, member by member: `.venv/bin/python -I tools/wikidata/report.py tools/wikidata/cache/minecraft.wiki_en_all_<date>.jsonl.gz -o /tmp/report.md` (about 3 minutes).
+8. Run both game suites, `test/run-e2e.sh --offline` and then `test/run-e2e.sh`. Their checks lean on the snapshot (named pages, par routes, the kinds and the dailies). If the offline suite's first checks say a named fact changed, pick another page that has it.
+9. Play a few games.
+10. Update the docs that name the ZIM or its counts: the ZIM's name, date and topic counts on this page, the ZIM's name in [internal/wiki-data.md](internal/wiki-data.md), and the par shares in [internal/picking.md](internal/picking.md) and in the comment above `REACHES` in `index.html`.
+11. Commit the four generated files, the new checksum, the old checksum's removal, any change to `config.json` and the docs together.
+
+The pre-commit hook runs the docs check and the offline suite, not the live one. When a commit changes the generated files or the checksum, it reminds you to run the live suite by hand.
+
+Details: [internal/wiki-data.md](internal/wiki-data.md#updating-the-snapshot)
+
+## RESEARCH.md
+
+[`tools/wikidata/RESEARCH.md`](../tools/wikidata/RESEARCH.md) records the testing behind the pools, done in October 2026 on the 2026-08 snapshot before they were decided.
+It measures pool designs on random pairs with all links, without navboxes and without hubs too, and sets out the decisions that came of it: the four pools, drawing a topic first, the pages left out, the difficulties, and **Top links only**.
+`report.py` has moved on since, so a new snapshot's report reads alongside it rather than matching it line for line.

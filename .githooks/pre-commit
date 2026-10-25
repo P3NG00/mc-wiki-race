@@ -1,15 +1,22 @@
 #!/usr/bin/env bash
-# Runs the offline suite on the working tree, unless the commit has only docs, pictures or tools/, and stops the commit
-# if a check fails, printing only the failures and the summary, and reminds a commit of a new wiki snapshot to run the
-# live suite by hand (see docs/testing.md).
+# Checks the docs' links and the names they mention (tools/check-docs.mjs), then runs the offline suite on the working
+# tree, unless the commit has only docs, pictures or tools/, and stops the commit if a check fails, printing only the
+# failures and the summary, and reminds a commit of a new wiki snapshot to run the live suite by hand (see
+# docs/internal/testing.md).
 set -uo pipefail
 cd "$(git rev-parse --show-toplevel)"
 staged=$(git diff --cached --name-only)
 if grep -qE '^(wiki-(data|links|navboxes|lead)\.js|.*\.zim\.sha256)$' <<<"$staged"; then
   echo 'pre-commit: this commit changes the wiki snapshot, so run the live suite (test/run-e2e.sh) by hand too; see docs/wiki-data.md'
 fi
-# Docs, pictures, the licence, .gitignore and the scripts that build the data change nothing the suite runs, so a commit
-# of only those skips it. Any other file, a new kind of file too, runs it.
+# The docs check's own test, when the check changes, printing only its failures and summary.
+if grep -q '^tools/check-docs' <<<"$staged"; then
+  test=$(node tools/check-docs.test.mjs) || { grep -v '^PASS' <<<"$test"; exit 1; }
+fi
+# The docs check, on every commit, since a code change can remove a name the docs mention as surely as a docs change can.
+docs=$(node tools/check-docs.mjs --staged) || { echo "$docs"; exit 1; }
+# Docs, pictures, the licence, .gitignore and tools/ (the scripts that build the data, and the docs check run above)
+# change nothing the suite runs, so a commit of only those skips it. Any other file, a new kind of file too, runs it.
 if ! grep -qvE '\.(md|png|ico)$|^(docs|tools)/|^(LICENSE|\.gitignore)$' <<<"$staged"; then
   echo 'pre-commit: only docs, pictures or tools/ changed, so the offline suite is skipped'
   exit 0

@@ -906,11 +906,12 @@ const THEMES = [...new Set(['auto', 'light', 'dark', ...Array.from(document.quer
 const WIKI = 'https://minecraft.wiki';
 const API = WIKI + '/api.php';
 
-// What the game knows about the wiki before asking it, from wiki-data.js, which tools/wikidata builds from the Kiwix ZIM
-// of minecraft.wiki (see docs/wiki-data.md). ARTICLES holds every article and every spin-off page, with how many pages link to it
-// (links), how many of those from outside navboxes (body), its topic if it is in the pool, its Content (fams: a family
-// such as joke, or its spin-off) and its tiers (popular, deep). Subpages, disambiguation and other non-content pages
-// have neither topic nor Content, so only Chaos rolls them. Version and list pages aren't in it at all (see LEFT_OUT).
+// What the game knows about the wiki before asking it, from wiki-data.js, which tools/wikidata builds from the Kiwix
+// ZIM of minecraft.wiki (see docs/internal/wiki-data.md). ARTICLES holds every article and every spin-off page, with
+// how many pages link to it (links), how many of those from outside navboxes (body), its topic if it is in the pool,
+// its Content (fams: a family such as joke, or its spin-off) and its tiers (popular, deep). Subpages, disambiguation
+// and other non-content pages have neither topic nor Content, so only Chaos rolls them. Version and list pages aren't
+// in it at all (see LEFT_OUT).
 const ARTICLES = new Map(WIKI_DATA.articles.map(([title, links, body, topic, fams, tiers]) => [title, { links, body, topic, fams, tiers }]));
 // The pool: game content by topic (TOPICS has their labels), which the Popular, Everyday and Deep cuts pools draw from.
 const POOL = new Map(WIKI_DATA.topics.map(k => [k, []]));
@@ -948,8 +949,8 @@ const TOPICS = {
   magic: { label: 'Enchantments & effects' },
 };
 // Target par (the Target row's second select): how far a rolled target is from the start, going by the link graph under
-// the difficulty and Content. On the 2026-08 snapshot most pool pairs are par 2: par 3 is 14% of targets in Normal and
-// 31% in Hard, where a few pairs are par 4, and 1% in Relaxed, where only a third of starts have one. With every family
+// the difficulty and Content. On the 2026-08 snapshot most pool pairs are par 2: par 3 is 16% of targets in Normal and
+// 34% in Hard, where a few pairs are par 4, and 1% in Relaxed, where only a third of starts have one. With every family
 // and spin-off on, par 3 and 4 are the most common and par 5 is 5–7%, and only Chaos's odd pages (chains of subpages,
 // spin-off dead ends) go past 6, so the last choice takes every par from PAR_TOP. A start rolled with the target
 // is checked for one before its lookup (in each topic it may come from, in turn), from the pars every start has
@@ -1185,7 +1186,7 @@ const MODE_HELP = {
   popular: 'Popular: the best-known game content, the 30% of it most linked across the wiki. A good place to start.',
   everyday: 'Everyday: all the game content: blocks, items, mobs, biomes, structures, enchantments and effects. Each topic is equally likely, and the start and target always come from different ones.',
   deep: 'Deep cuts: the least-known third of each topic. Think Camel Husk or Curse of Binding rather than Creeper.',
-  chaos: 'Chaos: any article on the wiki, history subpages, lists and April Fools jokes included. Expect obscure starting points.',
+  chaos: 'Chaos: any article on the wiki, history subpages, most lists and April Fools jokes included. Expect obscure starting points.',
 };
 function updateModeHelp() { $('#modeHelp').textContent = MODE_HELP[mode()]; }
 const poolLabel = () => $('input[name=mode]:checked').parentElement.textContent.trim();
@@ -4254,8 +4255,9 @@ function renderArticle(page, fragment, token, blocked = [], seen = []) {
     const belowTop = a => ${lead} && (!!a.closest('.navbox') || belowFirstSection(a));
     function classify(a) {
       // Navboxes are hidden too; this keeps them dead whatever the CSS does. An advancement's list of what it asks for
-      // (.hlist.searchaux: "Kill one of these 41 monsters", folded behind [show]) is a navbox in all but looks: the same
-      // list on every page it concerns, which the snapshot counts as a navbox (see docs/wiki-data.md). It stays in sight, dead.
+      // (.hlist.searchaux: "Kill one of these 41 monsters", folded behind [show]) is a navbox in all but looks: the
+      // same list on every page it concerns, which the snapshot counts as a navbox (see docs/internal/wiki-data.md). It
+      // stays in sight, dead.
       if (NO_NAV && a.closest('.navbox, .hlist.searchaux')) return null;
       const href = a.getAttribute('href') || '';
       if (href.startsWith('#')) { try { return { kind: 'anchor', id: decodeURIComponent(href.slice(1)) }; } catch (e) { return null; } }
@@ -4844,9 +4846,10 @@ function goBack() {
 // ---------------------------------------------------------------- Par
 // The link graph between the pages of WIKI_DATA.articles, by their place there: wiki-links.js (links outside navboxes)
 // and, for Relaxed, wiki-navboxes.js (each navbox once, and the navboxes each page carries), both made by
-// tools/wikidata/build.py with wiki-data.js. They are loaded the first time a result needs them, and refused if their
-// sha256 isn't wiki-data.js's, since a mismatch would give wrong routes. Each entry lists page numbers as the gaps between
-// them in base 36.
+// tools/wikidata/build.py with wiki-data.js. wiki-links.js is loaded as the page opens (the background draws from it),
+// the others the first time the rules need them (a roll's checks, par on the setup screen or in a game), and each is
+// refused if its sha256 isn't wiki-data.js's, since a mismatch would give wrong routes. Each entry lists page numbers
+// as the gaps between them in base 36.
 const PAGE_IDS = new Map(WIKI_DATA.articles.map(([title], i) => [title, i]));
 const decodeIds = s => { let n = -1; return s ? s.split(',').map(gap => n += parseInt(gap, 36)) : []; };
 const graphFiles = new Map();

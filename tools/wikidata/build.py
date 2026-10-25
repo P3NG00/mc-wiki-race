@@ -31,7 +31,7 @@ The link graph, for par, numbers pages by their place in articles and goes throu
   wiki-links.js           WIKI_LINKS: for every page, the pages it links to outside navboxes
   wiki-navboxes.js        WIKI_NAVBOXES: every distinct navbox, as the pages it links to (the copies of a navbox only
                           differ by which page shows as plain text, which extract.py adds back), and for every page the
-                          navboxes it carries. Stored once each, they are a tenth of the size of every page's own list.
+                          navboxes it carries. Stored once each, they are a ninth of the size of every page's own list.
   wiki-lead.js            WIKI_LEAD: for every page, the pages it links to above its first heading, for Top links only
 All have the sha256 of wiki-data.js's ZIM, and the game only uses them with a wiki-data.js that has the same.
 Links are counted per linking page, through redirects. An article's count only has links from articles. A spin-off

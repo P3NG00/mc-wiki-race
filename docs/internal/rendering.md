@@ -1,0 +1,157 @@
+# API access and rendering articles
+
+For people: [how-it-works.md](../how-it-works.md#fetching-articles), [hosting.md](../hosting.md#content-security-policy).
+
+Part of the architecture, which is all in `index.html`.
+
+## API access
+
+Every request goes through `api()`, which:
+- always adds `origin=*`,
+- allows at most `API_CONCURRENCY` (4) requests in flight with the rest queued in order (MediaWiki asks clients not to send many requests at once),
+- and times each one out after 30 s.
+
+The `origin=*` parameter is mandatory: it is what makes MediaWiki send `Access-Control-Allow-Origin: *` for anonymous requests, and without it the page cannot fetch anything from `file://`.
+
+Calls used:
+- `prop=pageprops|pageimages|extracts` (`pageInfo`):
+  - disambiguation flag,
+  - thumbnail,
+  - redirect resolution,
+  - and the description: the first paragraph of the TextExtracts plain-text intro, since `pageprops.description` is often an infobox caption and keeps HTML entities.
+- `action=parse` (article HTML, plus its live categories for Scavenger).
+
+Nothing polls; every request comes from a player action, and a roll makes one request.
+
+## Rendering articles
+
+Each article is written into a sandboxed iframe (`sandbox="allow-scripts"`, so it gets an opaque origin) via `srcdoc`. This design is deliberate:
+- The wiki's own stylesheets (`WIKI_STYLES`, loaded from `load.php`: the skin's, the site's, and those of what articles hold, such as references, math, tabs and folding boxes) apply without leaking into the game UI. They rely on `:root` and `body.wgl-theme-*` selectors, which is why a shadow root doesn't work.
+- `<base href="https://minecraft.wiki/">` resolves the parse output's relative `/images/...` URLs, srcset values and CSS `url()` values without any rewriting.
+- Values written into the frame's script go in as JSON with `<` escaped, since a link fragment can hold any text and an HTML comment opener followed by a script tag would make the parser run past the closing tag. That sequence must not appear literally anywhere in `index.html`'s scripts either, comments included: the page would silently not run.
+
+### Classifying links
+
+An inline script inside the iframe classifies every `<a>` and image-map `<area>` and intercepts clicks.
+
+#### Clicks
+
+- Same-page anchor links (`#…`) scroll locally.
+- Main-namespace `/w/Title#frag` links are sent to the parent with `postMessage({mwr:'nav', title, frag, x, y})`, and a click on a dead link as `{mwr:'dead', x, y}`.
+  - `x` and `y` are where the click was in the frame (the link's middle when a key pressed it), which the parent turns into a point on the page (`fromFrame`) for the click's effects (see [ui.md](ui.md)).
+- A live link pressed with a mouse or pen (not a finger, whose press may start a scroll) is sent ahead as `{mwr:'press', title}`, and the parent asks for its article at once (`pressLink`), the request the click would make, 50 to 150 ms sooner (see [rules.md](rules.md)).
+
+#### Live and visited links
+
+- Live links get `mwr-live`, which gives them a focus ring and tints text links (not ones around an image) in their own colour on hover.
+- Links to an article already visited this game also get `mwr-seen`: a visited-link purple with a dotted underline, or a dotted outline around an image, since the browser can't track visits inside the frame.
+- `game.seen` maps every visited title, and the link title that led there, to the article.
+- `navigate` passes its keys to `renderArticle` as `seen`, leaving out everything still ahead (a target or checkpoint passed early still has to be reached).
+- Other redirects to a visited article aren't known, so their links aren't marked.
+- The frame capitalises a link's first letter as MediaWiki does, so its titles match the `seen` and `blocked` lists.
+
+#### Dead links
+
+Everything else gets the `mwr-dead` class (dimmed) and does nothing:
+- other namespaces (`NAMESPACES`, including `Tutorial:`, `File:` and `Category:`, and a spin-off's unless it is in `game.content`),
+- red links (`.new`),
+- external links
+- and `?query` links.
+
+So are links to the left-out version and list pages and the redirects to them, in every difficulty (`LEFT_OUT`; see [wiki-data.md](wiki-data.md)), titled "Off limits: a version or list page": the frame gets them as a list written once at load (`LEFT_OUT_JSON`, about 160 KB).
+
+So are the titles passed in `blocked` (No hubs), titled "Off limits: No hubs".
+
+#### No navboxes
+
+- Under No navboxes every link inside a `.navbox` table, or inside an advancement's list of what it asks for (`.hlist.searchaux`), which the snapshot counts as a navbox (see [wiki-data.md](wiki-data.md)), is dead too; the list stays in sight, its links dead.
+- Those tables and their Navigation heading are also hidden.
+
+#### Top links only
+
+Under Top links only every article link after the first section heading in the parser output, and in any navbox, is dead too (`belowTop`), titled "Off limits: Top links only".
+- `FIRST_HEADING` is the first `.mw-heading` or `h2`–`h6`, as `extract.py` finds it, but the live wiki's table of contents' own heading, which the ZIM lacks.
+
+The rest of the article folds away under a dashed bar (`.mwr-fold`) over that heading, which:
+- clears the floated infobox (its links come before the heading, so they are live)
+- and says the rest has no live links,
+- with a Show it / Hide it button (`mwr-show-below` on the body).
+
+What folds (`.mwr-below`) is, at each level from the heading up to the parser output, everything from there on, and the live wiki's table of contents, which only lists folded sections. It is set up last, after the scripts that measure or build what is inside (the animator, tabs, folding boxes), and each folded part is in `unfolders`, so a link to a section in it, the article's fragment or an anchor, opens it first.
+
+#### A page with no live links
+
+- The frame counts its live links and sends the count with `ready` (`live`), and `frameReady` sets `game.stuck` when there are none.
+- The article then gets a banner that stays until the next navigation (`stuckText`, added to the checkpoint's banner when there is one) saying to go Back or give up, or with no Back that only giving up is left.
+- Rolls never give such a page (`joinsWeb`), but a custom article, a challenge link or a live edit can, and No hubs, Exact clicks or a round trip's way back can make every link on a page dead.
+- An unknown count (the frame script failed, or the 15 s timeout) gives no banner.
+
+### Failed images
+
+A script at the top of the iframe's `<head>`, ahead of the stylesheets, loads a failed image once more after 2 s. If it fails again it gets `mwr-broken`, which keeps the image's box and hides its alt text: on inventory icons the alt is a whole sentence, which Firefox would draw running out of the 32 px slot and down the table.
+
+### The element animator
+
+The frame script also runs the wiki's element animator (from MediaWiki:Common.js, which the frame doesn't load).
+
+- Every 2 s each `.animated` shows its next child (and an `.animated-subframe` child its own next child), so crafting grids cycle through their recipes instead of freezing on the frame the parse output marked (inside a subframe that is a different item per slot, such as a different plank in each).
+- As on the wiki, an animation inside a `.mcui` or `.animated-container` holds still while the pointer or focus is in it, so the slot being aimed at can be clicked.
+- Each animation keeps the height of its tallest frame, measured with all its frames shown (`holdHeights`):
+  - those above the first section heading (`FIRST_SECTION`, an infobox's picture) before the article shows,
+  - the rest once they come within a screen of the frame's window, since measuring every one at once held a page of hundreds (Crafting's grids) up by a tenth of a second.
+  - Its hidden frames' images are made eager then too.
+- With motion reduced (`CALM`, written into the script and sent again on a change, `{mwr:'calm', on}`) nothing cycles by itself: each box that would gets a ↻ button beside it (`.mwr-step`, inside a `.mcui` or `.animated-container`, after a lone animation) that moves its frames on once, as a tick would, since a click on a slot is its link's.
+
+### Tabber
+
+The frame script also runs the Tabber extension's script (its styles, `ext.Tabber`, are in `WIKI_STYLES`).
+
+- Each `.tabber` gets a row of tabs made from its panels' `data-title` and shows one panel at a time, starting on the one holding the linked section.
+- Infoboxes use it for an item's variants (Wooden, Golden, Stone… on Pickaxe); without it every panel shows, one under another.
+- It runs after the animator, which would measure frames in hidden panels as 0 px.
+
+### Layered blueprints
+
+The frame script also runs the wiki's layered blueprint gadget: each `.layered-blueprint-tab` (Layer 1, Layer 2… on a structure's blueprint) becomes a radio button and its label, and the wiki's CSS hides the layers above the checked one.
+
+### Folding boxes
+
+The frame script also runs the wiki's two kinds of folding box, which fold as on the wiki.
+
+- The wiki's CSS only hides what a folded box folds once the wiki's scripts have run (`.client-js` on `<html>`), so without them every box would show open, as on the wiki with JavaScript off.
+- The wiki's own (`.collapsible`, from MediaWiki:Common.js: File structure, the tables of a structure's parts, advancement lists, the groups inside navboxes):
+  - gets a `[show]`/`[hide]` toggle (`.collapsetoggle`)
+  - and starts folded if `.collapsed`: a table to its header row, a `tr.collapsible-rows` the rows after it, anything else its `.collapsible-content`.
+  - The folding is the `collapsed` class, and the hide rules are copied into the frame's styles without the `.client-js`.
+- MediaWiki's (`.mw-collapsible`, jquery.makeCollapsible, whose styles give the button its look):
+  - gets a `[hide]` button, or uses the toggle or placeholder it holds,
+  - and starts folded if `.mw-collapsed`: a table to its first row or caption, a list to its first item, anything else to the button.
+  - What it folds gets the `hidden` attribute, `until-found` where the browser has it, so finding text inside opens it.
+- Custom toggles (`collapsible-X`, `mw-customtoggle-X`) work as on the wiki.
+- A link to a section inside a folded box (the article's fragment or an anchor link) opens the boxes around it first (`unfolders`).
+- Toggling is not a click, and the links inside are classified with the rest, so a folded box's live links count for the stuck banner, and the link graph has them too, so par can go through one.
+- It runs after the animator, which measures frames inside folded boxes as 0 px.
+
+### Sounds
+
+The frame script also runs the wiki's sound gadget:
+- Each `.sound` in a Sounds table is a speaker (the gadget's styles, `ext.gadget.sound`, draw it, and the frame's styles hide the audio player behind it, as the wiki's do once its scripts have run) that plays its sound when clicked and stops it when clicked again, back at the start.
+- It plays whether or not the game's Sound is on, since the player asked for it.
+- Other audio and video stay hidden.
+
+### Tooltips
+
+The frame script also runs the wiki's Minecraft-style tooltips (from MediaWiki:Common.js; their look, `#minetip-tooltip` and the `format-*` colours, is in `site.styles`):
+- Hovering a `.minetip` or an inventory slot's `.invslot-item` shows its `data-minetip-title`, or its title, or that of the deepest element at its start, with the game's formatting codes (`&e`, `&l`, `&#rrggbb`…), and `data-minetip-text` under it, a line per `/`.
+- The titles inside are removed at the first hover, so the browser's tooltip doesn't show too.
+- A link the game has marked keeps its own title in `data-mwr-title` and the game's note in `data-mwr-note`, which the tooltip shows as a line of its own, red for off limits and purple for already on your path.
+
+### Calculators
+
+The wiki's calculators (`.mcw-calc`) are hidden: its script replaces each with an iframe, and without it they only say they are loading.
+
+### Light and dark theme
+
+- The article is drawn in the wiki's light or dark theme (`wgl-theme-light`/`wgl-theme-dark` on its `<body>`), matching the game theme (see [Themes](ui.md#themes)).
+- `wgl.theme.dark` is always in `WIKI_STYLES` (about 4 KB gzipped): apart from a few rules that change nothing visible here, it is scoped to the dark body class, so switching is a swap of `WGL_THEME_CLASSES`, which the parent asks for with `postMessage({mwr:'theme', dark})` without reloading the article.
+- The parent also sends it when the frame reports `ready`, which catches a theme change made while the article was loading.

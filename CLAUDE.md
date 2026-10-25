@@ -12,7 +12,7 @@ Open `index.html` directly in a browser (`file://` works; no server needed). `py
 
 ## Testing
 
-`test/run-e2e.sh [--offline] [screenshot-dir]` runs the suites in headless Firefox with WebDriver BiDi: `test/e2e.mjs` plays real games against the live wiki, and with `--offline`, `test/offline.mjs` checks the game's own logic in just over a minute with every request answered by the test. They need `firefox` and Node ≥ 22. The offline suite runs before every commit as a git pre-commit hook (`git config core.hooksPath .githooks` once per clone); the live suite runs only by hand, before a release and after a snapshot update. [docs/testing.md](docs/testing.md) has what each suite checks, random play and its seed, and what to check by hand before a release.
+`test/run-e2e.sh [--offline] [screenshot-dir]` runs the suites in headless Firefox with WebDriver BiDi: `test/e2e.mjs` plays real games against the live wiki, and with `--offline`, `test/offline.mjs` checks the game's own logic in about two and a half minutes with every request answered by the test. They need `firefox` and Node ≥ 22. The offline suite runs before every commit as a git pre-commit hook (`git config core.hooksPath .githooks` once per clone), unless the commit has only docs, pictures or `tools/`; the live suite runs only by hand, before a release and after a snapshot update. [docs/testing.md](docs/testing.md) has what each suite checks, random play and its seed, and what to check by hand before a release.
 
 Quick syntax check of the inline script, which also fails on an HTML comment opener in it (see [docs/rendering.md](docs/rendering.md)):
 ```sh

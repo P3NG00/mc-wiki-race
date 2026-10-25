@@ -48,7 +48,7 @@ An inline script inside the iframe classifies every `<a>` and image-map `<area>`
 - `game.seen` maps every visited title, and the link title that led there, to the article.
 - `navigate` passes its keys to `renderArticle` as `seen`, leaving out everything still ahead (a target or checkpoint passed early still has to be reached).
 - Other redirects to a visited article aren't known, so their links aren't marked.
-- The frame capitalises a link's first letter as MediaWiki does, so its titles match the `seen` and `blocked` lists.
+- The frame capitalises a link's first letter as MediaWiki does, so its titles match the `seen`, `dead` and `hubs` lists.
 
 #### Dead links
 
@@ -60,7 +60,7 @@ Everything else gets the `mwr-dead` class (dimmed) and does nothing:
 
 So are links to the left-out version and list pages and the redirects to them, in every difficulty (`LEFT_OUT`; see [wiki-data.md](wiki-data.md)), titled "Off limits: a version or list page": the frame gets them as a list written once at load (`LEFT_OUT_JSON`, about 160 KB).
 
-So are the titles passed in `blocked` (No hubs), titled "Off limits: No hubs".
+So are the titles passed in `dead`, the pages visits have made dead, titled under Exact clicks "Off limits: already visited (Exact clicks)" and on a round trip's way back "Off limits: part of your way there (Round trip)" (`DEAD_WHY`), and in `hubs` (No hubs), titled "Off limits on Hard: a big overview page".
 
 #### No navboxes
 

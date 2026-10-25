@@ -43,7 +43,7 @@ The pools:
 
 - *Popular*: the best-linked 30% of the pool (`tiers` has `popular`), from Lava, Fire and Villager down to about Andesite and Deep Dark. It is the relaxed pool: its pairs have the most routes.
 - *Everyday*, the default: the whole pool.
-- *Deep cuts*: the least-linked third of each topic, among articles linked well enough to be a target (`deep`), such as Camel Husk or Curse of Binding. Mobs are all well known, so a few are in Popular too.
+- *Deep cuts*: the least-linked third of each topic, among articles linked well enough to be a target (`deep`), such as Camel Husk or Fatal Poison. Mobs are all well known, so a few are in Popular too.
 - The topics are uneven (blocks 478, items 273, mobs 93, world 94, magic 82), so drawing a topic first gives each a fifth of the rolls.
 - A family or spin-off that is on is one more group, so Dungeons (1,364 pages) gets the same share as a topic.
 

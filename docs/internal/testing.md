@@ -201,8 +201,10 @@ So a new snapshot that changes one fails there by name rather than leaving a che
 
 - Links by difficulty:
   - version and list pages and redirects to them dead in Relaxed and Hard, titled as off limits
+  - hubs and redirects to them dead in Hard, titled as Hard's overview pages, the target's hub live
   - no left-out page in the data
 - A left-out page typed in or named in a challenge link not taken
+- A failure saying whose it is: the wiki's (a request not answered), the link data's (a graph file that doesn't load) or the game's (a card none of whose draws exists)
 - The difficulty a link's rules give
 - The Timer box:
   - on by default
@@ -357,7 +359,7 @@ A round trip:
 - its par
 - the HUD naming the target and then the start
 - reaching the target clearing Back and showing the banner
-- the way there dead with other links live
+- the way there dead, titled as part of the way there, with other links live
 - Back working again on the way back
 - the win recorded by its cards
 - a target with no way back saying so
@@ -377,6 +379,7 @@ A Relay round trip:
 
 Scavenger's round trip:
 
+- the peek going back to the hunt
 - the last find heading home
 - the win and its record
 
@@ -387,7 +390,7 @@ Exact clicks:
 - a route of exactly par + 2 on no page twice found before Start
 - the header's count
 - Back gone
-- visited pages dead
+- visited pages dead, titled as already visited
 - the target too soon losing as Too soon
 - on the count winning with no golf score and its path counted with no click marked as getting no closer
 - a link's `extra=4`:
@@ -514,6 +517,7 @@ Par:
   - a made-up blob with a good hash (titles that try to add keys, every first byte, runaway and unknown rule bits, every tag byte, UTF-8 cut short, random bytes) opening to nothing or to a challenge's keys only with its titles as sealed
   - a made-up sealed link's missing article not named and a hand-made one's named
   - a sealed link of markup and script titles with junk rules played through every place a title shows without anything running or being added: the made-up replies escape titles in their HTML as the wiki does
+  - its peek at a checkpoint going back to the article
 - Share:
   - the game, the result, the path and a link that opens to the game
   - under Blind target only the start, with no path

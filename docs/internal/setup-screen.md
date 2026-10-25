@@ -56,6 +56,12 @@ While a roll or lookup is under way (`withBusy` sets `#setup.busy`):
 
 `reroll` lets the page be drawn that way (`painted`) before its searches, which can hold the page up for a moment.
 
+If it fails, the status line says whose failure it was (`failText`):
+
+- the wiki's, any `api` error: "Couldn’t reach minecraft.wiki (HTTP 503). Check your connection and try again."
+- the link graph files', from `loadGraphFile`: "The game’s link data didn’t load (wiki-links.js). Reload the page."
+- otherwise the game's own message: a card none of whose draws fit (`rollOne`: "Couldn’t find an article that fits. Try Reroll again.") or a daily with no pair (`DAILY_FAILED`).
+
 Par has its own spinner while it is worked out (see [par.md](par.md)).
 
 The spinners are transform animations, so they keep turning while a search runs, and turn slowly with reduced motion.

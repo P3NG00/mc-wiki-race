@@ -1070,6 +1070,8 @@ async function api(params) {
     const data = await res.json();
     if (data.error) throw new Error(data.error.info || data.error.code);
     return data;
+  } catch (e) {
+    throw Object.assign(e, { wiki: true });   // the wiki's failure, not the game's (see failText)
   } finally {
     const next = apiQueue.shift();
     if (next) next(); else apiActive--;
@@ -1185,7 +1187,7 @@ function setImg(img, src) {
 const MODE_HELP = {
   popular: 'Popular: the best-known game content, the 30% of it most linked across the wiki. A good place to start.',
   everyday: 'Everyday: all the game content: blocks, items, mobs, biomes, structures, enchantments and effects. Each topic is equally likely, and the start and target always come from different ones.',
-  deep: 'Deep cuts: the least-known third of each topic. Think Camel Husk or Curse of Binding rather than Creeper.',
+  deep: 'Deep cuts: the least-known third of each topic. Think Camel Husk or Fatal Poison rather than Creeper.',
   chaos: 'Chaos: any article on the wiki, history subpages, most lists and April Fools jokes included. Expect obscure starting points.',
 };
 function updateModeHelp() { $('#modeHelp').textContent = MODE_HELP[mode()]; }
@@ -1212,7 +1214,7 @@ const RULES = {
   checkpoint: { label: 'Relay' },
   roundtrip: { label: 'Round trip', help: 'Then go back to the start, never through a page of the way there.' },
   scavenger: { label: 'Scavenger hunt' },
-  limit: { label: 'Six clicks', help: `Reach the target in ${CLICK_LIMIT} clicks or fewer, or lose. Back counts.` },
+  limit: { label: 'Six clicks', help: `Finish in ${CLICK_LIMIT} clicks or fewer, or lose: checkpoints, finds and the way home included. Back counts.` },
   exact: { label: 'Exact clicks' },
 };
 // The game, one of the tiles: its rule (a Race has none), and what its tile and the strip under the tiles say, and with
@@ -1514,13 +1516,17 @@ function leaveDaily() {
   return was;
 }
 
+// What a roll, lookup or load that failed says: the wiki not answering (api), the link graph not loading (loadGraphFile),
+// or else the game's own message.
+const failText = e => e.wiki ? `Couldn’t reach minecraft.wiki (${e.message.replace(/\.$/, '')}). Check your connection and try again.`
+  : e.graph ? `The game’s link data didn’t load (${e.graph}). Reload the page.` : e.message;
 // #setup.busy shows it: a spinner by the status line and on the cards being rolled.
 async function withBusy(fn) {
   setup.busy++;
   $('#setup').classList.add('busy');
   updatePlay();
   try { return await fn(); }
-  catch (e) { setStatus('Network error: ' + e.message.replace(/\.$/, '') + '. Check your connection and try again.', true); }
+  catch (e) { setStatus(failText(e), true); }
   finally { setup.busy--; $('#setup').classList.toggle('busy', setup.busy > 0); updatePlay(); }
 }
 
@@ -1569,7 +1575,7 @@ async function rollOne(which, group, accept = () => true, titles = null) {
     // into the result (see finish).
     if (info && !others().includes(info.title)) return Object.assign(info, which === 'goal' && { topic: $('#topic').value, reach: reach() });
   }
-  throw new Error('Gave up finding a good article');
+  throw new Error('Couldn’t find an article that fits. Try Reroll again.');
 }
 
 // Whether a page may take a card, by the snapshot under the setup's difficulty and Content: a start needs a route to
@@ -1638,6 +1644,8 @@ async function reroll(which, atStart = false) {
       && REACHES[reach()].fits, notice = '';
     const graph = par && await linkGraph(rules()), topic = POOL.has($('#topic').value) ? $('#topic').value : null;
     const aims = par && candidates(topic, true), what = par && REACHES[reach()].label.toLowerCase();
+    // How the notices below start, and the topic they name if one is chosen.
+    const noStart = `With ${poolLabel()} articles on ${LEVELS[level()].label}, no start has`, inTopic = topic ? ' in ' + TOPICS[topic].label : '';
     // Whether t may be start s's target: not from its topic (Chaos aside) unless that is the chosen one.
     const apart = (s, t) => topic || mode() === 'chaos' || groupOf(t) !== groupOf(s);
     if (par && targets.includes('start')) {
@@ -1669,7 +1677,7 @@ async function reroll(which, atStart = false) {
         if (!current('start')) return;
         if (start) {
           if (r !== chosen) {
-            notice = `No ${poolLabel()} start has a ${topic ? TOPICS[topic].label + ' ' : ''}target at ${what} on ${LEVELS[level()].label}, so this one is ${REACHES[r].label.toLowerCase()}.`;
+            notice = `${noStart} a target at ${what}${inTopic}, so this one is ${REACHES[r].label.toLowerCase()}.`;
             $('#reach').value = r;
             par = REACHES[r].fits;
           }
@@ -1684,7 +1692,7 @@ async function reroll(which, atStart = false) {
         const off = s => Math.abs(keptPar(s) - REACHES[reach()].near), least = Math.min(...reached.map(off));
         start = await rollOne('start', null, undefined, reached.filter(s => off(s) === least));
         if (!current('start')) return;
-        if (start) notice = `No ${poolLabel()} start has ${kept.title} at ${what}, so this one is par ${keptPar(start.title)}.`;
+        if (start) notice = `${noStart} ${kept.title} at ${what}, so this one is par ${keptPar(start.title)}.`;
       }
       if (start) {
         setup.start = start;
@@ -1694,7 +1702,7 @@ async function reroll(which, atStart = false) {
         // No start has a target at any par with these settings, so the game rolls with any par and says why. (A kept
         // target nothing reaches leaves the start rolled without a par.)
         if (!kept) {
-          notice = `No ${poolLabel()} start has a ${topic ? TOPICS[topic].label + ' ' : ''}target at any par on ${LEVELS[level()].label}, so Target par is back to Any par.`;
+          notice = `${noStart} a target at any par${inTopic}, so Target par is back to Any par.`;
           $('#reach').value = 'any';
         }
         par = false;
@@ -1901,7 +1909,8 @@ function openCalendar(month = today().slice(0, 7)) {
 
 // A daily can always be done: its target, checkpoints and finds are only taken where the link graph has a route under
 // its rules (on a Six clicks day, a short enough one; on an Exact clicks day, one of exactly its count), so the daily
-// needs the graph, and fails to load without it.
+// needs the graph, and fails to load without it. With no pair found it says DAILY_FAILED.
+const DAILY_FAILED = 'Couldn’t load this day’s daily challenge. Try again in a moment.';
 async function dailyPair(date) {
   const rule = dailyRule(date), rules = ['nonav', rule], hunt = rule === 'scavenger' ? ranked(date, 'hunt', DAILY_HUNTS)[0] : null;
   // The first title in the day's ranking that may take the card: ok checks it, and again the title the wiki resolves
@@ -1914,13 +1923,13 @@ async function dailyPair(date) {
       const info = await pageInfo(t);
       if (info && ok(info.title)) return info;
     }
-    throw new Error('No daily pair found');
+    throw new Error(DAILY_FAILED);
   };
   const par = async cards => (await parRoute({ ...cards, rules }))?.length - 1;   // NaN without a route
   const start = await first('start', () => true);
   if (hunt === 'kinds') {
     const kinds = firstKinds(ranked(date, 'kind', Object.keys(KINDS)), start.title);
-    if (!(await par({ start: start.title, kinds }) >= 1)) throw new Error('No daily pair found');
+    if (!(await par({ start: start.title, kinds }) >= 1)) throw new Error(DAILY_FAILED);
     return { rule, hunt, start, vias: [], goal: null, kinds };
   }
   // A target or checkpoint linked well enough, from a topic none of the cards before it has.
@@ -2369,8 +2378,8 @@ async function navigate(title, fragment, { back = false, from = null } = {}) {
   // Nothing still ahead is marked: a target or checkpoint passed early still has to be reached again.
   const left = ahead().map(c => c.title);
   const seen = [...game.seen].filter(([, t]) => !left.includes(t)).map(([k]) => k);
-  const blocked = [...game.dead, ...game.rules.includes('nohubs') ? [...HUB_TITLES.keys()].filter(t => !keep.includes(HUB_TITLES.get(t))) : []];
-  renderArticle(page, fragment, token, blocked, seen);
+  const hubs = game.rules.includes('nohubs') ? [...HUB_TITLES.keys()].filter(t => !keep.includes(HUB_TITLES.get(t))) : [];
+  renderArticle(page, fragment, token, { dead: [...game.dead], hubs }, seen);
   setTimeout(() => frameReady(token), 15000);   // a stalled stylesheet must not leave Back and Give up disabled
   // Compare the post-redirect title, so following a redirect onto the target counts as arriving.
   const arrived = game.goal ? page.title === game.goal.title && objective() === game.goal : !hunting();
@@ -3075,7 +3084,7 @@ async function advFinish(rec, first, newBest, dailyFirst) {
     await Promise.all(path.map(p => p.measured));
     const won = rec.won, skill = won && first && par >= ADV_PAR, speed = skill && g.timed;
     if (won) {
-      gainXp(lines, par ? `Win at par ${par}` : 'Win', 2 * Math.max(1, par ?? 1));
+      gainXp(lines, par ? `Win (par ${par})` : 'Win', 2 * Math.max(1, par ?? 1));
       if (!g.exact && par && rec.clicks <= par) gainXp(lines, ...rec.clicks < par ? ['Under par', 6] : ['At par', 3]);
       for (const k of XP_RULES) if (has(k)) gainXp(lines, k === 'nohubs' ? 'Hard' : RULES[k].label, 2);
       if (dailyFirst) gainXp(lines, 'The daily, won for the first time', 10);
@@ -4227,8 +4236,9 @@ function themeIsDark() {
 // Restyles the loaded article in place. Also sent when a frame reports ready, in case the theme changed while it loaded.
 function syncFrameTheme() { $('#frame').contentWindow?.postMessage({ mwr: 'theme', dark: themeIsDark() }, '*'); }
 
-// blocked: titles whose links are dead for this game (No hubs). seen: titles visited this game, whose links are marked.
-function renderArticle(page, fragment, token, blocked = [], seen = []) {
+// Titles whose links are dead for this game: dead, the pages visits have made dead (Exact clicks's, or a round trip's way
+// there), and hubs (No hubs). seen: titles visited this game, whose links are marked.
+function renderArticle(page, fragment, token, { dead = [], hubs = [] } = {}, seen = []) {
   const dark = themeIsDark();
   const noNav = game.rules.includes('nonav'), lead = game.rules.includes('lead');
   // The article renders in a sandboxed iframe (opaque origin): the wiki's own CSS applies untouched,
@@ -4241,7 +4251,8 @@ function renderArticle(page, fragment, token, blocked = [], seen = []) {
     const NS = new Set(${js(NAMESPACES.filter(n => !game.content.includes(n)).map(n => n.toLowerCase()))});
     const FRAG = ${js(fragment || '')};
     const WGL = ${js(WGL_THEME_CLASSES)};
-    const BLOCKED = new Set(${js(blocked)});
+    const DEAD = new Set(${js(dead)}), DEAD_WHY = ${js(game.exact ? 'already visited (Exact clicks)' : 'part of your way there (Round trip)')};
+    const HUBS = new Set(${js(hubs)});
     const LEFT_OUT = new Set(${LEFT_OUT_JSON});
     const SEEN = new Set(${js(seen)});
     const NO_NAV = ${noNav};
@@ -4271,10 +4282,12 @@ function renderArticle(page, fragment, token, blocked = [], seen = []) {
       try { t = decodeURIComponent(rest).replace(/_/g, ' '); frag = decodeURIComponent(frag); } catch (e) { return null; }
       const c = t.indexOf(':');
       if (c > 0 && NS.has(t.slice(0, c).trim().toLowerCase())) return null;
-      t = t.charAt(0).toUpperCase() + t.slice(1);   // as MediaWiki does, so titles match the blocked and seen lists
-      if (LEFT_OUT.has(t)) return { kind: 'blocked', why: 'a version or list page' };
-      if (BLOCKED.has(t)) return { kind: 'blocked', why: 'No hubs' };
-      if (belowTop(a)) return { kind: 'blocked', why: 'Top links only' };
+      t = t.charAt(0).toUpperCase() + t.slice(1);   // as MediaWiki does, so titles match the dead, hub and seen lists
+      // A dead link's note says why it is dead.
+      if (LEFT_OUT.has(t)) return { kind: 'blocked', note: 'Off limits: a version or list page' };
+      if (DEAD.has(t)) return { kind: 'blocked', note: 'Off limits: ' + DEAD_WHY };
+      if (HUBS.has(t)) return { kind: 'blocked', note: 'Off limits on Hard: a big overview page' };
+      if (belowTop(a)) return { kind: 'blocked', note: 'Off limits: Top links only' };
       return { kind: 'article', title: t, frag, seen: SEEN.has(t) };
     }
     // What folds (see the folding boxes below) to what opens it, for a link to a section inside.
@@ -4292,7 +4305,7 @@ function renderArticle(page, fragment, token, blocked = [], seen = []) {
       if (!c || c.kind === 'blocked') a.classList.add('mwr-dead');
       else if (c.kind === 'article') a.classList.add('mwr-live');
       // The Minecraft-style tooltips (below) show the link's own title, with the note on a line of its own.
-      const note = c?.kind === 'blocked' ? 'Off limits: ' + c.why : c?.seen ? 'Already on your path' : '';
+      const note = c?.kind === 'blocked' ? c.note : c?.seen ? 'Already on your path' : '';
       if (note) {
         if (a.hasAttribute('title')) a.dataset.mwrTitle = a.title;
         a.dataset.mwrNote = note;
@@ -4856,8 +4869,8 @@ const graphFiles = new Map();
 function loadGraphFile(file, read) {
   if (!graphFiles.has(file)) graphFiles.set(file, new Promise((resolve, reject) => {
     const script = Object.assign(document.createElement('script'), { src: file });
-    script.onload = () => { const d = read(); d.sha256 === WIKI_DATA.sha256 ? resolve(d) : reject(new Error(`${file} doesn’t match wiki-data.js`)); };
-    script.onerror = () => { graphFiles.delete(file); script.remove(); reject(new Error(`couldn’t load ${file}`)); };
+    script.onload = () => { const d = read(); d.sha256 === WIKI_DATA.sha256 ? resolve(d) : reject(Object.assign(new Error(`${file} doesn’t match wiki-data.js`), { graph: file })); };
+    script.onerror = () => { graphFiles.delete(file); script.remove(); reject(Object.assign(new Error(`couldn’t load ${file}`), { graph: file })); };
     document.head.append(script);
   }));
   return graphFiles.get(file);
@@ -6346,7 +6359,7 @@ $('#btnPeek').onclick = () => {
   openModal(`<h2>${objectiveLabel()}: ${esc(g.title)}</h2>
     <div class="peek"><img alt="" class="hidden"><p>${esc(g.desc || 'No description available.')}</p></div>
     ${game.timed ? '<p class="note">The clock keeps running while you peek.</p>' : ''}
-    <div class="actions"><button class="primary" id="pClose">Back to the hunt</button></div>`);
+    <div class="actions"><button class="primary" id="pClose">Back to the article</button></div>`);
   setImg($('.peek img'), g.img);
   $('#pClose').onclick = closeModal;
 };

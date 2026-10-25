@@ -821,7 +821,7 @@ fault = { match: () => true };
 await send('browsingContext.navigate', { context: ctx, url: 'about:blank', wait: 'complete' });
 await send('browsingContext.navigate', { context: ctx, url: fileUrl, wait: 'complete' });
 const status = "document.querySelector('#setupStatus').textContent";
-check('a roll that fails says so', await until(`${status}.startsWith('Network error') && !${status}.includes('..') && setup.busy === 0`, 15000), await ev(status));
+check('a roll that fails says so', await until(`${status}.startsWith('Couldn’t reach minecraft.wiki') && !${status}.includes('..') && setup.busy === 0`, 15000), await ev(status));
 fault = null;
 await ev("document.querySelector('#btnRerollAll').click()");
 check('the next roll works', await until("!document.querySelector('#btnPlay').disabled", 30000), await ev(status));

@@ -46,7 +46,7 @@ These are checkboxes that go with any game, in any mix.
 | **No Back** | The Back button is gone: every click is final. |
 | **Blind target** | The target is hidden until you start, then you only get its name. A Relay shows each stop once you reach the one before. |
 | **Top links only** | Only the links above an article's first heading work: its opening text, infobox and the notes at the top. Routes get much longer. |
-| **Six clicks** | Reach the target in 6 clicks or fewer, or lose. Back counts. |
+| **Six clicks** | Finish in 6 clicks or fewer, or lose: checkpoints, finds and the way home included. Back counts. |
 | **Distance** | Always shows how many clicks your next stop is from your page, by the shortest route: the target, a checkpoint, the nearest find or the start on the way back. A click that gets you closer is cheered. |
 
 A few don't combine, and their box greys out with the reason. Six clicks is off with Exact clicks ("Off: Exact clicks has its own count.") and with Top links only ("Off: with Top links only, routes are often longer than six clicks."). Round trip is off with Exact clicks ("Off: Exact clicks never visits a page twice.").
@@ -64,7 +64,7 @@ The **Articles** row picks the pool, the articles the cards are drawn from.
 |---|---|
 | **Popular** | The best-known game content, the 30% of it most linked across the wiki. A good place to start. |
 | **Everyday** | All the game content: blocks, items, mobs, biomes, structures, enchantments and effects. Each topic is equally likely, and the start and target always come from different ones. |
-| **Deep cuts** | The least-known third of each topic. Think Camel Husk or Curse of Binding rather than Creeper. |
+| **Deep cuts** | The least-known third of each topic. Think Camel Husk or Fatal Poison rather than Creeper. |
 | **Chaos** | Any article on the wiki, history subpages, most lists and April Fools jokes included. Expect obscure starting points. |
 
 Everyday is the default. Popular and Deep cuts pick topics the same way, while Chaos draws from every article alike and its cards may share a topic. Every rolled card has a route to the others, going by the wiki's offline copy (a download of the whole wiki, dated in the footer), though an article you type in isn't checked.
@@ -111,7 +111,7 @@ On the right are your **Clicks** ("of 6" with a dot a click under Six clicks), *
 ## Links in the article
 
 - Live links light up on hover. Links to a page already on your path are purple and dotted, and say "Already on your path".
-- Dead links are dimmed and do nothing but a villager's "hrmm": files, categories, tutorials and other non-article pages, red links, links off the wiki, version pages, and the few big list pages of game data that link to nearly everything ("Off limits: a version or list page"). Under Hard and Top links only, their dead links say so too.
+- Dead links are dimmed and do nothing but a villager's "hrmm": files, categories, tutorials and other non-article pages, red links, links off the wiki, version pages, and the few big list pages of game data that link to nearly everything ("Off limits: a version or list page"). The rules' dead links say why too: Hard's overview pages ("Off limits on Hard: a big overview page"), everything below the top under Top links only, the pages you've visited under Exact clicks, and your way there once a Round trip turns back.
 - A redirect to the target counts as reaching it.
 - A page with no live links says so in a banner: go Back, or give up.
 - The wiki's own features work: crafting grids cycle through their recipes, tabs switch, folding boxes fold, and the speakers in a Sounds table play.

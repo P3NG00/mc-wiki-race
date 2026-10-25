@@ -366,7 +366,7 @@ For Scavenger the things to find, found ones ticked with what found them.
 
 A route of more than `ROUTE_FULL` (3) stops shrinks the done chips to their ✓ (their names stay in a tooltip), and a click on one opens them all (`.route.open`).
 The row scrolls sideways when it still doesn't fit, kept on the objective by `scrollRouteToNow` (also on resize).
-The ? button beside it is the peek.
+The ? button beside it is the peek: the objective's picture and description, or Scavenger's list of what is left. Its button says "Back to the hunt" in Scavenger and "Back to the article" otherwise.
 
 ### The right side
 

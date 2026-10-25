@@ -47,7 +47,7 @@ The research behind it: with navboxes almost any sensible click gets closer ([RE
 *No hubs* makes links to the hubs (`hubs` in `tools/wikidata/config.json`) dead:
 
 - `HUB_TITLES` maps every hub and its redirects, those to sections included (about 1,000 titles, from `wiki-data.js`), to the hub.
-- `navigate` passes all of them except the target's hub to `renderArticle` as `blocked`.
+- `navigate` passes all of them except the target's hub to `renderArticle` as `hubs`, whose links say "Off limits on Hard: a big overview page".
 - Going Back to a hub start is allowed, and a hub that is a checkpoint stays live too.
 
 ### Blind target
@@ -107,7 +107,7 @@ Showing the measure:
 Revisits are out because a page almost always links back to the one before, which would make any count easy. So:
 
 - Back is hidden (`canGoBack`).
-- Every visited page is dead by every title that led to it (`game.dead`, renewed on each arrival).
+- Every visited page is dead by every title that led to it (`game.dead`, renewed on each arrival), its links saying "Off limits: already visited (Exact clicks)".
 - Reaching the target sooner loses (`tooSoon`), as does using up the count (`game.limit`, `outOfClicks`).
 
 #### A route of the count
@@ -182,7 +182,7 @@ In play:
 - `finish` records it by its cards: the target as `goal`, the checkpoints as `vias` and `back`.
 - Reaching the target, or the last find (`turnBack`):
   - starts the Back stack again from there, so Back can't walk the way there backwards
-  - makes every page of the way there dead, the target included, but those still ahead (`ahead()`: the checkpoints of the way back and the start): `game.dead` holds their titles and the link titles that led to them, which `navigate` adds to `blocked` and Distance goes around.
+  - makes every page of the way there dead, the target included, but those still ahead (`ahead()`: the checkpoints of the way back and the start): `game.dead` holds their titles and the link titles that led to them, which `navigate` passes to `renderArticle` as `dead` (their links say "Off limits: part of your way there (Round trip)") and Distance goes around.
 - If the snapshot has no way on around them, that arrival is marked `stranded` (⛔ on the path), and the banner reaching it says only giving up is left, or `STRANDED` over the article if the banner has already gone. The path entry is marked in the accent colour.
 - `CLICK_LIMIT` covers the whole route.
 

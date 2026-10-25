@@ -140,6 +140,16 @@ check('the data has no left-out page', await ev("WIKI_DATA.articles.every(([t]) 
 await ev("setCustom('start', 'Java Edition version history')");
 check('a left-out page typed in isn’t taken', await until("setup.busy === 0 && document.querySelector('#setupStatus').textContent === 'No article named “Java Edition version history” on minecraft.wiki.'")
   && await ev("setup.start.title === 'Diamond'"), await ev("document.querySelector('#setupStatus').textContent"));
+// A failure says whose it is: the wiki's (here a request the suite doesn't answer), the link data's, or the game's own
+// (a card none of whose draws exists).
+const failSays = async fn => ev(`withBusy(${fn}).then(() => document.querySelector('#setupStatus').textContent)`);
+const failMessages = [await failSays("() => api({ action: 'query', prop: 'pageimages' })"), await failSays("() => loadGraphFile('no-such-file.js', () => null)"),
+  await failSays("() => rollOne('goal', null, undefined, ['No such page'])")];
+check('a failure says whose it is: the wiki’s, the link data’s or the game’s',
+  failMessages[0] === 'Couldn’t reach minecraft.wiki (Not answered offline: query prop=pageimages). Check your connection and try again.'
+  && failMessages[1] === 'The game’s link data didn’t load (no-such-file.js). Reload the page.' && failMessages[2] === 'Couldn’t find an article that fits. Try Reroll again.',
+  failMessages.join(' | '));
+await ev("setStatus('')");
 await play();
 let links = await linkStates();
 const leftOut = "['Java_Edition_version_history', 'Pocket_Edition_version_history', 'Closed_captions'].every(t => document.querySelector(`a[href='/w/${t}']`).title === 'Off limits: a version or list page')";
@@ -158,7 +168,7 @@ check('the header shows par', await until("/^\\d+$/.test(document.querySelector(
 links = await linkStates();
 check('Hard: hubs, redirects to them, navboxes and left-out pages dead; the target hub and other links live',
   links.Block === 'dead' && links.Blocks === 'dead' && links.Creeper === 'dead' && links.Java_Edition_version_history === 'dead' && links.Closed_captions === 'dead'
-  && links.Crafting === 'live' && links.Diamond_Pickaxe === 'live' && await ev("document.querySelector('a[href=\"/w/Block\"]').title === 'Off limits: No hubs'", await frameCtx())
+  && links.Crafting === 'live' && links.Diamond_Pickaxe === 'live' && await ev("document.querySelector('a[href=\"/w/Block\"]').title === 'Off limits on Hard: a big overview page'", await frameCtx())
   && await ev("HUB_TITLES.get('Crafting') === 'Crafting'"), JSON.stringify(links));   // else Crafting live would test nothing
 await ev('finish(false)');
 const shortest = "[...document.querySelectorAll('#mBest li')].map(li => li.textContent).join(' → ')";
@@ -360,7 +370,7 @@ check('and each bursts into its sparks', await until("fx.parts.filter(p => p.lif
 // Its XP in the result: 2 × par, and more for the rest, flying into the bar, on Minecraft's levels.
 check('XP levels are Minecraft\'s', await ev("xpLevel(6).L === 0 && xpLevel(7).L === 1 && xpLevel(7).into === 0 && xpLevel(352).L === 16 && xpLevel(353).into === 1"));
 check('a win lists its XP in the result, filling the bar', await until("!!document.querySelector('#mXp:not(.hidden) .xp')", 5000)
-  && await ev(`$('#mXp').textContent.includes('Win at par ' + ${relayPar}) && $('#mXp').textContent.includes('+' + 2 * ${relayPar}) && adv.xp > 0`), await ev("$('#mXp').textContent"));
+  && await ev(`$('#mXp').textContent.includes('Win (par ' + ${relayPar} + ')') && $('#mXp').textContent.includes('+' + 2 * ${relayPar}) && adv.xp > 0`), await ev("$('#mXp').textContent"));
 await ev("closeModal(); toSetup()");
 // Swap reverses the whole chain. A third checkpoint rolls a third card; back to one, Reroll all drops the other two.
 await ev("document.querySelector('#btnSwap').click()");
@@ -396,7 +406,8 @@ check('reaching the target turns back: the banner, the HUD, Back starting again'
   && game.stack.join() === 'Zombie' && document.querySelector('#btnBack').disabled && game.path[2].via === 1`) && await ev(hud) === 'Back to Diamond', await ev(toast));
 const liveLinks = async () => JSON.parse(await ev(`JSON.stringify(Object.fromEntries([...document.querySelectorAll('a')].map(a => [a.getAttribute('href'), a.classList.contains('mwr-live')])))`, await frameCtx()));
 let rtLinks = await liveLinks();
-check('the way there is dead, other links live', rtLinks['/w/Crafting'] === false && rtLinks['/w/Diamond_Pickaxe'] === true, JSON.stringify(rtLinks));
+check('the way there is dead, saying why, other links live', rtLinks['/w/Crafting'] === false && rtLinks['/w/Diamond_Pickaxe'] === true
+  && await ev("document.querySelector('a[href=\"/w/Crafting\"]').title === 'Off limits: part of your way there (Round trip)'", await frameCtx()), JSON.stringify(rtLinks));
 await ev("navigate('Diamond Pickaxe', null)");
 await until('game.path.length === 4 && !game.loading');
 check('Back works again on the way back', await ev("!document.querySelector('#btnBack').disabled"));
@@ -523,6 +534,8 @@ check('without Round trip the target goes back to the end', await ev(`backCount(
 // Scavenger's round trip finds everything, then heads home.
 await open('#start=Diamond&via=Creeper&via=Zombie&target=Crafting&rules=roundtrip,scavenger');
 await play();
+check('the peek at the finds goes back to the hunt', await ev("(document.querySelector('#btnPeek').click(), document.querySelector('#pClose').textContent === 'Back to the hunt')"));
+await ev('closeModal()');
 for (const [i, t] of ['Creeper', 'Zombie', 'Crafting'].entries()) {
   await ev(`navigate('${t}', null)`);
   await until(`game.path.length === ${i + 2} && !game.loading`);
@@ -560,7 +573,8 @@ check('the header counts toward it and Back is gone', await ev(`document.querySe
 await ev("navigate('Crafting', null)");
 await until('game.path.length === 2 && !game.loading');
 rtLinks = await liveLinks();
-check('visited pages are dead links', rtLinks['/w/Crafting'] === false && rtLinks['/w/Diamond_Pickaxe'] === true, JSON.stringify(rtLinks));
+check('visited pages are dead links, saying why', rtLinks['/w/Crafting'] === false && rtLinks['/w/Diamond_Pickaxe'] === true
+  && await ev("document.querySelector('a[href=\"/w/Crafting\"]').title === 'Off limits: already visited (Exact clicks)'", await frameCtx()), JSON.stringify(rtLinks));
 await ev("navigate('Zombie', null)");
 check('reaching the target sooner loses: Too soon', await until('!game.active') && await ev(`(r => r.tooSoon && !r.won && r.exact === ${n})(store.get('mwr.history', [])[0])
   && document.querySelector('#modal h2').textContent === 'Too soon' && document.querySelector('#modal').textContent.includes('it had to be exactly ${n}')`));
@@ -843,7 +857,7 @@ await ev("setCustom('goal', 'Zombie')");
 await until("setup.goal?.title === 'Zombie' && setup.busy === 0");
 await ev("reroll('start')");
 const keptPar = await until(ready, 30000) && await ev("cardsRoute([setup.start.title, 'Zombie'], rules()).then(r => r.length - 1)");
-check('and with none at the par, one at the nearest par', await ev(`setup.goal.title === 'Zombie' && ${status} === 'No Popular start has Zombie at par 3, so this one is par ${keptPar}.'`)
+check('and with none at the par, one at the nearest par', await ev(`setup.goal.title === 'Zombie' && ${status} === 'With Popular articles on Relaxed, no start has Zombie at par 3, so this one is par ${keptPar}.'`)
   && keptPar === 2, `${await ev(status)} (par ${keptPar})`);
 // Settings with no pair at the par (in Popular on Relaxed no start has a Blocks target at par 3) roll at the nearest par
 // that has one, the lower first, saying why, and the option is off until they change.
@@ -851,7 +865,7 @@ await ev("document.querySelector('#topic').value = 'blocks'; document.querySelec
 await ev("reroll('all')");
 const p3Off = "(document.querySelector('#reach').dispatchEvent(new Event('focus')), document.querySelector('#reach option[value=p3]').disabled)";
 const nearPar = await until(ready, 30000) && await ev(`cardsRoute([setup.start.title, setup.goal.title], rules()).then(r => r.length - 1)`);
-check('settings with no pair at the par roll at the nearest par, saying why, and the option is off', await ev(`${status} === 'No Popular start has a Blocks target at par 3 on Relaxed, so this one is par 2.'
+check('settings with no pair at the par roll at the nearest par, saying why, and the option is off', await ev(`${status} === 'With Popular articles on Relaxed, no start has a target at par 3 in Blocks, so this one is par 2.'
     && $('#reach').value === 'p2' && groupOf(setup.goal.title) === 'blocks' && ${p3Off}`) && nearPar === 2, `${await ev(status)} (par ${nearPar})`);
 check('until the settings change', await ev(`(document.querySelector('#topic').value = 'world', !${p3Off})`));
 // A start typed in is kept when a par is picked, and with no target at it (in Popular on Relaxed no start has a Mobs
@@ -1771,6 +1785,7 @@ await ev(`navigate(${JSON.stringify(payloads[1])}, null)`);
 await until("game.viaNext === 1 && !game.loading");
 await ev("document.querySelector('#btnPeek').click()");
 const peeked = await ev(injected);
+check('the peek at a checkpoint goes back to the article', await ev("document.querySelector('#pClose').textContent === 'Back to the article'"));
 await ev(`closeModal(); navigate(${JSON.stringify(payloads[2])}, null)`);
 await until("!document.querySelector('#modalBg').classList.contains('hidden') && !!document.querySelector('.result')");
 const frameClean = await ev(injected, await frameCtx());

@@ -75,7 +75,7 @@ flowchart LR
 Every request to the wiki's MediaWiki API goes through `api()`. It adds `origin=*`, keeps at most four requests in flight with the rest queued in order (MediaWiki asks clients not to send many at once), and times each out after 30 seconds. Most requests are `pageInfo`, for a card's description, picture and redirects, or `action=parse`, for an article's HTML. The rest look up the addresses of the wiki's pictures and sounds once each, when first needed.
 Nothing polls: every request comes from something the player did.
 
-The parse cache keeps up to 40 titles (an article is kept under both the requested and the resolved title) and at most 10 million characters, so Back and Retry this pair don't fetch again. The API marks parse replies uncacheable, so the browser's own cache can't do this.
+The parse cache keeps up to 40 titles (an article is kept under both the requested and the resolved title) and at most 10 million characters, so Back and Play again don't fetch again. The API marks parse replies uncacheable, so the browser's own cache can't do this.
 When a link is pressed with a mouse or pen, the frame says so and the article is asked for at once, a little before the click arrives.
 
 Details: [internal/rendering.md](internal/rendering.md#api-access), [internal/rules.md](internal/rules.md#the-parse-cache)
@@ -105,7 +105,7 @@ Details: [internal/picking.md](internal/picking.md)
 
 ## Challenge links
 
-Copy challenge link puts the setup into the URL hash as `g=`: the cards and the rules, packed into bytes and scrambled so the pair isn't readable at a glance. The key is in the page, so this hides rather than protects; a made-up link can do nothing a plain one can't. Titles go in as text, so a link still opens the same game after a snapshot update.
+Copy challenge link puts the setup into the URL hash as `g=`: the cards and the rules, packed into bytes and scrambled so the cards aren't readable at a glance. The key is in the page, so this hides rather than protects; a made-up link can do nothing a plain one can't. Titles go in as text, so a link still opens the same game after a snapshot update.
 Plain `start=`, `target=`, `via=` and `rules=` keys work too, which is handy for testing a route.
 
 Details: [internal/url-hash.md](internal/url-hash.md)

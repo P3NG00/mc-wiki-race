@@ -194,7 +194,7 @@ An item's blast (see [items.md](items.md)) throws the pieces of the page around 
 
 - While a game is on (`startGame` until `finish` or `toSetup`), a `beforeunload` listener (`guardLeaving`) makes closing the tab, reloading, the browser's Back and any other way of leaving the page ask first with the browser's own dialog.
 - It is added and removed rather than left on, since a page with one may be kept out of the back/forward cache.
-- Browsers only show the dialog after a real click or key press, and a game only starts from one (Start or Retry this pair).
+- Browsers only show the dialog after a real click or key press, and a game only starts from one (Start or Play again).
 - iOS Safari doesn't show it at all.
 
 ## Path, Back and the win check
@@ -222,7 +222,7 @@ An item's blast (see [items.md](items.md)) throws the pieces of the page around 
 
 - `parseCache` keeps up to `PARSE_CACHE_MAX` (40) parse results, and articles of `PARSE_CACHE_TEXT` (10 million) characters in all, since a long one is over a million, the oldest going first but never the page just cached.
 - They are stored under both the requested and the resolved title, and it is cleared on return to setup.
-- Back and "Retry this pair" don't refetch.
+- Back and "Play again" don't refetch.
 - The API marks parse responses uncacheable, so the browser's HTTP cache can't do this.
 - A link pressed in the article (`{mwr:'press'}`) has its article asked for at the press (`pressLink`, through `askParse`, which `navigate` uses too), held in `pressed` until the next navigation:
   - one to that title waits for that request instead of making its own

@@ -14,7 +14,7 @@ Par is the fewest clicks for a pair, going by the snapshot.
 - The search can hold the page up for a moment, a round trip's or Scavenger's most, so `setupPar` first shows `Par …` with a spinner (`.working`) and waits for the page to be drawn (`painted`).
   - Of the runs started meanwhile (a change of rules renders every card) only the last one searches.
 - `startGame` works it out for the game (`game.parReady`, then `game.par`, for the header), taking the route the setup screen has just found.
-  - `cardsRoute` keeps its last search by everything it went by (`lastRoute`), so Start and Retry this pair don't search again, and drops one that fails.
+  - `cardsRoute` keeps its last search by everything it went by (`lastRoute`), so Start and Play again don't search again, and drops one that fails.
 - Both show par in every game, so a player knows the score to aim for from the start; only Blind target holds it until the game starts.
 
 ### Golf scores
@@ -46,12 +46,12 @@ The result also shows one shortest route. `showPar` fills, once it knows, unless
 
 The result window (`finish`, `.result`) goes:
 1. the outcome as the heading (a loss in the target colour, with its reason under it) and the golf score beside it;
-2. the game and its extra rules as labels, like the header's, with the route and the settings the labels don't say;
+2. the game and its extra rules as labels, like the header's, with a daily's day (`shortDate`), the route and the settings the labels don't say;
 3. four tiles (clicks, or "2 of 4" for Exact clicks, par, time, time per click);
 4. the personal best (a green bar when it is a new one);
 5. your path;
 6. the missed shortcut, with the shortest route beside it;
-7. then Share, Copy challenge link, Retry this pair and New game.
+7. then Share, Copy challenge link, Play again and New game.
 
 ### Your path
 
@@ -79,14 +79,14 @@ Then, folded away under "Show a shortcut you missed" (`#mShortcut`, a `<details>
 
 Beside it, the shortest route (for Exact clicks, a route of its count).
 
-Then Share, Copy challenge link, Retry this pair and New game.
+Then Share, Copy challenge link, Play again and New game.
 
 ### Share and the challenge link
 
 - Share and Copy challenge link both copy `game.link`, made at `startGame` from the setup that started the game by `gameLink`, which the setup screen's Copy challenge link uses too.
   - `game.link` is the sealed challenge link, or for a daily `#daily=<date>`, since the blob never holds a daily and its game wouldn't count as one.
 - Share (`shareText`) copies:
-  - the game's labels and settings,
+  - a daily's day with its year, the game's labels and settings,
   - the route,
   - the result with par and its golf name,
   - your path with each page's count in brackets (from the result's own path entries, `steps`, so a record from the history alone has none)

@@ -11,7 +11,7 @@ Play it at **[mcwikirace.com](https://mcwikirace.com/)**.
 - **Four games:** Race, Relay (checkpoints on the way), Scavenger hunt and Exact clicks.
 - **Extra rules** to mix in: Round trip, No Back, Blind target, Top links only, Six clicks and Distance.
 - **Three difficulties**, a choice of articles from the best known to the deepest cuts, a target topic and a target par.
-- **A daily challenge**, the same pair for everyone on the same date, with streaks.
+- **A daily challenge**, the same game for everyone on the same date, with streaks.
 - **Scored like golf** against par, the fewest clicks the game can be done in, with the route you missed.
 - **Advancements**, a background that maps the wiki's links, a note block for your clicks, and items that blow the page up.
 

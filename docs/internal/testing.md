@@ -253,7 +253,7 @@ The items:
 - a click lighting a placed TNT
 - Rebuild putting every piece back, the article's too, and play going on to a win
 - a bed slept in blowing at once
-- Give up giving up with the page whole under the result
+- Give up giving up with the page whole under the result, headed You gave up
 - the respawn anchor's four charges and its blast on the fifth click leaving the footer whole
 - the pieces coming to rest on what is left of the page rather than the bottom of the window
 - an item in hand splitting the text in view without moving anything
@@ -513,7 +513,7 @@ Par:
   - no title in the URL
   - two links to one game differing
   - one opening to its game held unseen
-  - a damaged or overlong blob rolling a random pair and saying so
+  - a damaged or overlong blob rolling new cards and saying so
   - a made-up blob with a good hash (titles that try to add keys, every first byte, runaway and unknown rule bits, every tag byte, UTF-8 cut short, random bytes) opening to nothing or to a challenge's keys only with its titles as sealed
   - a made-up sealed link's missing article not named and a hand-made one's named
   - a sealed link of markup and script titles with junk rules played through every place a title shows without anything running or being added: the made-up replies escape titles in their HTML as the wiki does
@@ -521,7 +521,7 @@ Par:
 - Share:
   - the game, the result, the path and a link that opens to the game
   - under Blind target only the start, with no path
-  - a daily's, and its setup screen's challenge link, linking its day
+  - a daily's naming its day with the year, as the result names it without, and with its setup screen's challenge link linking its day
 - Random game:
   - eight clicks each filling the cards its settings use, the start alone under Blind target, with the line above the cards naming the game
   - not all coming out the same

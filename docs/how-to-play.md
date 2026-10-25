@@ -16,7 +16,7 @@ Open [mcwikirace.com](https://mcwikirace.com/): a start and a target are already
 - **Your game**: one line that sums up the game, the extra rules, the articles and the difficulty.
 - The cards: **Start** and **Target**, plus **Checkpoint** cards in a Relay, or a **Find one of each** card in a Scavenger hunt of kinds. Each shows its article's picture and description.
 - **🎲 Reroll** on a card rolls a new article for it. Or type any article on the wiki into the box under it ("or type an article…") and press Enter.
-- **Start game**, with par beside it: the fewest clicks the pair can be done in.
+- **Start game**, with par beside it: the fewest clicks the game can be done in.
 - **🎲 Reroll all** rolls every card, and **⇄ Swap** plays the whole thing backwards, checkpoints included (it's hidden under Blind target and in a hunt of kinds). **🎲 Random game** sets every setting below the cards at random, then rolls new cards; the settings beside the title stay as they are.
 - **Copy challenge link** copies a link that opens this exact game (see [Challenge links](#challenge-links)).
 
@@ -124,13 +124,13 @@ Back returns to the previous article and counts as a click. The clock pauses whi
 
 ## The result
 
-The result window opens with "🎉 You made it!" (or "🎉 You found them all!"), or "Out of clicks", "Too soon" or "Game over". Under it are your game's labels, then tiles for **Clicks**, **Par**, **Time** and **Per click** (just the first two with the Timer off), your personal best, the XP the game earned, your path and the shortest route.
+The result window opens with "🎉 You made it!" (or "🎉 You found them all!"), or "Out of clicks", "Too soon" or "You gave up". Under it are your game's labels, then tiles for **Clicks**, **Par**, **Time** and **Per click** (just the first two with the Timer off), your personal best, the XP the game earned, your path and the shortest route.
 
-Beside each page of your path is the fewest clicks from it to what was next; in red, a click that got no closer. For Exact clicks the route column shows one way in exactly your count instead. The buttons are **Share**, **Copy challenge link**, **Retry this pair** and **New game**.
+Beside each page of your path is the fewest clicks from it to what was next; in red, a click that got no closer. For Exact clicks the route column shows one way in exactly your count instead. The buttons are **Share**, **Copy challenge link**, **Play again** and **New game**.
 
 ## Par and golf scores
 
-Par is the fewest clicks for a pair, going by the wiki's offline copy ([how that's made](wiki-data.md)), shown beside **Start game** and in the header from the start (under Blind target, once the game starts). A win is named as in golf:
+Par is the fewest clicks a game can be done in, going by the wiki's offline copy ([how that's made](wiki-data.md)), shown beside **Start game** and in the header from the start (under Blind target, once the game starts). A win is named as in golf:
 
 | Score | Means |
 |---|---|
@@ -148,17 +148,17 @@ Under your path, **Show a shortcut you missed** opens the shortcut from your cos
 
 ## Share and personal bests
 
-**Share** copies your game, the route, your result with par and its golf name, your path with each page's count in brackets, and a link to play it. Under Blind target it names only the start and leaves your path out, so it gives nothing away.
+**Share** copies your game (a daily's with its day and year), the route, your result with par and its golf name, your path with each page's count in brackets, and a link to play it. Under Blind target it names only the start and leaves your path out, so it gives nothing away.
 
-Your personal best for a pair is the fewest clicks, then the fastest time, among games with the same cards and rules (an Exact clicks count is a game of its own). Beat it and you get "New personal best for this pair!", a fanfare and gold fireworks. A game with the Timer off is compared on clicks alone.
+Your personal best for a game is the fewest clicks, then the fastest time, among games with the same cards and rules (an Exact clicks count is a game of its own). Beat it and you get "New personal best for this game!", a fanfare and gold fireworks. A game with the Timer off is compared on clicks alone.
 
 ## Recent games
 
-**Recent games** lists your last 50 games: the game, the route, the result, the time and when. A win's badge is green, a loss's orange and giving up grey, and **Best** marks each pair's personal best. **Clear history** deletes them all, personal bests, dailies and the daily streak included, after asking; your advancements and XP stay.
+**Recent games** lists your last 50 games: the game, the route, the result, the time and when. A win's badge is green, a loss's orange and giving up grey, and **Best** marks each game's personal best. **Clear history** deletes them all, personal bests, dailies and the daily streak included, after asking; your advancements and XP stay.
 
 ## The daily
 
-**📅 Play the daily** loads today's pair: the same for everyone on the same date, on Normal plus one rule. That rule is one of No Back, Blind target, a Relay of 1 or 2 checkpoints, Hard (No navboxes and No hubs), Six clicks, Round trip, Exact clicks (par + 2, 3 or 4) or a Scavenger hunt.
+**📅 Play the daily** loads today's challenge: the same for everyone on the same date, on Normal plus one rule. That rule is one of No Back, Blind target, a Relay of 1 or 2 checkpoints, Hard (No navboxes and No hubs), Six clicks, Round trip, Exact clicks (par + 2, 3 or 4) or a Scavenger hunt.
 Every daily can be done, going by the offline copy, and a Six clicks daily has par 4 or less, leaving two clicks to spare.
 
 Any change to the cards or rules makes it an ordinary game, and the game tells you so. A daily's Share and challenge link open that day's daily.
@@ -172,8 +172,8 @@ The line under the daily shows your streak, your best, and the days won of those
 ## Challenge links
 
 **Copy challenge link**, on the setup screen or in the result, copies a link that opens this exact game: its cards, game, rules, difficulty and count.
-It looks like `https://mcwikirace.com/#g=…`, sealed so the pair isn't readable at a glance. The target topic, target par and Content aren't in it: whoever opens it plays with their own Content boxes, though a card's own spin-off always counts.
-Under Blind target it picks the hidden cards first, and they stay hidden for whoever opens the link. A link cut short rolls a random pair instead, and says it's damaged.
+It looks like `https://mcwikirace.com/#g=…`, sealed so the cards aren't readable at a glance. The target topic, target par and Content aren't in it: whoever opens it plays with their own Content boxes, though a card's own spin-off always counts.
+Under Blind target it picks the hidden cards first, and they stay hidden for whoever opens the link. A link cut short rolls new cards instead, and says it's damaged.
 
 ### Writing one by hand
 
@@ -189,7 +189,7 @@ You can also write a link's keys after the `#` yourself, joined with `&`, for ex
 | `extra=` | With Exact clicks, the clicks over par, 1 to 5. |
 | `daily` or `daily=YYYY-MM-DD` | Today's daily, or a past day's. |
 
-A link without `rules` plays on Relaxed. `#rules=…` on its own sets the rules for a rolled pair. An article that doesn't exist rolls a random pair instead.
+A link without `rules` plays on Relaxed. `#rules=…` on its own sets the rules for the cards rolled. An article that doesn't exist rolls new cards instead.
 
 ## Settings
 
@@ -254,7 +254,7 @@ On the TNT article, a blast that reaches the infobox's big picture of TNT lights
 **🏆 Advancements**, at the right of the Recent games heading, opens the panel with how many you've earned.
 Each is earned once and kept, and pops up as a Minecraft toast in the top right: a task's says "Advancement Made!", a goal's "Goal Reached!" and a challenge's "Challenge Complete!". Hidden ones show as ??? until earned. **Reset advancements**, at the panel's foot, forgets them all and your XP.
 
-Skill advancements need par 3 or more on a pair's first game, so retrying a pair or typing in an easy one won't earn them. Speed ones need that and the Timer on.
+Skill advancements need par 3 or more, the first time you play that game, so playing it again or typing in an easy one won't earn them. Speed ones need that and the Timer on.
 
 | Group | Name | Tier | How to earn it | Hidden |
 |---|---|---|---|---|
@@ -283,7 +283,7 @@ Skill advancements need par 3 or more on a pair's first game, so retrying a pair
 | Keeping at it | Regular | Task | Win 10 games. | |
 | Keeping at it | Veteran | Goal | Win 50 games. | |
 | Keeping at it | Wiki Legend | Challenge | Win 100 games. | |
-| Keeping at it | Self-Improvement | Task | Beat your own best on a pair. | |
+| Keeping at it | Self-Improvement | Task | Beat your own best at the same game. | |
 | Keeping at it | Habit | Task | Win the daily 3 days in a row. | |
 | Keeping at it | Week Streak | Goal | Win the daily 7 days in a row. | |
 | Keeping at it | Devoted | Challenge | Win the daily 30 days in a row. | |

@@ -511,7 +511,8 @@ check(`a Blind target daily (${blindDay}) holds its target unseen`, await ev(`se
 check('a daily\'s challenge link is its day', await ev(`gameLink().endsWith('#daily=${blindDay}')`), await ev('gameLink()'));
 await play();
 await ev("finish(false)");
-check('a daily\'s share links its day and names only its start', await ev(`(t => game.link.endsWith('#daily=${blindDay}') && t.startsWith('MC Wiki Race · Daily ${blindDay}\\n')
+check('a daily\'s share and result name its day and only its start', await ev(`(t => game.link.endsWith('#daily=${blindDay}') && t.startsWith('MC Wiki Race · Daily ' + shortDate(localDay('${blindDay}'), true) + '\\n')
+  && $('.result-game .note').textContent.startsWith('Daily ' + shortDate(localDay('${blindDay}')) + ': ')
   && t.includes('\\n' + game.start.title + ' → ?\\n') && !t.includes(game.goal.title))(${shared})`), await ev(shared));
 await ev("closeModal(); toSetup()");
 await ev("window.held = setup.goal; document.querySelector('#rules input[value=blind]').click()");
@@ -1093,7 +1094,7 @@ check('it goes back to the first daily\'s month and no further', await ev(`(() =
 })()`));
 await ev("document.querySelector('#modal .cal button:not(:disabled)').click()");
 check('a day loads its daily', await until("setup.daily !== null && setup.daily < today() && document.querySelector('#modalBg').classList.contains('hidden')") && await until(ready)
-  && await ev("document.querySelector('#setupStatus').textContent.startsWith('Daily challenge for ' + setup.daily)"), await ev('setup.daily'));
+  && await ev("document.querySelector('#setupStatus').textContent.startsWith('Daily challenge for ' + shortDate(localDay(setup.daily)) + ': ')"), await ev('setup.daily'));
 check('Clear history empties the dailies too', await ev(`(() => {
   document.querySelector('#btnClearHistory').click(); document.querySelector('#hClear').click();
   return localStorage.getItem('mwr.dailies') === '{}' && document.querySelector('#dailyStats').textContent === '';
@@ -1307,7 +1308,7 @@ await ev(`(r => { holdItem('bed'); $('.hold').onclick({ clientX: r.left + 100, c
 check('a bed slept in blows at once', await ev("items.broken && !!adv.got.intentional"));
 await ev("$('#btnBrokenGiveUp').click()");
 check('Give up gives up, the page whole again under the result', await until('!game.active', 3000)
-  && await ev("(r => !r.won && !Object.keys(LOSSES).some(k => r[k]))(savedGames()[0]) && !items.broken && !document.querySelector('#game [data-broke-style]') && $('.result-head h2').textContent === 'Game over'"));
+  && await ev("(r => !r.won && !Object.keys(LOSSES).some(k => r[k]))(savedGames()[0]) && !items.broken && !document.querySelector('#game [data-broke-style]') && $('.result-head h2').textContent === 'You gave up'"));
 await ev('closeModal(); toSetup()');
 // The setup screen: the respawn anchor's four charges, then its blast; Rebuild.
 const pageHeight = await ev('document.documentElement.scrollHeight');

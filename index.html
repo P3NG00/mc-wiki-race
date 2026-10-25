@@ -756,7 +756,7 @@ const THEMES = [...new Set(['auto', 'light', 'dark', ...Array.from(document.quer
   <div class="daily-box">
     <div><span class="kicker">Daily challenge · <span id="dailyDate"></span></span><b id="dailyWhat"></b> <span class="note" id="dailyDone"></span>
       <span class="daily-stats note"><span id="dailyStats"></span><button class="link" id="btnPastDailies">Past dailies</button></span></div>
-    <button id="btnDaily" title="Today’s pair: the same for everyone">📅 Play the daily</button>
+    <button id="btnDaily" title="Today’s challenge: the same for everyone">📅 Play the daily</button>
   </div>
 
   <div class="your-game">
@@ -794,11 +794,11 @@ const THEMES = [...new Set(['auto', 'light', 'dark', ...Array.from(document.quer
 
   <div class="setup-actions">
     <button class="primary" id="btnPlay" disabled>Start game</button>
-    <span class="setup-par" id="setupPar" title="The fewest clicks this pair can be done in, going by the wiki’s offline copy"></span>
+    <span class="setup-par" id="setupPar" title="The fewest clicks this game can be done in, going by the wiki’s offline copy"></span>
     <button id="btnRerollAll">🎲 Reroll all</button>
     <button id="btnRandom" title="Every setting below at random, then new cards">🎲 Random game</button>
     <button id="btnSwap">⇄ Swap</button>
-    <button id="btnCopy" title="Copy a link that opens this exact pair">Copy challenge link</button>
+    <button id="btnCopy" title="Copy a link that opens this exact game">Copy challenge link</button>
     <span class="status" id="setupStatus"></span>
   </div>
 
@@ -1421,8 +1421,8 @@ async function setupPar() {
 }
 
 // A shortest route for the cards' titles, in cardKeys order, and Scavenger's kinds if it has them, under rules, with
-// back of the checkpoints after the target. The last search is kept by all it went by (lastRoute), so Start and Retry this
-// pair take the route the setup screen has just found rather than searching again; one that fails isn't kept.
+// back of the checkpoints after the target. The last search is kept by all it went by (lastRoute), so Start and Play again
+// take the route the setup screen has just found rather than searching again; one that fails isn't kept.
 let lastRoute = { key: null, route: null };
 function cardsRoute(titles, rules, kinds = null, back = 0) {
   const content = contentInPlay(titles), key = JSON.stringify([titles, rules, kinds, back, content]);
@@ -1889,7 +1889,7 @@ function openCalendar(month = today().slice(0, 7)) {
   };
   const shift = n => dateKey(new Date(y, m - 1 + n, 1)).slice(0, 7);
   openModal(`<h2>Past dailies</h2>
-    <p class="note">Play any day’s daily since ${esc(shortDate(new Date(DAILY_FIRST + 'T00:00')))}. Only one won on its own day counts toward a streak.</p>
+    <p class="note">Play any day’s daily since ${esc(shortDate(localDay(DAILY_FIRST)))}. Only one won on its own day counts toward a streak.</p>
     <div class="cal-head"><button id="calPrev" aria-label="Previous month"${shift(-1) < DAILY_FIRST.slice(0, 7) ? ' disabled' : ''}>‹</button>
       <b>${esc(new Date(y, m - 1, 1).toLocaleDateString(undefined, { month: 'long', year: 'numeric' }))}</b>
       <button id="calNext" aria-label="Next month"${shift(1) > now.slice(0, 7) ? ' disabled' : ''}>›</button></div>
@@ -1966,7 +1966,7 @@ async function loadDaily(date = today()) {
     syncVia();
     keys.forEach(renderCard);
     const day = savedDailies()[date], done = day?.won ? day : null;
-    setStatus(`Daily challenge for ${date}: ${dailyText(date)}.` + (done ? ` You did it in ${wonText(done, true)}.` : ' Press Start when ready.'));
+    setStatus(`Daily challenge for ${shortDate(localDay(date))}: ${dailyText(date)}.` + (done ? ` You did it in ${wonText(done, true)}.` : ' Start the game when you’re ready.'));
   });
 }
 
@@ -2058,8 +2058,11 @@ function openLink(blob) {
   } catch { return null; }
 }
 
-// A day as "21 Oct" (with the year when it isn't this one), and a game's day as Today or Yesterday when it is.
-const shortDate = d => d.toLocaleDateString(undefined, { day: 'numeric', month: 'short', ...(d.getFullYear() !== new Date().getFullYear() && { year: 'numeric' }) });
+// A day as "21 Oct", with the year when it isn't this one or year asks for it, and a game's day as Today or Yesterday
+// when it is.
+const shortDate = (d, year = d.getFullYear() !== new Date().getFullYear()) => d.toLocaleDateString(undefined, { day: 'numeric', month: 'short', ...(year && { year: 'numeric' }) });
+// A YYYY-MM-DD day at its local midnight.
+const localDay = key => new Date(key + 'T00:00');
 function whenText(at) {
   const day = new Date(at).toDateString(), now = new Date();
   return day === now.toDateString() ? 'Today' : day === new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1).toDateString() ? 'Yesterday' : shortDate(new Date(at));
@@ -2080,7 +2083,7 @@ function renderHistory() {
   $('#advCount').textContent = `${advEarned()} / ${Object.keys(ADVANCEMENTS).length}`;
   $('#history tbody').innerHTML = rows.slice(0, 15).map(r => {
     const tags = [[GAMES[gameOf(r.rules)].label, 'game'], ...extraLabels(r.rules).map(t => [t]),
-      ...r.daily ? [[`Daily ${shortDate(new Date(r.daily + 'T00:00'))}`, 'daily']] : []];   // local midnight of that day
+      ...r.daily ? [[`Daily ${shortDate(localDay(r.daily))}`, 'daily']] : []];
     const loss = lossOf(r), golf = r.won && !r.exact && r.par !== undefined ? golfScore(r.clicks, r.par) : null;
     const result = r.won ? ['✓ ' + clicksText(r.clicks), 'won'] : loss ? [`✗ ${LOSSES[loss]}`, 'lost'] : ['Gave up', ''];
     // At par it's just "Par 2"; otherwise the golf name and what it means, then par.
@@ -2291,7 +2294,7 @@ function startGame() {
   navigate(game.start.title, null);
 }
 
-// Parse results by requested and resolved title, so Back and "Retry this pair" don't refetch.
+// Parse results by requested and resolved title, so Back and Play again don't refetch.
 // The API marks parse responses uncacheable, so the browser cache doesn't help here. Cleared on return to setup. At most
 // PARSE_CACHE_MAX titles, and PARSE_CACHE_TEXT characters of articles in all (a long one is over a million, so 40 could
 // hold tens of megabytes on a phone), the oldest going first, but never the page just cached.
@@ -2865,7 +2868,7 @@ function cheer(entry) {
 // wins, articles visited, the different articles visited (pages, by title, so a new snapshot keeps them), the topics
 // seen, the blasts that broke the page (see Items) and the note block's instruments heard (see Note block). They are checked as a page arrives (advArrive), as a game ends (advFinish) and as Distance cheers (cheer). Skill
 // and speed ones need par ADV_PAR or more and the pair's first game, none of it in the history before, so a typed easy
-// pair or Retry this pair doesn't earn them; speed ones also need the Timer.
+// pair or Play again doesn't earn them; speed ones also need the Timer.
 const ADV_PAR = 3;
 const ADV_TIERS = {
   task: { label: 'Task', title: 'Advancement Made!', sound: 'checkpoint' },
@@ -2874,8 +2877,8 @@ const ADV_TIERS = {
 };
 const ADV_GROUPS = {
   start: { label: 'Getting started' },
-  skill: { label: 'Skill', note: `Par ${ADV_PAR} or more, on a pair’s first game.` },
-  speed: { label: 'Speed', note: `Timer on, par ${ADV_PAR} or more, on a pair’s first game.` },
+  skill: { label: 'Skill', note: `Par ${ADV_PAR} or more, the first time you play that game.` },
+  speed: { label: 'Speed', note: `Timer on, par ${ADV_PAR} or more, the first time you play that game.` },
   keep: { label: 'Keeping at it' },
   explore: { label: 'Exploring' },
   items: { label: 'Items' },
@@ -2909,7 +2912,7 @@ const ADVANCEMENTS = Object.fromEntries([
   ['regular', 'keep', 'Regular', 'Win 10 games.', 'task', 'Iron Ingot', '🥉', { of: 10, tally: 'wins', unit: 'wins' }],
   ['veteran', 'keep', 'Veteran', 'Win 50 games.', 'goal', 'Gold Ingot', '🥈', { of: 50, tally: 'wins', unit: 'wins' }],
   ['legend', 'keep', 'Wiki Legend', 'Win 100 games.', 'challenge', 'Diamond', '💎', { of: 100, tally: 'wins', unit: 'wins' }],
-  ['selfImprovement', 'keep', 'Self-Improvement', 'Beat your own best on a pair.', 'task', 'Bottle o\' Enchanting', '📈'],
+  ['selfImprovement', 'keep', 'Self-Improvement', 'Beat your own best at the same game.', 'task', 'Bottle o\' Enchanting', '📈'],
   ['habit', 'keep', 'Habit', 'Win the daily 3 days in a row.', 'task', 'Clock', '🕒', { of: 3, tally: 'streak', unit: 'days' }],
   ['weekStreak', 'keep', 'Week Streak', 'Win the daily 7 days in a row.', 'goal', 'Campfire', '🔥', { of: 7, tally: 'streak', unit: 'days' }],
   ['devoted', 'keep', 'Devoted', 'Win the daily 30 days in a row.', 'challenge', 'Beacon', '🗼', { of: 30, tally: 'streak', unit: 'days' }],
@@ -3071,7 +3074,7 @@ function advArrive(title, back) {
   } catch { /* no advancement */ }
 }
 // A game's end, from finish, with whether it was the pair's first game and a new personal best. What it needs of the
-// game is read before the first await, since Retry this pair may start another; par and the arrivals' counts are waited
+// game is read before the first await, since Play again may start another; par and the arrivals' counts are waited
 // for. Its toasts come once the result's fanfare has played (ADV_AFTER_RESULT).
 const ADV_AFTER_RESULT = 1200;
 async function advFinish(rec, first, newBest, dailyFirst) {
@@ -5334,10 +5337,10 @@ function finish(won, lost = null) {
     (toGoText(p) ? ` <span class="note togo${worse(p, i) ? ' worse' : ''}">${toGoText(p)}</span>` : '') + '</li>').join('');
   const newBest = won && best && beats(rec, best);
   advFinish(rec, first, !!newBest, dailyFirst);
-  const bestNote = !won || !best ? '' : newBest ? '<p class="best new">New personal best for this pair!</p>'
-    : `<p class="best note">Your best for this pair: ${wonText(best)}.</p>`;
+  const bestNote = !won || !best ? '' : newBest ? '<p class="best new">New personal best for this game!</p>'
+    : `<p class="best note">Your best for this game: ${wonText(best)}.</p>`;
   // The heading: the outcome, with a loss's reason under it. Exact clicks's column holds a route of its count.
-  const title = won ? (game.hunt && !game.roundTrip ? '🎉 You found them all!' : '🎉 You made it!') : LOSSES[lost] ?? 'Game over';
+  const title = won ? (game.hunt && !game.roundTrip ? '🎉 You found them all!' : '🎉 You made it!') : LOSSES[lost] ?? 'You gave up';
   const reason = lost === 'tooSoon' ? `You reached ${target.title} on click ${rec.clicks}, but it had to be exactly ${game.limit}.`
     : lost === 'outOfClicks' ? `All ${game.limit} clicks used, ${hunting() ? 'with something still to find' : game.roundTrip ? `and not back at ${game.goal.title} yet` : 'and no target yet'}.` : '';
   const { tags, otherSettings } = resultLabels(rec);
@@ -5346,7 +5349,7 @@ function finish(won, lost = null) {
     <div class="result-head"><h2${won ? '' : ' class="lost"'}>${title}</h2><span class="score hidden" id="mScore"></span></div>
     ${reason ? `<p class="reason">${esc(reason)}</p>` : ''}
     <div class="result-game">${tags.map((t, i) => `<span class="tag${i ? '' : ' game'}">${esc(t)}</span>`).join('')}
-      <p class="note">${rec.daily ? `Daily ${rec.daily}: ` : ''}${esc(route)}${otherSettings ? ' · ' + esc(otherSettings) : ''}</p></div>
+      <p class="note">${rec.daily ? `Daily ${esc(shortDate(localDay(rec.daily)))}: ` : ''}${esc(route)}${otherSettings ? ' · ' + esc(otherSettings) : ''}</p></div>
     <div class="tiles${game.timed ? '' : ' untimed'}">
       <div class="tile"><div class="v mono">${won ? rec.clicks : game.exact ? `${rec.clicks} of ${game.limit}` : '—'}</div><div class="k">Clicks</div></div>
       <div class="tile"><div class="v mono" id="mPar">${rec.par ?? '…'}</div><div class="k">Par</div></div>
@@ -5366,7 +5369,7 @@ function finish(won, lost = null) {
     <div class="actions">
       <button id="mShare" title="Copy your result and a link to play this game">Share</button>
       <button id="mLink" title="Copy a link that opens this exact game">Copy challenge link</button>
-      <button id="mSame">Retry this pair</button>
+      <button id="mSame">Play again</button>
       <button class="primary" id="mNew">New game</button>
     </div></div>`, false);
   if (won) effect(newBest ? 'best' : 'win', { ...middleOf($('.result-head h2')), daily: dailyFirst });
@@ -5408,7 +5411,7 @@ function shareText(rec, link, steps = []) {
   const time = rec.ms !== undefined && fmtTime(rec.ms), count = rec.exact ? `${rec.clicks} of ${rec.exact} clicks` : !time && clicksText(rec.clicks);
   const result = rec.won ? wonText(rec) : `${LOSSES[lossOf(rec)] ?? 'Gave up'} after ${[count, time].filter(Boolean).join(', ')}`;
   const par = rec.par === undefined ? '' : ` · par ${rec.par}${rec.won && !rec.exact ? ': ' + golfText(golfScore(rec.clicks, rec.par)) : ''}`;
-  return [`MC Wiki Race${rec.daily ? ` · Daily ${rec.daily}` : ''}`,
+  return [`MC Wiki Race${rec.daily ? ` · Daily ${shortDate(localDay(rec.daily), true)}` : ''}`,
     [...tags, otherSettings].filter(Boolean).join(' · '),
     shareRouteText(rec),
     `${rec.won ? '✅' : '❌'} ${result}${par}`,
@@ -6411,20 +6414,20 @@ const cardsLoaded = () => !!setup.start && !!(huntMode() === 'kinds' ? setup.kin
       cardKeys().forEach(renderCard);
       setup.challenge = true;
       const r = rulesText(rules());
-      setStatus(`Challenge loaded${r ? ' with ' + r : ''}. Press Start when ready.`);
+      setStatus(`Challenge loaded${r ? ' with ' + r : ''}. Start the game when you’re ready.`);
     });
     if (!cardsLoaded()) {
       await reroll('all');
       // Named only from a hand-made link, whose titles are in the URL to read: anyone can seal any text in a link.
       if (missing && setup.start) setStatus((blob === null ? `The challenge link’s article “${missing}”` : 'One of the challenge link’s articles')
-        + ' doesn’t exist, so a random pair was rolled instead.', true);
+        + ' doesn’t exist, so new cards were rolled instead.', true);
     }
   } else if (h.has('daily')) {
     await loadDaily(dailyDate(h.get('daily')));
     if (!cardsLoaded()) await reroll('all');
   } else {
     await reroll('all');
-    if (query === null && setup.start) setStatus('The challenge link is damaged, perhaps cut short, so a random pair was rolled instead.', true);
+    if (query === null && setup.start) setStatus('The challenge link is damaged, perhaps cut short, so new cards were rolled instead.', true);
   }
   syncVia();   // a challenge link may have turned Checkpoint on
 })();

@@ -29,13 +29,13 @@ A made-up blob can do nothing a plain link can't.
 
 A `#g=` hash is read on its own, leaving anything beside it out.
 
-A blob longer than `LINK_MAX` (room for five titles of MediaWiki's longest), not base64url, failing its hash (a link a chat app cut short) or not unpacking rolls a random pair and says the link is damaged.
+A blob longer than `LINK_MAX` (room for five titles of MediaWiki's longest), not base64url, failing its hash (a link a chat app cut short) or not unpacking rolls new cards and says the link is damaged.
 
 ## `start=` and `target=`: a fixed pair
 
 - `start=<Title>` with `target=<Title>` (or `kind=`): a fixed pair, handy for testing a specific route.
 - A `start` with neither is no challenge, and a pair is rolled.
-- Every title is looked up live, and if one doesn't exist a random pair is rolled instead.
+- Every title is looked up live, and if one doesn't exist new cards are rolled instead.
 - A sealed link's missing article isn't named in the message, since anyone can seal any text in a link and titles are otherwise only shown once the wiki has them; a hand-made link's is, its titles being in the URL to read.
 
 ## `via=`: checkpoints

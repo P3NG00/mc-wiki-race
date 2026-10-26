@@ -254,7 +254,7 @@ The items:
 - a click lighting a placed TNT
 - Rebuild putting every piece back, the article's too, and play going on to a win
 - a bed slept in blowing at once
-- Give up giving up with the page whole under the result, headed You gave up
+- Give up giving up with the page whole under the result, headed You gave up in grey
 - the respawn anchor's four charges and its blast on the fifth click leaving the footer whole
 - the pieces coming to rest on what is left of the page rather than the bottom of the window
 - an item in hand splitting the text in view without moving anything
@@ -288,7 +288,7 @@ The advancements:
 - the panel's tiles, gold and ??? ones
 - a count's progress and a secret's detail saying nothing
 - stored advancements keeping only what would be written
-- Clear history leaving them and Reset forgetting them
+- Clear history leaving them, as the panel's foot says, and Reset forgetting them
 
 ### Effects
 
@@ -453,6 +453,7 @@ Also:
 The daily:
 
 - a link playing only a real day that has come, a sealed link holding no daily, and a record keeping only a real day
+- a daily with no pair saying to pick another day or play your own game, the cards left as they were
 - the same on every load
 - Normal plus its rule
 - its cards from different topics
@@ -507,7 +508,7 @@ Par:
 - a round trip goes there and back with the way back off the way there, almost always at the lower bound
 - a Relay round trip goes round its loop in order
 - Scavenger's goes home after the hunt
-- a page missing from the snapshot is named
+- a page missing from the snapshot named in the result's par line, a start with no route saying so, and the line otherwise naming the offline copy and its date as the footer does
 - the setup screen, the header, the result, the record and the history show par, with golf's names for the score
 
 ### Report link, sealed links, Share and Random game
@@ -561,7 +562,7 @@ The background:
 - a game given up listing only its new articles' XP
 - stored XP only a whole number of none or more, and Reset advancements clearing it
 - the note block:
-  - a pick saved and what a click and Back play
+  - a pick saved and what a click and Back play, as the window's foot says
   - a mob head on top its mob once at its own pitch, the creeper's too, named under the note block with the blocks greyed out
   - a click's sparks in its note's colour
   - Sound of Music on the 20th instrument heard and only instruments kept toward it

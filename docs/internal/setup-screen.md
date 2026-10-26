@@ -64,7 +64,7 @@ If it fails, the status line says whose failure it was (`failText`):
   - none: "Couldn’t reach minecraft.wiki (Failed to fetch). Check your connection and try again."
   - an error: "minecraft.wiki sent back an error (HTTP 503). Try again in a moment."
 - the link graph files', from `loadGraphFile`: "The game’s link data didn’t load (wiki-links.js). Reload the page."
-- otherwise the game's own message: a card none of whose draws fit (`rollOne`: "Couldn’t find an article that fits. Try Reroll again.") or a daily with no pair (`DAILY_FAILED`).
+- otherwise the game's own message: a card none of whose draws fit (`rollOne`: "Couldn’t find an article that fits. Try Reroll again.") or a daily with no pair (`DAILY_FAILED`: "Couldn’t make this day’s daily challenge. Pick another day from Past dailies, or play your own game.", since such a day would fail the same way every time; none does on the snapshot).
 
 Par has its own spinner while it is worked out (see [par.md](par.md)).
 
@@ -92,7 +92,7 @@ The setup screen ends with the facts line (`#bgFacts`, see [ui.md](ui.md)) and a
 - the GitHub link
 - MIT license
 - credit for the wiki's CC BY-NC-SA 3.0 content
-- the date of the wiki's offline copy the rolls and par go by, `#wikiCopy`, filled from `WIKI_DATA.snapshot` by `init` (shown as the page's other dates are, `shortDate`, with its year) and linking Minecraft Wiki:Offline use, and that the articles themselves are live
+- the date of the wiki's offline copy the rolls and par go by, `#wikiCopy`, filled from `WIKI_DATA.snapshot` by `init` (`snapshotDay`: shown as the page's other dates are, `shortDate`, with its year) and linking Minecraft Wiki:Offline use, and that the articles themselves are live
 - a non-affiliation notice.
 
 ## The licence during play

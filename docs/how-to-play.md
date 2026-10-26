@@ -140,7 +140,7 @@ Par is the fewest clicks a game can be done in, going by the wiki's offline copy
 | Birdie, Eagle, Albatross | 1, 2 or 3 under par |
 | N over par, N under par | anything further |
 
-You can only beat par where the live wiki has a link the offline copy doesn't. Exact clicks gets no golf score, since every win is par plus the count you picked.
+You can only beat par where the live wiki has a link the offline copy doesn't. Exact clicks gets no golf score, since every win is par plus the count you picked. The result names the offline copy par went by, or says a page you played isn't in it, so par is unknown.
 
 ## The missed shortcut
 
@@ -215,7 +215,7 @@ The âœ¦ button in the bottom-right corner hides everything but the background; â
 
 ## The note block
 
-The note block button, in the bottom-right corner on the setup screen and in the game header, picks what your clicks play. Each click climbs a scale, Back falls two notes, and a win plays a fanfare on the instrument underneath. In its window, **Underneath** picks the block it stands on, and so the instrument:
+The note block button, in the bottom-right corner on the setup screen and in the game header, picks what your clicks play. Each click climbs a scale, Back falls two notes (a mob head plays its sound once), and a win plays a fanfare on the instrument underneath. In its window, **Underneath** picks the block it stands on, and so the instrument:
 
 | Block | Instrument | Block | Instrument | Block | Instrument |
 |---|---|---|---|---|---|

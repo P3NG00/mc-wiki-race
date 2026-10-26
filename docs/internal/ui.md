@@ -79,7 +79,7 @@ Nothing is fetched with Sound off, and one that fails is asked again a minute la
 ### The game's sounds
 
 The game's:
-- a link click is the note block's instrument, a harp unless another is picked (see [Note block](#note-block)), climbing a pentatonic scale from its middle F# with each click of the game (played when the navigation starts, so a slow load doesn't delay it); Back falls two notes;
+- a link click is the note block's instrument, a harp unless another is picked (see [Note block](#note-block)), climbing a pentatonic scale from its middle F# with each click of the game (played when the navigation starts, so a slow load doesn't delay it); Back falls two notes, or with a mob head plays its sound once (the window's foot says so);
 - a dead link is a villager's "hrmm" (`Villager deny`; the frame posts `{mwr:'dead'}`), and so is giving up;
 - a checkpoint or find (`celebrateCheckpoint`) and a task's toast are an arrow's ding (`Successful hit`), at half its pitch, as heard in the game;
 - a new personal best and a challenge's toast are Minecraft's challenge fanfare, not twice at once;

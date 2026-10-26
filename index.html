@@ -612,6 +612,7 @@
   .result-head { display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: center; }
   .result-head h2 { margin: 0; font-size: 26px; letter-spacing: -.01em; }
   .result-head h2.lost { color: var(--target); }
+  .result-head h2.gave-up { color: var(--muted); }   /* grey, as Recent games marks giving up */
   .result .reason { margin: -6px 0 0; }
   .score { font-size: 15px; font-weight: 700; border-radius: var(--radius-pill); padding: 3px 12px; background: var(--accent-soft); color: var(--accent); }
   .score .note { font-weight: 400; color: inherit; opacity: .85; }
@@ -1918,8 +1919,10 @@ function openCalendar(month = today().slice(0, 7)) {
 
 // A daily can always be done: its target, checkpoints and finds are only taken where the link graph has a route under
 // its rules (on a Six clicks day, a short enough one; on an Exact clicks day, one of exactly its count), so the daily
-// needs the graph, and fails to load without it. With no pair found it says DAILY_FAILED.
-const DAILY_FAILED = 'Couldn’t load this day’s daily challenge. Try again in a moment.';
+// needs the graph, and fails to load without it. With no pair found it says DAILY_FAILED: every day on the snapshot
+// has one, but one that didn't would fail the same way every time (no title fits, or the first 20 are gone from the live wiki), so it
+// points to another game rather than to trying again.
+const DAILY_FAILED = 'Couldn’t make this day’s daily challenge. Pick another day from Past dailies, or play your own game.';
 async function dailyPair(date) {
   const rule = dailyRule(date), rules = ['nonav', rule], hunt = rule === 'scavenger' ? ranked(date, 'hunt', DAILY_HUNTS)[0] : null;
   // The first title in the day's ranking that may take the card: ok checks it, and again the title the wiki resolves
@@ -2072,6 +2075,8 @@ function openLink(blob) {
 const shortDate = (d, year = d.getFullYear() !== new Date().getFullYear()) => d.toLocaleDateString(undefined, { day: 'numeric', month: 'short', ...(year && { year: 'numeric' }) });
 // A YYYY-MM-DD day at its local midnight.
 const localDay = key => new Date(key + 'T00:00');
+// The offline copy's date, with its year, as the footer and the result's par line name it.
+const snapshotDay = () => shortDate(localDay(WIKI_DATA.snapshot), true);
 function whenText(at) {
   const day = new Date(at).toDateString(), now = new Date();
   return day === now.toDateString() ? 'Today' : day === new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1).toDateString() ? 'Yesterday' : shortDate(new Date(at));
@@ -3208,7 +3213,7 @@ function openAdvancements() {
           return `<button class="adv-tile${at ? ' got' : ''}${advPicked === k ? ' picked' : ''}" data-adv-key="${k}">${advFrame(k, hidden, !!at)}`
             + `<span class="label">${hidden ? '???' : esc(a.name)}</span>${a.of && !at ? `<span class="mini"><i style="width: ${100 * n / a.of}%"></i></span>` : ''}</button>`;
         }).join('')}</div></section>`;
-    }).join('') + `<div class="adv-foot"><span class="note">Your history and dailies are kept apart: Clear history leaves these.</span>
+    }).join('') + `<div class="adv-foot"><span class="note">Clear history keeps your advancements and XP. Only Reset advancements clears them.</span>
       <button class="link" id="aReset">Reset advancements</button></div></div>`);
   $('#aClose').onclick = closeModal;
   for (const t of document.querySelectorAll('.adv-tile')) t.onclick = () => {
@@ -4137,7 +4142,7 @@ function openNoteBox(btn) {
       <button class="hit" aria-label="Play the note block"></button></div><p class="nb-what" aria-live="polite"></p></div>
     <div><p class="nb-label">On top <span>(a mob head plays its mob)</span></p><div class="nb-slots heads"></div>
       <p class="nb-label">Underneath <span>(picks the instrument)</span></p><div class="nb-slots unders"></div>
-      <p class="nb-foot">Links play it as you click them, a step up the scale each time; Back plays two notes going down.</p>
+      <p class="nb-foot">Links play it as you click them, a step up the scale each time; Back plays two notes going down, or a mob head’s sound once.</p>
       <p class="nb-off">Sound is off. <button class="link">Turn it on</button></p></div></div>`;
   box.querySelector('.heads').innerHTML = noteSlot('head', '', null, 'Nothing', 'plays the block below')
     + Object.entries(NOTE_HEADS).map(([k, h]) => noteSlot('head', k, h, h.block, `plays ${h.plays}, at one pitch`)).join('');
@@ -5267,14 +5272,13 @@ const golfText = g => g.name + (g.note ? ` (${g.note})` : '');
 // unless that result has been closed by then. A record saved before par was known gets it now. Exact clicks keeps its
 // own route in that column (see finish) and gets no golf score.
 async function showPar(rec, routeReady) {
-  const el = $('#par'), missing = chain(rec).find(t => !PAGE_IDS.has(t));
+  const el = $('#par'), missing = chain(rec).find(t => !PAGE_IDS.has(t)), copy = `the wiki’s offline copy from ${snapshotDay()}`;
   let text, par = null, route = null;
   try {
     route = missing ? null : await routeReady;
     if (route) par = route.length - 1;
-    text = missing ? `“${missing}” isn’t in the wiki as of ${WIKI_DATA.snapshot}, so the fewest clicks are unknown.`
-      : !route ? `No route going by the wiki on ${WIKI_DATA.snapshot}, with these settings.`
-      : `Going by the wiki’s copy from ${WIKI_DATA.snapshot}.`;
+    text = missing ? `“${missing}” isn’t in ${copy}, so the fewest clicks are unknown.`
+      : !route ? `No route in ${copy} with these settings.` : `Going by ${copy}.`;
   } catch (e) {
     text = `Couldn’t work out the fewest clicks: ${e.message}.`;
   }
@@ -5355,7 +5359,7 @@ function finish(won, lost = null) {
   const { tags, otherSettings } = resultLabels(rec);
   play(newBest ? 'best' : won ? 'win' : lost ? 'lose' : 'giveUp');
   openModal(`<div class="result">
-    <div class="result-head"><h2${won ? '' : ' class="lost"'}>${title}</h2><span class="score hidden" id="mScore"></span></div>
+    <div class="result-head"><h2${won ? '' : lost ? ' class="lost"' : ' class="gave-up"'}>${title}</h2><span class="score hidden" id="mScore"></span></div>
     ${reason ? `<p class="reason">${esc(reason)}</p>` : ''}
     <div class="result-game">${tags.map((t, i) => `<span class="tag${i ? '' : ' game'}">${esc(t)}</span>`).join('')}
       <p class="note">${rec.daily ? `Daily ${esc(shortDate(localDay(rec.daily)))}: ` : ''}${esc(route)}${otherSettings ? ' · ' + esc(otherSettings) : ''}</p></div>
@@ -6381,7 +6385,7 @@ const cardsLoaded = () => !!setup.start && !!(huntMode() === 'kinds' ? setup.kin
 // #daily=YYYY-MM-DD, a past day) that day's pair and rule, otherwise roll a random one. A #g= hash is read on its own:
 // anything beside it is left out.
 (async function init() {
-  $('#wikiCopyDate').textContent = shortDate(localDay(WIKI_DATA.snapshot), true);
+  $('#wikiCopyDate').textContent = snapshotDay();
   updateModeHelp();
   updateLevelHelp();
   syncContentToMode();   // a reload may bring the Pool radio button back on Chaos

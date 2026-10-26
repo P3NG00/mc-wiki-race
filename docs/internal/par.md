@@ -45,7 +45,7 @@ The result also shows one shortest route. `showPar` fills, once it knows, unless
 ## The result window
 
 The result window (`finish`, `.result`) goes:
-1. the outcome as the heading (a loss in the target colour, with its reason under it) and the golf score beside it;
+1. the outcome as the heading (a loss in the target colour, with its reason under it; giving up grey, as Recent games marks it) and the golf score beside it;
 2. the game and its extra rules as labels, like the header's, with a daily's day (`shortDate`), the route and the settings the labels don't say;
 3. four tiles (clicks, or "2 of 4" for Exact clicks, par, time, time per click);
 4. the personal best (a green bar when it is a new one);
@@ -140,4 +140,4 @@ With Round trip each goes home from its last find around the hunt:
 
 ### Live edits
 
-Live edits since the snapshot can make the real fewest clicks lower or higher, so the wiki-date line `#par` names the snapshot's date. It also shows one route that takes that many.
+Live edits since the snapshot can make the real fewest clicks lower or higher, so the wiki-date line `#par` names the snapshot's date, as the footer shows it (`snapshotDay`): "Going by the wiki’s offline copy from 21 Aug 2026.", or that a page isn't in that copy, or that it has no route with these settings. It also shows one route that takes that many.

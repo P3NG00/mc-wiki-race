@@ -262,7 +262,7 @@ check('reaching the target wins', await until("!game.active && !document.querySe
 // Golf: the result scores the win against par, from the link graph files, and shows a shortest route. This Relaxed game
 // took 3 clicks, Back included, for a pair linked directly or nearly.
 const shortest = "[...document.querySelectorAll('#mBest li')].map(li => li.textContent).join(' → ')";
-check('the result scores the win against par and shows a route', await until(`document.querySelector('#par').textContent === 'Going by the wiki’s copy from ' + WIKI_DATA.snapshot + '.'
+check('the result scores the win against par and shows a route', await until(`document.querySelector('#par').textContent === 'Going by the wiki’s offline copy from ' + shortDate(localDay(WIKI_DATA.snapshot), true) + '.'
   && document.querySelector('#mScore').textContent.startsWith(golfScore(clicks(), game.par).name) && document.querySelector('#mBestTitle').textContent === 'Shortest route · par ' + game.par
   && (r => r.startsWith('Diamond → ') && r.endsWith(' → Diamond Pickaxe'))(${shortest})`) &&
   await ev("game.par >= 1 && game.par <= 2 && savedGames()[0].par === game.par && document.querySelector('#mPar').textContent === String(game.par)"),

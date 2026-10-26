@@ -186,7 +186,7 @@ check('Hard: a navbox\'s and a requirement list\'s links say they count as a nav
 await ev('finish(false)');
 const shortest = "[...document.querySelectorAll('#mBest li')].map(li => li.textContent).join(' → ')";
 check('the result shows par and a shortest route beside your path', await until(`/^Shortest route · par \\d+$/.test(document.querySelector('#mBestTitle').textContent)
-  && /^Diamond → .*Crafting$/.test(${shortest}) && document.querySelector('#par').textContent.startsWith('Going by the wiki’s copy from ')`),
+  && /^Diamond → .*Crafting$/.test(${shortest}) && document.querySelector('#par').textContent === 'Going by the wiki’s offline copy from ' + shortDate(localDay(WIKI_DATA.snapshot), true) + '.'`),
   await ev(shortest));
 // Share copies the game, its result, the path and a link that plays it; Copy challenge link that link alone.
 const shared = "shareText(savedGames()[0], game.link)";
@@ -1040,6 +1040,12 @@ check('a record only keeps a real day', await ev(`(r => isRecord(r) && isRecord(
 await open('#daily=2026-01-02');
 check('a Round trip daily (2026-01-02) is a Race there and back', await until(ready) && await ev(`rules().join() === 'nonav,roundtrip'
   && gameMode() === 'race' && cardKeys().join() === 'start,goal' && document.querySelector('#setupStatus').textContent.includes(': Round trip.')`), await ev(pairOf));
+// A daily with no pair (here no page looked up exists) says so and points elsewhere, the cards left as they were.
+await ev("window.realPageInfo = pageInfo; window.cardsBefore = cardKeys().map(w => setup[w]?.title).join(); pageInfo = async () => null; loadDaily('2026-01-03')");
+check('a daily with no pair says to pick another day or play your own game', await until("setup.busy === 0 && document.querySelector('#setupStatus').textContent === DAILY_FAILED")
+  && await ev("DAILY_FAILED === 'Couldn’t make this day’s daily challenge. Pick another day from Past dailies, or play your own game.' && cardKeys().map(w => setup[w]?.title).join() === cardsBefore"),
+  await ev("document.querySelector('#setupStatus').textContent"));
+await ev('pageInfo = realPageInfo');
 // Every daily can be done: a route under its rules, and on a Six clicks day par 4 or less. A month of them.
 const dailies = JSON.parse(await ev(`(async () => {
   const out = [];
@@ -1228,7 +1234,14 @@ check('Scavenger\'s round trip par goes home after the hunt', par.kinds);
 await open('#start=Brand%20New%20Mob&target=Diamond');
 await play();
 await ev('finish(false)');
-check('par names a card\'s page that isn\'t in the snapshot', await until("document.querySelector('#par')?.textContent.startsWith('“Brand New Mob” isn’t in the wiki')"),
+check('par names a card\'s page that isn\'t in the snapshot', await until("document.querySelector('#par')?.textContent === '“Brand New Mob” isn’t in the wiki’s offline copy from ' + shortDate(localDay(WIKI_DATA.snapshot), true) + ', so the fewest clicks are unknown.'"),
+  await ev("document.querySelector('#par')?.textContent"));
+await ev('closeModal(); toSetup()');
+// From a dead end there is no route at all.
+await open(`#start=${encodeURIComponent(deadEnd)}&target=Diamond`);
+await play();
+await ev('finish(false)');
+check('par says when the offline copy has no route', await until("document.querySelector('#par')?.textContent === 'No route in the wiki’s offline copy from ' + shortDate(localDay(WIKI_DATA.snapshot), true) + ' with these settings.'"),
   await ev("document.querySelector('#par')?.textContent"));
 await ev('closeModal(); toSetup()');
 
@@ -1340,7 +1353,8 @@ await ev(`(r => { holdItem('bed'); $('.hold').onclick({ clientX: r.left + 100, c
 check('a bed slept in blows at once', await ev("items.broken && !!adv.got.intentional"));
 await ev("$('#btnBrokenGiveUp').click()");
 check('Give up gives up, the page whole again under the result', await until('!game.active', 3000)
-  && await ev("(r => !r.won && !Object.keys(LOSSES).some(k => r[k]))(savedGames()[0]) && !items.broken && !document.querySelector('#game [data-broke-style]') && $('.result-head h2').textContent === 'You gave up'"));
+  && await ev(`(r => !r.won && !Object.keys(LOSSES).some(k => r[k]))(savedGames()[0]) && !items.broken && !document.querySelector('#game [data-broke-style]') && $('.result-head h2').textContent === 'You gave up'
+  && (probe => (document.body.append(probe), probe.style.color = 'var(--muted)', (c => (probe.remove(), c))(getComputedStyle(probe).color)))(document.createElement('i')) === getComputedStyle($('.result-head h2')).color`));
 await ev('closeModal(); toSetup()');
 // The setup screen: the respawn anchor's four charges, then its blast; Rebuild.
 const pageHeight = await ev('document.documentElement.scrollHeight');
@@ -1594,7 +1608,10 @@ await ev('saveAdv()');   // back to the earned ones
 await ev("$('#btnClearHistory').click(); $('#hClear').click()");
 check('Clear history leaves them, the heading and the button still there with no table', await ev(`advEarned() === ${earnedN} && savedGames().length === 0
   && !$('#history').classList.contains('hidden') && $('.history-wrap').classList.contains('hidden') && $('#btnClearHistory').classList.contains('hidden')`));
-await ev("$('#btnAdv').click(); $('#aReset').click(); $('#aWipe').click()");
+await ev("$('#btnAdv').click()");
+check('the panel\'s foot says Clear history keeps them and XP', await ev("document.querySelector('.adv-foot .note').textContent === 'Clear history keeps your advancements and XP. Only Reset advancements clears them.'"),
+  await ev("document.querySelector('.adv-foot .note').textContent"));
+await ev("$('#aReset').click(); $('#aWipe').click()");
 check('Reset advancements forgets them and the counts', await ev(`advEarned() === 0 && adv.wins === 0 && adv.xp === 0 && adv.pages.size === 0 && JSON.stringify(store.get('mwr.advancements').got) === '{}'
   && $('#advCount').textContent.startsWith('0 / ') && document.querySelectorAll('.adv-tile.got').length === 0 && $('#history').classList.contains('hidden')`));
 await ev('closeModal()');
@@ -1657,6 +1674,7 @@ const notes = await ev(`(() => {
   const heard = [], was = sample; sample = (b, rate) => heard.push(b + ' ' + rate.toFixed(3));
   soundBank.set('bell', ['bell']); soundBank.set('zombieHead', ['zombie']); soundBank.set('creeperHead', ['creeper']);
   $('#btnNotes').click(); const slot = k => document.querySelector('.note-box [data-k="' + k + '"]');
+  const foot = document.querySelector('.nb-foot').textContent === 'Links play it as you click them, a step up the scale each time; Back plays two notes going down, or a mob head’s sound once.';
   slot('bell').click(); heard.length = 0; SOUNDS.click(1); SOUNDS.back(); const bell = heard.join();
   const saved = JSON.stringify(store.get('mwr.noteBlock'));
   slot('zombie').click(); heard.length = 0; SOUNDS.click(3); SOUNDS.back(); const zombie = heard.join();
@@ -1668,9 +1686,9 @@ const notes = await ev(`(() => {
   slot('harp').click(); sample = was; ['bell', 'zombieHead', 'creeperHead'].forEach(k => soundBank.delete(k));
   document.body.click(); const closed = !document.querySelector('.note-box') && $('#btnNotes').getAttribute('aria-expanded') === 'false';
   return bell === 'bell 1.122,bell 1.335,bell 1.000' && saved === '{"under":"bell","head":null}' && zombie === 'zombie 1.000,zombie 1.000' && creeper === 'creeper 1.000'
-    && shown && off && sizes.size === 1 && [...sizes][0].endsWith('true') && closed || JSON.stringify([bell, saved, zombie, creeper, shown, off, [...sizes], closed]);
+    && shown && off && sizes.size === 1 && [...sizes][0].endsWith('true') && closed && foot || JSON.stringify([bell, saved, zombie, creeper, shown, off, [...sizes], closed, foot]);
 })()`);
-check('the note block picks what clicks and Back play, and a mob head on top plays its mob once, at its own pitch', notes === true, notes);
+check('the note block picks what clicks and Back play, and a mob head on top plays its mob once, at its own pitch, as its foot says', notes === true, notes);
 // A click's sparks take its note's colour (none for a mob head); Sound of Music is every instrument heard, counted, and
 // the count is kept only for instruments.
 check('a click\'s sparks are its note\'s colour, and with a mob head the game\'s own', await ev(`(() => {

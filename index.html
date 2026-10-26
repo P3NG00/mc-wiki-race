@@ -730,7 +730,7 @@ const THEMES = [...new Set(['auto', 'light', 'dark', ...Array.from(document.quer
     <h1>MC Wiki Race</h1>
     <div class="head-opts">
       <label><input type="checkbox" id="soundToggle"> Sound</label>
-      <label title="A clock while you play, and your time in the result. Off records no time, for a relaxed game."><input type="checkbox" id="timerToggle"> Timer</label>
+      <label title="A clock while you play, and your time in the result. Off: no clock, and no time is recorded."><input type="checkbox" id="timerToggle"> Timer</label>
       <label id="effectsLabel"><input type="checkbox" id="effectsToggle"> Effects</label>
       <label id="motionLabel"><input type="checkbox" id="motionToggle"> Reduce motion</label>
       <label>Theme <select id="themeSelect"></select></label>
@@ -745,7 +745,7 @@ const THEMES = [...new Set(['auto', 'light', 'dark', ...Array.from(document.quer
           </select></label>
           <label title="Light up every page by how many clicks it is from the start."><input type="checkbox" id="bgWave"> Wave from the start</label>
           <label title="Draw the shortest route between the cards: it gives the game away."><input type="checkbox" id="bgRoute"> Show the route (spoiler)</label>
-          <label title="Show pairs of its own until you change anything on the page, then follow your cards."><input type="checkbox" id="bgRoll"> Roll by itself</label>
+          <label title="Mark random pairs of its own until you change anything on the setup screen, then mark your cards."><input type="checkbox" id="bgRoll"> Roll by itself</label>
         </div>
       </details>
     </div>
@@ -797,7 +797,7 @@ const THEMES = [...new Set(['auto', 'light', 'dark', ...Array.from(document.quer
     <span class="setup-par" id="setupPar" title="The fewest clicks this game can be done in, going by the wiki’s offline copy"></span>
     <button id="btnRerollAll">🎲 Reroll all</button>
     <button id="btnRandom" title="Every setting below at random, then new cards">🎲 Random game</button>
-    <button id="btnSwap">⇄ Swap</button>
+    <button id="btnSwap" title="Swap the start and the target">⇄ Swap</button>
     <button id="btnCopy" title="Copy a link that opens this exact game">Copy challenge link</button>
     <span class="status" id="setupStatus"></span>
   </div>
@@ -813,7 +813,7 @@ const THEMES = [...new Set(['auto', 'light', 'dark', ...Array.from(document.quer
     <span class="game-opt" data-game="exact" id="exactInfo"></span>
   </div>
 
-  <h2 class="step">2 · Extra rules <span class="note">(any mix)</span></h2>
+  <h2 class="step">2 · Extra rules <span class="note">(most combine)</span></h2>
   <div class="extras" role="group" aria-label="Extra rules" id="rules"></div>
 
   <h2 class="step">3 · Articles and difficulty</h2>
@@ -1186,8 +1186,8 @@ function setImg(img, src) {
 
 const MODE_HELP = {
   popular: 'Popular: the best-known game content, the 30% of it most linked across the wiki. A good place to start.',
-  everyday: 'Everyday: all the game content: blocks, items, mobs, biomes, structures, enchantments and effects. Each topic is equally likely, and the start and target always come from different ones.',
-  deep: 'Deep cuts: the least-known third of each topic. Think Camel Husk or Fatal Poison rather than Creeper.',
+  everyday: 'Everyday: every block, item, mob, biome, structure, enchantment and effect (the Content row adds more). Each topic is equally likely, and the start and target always come from different ones.',
+  deep: 'Deep cuts: the least-linked third of each topic, so lesser-known pages. Think Camel Husk or Fatal Poison rather than Creeper.',
   chaos: 'Chaos: any article on the wiki, history subpages, most lists and April Fools jokes included. Expect obscure starting points.',
 };
 function updateModeHelp() { $('#modeHelp').textContent = MODE_HELP[mode()]; }
@@ -1231,7 +1231,7 @@ const GAMES = {
     help: `instead of one target, find ${HUNT_SIZE} things in any order: one of each of ${HUNT_SIZE} kinds, or ${HUNT_SIZE} articles.`,
     trip: { diagram: 'A → ✓ ✓ ✓ → A', blurb: `Find ${HUNT_SIZE} things, then home.`,
       help: `find ${HUNT_SIZE} things in any order: one of each of ${HUNT_SIZE} kinds, or ${HUNT_SIZE} articles. Then go back to the start, never through a page you passed while hunting.` } },
-  exact: { rule: 'exact', label: 'Exact clicks', diagram: 'A → → → → B', blurb: `Land on it in exactly par + ${EXACT_EXTRAS[0]} to ${EXACT_EXTRAS.at(-1)}.`,
+  exact: { rule: 'exact', label: 'Exact clicks', diagram: 'A → → → → B', blurb: `Land on the target in exactly par + ${EXACT_EXTRAS[0]} to ${EXACT_EXTRAS.at(-1)} clicks.`,
     help: 'reach the target in exactly par + the clicks you pick, never on a page twice. Too soon loses too, so plan a detour.' },
 };
 const EXTRA_RULES = ['roundtrip', 'noback', 'blind', 'lead', 'limit', 'distance'];
@@ -1408,7 +1408,7 @@ async function setupPar() {
       setup.exact = exact;
       text = !route ? 'No par to count exact clicks from' : exact ? `${text} · exactly ${n}` : `${text} · no way in exactly ${n}`;
       if (!blind) $('#exactInfo').textContent = !route ? 'This pair has no par to count from.' : exact ? `This pair: par ${n - extra} + ${extra}, so exactly ${n} clicks.`
-        : `This pair can’t be done in exactly ${n} clicks.`;
+        : `This pair can’t be done in exactly ${n} clicks: reroll, or pick another count.`;
     }
   }
   if (token === setupParToken) {

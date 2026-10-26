@@ -17,7 +17,7 @@ Open [mcwikirace.com](https://mcwikirace.com/): a start and a target are already
 - The cards: **Start** and **Target**, plus **Checkpoint** cards in a Relay, or a **Find one of each** card in a Scavenger hunt of kinds. Each shows its article's picture and description.
 - **🎲 Reroll** on a card rolls a new article for it. Or type any article on the wiki into the box under it ("or type an article…") and press Enter.
 - **Start game**, with par beside it: the fewest clicks the game can be done in.
-- **🎲 Reroll all** rolls every card, and **⇄ Swap** plays the whole thing backwards, checkpoints included (it's hidden under Blind target and in a hunt of kinds). **🎲 Random game** sets every setting below the cards at random, then rolls new cards; the settings beside the title stay as they are.
+- **🎲 Reroll all** rolls every card, and **⇄ Swap** swaps the start and the target: a Relay's checkpoints go in reverse, and a Round trip goes round the same loop from the target (it's hidden under Blind target and in a hunt of kinds). **🎲 Random game** sets every setting below the cards at random, then rolls new cards; the settings beside the title stay as they are.
 - **Copy challenge link** copies a link that opens this exact game (see [Challenge links](#challenge-links)).
 
 Under those come three steps: **1 · Choose a game**, **2 · Extra rules** and **3 · Articles and difficulty**.
@@ -38,7 +38,7 @@ Pick one of the tiles. The strip under them explains the game and holds its one 
 
 ## Extra rules
 
-These are checkboxes that go with any game, in any mix.
+These are checkboxes that go with any game, and most combine.
 
 | Rule | What it does |
 |---|---|
@@ -63,8 +63,8 @@ The **Articles** row picks the pool, the articles the cards are drawn from.
 | Pool | What it holds |
 |---|---|
 | **Popular** | The best-known game content, the 30% of it most linked across the wiki. A good place to start. |
-| **Everyday** | All the game content: blocks, items, mobs, biomes, structures, enchantments and effects. Each topic is equally likely, and the start and target always come from different ones. |
-| **Deep cuts** | The least-known third of each topic. Think Camel Husk or Fatal Poison rather than Creeper. |
+| **Everyday** | Every block, item, mob, biome, structure, enchantment and effect (the Content row adds more). Each topic is equally likely, and the start and target always come from different ones. |
+| **Deep cuts** | The least-linked third of each topic, so lesser-known pages. Think Camel Husk or Fatal Poison rather than Creeper. |
 | **Chaos** | Any article on the wiki, history subpages, most lists and April Fools jokes included. Expect obscure starting points. |
 
 Everyday is the default. Popular and Deep cuts pick topics the same way, while Chaos draws from every article alike and its cards may share a topic. Every rolled card has a route to the others, going by the wiki's offline copy (a download of the whole wiki, dated in the footer), though an article you type in isn't checked.
@@ -196,7 +196,7 @@ A link without `rules` plays on Relaxed. `#rules=…` on its own sets the rules 
 | Setting | What it does |
 |---|---|
 | **Sound** | Minecraft's own sounds, fetched from the wiki. The speaker in the game header mutes them too. |
-| **Timer** | A clock while you play, and your time in the result. Off records no time, for a relaxed game. |
+| **Timer** | A clock while you play, and your time in the result. Off: no clock, and no time is recorded. |
 | **Effects** | Sparks into the click count, fireworks for a win, XP orbs. The items' own explosions and fireworks stay either way. |
 | **Reduce motion** | Stops everything that moves by itself: sparks, the background, moving pictures (shown as their first frame), and the crafting grids, which get a ↻ button instead. Sounds still play. |
 | **Theme** | **Auto** follows your system, or **Light** or **Dark**. The article is drawn in the wiki's matching theme. |
@@ -209,7 +209,7 @@ Behind the setup screen is a picture of the wiki itself, picked in the **Backgro
 
 - The constellation is each topic's best-linked articles as stars, joined to those they link with, with pulses playing games of their own along the links. Stars near your mouse make way and the nearest shows its name.
 - The redstone map is every article but subpages and spin-off pages as one block, grouped like a world map's biomes, brighter the more it's linked. Your mouse is a torch.
-- **Wave from the start** lights every page by how many clicks it is from the start. **Show the route (spoiler)** draws the shortest route between your cards. **Roll by itself** shows pairs of its own until you change anything on the page, then follows your cards.
+- **Wave from the start** lights every page by how many clicks it is from the start. **Show the route (spoiler)** draws the shortest route between your cards. **Roll by itself** marks random pairs of its own until you change anything on the setup screen, then marks your cards.
 
 The ✦ button in the bottom-right corner hides everything but the background; ✕ or Escape brings it back. Above the footer, a line of facts about the wiki and your cards changes every 7 seconds.
 

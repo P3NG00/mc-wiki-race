@@ -398,6 +398,7 @@ Exact clicks:
   - the challenge link carrying it
   - under Blind target held unseen (the strip and the line above the cards saying Random) and played
 - par + 4 and par + 2 being two games for personal bests
+- a pair with no route of exactly its count keeping Start off, the strip saying to reroll or pick another count
 - Random rolling par + 1 to 5 with each roll, and the line above the cards saying only "par + random"
 - running out losing
 - Six clicks and Round trip greyed out with the reason and left out even if ticked, and back with another game

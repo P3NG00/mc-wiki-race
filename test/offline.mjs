@@ -608,6 +608,13 @@ check('a link\'s extra=4 makes the count par + 4, and the challenge link carries
   && document.querySelector('#gameSum').textContent.startsWith('Exact clicks (par + 4)') && openLink(new URL(challengeLink()).hash.slice(3)).includes('&extra=4&')`),
   await ev("setup.exact?.join(' → ')"));
 check('par + 4 and par + 2 are two games for personal bests', await ev(`(r => recordKey({ ...r, exact: ${exact.par + 4} }) !== recordKey({ ...r, exact: ${n} }))({ start: 'Diamond', goal: 'Zombie', rules: ['exact'] })`));
+// With no route of exactly the count (here the search made to find none), Start stays off and the strip says what to do.
+await ev("window.realExactRoute = exactRoute; exactRoute = async () => null; updateSetupPar()");
+check('a pair with no route of exactly its count keeps Start off, saying to reroll or pick another count',
+  await until(`document.querySelector('#exactInfo').textContent === 'This pair can’t be done in exactly ${exact.par + 4} clicks: reroll, or pick another count.'`)
+  && await ev(`document.querySelector('#btnPlay').disabled && document.querySelector('#setupPar').textContent === 'Par ${exact.par} · no way in exactly ${exact.par + 4}'`),
+  await ev("document.querySelector('#exactInfo').textContent"));
+await ev("exactRoute = realExactRoute; updateSetupPar()");
 // Under Blind target a link's number is held unseen like its cards: the strip and the line above them say Random.
 await open('#start=Diamond&target=Zombie&rules=exact,blind&extra=4');
 check('under Blind target a link\'s extra=4 is held unseen, and Start plays par + 4', await until('!!setup.exact') && await ev(`document.querySelector('#exactExtra').value === 'random'

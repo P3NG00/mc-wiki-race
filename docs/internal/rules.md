@@ -8,7 +8,8 @@ Part of the architecture, which is all in `index.html`. The state is the `game` 
 
 - `game.content` is the Content in play: what is on at `startGame`, plus the spin-off of any card's page (`spinoffOf`), whose links have to work to reach it, so a challenge link starting on `Dungeons:Creeper` needs no checkbox.
 - `renderArticle` leaves its spin-offs out of the frame's dead namespaces.
-- `toInfo` refuses a left-out page (`LEFT_OUT`), and accepts a page in a spin-off's namespace by its number, taken from the ZIM's `ns-<N>` body classes, which match the live API's `ns`.
+- `toInfo` accepts a page in a spin-off's namespace by its number, taken from the ZIM's `ns-<N>` body classes, which match the live API's `ns`.
+- It refuses a page that doesn't exist (null) and one the game leaves out (false): a left-out page (`LEFT_OUT`) or one in any other namespace (Tutorial:, Category:…), so a typed-in title can say which (see [setup-screen.md](setup-screen.md#top-to-bottom)).
 
 ## Difficulty
 

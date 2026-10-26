@@ -203,7 +203,7 @@ So a new snapshot that changes one fails there by name rather than leaving a che
   - version and list pages and redirects to them dead in Relaxed and Hard, titled as off limits
   - hubs and redirects to them dead in Hard, titled as Hard's overview pages, the target's hub live
   - no left-out page in the data
-- A left-out page typed in or named in a challenge link not taken
+- A left-out page typed in or named in a challenge link not taken, a typed-in one saying the game leaves it out, as it does a page that isn't an article, and one that doesn't exist saying there's no article by that name
 - A failure saying whose it is: the wiki's (a request not answered), the link data's (a graph file that doesn't load) or the game's (a card none of whose draws exists)
 - The difficulty a link's rules give
 - The Timer box:
@@ -332,6 +332,7 @@ Blind target:
 - an ordinary roll leaving them unpicked with no Reroll, Swap or par
 - Start picking them from different topics
 - Copy challenge link picking them unseen
+- a copy the browser refuses saying so, with the link to copy by hand
 - turning the rule off dropping them and rolling new ones, and on again dropping them
 - Exact clicks's count hidden and Start picking a target with a route of exactly par + 2
 - a target par holding
@@ -398,7 +399,7 @@ Exact clicks:
   - the challenge link carrying it
   - under Blind target held unseen (the strip and the line above the cards saying Random) and played
 - par + 4 and par + 2 being two games for personal bests
-- a pair with no route of exactly its count keeping Start off, the strip saying to reroll or pick another count
+- a pair with no route of exactly its count keeping Start off, the strip saying to reroll or pick another number of clicks
 - Random rolling par + 1 to 5 with each roll, and the line above the cards saying only "par + random"
 - running out losing
 - Six clicks and Round trip greyed out with the reason and left out even if ticked, and back with another game
@@ -510,6 +511,7 @@ Par:
 ### Report link, sealed links, Share and Random game
 
 - The footer's report link filling a mail in with the game on the cards and the offline copy's date
+- The footer naming the offline copy's date as the page's other dates are, with its year, and linking where it comes from
 - Sealed challenge links:
   - no title in the URL
   - two links to one game differing
@@ -576,7 +578,7 @@ The background:
   - a torch warming the map's blocks around it
   - nothing under reduce motion
 - Background only:
-  - the corner button hiding the setup screen but the box, open, the facts line and itself
+  - the corner button hiding the setup screen but the box, open, the facts line and itself, and saying it goes back to the setup screen
   - the picture stronger and Roll by itself left on
   - Escape and the button bringing the screen back
   - Off leaving it and hiding the button

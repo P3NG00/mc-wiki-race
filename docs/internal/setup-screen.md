@@ -20,8 +20,10 @@ The setup screen puts playing first.
     - each day from `DAILY_FIRST` to today a button that loads its daily (`loadDaily`), named with its game and result in its tooltip, and marked won on its day, won later or not won.
 - Your game (`#gameSum`, filled by `updateGameSum`): the game with its option, the extra rules, the articles and the difficulty.
 - The cards.
+  - A title typed into a card's box (`setCustom`) that `pageInfo` refuses says why: "No article named “X” on minecraft.wiki.", or for a page the game leaves out (see [rules.md](rules.md)) "“X” is on minecraft.wiki, but the game leaves it out (a version, list or non-article page)."
 - Start game and par.
 - Reroll all.
+- Copy challenge link (`#btnCopy`): "Challenge link copied.", or when the browser refuses the copy, the link in the status line to copy by hand.
 - Random game (`#btnRandom`, `randomGame`):
   - every setting under the cards at random, each on its own, every box a coin flip and every choice as likely as the others, then `reroll('all')`
   - Sound, Timer, Theme and the background's settings stay as they are, but Roll by itself, which any change turns off.
@@ -88,7 +90,7 @@ The setup screen ends with the facts line (`#bgFacts`, see [ui.md](ui.md)) and a
 - the GitHub link
 - MIT license
 - credit for the wiki's CC BY-NC-SA 3.0 content
-- the date of the wiki's offline copy the rolls and par go by, `#wikiCopy`, filled from `WIKI_DATA.snapshot` by `init` and linking Minecraft Wiki:Offline use
+- the date of the wiki's offline copy the rolls and par go by, `#wikiCopy`, filled from `WIKI_DATA.snapshot` by `init` (shown as the page's other dates are, `shortDate`, with its year) and linking Minecraft Wiki:Offline use, and that the articles themselves are live
 - a non-affiliation notice.
 
 ## The licence during play

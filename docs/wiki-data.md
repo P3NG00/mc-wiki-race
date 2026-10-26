@@ -9,7 +9,7 @@ Never edit those files by hand; rebuild them.
 
 Everything you read in a game is fetched live from the minecraft.wiki API while you play: the articles, their pictures and the cards' descriptions.
 Everything the game has to know about the whole wiki at once comes from the snapshot instead: which articles a roll can pick, their topics and link counts, the hubs and the pages left out, the wiki's namespaces, the Scavenger hunt's kinds, and the links between all 13,177 pages that par is worked out on.
-The snapshot's date shows in the setup screen's footer ("Which articles come up, and par, go by the wiki’s offline copy from …") and in the result's par line.
+The snapshot's date shows in the setup screen's footer ("Rolls and par go by the wiki’s offline copy from …") and in the result's par line.
 Between snapshots the live wiki moves on, so a page newer than the snapshot can't be rolled, and par can be off where an article has changed.
 
 ## Why the data is never crawled

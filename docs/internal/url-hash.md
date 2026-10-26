@@ -35,7 +35,7 @@ A blob longer than `LINK_MAX` (room for five titles of MediaWiki's longest), not
 
 - `start=<Title>` with `target=<Title>` (or `kind=`): a fixed pair, handy for testing a specific route.
 - A `start` with neither is no challenge, and a pair is rolled.
-- Every title is looked up live, and if one doesn't exist new cards are rolled instead.
+- Every title is looked up live, and if one doesn't exist or is left out of the game (`toInfo`, see [rules.md](rules.md)) new cards are rolled instead.
 - A sealed link's missing article isn't named in the message, since anyone can seal any text in a link and titles are otherwise only shown once the wiki has them; a hand-made link's is, its titles being in the URL to read.
 
 ## `via=`: checkpoints

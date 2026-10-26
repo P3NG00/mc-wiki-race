@@ -331,7 +331,7 @@ Once the cards are known their facts take turns with those (`bgPairFacts`):
 This is class `bg-view` on `<body>`: `visibility`, unlike `display`, lets those three show inside the hidden screen, and the page doesn't scroll.
 
 The picture is 1.6 times as strong there, up to full strength (`bgTheme`), with nothing to read in front of it.
-The button again, or Escape, brings the screen back, and so does picking Off, or a game starting (`bgShow`).
+The button again (its tooltip "Back to the setup screen (Esc)"), or Escape, brings the screen back, and so does picking Off, or a game starting (`bgShow`).
 The button sits under a modal (`z-index` 5).
 Neither the button nor the box counts as a change for Roll by itself, so the background keeps showing pairs of its own.
 

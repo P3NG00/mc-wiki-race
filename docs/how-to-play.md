@@ -15,7 +15,7 @@ Open [mcwikirace.com](https://mcwikirace.com/): a start and a target are already
 - **Daily challenge**: today's game, the same for everyone (see [The daily](#the-daily)).
 - **Your game**: one line that sums up the game, the extra rules, the articles and the difficulty.
 - The cards: **Start** and **Target**, plus **Checkpoint** cards in a Relay, or a **Find one of each** card in a Scavenger hunt of kinds. Each shows its article's picture and description.
-- **🎲 Reroll** on a card rolls a new article for it. Or type any article on the wiki into the box under it ("or type an article…") and press Enter.
+- **🎲 Reroll** on a card rolls a new article for it. Or type almost any article on the wiki into the box under it ("or type an article…") and press Enter (version pages, the big lists of game data and pages that aren't articles, such as tutorials, are left out).
 - **Start game**, with par beside it: the fewest clicks the game can be done in.
 - **🎲 Reroll all** rolls every card, and **⇄ Swap** swaps the start and the target: a Relay's checkpoints go in reverse, and a Round trip goes round the same loop from the target (it's hidden under Blind target and in a hunt of kinds). **🎲 Random game** sets every setting below the cards at random, then rolls new cards; the settings beside the title stay as they are.
 - **Copy challenge link** copies a link that opens this exact game (see [Challenge links](#challenge-links)).
@@ -31,7 +31,7 @@ Pick one of the tiles. The strip under them explains the game and holds its one 
 | **Race** | A → B | Get from the start to the target in as few clicks as you can. | |
 | **Relay** | A → 1 → 2 → B | Visit each checkpoint, in order, before the target counts. A later checkpoint reached early is just an ordinary page. | **Checkpoints**: 1, 2 or 3 |
 | **Scavenger hunt** | A → ✓ ✓ ✓ | Instead of one target, find 3 things in any order: one of each of 3 kinds, or 3 articles. | **Find**: 3 kinds or 3 articles |
-| **Exact clicks** | A → → → → B | Reach the target in exactly par + the clicks you pick, never on a page twice. | **Count**: par + 1 to par + 5, or Random |
+| **Exact clicks** | A → → → → B | Reach the target in exactly par + the clicks you pick, never on a page twice. | **Clicks**: par + 1 to par + 5, or Random |
 
 - A kind is a wiki category, such as Hostile mobs, shown with a few of its best-known members as examples. One page can find several kinds at once, and the start never counts.
 - In Exact clicks there's no Back, every page you've visited goes dead, and landing on the target too soon loses, as does running out of clicks. There's always a route of the count: the result shows one.
@@ -81,7 +81,7 @@ The **Difficulty** row decides which links work. Normal is the default.
 
 ## Target topic and par
 
-The **Target** row has two choices. The topic (**Any topic**, **Blocks**, **Items**, **Mobs**, **Biomes & structures**, **Enchantments & effects**) takes targets only from that topic, with the start from another one. The par (**Any par**, **Par 1** to **Par 4**, **Par 5+**) picks how many clicks the target is from the start, at the fewest.
+The **Target** row has two choices. The topic (**Any topic**, **Blocks**, **Items**, **Mobs**, **Biomes & structures**, **Enchantments & effects**) takes targets only from that topic. Outside Chaos the start always comes from another topic. The par (**Any par**, **Par 1** to **Par 4**, **Par 5+**) picks how many clicks the target is from the start, at the fewest.
 
 Most pairs are par 2, and par 3 or more is rare in Relaxed. When no start has a target at the par you picked, the roll takes the nearest par that has one and says so, and a par no start can have is greyed out. Scavenger has no target, so it hides the par choice.
 
@@ -171,7 +171,7 @@ The line under the daily shows your streak, your best, and the days won of those
 
 ## Challenge links
 
-**Copy challenge link**, on the setup screen or in the result, copies a link that opens this exact game: its cards, game, rules, difficulty and count.
+**Copy challenge link**, on the setup screen or in the result, copies a link that opens this exact game: its cards, game, rules, difficulty and count. If your browser won't let the setup screen copy it, the link shows under the buttons to copy by hand.
 It looks like `https://mcwikirace.com/#g=…`, sealed so the cards aren't readable at a glance. The target topic, target par and Content aren't in it: whoever opens it plays with their own Content boxes, though a card's own spin-off always counts.
 Under Blind target it picks the hidden cards first, and they stay hidden for whoever opens the link. A link cut short rolls new cards instead, and says it's damaged.
 
@@ -189,7 +189,7 @@ You can also write a link's keys after the `#` yourself, joined with `&`, for ex
 | `extra=` | With Exact clicks, the clicks over par, 1 to 5. |
 | `daily` or `daily=YYYY-MM-DD` | Today's daily, or a past day's. |
 
-A link without `rules` plays on Relaxed. `#rules=…` on its own sets the rules for the cards rolled. An article that doesn't exist rolls new cards instead.
+A link without `rules` plays on Relaxed. `#rules=…` on its own sets the rules for the cards rolled. An article that doesn't exist, or that the game leaves out, rolls new cards instead.
 
 ## Settings
 

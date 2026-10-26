@@ -10,7 +10,7 @@ const [port, fileUrl] = process.argv.slice(2);
 const dataText = fs.readFileSync(new URL('../wiki-data.js', import.meta.url), 'utf8'), marker = 'const WIKI_DATA = ';
 const { spinoffs: SPINOFFS, hubs } = JSON.parse(dataText.slice(dataText.indexOf(marker) + marker.length, dataText.lastIndexOf(';')));
 const HUBS = [...new Set(Object.values(hubs))];
-const nsOf = title => SPINOFFS[Object.keys(SPINOFFS).find(n => title.startsWith(n + ':'))] ?? 0;
+const nsOf = title => title.startsWith('Category:') ? 14 : SPINOFFS[Object.keys(SPINOFFS).find(n => title.startsWith(n + ':'))] ?? 0;
 
 const ws = new WebSocket(`ws://127.0.0.1:${port}/session`);
 let id = 0;
@@ -110,7 +110,8 @@ const play = async () => {
 // is live. No hubs alone (from an older link) is Hard: hubs and redirects to them are dead, the target hub stays live,
 // and so are navboxes' links.
 check('the data loads', await open('#start=Diamond&target=Crafting') && await ev("WIKI_DATA.snapshot.length === 10 && POOL.size === 5"));
-check('the footer names the offline copy\'s date and links where it comes from', await ev(`$('#wikiCopyDate').textContent === WIKI_DATA.snapshot && $('#wikiCopy a').href === 'https://minecraft.wiki/w/Minecraft_Wiki:Offline_use'`));
+check('the footer names the offline copy\'s date as the page\'s other dates, with its year, and links where it comes from', await ev(`$('#wikiCopyDate').textContent === shortDate(localDay(WIKI_DATA.snapshot), true)
+  && $('#wikiCopyDate').textContent.includes(WIKI_DATA.snapshot.slice(0, 4)) && $('#wikiCopy a').href === 'https://minecraft.wiki/w/Minecraft_Wiki:Offline_use'`), await ev("$('#wikiCopy').textContent"));
 // The report link fills the mail in when clicked (the navigation is stopped, so no mail app opens).
 check('the footer\'s report link fills a mail in with the game on the cards and the offline copy\'s date', await ev(`(() => {
   const a = $('#feedbackMail');
@@ -138,7 +139,13 @@ check('the snapshot still has what the checks lean on', !factsOff.length, factsO
 check('a challenge link without rules is Relaxed', await ev("level() === 'relaxed' && rules().length === 0"));
 check('the data has no left-out page', await ev("WIKI_DATA.articles.every(([t]) => !LEFT_OUT.has(t))"));
 await ev("setCustom('start', 'Java Edition version history')");
-check('a left-out page typed in isn’t taken', await until("setup.busy === 0 && document.querySelector('#setupStatus').textContent === 'No article named “Java Edition version history” on minecraft.wiki.'")
+check('a left-out page typed in isn’t taken, saying the game leaves it out', await until("setup.busy === 0 && document.querySelector('#setupStatus').textContent === '“Java Edition version history” is on minecraft.wiki, but the game leaves it out (a version, list or non-article page).'")
+  && await ev("setup.start.title === 'Diamond'"), await ev("document.querySelector('#setupStatus').textContent"));
+await ev("setCustom('start', 'Category:Blocks')");
+check('so is a page that isn’t an article', await until("setup.busy === 0 && document.querySelector('#setupStatus').textContent === '“Category:Blocks” is on minecraft.wiki, but the game leaves it out (a version, list or non-article page).'")
+  && await ev("setup.start.title === 'Diamond'"), await ev("document.querySelector('#setupStatus').textContent"));
+await ev("setCustom('start', 'No such page')");
+check('and one that doesn’t exist says there’s no article by that name', await until("setup.busy === 0 && document.querySelector('#setupStatus').textContent === 'No article named “No such page” on minecraft.wiki.'")
   && await ev("setup.start.title === 'Diamond'"), await ev("document.querySelector('#setupStatus').textContent"));
 // A failure says whose it is: the wiki's (here a request the suite doesn't answer), the link data's, or the game's own
 // (a card none of whose draws exists).
@@ -484,6 +491,12 @@ await ev("reroll('all')");
 await until(ready);
 await ev("document.querySelector('#btnCopy').click()");
 check('Copy challenge link picks them and holds them unseen', await until('!!setup.goal && setup.busy === 0') && await ev(`openLink(new URL(challengeLink()).hash.slice(3)).includes('&target=') && ${visibleCards}.endsWith(',Hidden,Hidden')`));
+// A copy the browser refuses leaves the link in the status line to copy by hand (each sealing differs, so compared opened).
+await ev("navigator.clipboard.writeText = () => Promise.reject(new Error('Refused')); document.querySelector('#btnCopy').click()");
+check('a refused copy says so, with the link to copy by hand', await until(`(([, link]) => link && openLink(new URL(link).hash.slice(3)) === openLink(new URL(gameLink()).hash.slice(3)))
+  (document.querySelector('#setupStatus').textContent.split('Couldn’t copy, so copy the link from here: '))`),
+  await ev("document.querySelector('#setupStatus').textContent"));
+await ev("delete navigator.clipboard.writeText");
 await ev("window.held = [setup.via0, setup.goal]; document.querySelector('#rules input[value=blind]').click()");
 check('turning Blind target off drops them and rolls new ones to show', await until(ready)
   && await ev(`!${visibleCards}.includes('Hidden') && !!setup.via0 && !!setup.goal && setup.via0 !== held[0] && setup.goal !== held[1]`), await ev(visibleCards));
@@ -611,7 +624,7 @@ check('par + 4 and par + 2 are two games for personal bests', await ev(`(r => re
 // With no route of exactly the count (here the search made to find none), Start stays off and the strip says what to do.
 await ev("window.realExactRoute = exactRoute; exactRoute = async () => null; updateSetupPar()");
 check('a pair with no route of exactly its count keeps Start off, saying to reroll or pick another count',
-  await until(`document.querySelector('#exactInfo').textContent === 'This pair can’t be done in exactly ${exact.par + 4} clicks: reroll, or pick another count.'`)
+  await until(`document.querySelector('#exactInfo').textContent === 'This pair can’t be done in exactly ${exact.par + 4} clicks: reroll, or pick another number of clicks.'`)
   && await ev(`document.querySelector('#btnPlay').disabled && document.querySelector('#setupPar').textContent === 'Par ${exact.par} · no way in exactly ${exact.par + 4}'`),
   await ev("document.querySelector('#exactInfo').textContent"));
 await ev("exactRoute = realExactRoute; updateSetupPar()");
@@ -1247,13 +1260,13 @@ const madeUp = JSON.parse(await ev(`(() => {
 check('a made-up blob with a good hash opens only to a challenge, its titles as sealed', !madeUp[0].length
   && madeUp[1] === 'start=%26daily%3D2026-01-01' && madeUp[2] === null, JSON.stringify(madeUp));
 await open('#g=' + await ev("sealLink('start=No%20such%20page%2C%20visit%20example.com&target=Diamond')"));
-check('a sealed link\'s missing article isn\'t named', await until("document.querySelector('#setupStatus').textContent.startsWith('One of the challenge link’s articles doesn’t exist')")
+check('a sealed link\'s missing article isn\'t named', await until("document.querySelector('#setupStatus').textContent.startsWith('One of the challenge link’s articles doesn’t exist or is left out of the game')")
   && !await ev("document.querySelector('#setupStatus').textContent.includes('example')"), await ev("document.querySelector('#setupStatus').textContent"));
 await open('#start=No%20such%20page&target=Diamond');
-check('a hand-made link\'s missing article is named', await until("document.querySelector('#setupStatus').textContent.startsWith('The challenge link’s article “No such page” doesn’t exist')"),
+check('a hand-made link\'s missing article is named', await until("document.querySelector('#setupStatus').textContent.startsWith('The challenge link’s article “No such page” doesn’t exist or is left out of the game')"),
   await ev("document.querySelector('#setupStatus').textContent"));
 await open('#start=Java%20Edition%20version%20history&target=Diamond');
-check('so is a left-out page', await until("document.querySelector('#setupStatus').textContent.startsWith('The challenge link’s article “Java Edition version history” doesn’t exist')"),
+check('so is a left-out page', await until("document.querySelector('#setupStatus').textContent.startsWith('The challenge link’s article “Java Edition version history” doesn’t exist or is left out of the game')"),
   await ev("document.querySelector('#setupStatus').textContent"));
 
 // Random game: every setting at random, then new cards for them. Eight clicks each fill the cards the settings use (the
@@ -1710,7 +1723,8 @@ await ev("setCalm(false), bgSetting('style', 'auto'), document.dispatchEvent(new
 // leaves it and hides the button.
 const seen = sel => `$('${sel}').checkVisibility({ visibilityProperty: true })`;
 await ev("bgSetting('roll', true), $('#btnBgView').click()");
-check('the corner button shows only the background, with its box open and stronger', await ev(`bgViewing() && $('#bgOpts').open && bgSet.roll
+check('the corner button shows only the background, with its box open and stronger, and says it goes back to the setup screen', await ev(`bgViewing() && $('#bgOpts').open && bgSet.roll
+  && $('#btnBgView').title === 'Back to the setup screen (Esc)' && $('#btnBgView').getAttribute('aria-label') === $('#btnBgView').title
   && !${seen('#btnPlay')} && !${seen('#cardStart')} && ${seen('#bgStyle')} && ${seen('#btnBgView')} && ${seen('#bgFacts')}
   && bg.colors.strength > parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--viz-opacity'))`));
 await ev("document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))");

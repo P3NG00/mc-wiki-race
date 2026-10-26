@@ -64,7 +64,7 @@ So are the titles passed in `dead`, the pages visits have made dead, titled unde
 
 #### No navboxes
 
-- Under No navboxes every link inside a `.navbox` table, or inside an advancement's list of what it asks for (`.hlist.searchaux`), which the snapshot counts as a navbox (see [wiki-data.md](wiki-data.md)), is dead too; the list stays in sight, its links dead.
+- Under No navboxes every link inside a `.navbox` table, or inside an advancement's list of what it asks for (`.hlist.searchaux`), which the snapshot counts as a navbox (see [wiki-data.md](wiki-data.md)), is dead too, titled "Off limits on Normal and Hard: this list counts as a navbox"; the list stays in sight, its links dead.
 - Those tables and their Navigation heading are also hidden.
 
 #### Top links only
@@ -100,7 +100,7 @@ The frame script also runs the wiki's element animator (from MediaWiki:Common.js
   - those above the first section heading (`FIRST_SECTION`, an infobox's picture) before the article shows,
   - the rest once they come within a screen of the frame's window, since measuring every one at once held a page of hundreds (Crafting's grids) up by a tenth of a second.
   - Its hidden frames' images are made eager then too.
-- With motion reduced (`CALM`, written into the script and sent again on a change, `{mwr:'calm', on}`) nothing cycles by itself: each box that would gets a ↻ button beside it (`.mwr-step`, inside a `.mcui` or `.animated-container`, after a lone animation) that moves its frames on once, as a tick would, since a click on a slot is its link's.
+- With motion reduced (`CALM`, written into the script and sent again on a change, `{mwr:'calm', on}`) nothing cycles by itself: each box that would gets a ↻ button beside it (`.mwr-step`, inside a `.mcui` or `.animated-container`, after a lone animation) that moves its frames on once, as a tick would, since a click on a slot is its link's. Its tooltip and label are "Show the next picture".
 
 ### Tabber
 

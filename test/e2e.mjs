@@ -219,11 +219,11 @@ await ev('setCalm(true)');
 const calmFrom = await ev(shownItem, f);
 await sleep(4500);
 const calmStill = await ev(shownItem, f);
-await ev(`(s => (s.closest('.animated-container, .mcui').querySelector(':scope > .mwr-step') ?? s.nextElementSibling).click())(${outputSlot})`, f);
+const stepTip = await ev(`(s => (b => (b.click(), b.title === 'Show the next picture' && b.getAttribute('aria-label') === b.title))(s.closest('.animated-container, .mcui').querySelector(':scope > .mwr-step') ?? s.nextElementSibling))(${outputSlot})`, f);
 await sleep(200);
 const calmStepped = await ev(shownItem, f);
 await ev('setCalm(false)');
-check('with motion reduced the slots hold still, and the button beside the grid moves them on', !!calmFrom && calmStill === calmFrom && calmStepped !== calmFrom
+check('with motion reduced the slots hold still, and the button beside the grid, Show the next picture, moves them on', stepTip && !!calmFrom && calmStill === calmFrom && calmStepped !== calmFrom
   && await until("!document.querySelector('.mwr-step')", 2000, f), `${calmFrom} -> ${calmStill} -> ${calmStepped}`);
 // The infobox's tabs (Wooden, Golden, Stone…) show one picture at a time, and clicking a tab switches to it.
 const tabState = `JSON.stringify((t => ({ tabs: [...t.querySelectorAll('.tabbernav li')].map(li => (li.classList.contains('tabberactive') ? '*' : '') + li.textContent),

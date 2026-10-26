@@ -111,14 +111,14 @@ On the right are your **Clicks** ("of 6" with a dot a click under Six clicks), *
 ## Links in the article
 
 - Live links light up on hover. Links to a page already on your path are purple and dotted, and say "Already on your path".
-- Dead links are dimmed and do nothing but a villager's "hrmm": files, categories, tutorials and other non-article pages, red links, links off the wiki, version pages, and the few big list pages of game data that link to nearly everything ("Off limits: a version or list page"). The rules' dead links say why too: Hard's overview pages ("Off limits on Hard: a big overview page"), everything below the top under Top links only, the pages you've visited under Exact clicks, and your way there once a Round trip turns back.
+- Dead links are dimmed and do nothing but a villager's "hrmm": files, categories, tutorials and other non-article pages, red links, links off the wiki, version pages, and the few big list pages of game data that link to nearly everything ("Off limits: a version or list page"). The rules' dead links say why too: Hard's overview pages ("Off limits on Hard: a big overview page"), the lists of what an advancement asks for on Normal and Hard, since they count as navboxes ("Off limits on Normal and Hard: this list counts as a navbox"), everything below the top under Top links only, the pages you've visited under Exact clicks, and your way there once a Round trip turns back.
 - A redirect to the target counts as reaching it.
 - A page with no live links says so in a banner: go Back, or give up.
 - The wiki's own features work: crafting grids cycle through their recipes, tabs switch, folding boxes fold, and the speakers in a Sounds table play.
 
 ## Back, the clock and giving up
 
-Back returns to the previous article and counts as a click. The clock pauses while an article loads, and while the Give up dialog is open, but keeps running while you peek. If an article fails to load you get **Retry** and **Cancel**, with the clock stopped.
+Back returns to the previous article and counts as a click. The clock pauses while an article loads, and while the Give up dialog is open, but keeps running while you peek. If an article fails to load you get **Retry** and **Cancel**, with the clock stopped, and whether the wiki couldn't be reached or sent back an error.
 
 **Give up** asks first ("Give up?"), with **Keep going** to change your mind. While a game is on, closing the tab, reloading or the browser's Back asks first with the browser's own dialog (except on iOS Safari, which never shows it).
 

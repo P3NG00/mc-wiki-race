@@ -151,9 +151,11 @@ check('and one that doesn’t exist says there’s no article by that name', awa
 // (a card none of whose draws exists).
 const failSays = async fn => ev(`withBusy(${fn}).then(() => document.querySelector('#setupStatus').textContent)`);
 const failMessages = [await failSays("() => api({ action: 'query', prop: 'pageimages' })"), await failSays("() => loadGraphFile('no-such-file.js', () => null)"),
-  await failSays("() => rollOne('goal', null, undefined, ['No such page'])")];
-check('a failure says whose it is: the wiki’s, the link data’s or the game’s',
-  failMessages[0] === 'Couldn’t reach minecraft.wiki (Not answered offline: query prop=pageimages). Check your connection and try again.'
+  await failSays("() => rollOne('goal', null, undefined, ['No such page'])"),
+  await failSays("() => (window.realFetch = fetch, fetch = () => Promise.reject(new TypeError('Failed to fetch.')), api({ action: 'query' }).finally(() => fetch = realFetch))")];
+check('a failure says whose it is: the wiki’s (an error it sent back, or no answer), the link data’s or the game’s',
+  failMessages[0] === 'minecraft.wiki sent back an error (Not answered offline: query prop=pageimages). Try again in a moment.'
+  && failMessages[3] === 'Couldn’t reach minecraft.wiki (Failed to fetch). Check your connection and try again.'
   && failMessages[1] === 'The game’s link data didn’t load (no-such-file.js). Reload the page.' && failMessages[2] === 'Couldn’t find an article that fits. Try Reroll again.',
   failMessages.join(' | '));
 await ev("setStatus('')");
@@ -177,6 +179,10 @@ check('Hard: hubs, redirects to them, navboxes and left-out pages dead; the targ
   links.Block === 'dead' && links.Blocks === 'dead' && links.Creeper === 'dead' && links.Java_Edition_version_history === 'dead' && links.Closed_captions === 'dead'
   && links.Crafting === 'live' && links.Diamond_Pickaxe === 'live' && await ev("document.querySelector('a[href=\"/w/Block\"]').title === 'Off limits on Hard: a big overview page'", await frameCtx())
   && await ev("HUB_TITLES.get('Crafting') === 'Crafting'"), JSON.stringify(links));   // else Crafting live would test nothing
+// A navbox's links, and a requirement list's (div.hlist.searchaux, which stays in sight), say why they are dead.
+check('Hard: a navbox\'s and a requirement list\'s links say they count as a navbox', await ev(`(d => (d.className = 'hlist searchaux', d.innerHTML = '<a href="/w/Ghast">Ghast</a>',
+  document.body.append(d), (c => (d.remove(), c?.kind === 'blocked' && c.note === 'Off limits on Normal and Hard: this list counts as a navbox'))(classify(d.firstChild))))(document.createElement('div'))
+  && document.querySelector('.navbox a[href="/w/Creeper"]').title === 'Off limits on Normal and Hard: this list counts as a navbox'`, await frameCtx()));
 await ev('finish(false)');
 const shortest = "[...document.querySelectorAll('#mBest li')].map(li => li.textContent).join(' → ')";
 check('the result shows par and a shortest route beside your path', await until(`/^Shortest route · par \\d+$/.test(document.querySelector('#mBestTitle').textContent)
@@ -352,7 +358,7 @@ await until('game.path.length === 2 && !game.loading');
 check('the second checkpoint reached first doesn\'t count', await ev('game.viaNext === 0 && !game.path[1].via') && await ev(hud) === 'Checkpoint 1 Creeper');
 await ev("navigate('Creeper', null)");
 await until('game.path.length === 3 && !game.loading');
-check('reaching the first checkpoint names the second', await ev(`game.path[2].via === 1 && ${toast} === '✓ Checkpoint 1 of 2 reached! Now find Zombie'`) &&
+check('reaching the first checkpoint names the second', await ev(`game.path[2].via === 1 && ${toast} === '✓ Checkpoint 1 of 2 reached! Now find Zombie.'`) &&
   await ev(hud) === 'Checkpoint 2 Zombie', await ev(toast));
 // The header's route: four stops, so the two done shrink to their ✓ until one is clicked, which opens them all.
 const routeState = "[...document.querySelectorAll('#hudRoute .chip')].map(c => c.className.replace('chip ', '') + ':' + c.querySelector('.n').textContent).join(' | ')";
@@ -365,7 +371,7 @@ await until('game.path.length === 4 && !game.loading');
 check('the target before the last checkpoint doesn\'t win', await ev('game.active'));
 await ev("navigate('Zombie', null)");
 await until('game.path.length === 5 && !game.loading');
-check('reaching the last checkpoint names the target', await ev(`game.path[4].via === 2 && ${toast} === '✓ Checkpoint 2 of 2 reached! Now find Crafting'`) &&
+check('reaching the last checkpoint names the target', await ev(`game.path[4].via === 2 && ${toast} === '✓ Checkpoint 2 of 2 reached! Now find Crafting.'`) &&
   await ev(hud) === 'Target Crafting', await ev(toast));
 const relayPar = await ev("parRoute({ start: 'Diamond', vias: ['Creeper', 'Zombie'], goal: 'Crafting', rules: [] }).then(r => r.length - 1)");
 await ev("navigate('Crafting', null)");
@@ -409,7 +415,7 @@ await ev("navigate('Crafting', null)");
 await until('game.path.length === 2 && !game.loading');
 await ev("navigate('Zombie', null)");
 await until('game.path.length === 3 && !game.loading');
-check('reaching the target turns back: the banner, the HUD, Back starting again', await ev(`${toast} === '✓ Target reached! Now head back to Diamond'
+check('reaching the target turns back: the banner, the HUD, Back starting again', await ev(`${toast} === '✓ Target reached! Now head back to Diamond.'
   && game.stack.join() === 'Zombie' && document.querySelector('#btnBack').disabled && game.path[2].via === 1`) && await ev(hud) === 'Back to Diamond', await ev(toast));
 const liveLinks = async () => JSON.parse(await ev(`JSON.stringify(Object.fromEntries([...document.querySelectorAll('a')].map(a => [a.getAttribute('href'), a.classList.contains('mwr-live')])))`, await frameCtx()));
 let rtLinks = await liveLinks();
@@ -418,6 +424,10 @@ check('the way there is dead, saying why, other links live', rtLinks['/w/Craftin
 await ev("navigate('Diamond Pickaxe', null)");
 await until('game.path.length === 4 && !game.loading');
 check('Back works again on the way back', await ev("!document.querySelector('#btnBack').disabled"));
+await ev("document.querySelector('#btnPeek').click()");
+check('the peek on the way back is headed Back to the start, with no colon', await ev("document.querySelector('#modal h2').textContent === 'Back to Diamond'"),
+  await ev("document.querySelector('#modal h2')?.textContent"));
+await ev('closeModal()');
 await ev("navigate('Diamond', null)");
 check('back at the start wins, recorded by its cards', await until('!game.active') && await ev(`(r => r.won && r.goal === 'Zombie' && !r.vias && !r.back
   && r.rules.join() === 'roundtrip')(store.get('mwr.history', [])[0]) && document.querySelector('#modal').textContent.includes('Diamond → Zombie → Diamond')`));
@@ -435,17 +445,17 @@ await play();
 check('the HUD names the first checkpoint', await ev(hud) === 'Checkpoint 1 Creeper', await ev(hud));
 await ev("navigate('Creeper', null)");
 await until('game.path.length === 2 && !game.loading');
-check('the first checkpoint names the target', await ev(`${toast} === '✓ Checkpoint 1 of 2 reached! Now find Crafting'`) && await ev(hud) === 'Target Crafting', await ev(toast));
+check('the first checkpoint names the target', await ev(`${toast} === '✓ Checkpoint 1 of 2 reached! Now find Crafting.'`) && await ev(hud) === 'Target Crafting', await ev(toast));
 await ev("navigate('Zombie', null)");
 await until('game.path.length === 3 && !game.loading');
 await ev("navigate('Crafting', null)");
 await until('game.path.length === 4 && !game.loading');
-check('the target names the checkpoint of the way back, which stays live', await ev(`${toast} === '✓ Target reached! Now find Zombie'
+check('the target names the checkpoint of the way back, which stays live', await ev(`${toast} === '✓ Target reached! Now find Zombie.'
   && game.path[3].via === 2 && game.dead.has('Creeper') && game.dead.has('Crafting') && !game.dead.has('Zombie') && !game.dead.has('Diamond')`)
   && await ev(hud) === 'Checkpoint 2 Zombie' && (await liveLinks())['/w/Creeper'] === false, await ev(toast));
 await ev("navigate('Zombie', null)");
 await until('game.path.length === 5 && !game.loading');
-check('the last checkpoint heads home', await ev(`${toast} === '✓ Checkpoint 2 of 2 reached! Now head back to Diamond'
+check('the last checkpoint heads home', await ev(`${toast} === '✓ Checkpoint 2 of 2 reached! Now head back to Diamond.'
   && document.querySelector('#hudTags').textContent.includes('2 of 2 checkpoints reached · On the way back')`) && await ev(hud) === 'Back to Diamond', await ev(toast));
 await ev("navigate('Diamond', null)");
 check('the Relay round trip is won, recorded with its split, par over the loop', await until('!game.active') && await ev(`(r => r.won && r.goal === 'Crafting'
@@ -554,7 +564,7 @@ for (const [i, t] of ['Creeper', 'Zombie', 'Crafting'].entries()) {
   await ev(`navigate('${t}', null)`);
   await until(`game.path.length === ${i + 2} && !game.loading`);
 }
-check('the last find heads home', await ev(`game.active && ${toast} === '✓ Found Crafting (3 of 3)! Now head back to Diamond' && game.dead.has('Creeper')`)
+check('the last find heads home', await ev(`game.active && ${toast} === '✓ Found Crafting (3 of 3)! Now head back to Diamond.' && game.dead.has('Creeper')`)
   && await ev(hud) === 'Back to Diamond', await ev(toast));
 await ev("navigate('Diamond', null)");
 check('back home wins the hunt, recorded with the way home', await until('!game.active') && await ev(`(r => r.won && r.finds.length === 3 && r.rules.join() === 'roundtrip,scavenger')(store.get('mwr.history', [])[0])
@@ -583,7 +593,9 @@ check('Exact clicks: setup finds a route of exactly par + 2 on no page twice, an
   await ev(`document.querySelector('#setupPar').textContent === 'Par ${exact.par} · exactly ${exact.par + 2}'`), exact.route?.join(' → '));
 const n = exact.par + 2;
 await play();
-check('the header counts toward it and Back is gone', await ev(`document.querySelector('#hudClicks').textContent === '0' && document.querySelector('#hudClicksK').textContent === 'of exactly ${n}' && document.querySelectorAll('#hudMeter i').length === ${n} && document.querySelector('#btnBack').classList.contains('hidden')`));
+check('the header counts toward it, saying the count only there, and Back is gone', await ev(`document.querySelector('#hudClicks').textContent === '0' && document.querySelector('#hudClicksK').textContent === 'of exactly ${n}' && document.querySelectorAll('#hudMeter i').length === ${n} && document.querySelector('#btnBack').classList.contains('hidden')
+  && document.querySelector('#hudTags').textContent.endsWith('Land on the target with your last click, not before') && document.querySelector('#hudLbl').textContent === 'Target'`),
+  await ev("[document.querySelector('#hudTags').textContent, document.querySelector('#hudLbl').textContent].join(' | ')"));
 await ev("navigate('Crafting', null)");
 await until('game.path.length === 2 && !game.loading');
 rtLinks = await liveLinks();

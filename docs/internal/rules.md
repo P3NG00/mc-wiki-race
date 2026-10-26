@@ -110,6 +110,7 @@ Revisits are out because a page almost always links back to the one before, whic
 - Back is hidden (`canGoBack`).
 - Every visited page is dead by every title that led to it (`game.dead`, renewed on each arrival), its links saying "Off limits: already visited (Exact clicks)".
 - Reaching the target sooner loses (`tooSoon`), as does using up the count (`game.limit`, `outOfClicks`).
+- The header shows the count only by the clicks ("of exactly 7" and its dots); beside the labels is "Land on the target with your last click, not before", and the target's chip says just Target.
 
 #### A route of the count
 
@@ -212,7 +213,7 @@ An item's blast (see [items.md](items.md)) throws the pieces of the page around 
 - `game.loading` stays set until the frame posts `{mwr:'ready', token}`.
 - That message comes from its own `<script>` after the main frame script, so it is sent only after the render-blocking stylesheets have loaded.
 - A 15 s timeout calls `frameReady` anyway.
-- An article that fails to load (a network or HTTP error, a MediaWiki error, a reply that isn't JSON or has no article) shows Retry and Cancel with the clock stopped.
+- An article that fails to load (a network or HTTP error, a MediaWiki error, a reply that isn't JSON or has no article) shows Retry and Cancel with the clock stopped, under what went wrong as the setup screen words it (`failText`, see [setup-screen.md](setup-screen.md#while-a-roll-is-under-way)).
 - Everything that can fail has to fail inside `navigate`'s `try`: an error after it would leave the game loading, with Give up disabled.
 
 ## `navToken`

@@ -1063,15 +1063,16 @@ const apiQueue = [];
 async function api(params) {
   if (apiActive < API_CONCURRENCY) apiActive++;
   else await new Promise(r => apiQueue.push(r));
+  let res;
   try {
     // origin=* is required for anonymous CORS from a file:// page.
-    const res = await fetch(`${API}?${new URLSearchParams({ format: 'json', formatversion: '2', origin: '*', ...params })}`, { signal: AbortSignal.timeout(30000) });
+    res = await fetch(`${API}?${new URLSearchParams({ format: 'json', formatversion: '2', origin: '*', ...params })}`, { signal: AbortSignal.timeout(30000) });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = await res.json();
     if (data.error) throw new Error(data.error.info || data.error.code);
     return data;
   } catch (e) {
-    throw Object.assign(e, { wiki: true });   // the wiki's failure, not the game's (see failText)
+    throw Object.assign(e, { wiki: true, reached: !!res });   // the wiki's failure, not the game's, and whether it answered (see failText)
   } finally {
     const next = apiQueue.shift();
     if (next) next(); else apiActive--;
@@ -1519,9 +1520,10 @@ function leaveDaily() {
   return was;
 }
 
-// What a roll, lookup or load that failed says: the wiki not answering (api), the link graph not loading (loadGraphFile),
-// or else the game's own message.
-const failText = e => e.wiki ? `Couldn’t reach minecraft.wiki (${e.message.replace(/\.$/, '')}). Check your connection and try again.`
+// What a roll, lookup or load that failed says: the wiki not answering or answering with an error (api), the link graph
+// not loading (loadGraphFile), or else the game's own message.
+const failText = (e, why = e.message.replace(/\.$/, '')) => e.wiki ? (e.reached ? `minecraft.wiki sent back an error (${why}). Try again in a moment.`
+  : `Couldn’t reach minecraft.wiki (${why}). Check your connection and try again.`)
   : e.graph ? `The game’s link data didn’t load (${e.graph}). Reload the page.` : e.message;
 // #setup.busy shows it: a spinner by the status line and on the cards being rolled.
 async function withBusy(fn) {
@@ -2203,11 +2205,11 @@ function renderObjective() {
   // Checkpoints reached so far, a round trip's target aside, and whether a round trip has turned back.
   const reached = game.viaNext - (game.turn && game.viaNext >= game.turn ? 1 : 0);
   const home = game.roundTrip && !hunting() && (!game.turn || game.viaNext >= game.turn);
-  const progress = [left && `Found ${game.hunt.length - left.length} of ${game.hunt.length}`, game.exact && `Land on the target on click ${game.limit}, not before`,
+  const progress = [left && `Found ${game.hunt.length - left.length} of ${game.hunt.length}`, game.exact && 'Land on the target with your last click, not before',
     n && `${reached} of ${n} checkpoint${n > 1 ? 's' : ''} reached`, game.roundTrip && (home ? 'On the way back' : 'On the way there')].filter(Boolean).join(' · ');
   $('#hudTags').innerHTML = [GAMES[g].label, ...extraLabels(game.rules)]
     .map((t, i) => `<span class="tag${i ? '' : ' game'}">${esc(t)}</span>`).join('') + (progress ? ` <span class="note">${esc(progress)}</span>` : '');
-  const goal = { state: objective() === game.goal ? 'now' : 'ahead', k: game.roundTrip ? 'Back to' : game.exact ? `Target · exactly ${game.limit}` : 'Target',
+  const goal = { state: objective() === game.goal ? 'now' : 'ahead', k: game.roundTrip ? 'Back to' : 'Target',
     name: game.goal?.title, goal: true };
   const stops = game.hunt ? [...game.hunt.map(h => ({ state: h.found ? 'done' : 'ahead', name: h.label, sub: h.kind && h.found })), ...game.roundTrip ? [goal] : []]
     : [{ state: 'done', k: 'Start', name: game.start.title },
@@ -2251,7 +2253,7 @@ function celebrateCheckpoint() {
     : entry.via === game.turn ? 'Target reached' : `Checkpoint ${n > 1 ? `${checkpointNumber(entry.via)} of ${n} ` : ''}reached`;
   // What comes next, or that the way on is cut off: on a round trip only giving up is left then (see turnBack).
   const then = !next ? '' : stranded ? `, but there’s no way ${next === game.goal ? 'back' : 'on'} to ${next.title} that doesn’t retrace your steps.`
-    : `! Now ${next === game.goal && game.roundTrip ? 'head back to' : 'find'} ${next.title}`;
+    : `! Now ${next === game.goal && game.roundTrip ? 'head back to' : 'find'} ${next.title}.`;
   showToast(`✓ ${what}${then}${game.stuck ? ' ' + stuckText() : ''}`, game.stuck ? null : stranded ? 6000 : 3000);
   $('.hud .goal').classList.add('reached');
   play('checkpoint');
@@ -2314,7 +2316,7 @@ function cacheParse(keys, page) {
 }
 // An article from the wiki. A reply without one fails here, so it fails inside navigate's try.
 const askParse = title => api({ action: 'parse', page: title, prop: 'text|displaytitle|categories', redirects: '1', disableeditsection: '1', disablelimitreport: '1' })
-  .then(d => d.parse || Promise.reject(new Error('The wiki sent no article')));
+  .then(d => d.parse || Promise.reject(Object.assign(new Error('no article in its reply'), { wiki: true, reached: true })));
 // A live link pressed with a mouse or pen (the frame posts {mwr:'press'}): its article is asked for at once, the request
 // its click would make, sent the 50 to 150 ms sooner that a click comes after the press. The next navigation takes it if
 // it goes there, else drops it, as does going back to setup. A failure is the click's to show, as its own would be.
@@ -2353,7 +2355,7 @@ async function navigate(title, fragment, { back = false, from = null } = {}) {
     if (token !== game.navToken) return;
     game.loading = false;
     renderHud();
-    showOverlay(`Couldn’t load <b>${esc(title)}</b>.<br><span class="note">${esc(e.message)}</span><br><br>
+    showOverlay(`Couldn’t load <b>${esc(title)}</b>.<br><span class="note">${esc(failText(e))}</span><br><br>
       <button class="primary" id="btnRetry">Retry</button> <button id="btnCancelNav">Cancel</button>`);
     $('#btnRetry').onclick = () => navigate(title, fragment, { back });
     // With no article loaded yet there is nothing to go back to, so return to setup.
@@ -4279,7 +4281,7 @@ function renderArticle(page, fragment, token, { dead = [], hubs = [] } = {}, see
       // (.hlist.searchaux: "Kill one of these 41 monsters", folded behind [show]) is a navbox in all but looks: the
       // same list on every page it concerns, which the snapshot counts as a navbox (see docs/internal/wiki-data.md). It
       // stays in sight, dead.
-      if (NO_NAV && a.closest('.navbox, .hlist.searchaux')) return null;
+      if (NO_NAV && a.closest('.navbox, .hlist.searchaux')) return { kind: 'blocked', note: 'Off limits on Normal and Hard: this list counts as a navbox' };
       const href = a.getAttribute('href') || '';
       if (href.startsWith('#')) { try { return { kind: 'anchor', id: decodeURIComponent(href.slice(1)) }; } catch (e) { return null; } }
       if (!href.startsWith('/w/') || a.classList.contains('new')) return null;
@@ -4445,8 +4447,8 @@ function renderArticle(page, fragment, token, { dead = [], hubs = [] } = {}, see
         let b = inside ? box.querySelector(':scope > .mwr-step') : box.nextElementSibling?.classList.contains('mwr-step') && box.nextElementSibling;
         if (!on) { if (b) b.remove(); continue; }
         if (b) continue;
-        b = Object.assign(document.createElement('button'), { type: 'button', className: 'mwr-step' + (inside ? '' : ' after'), textContent: '↻', title: 'Show the next' });
-        b.setAttribute('aria-label', 'Show the next');
+        b = Object.assign(document.createElement('button'), { type: 'button', className: 'mwr-step' + (inside ? '' : ' after'), textContent: '↻', title: 'Show the next picture' });
+        b.setAttribute('aria-label', b.title);
         b.onclick = e => { e.preventDefault(); e.stopPropagation(); tick(animated.filter(el => box.contains(el))); };
         if (inside && getComputedStyle(box).position === 'static') box.style.position = 'relative';
         if (inside) box.append(b); else box.after(b);
@@ -5222,7 +5224,7 @@ const toGoText = p => !('togo' in p) || p.togo === 0 ? '' : p.togo === undefined
 // can't walk the way there backwards, and every page of the way there (and every link title that led to one) goes dead,
 // but those still ahead: the checkpoints of the way back and the start. If the snapshot has no way on around them, the
 // arrival is marked stranded and says so: only giving up is left.
-const STRANDED = 'There’s no way back that doesn’t retrace your steps';
+const STRANDED = 'There’s no way back that doesn’t retrace your steps.';
 function turnBack(entry) {
   game.stack = [entry.title];
   const left = ahead().map(c => c.title);
@@ -6365,8 +6367,8 @@ $('#btnPeek').onclick = () => {
     $('#pClose').onclick = closeModal;
     return;
   }
-  const g = objective();
-  openModal(`<h2>${objectiveLabel()}: ${esc(g.title)}</h2>
+  const g = objective(), label = objectiveLabel();
+  openModal(`<h2>${label === 'Back to' ? label : label + ':'} ${esc(g.title)}</h2>
     <div class="peek"><img alt="" class="hidden"><p>${esc(g.desc || 'No description available.')}</p></div>
     ${game.timed ? '<p class="note">The clock keeps running while you peek.</p>' : ''}
     <div class="actions"><button class="primary" id="pClose">Back to the article</button></div>`);

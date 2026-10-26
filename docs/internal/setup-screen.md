@@ -60,7 +60,9 @@ While a roll or lookup is under way (`withBusy` sets `#setup.busy`):
 
 If it fails, the status line says whose failure it was (`failText`):
 
-- the wiki's, any `api` error: "Couldn’t reach minecraft.wiki (HTTP 503). Check your connection and try again."
+- the wiki's, any `api` error (and `askParse`'s reply with no article), by whether it answered at all (`reached`):
+  - none: "Couldn’t reach minecraft.wiki (Failed to fetch). Check your connection and try again."
+  - an error: "minecraft.wiki sent back an error (HTTP 503). Try again in a moment."
 - the link graph files', from `loadGraphFile`: "The game’s link data didn’t load (wiki-links.js). Reload the page."
 - otherwise the game's own message: a card none of whose draws fit (`rollOne`: "Couldn’t find an article that fits. Try Reroll again.") or a daily with no pair (`DAILY_FAILED`).
 

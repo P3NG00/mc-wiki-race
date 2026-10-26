@@ -24,7 +24,7 @@ What it checks, by area:
 - Navigation
 - The crafting grid:
   - the crafting grid's slots cycling and holding still under the pointer, and with motion reduced holding still
-  - the button beside the grid moving the slots on
+  - the button beside the grid, Show the next picture, moving the slots on
   - the slot under the pointer showing its item in a Minecraft-style tooltip that goes with the pointer
   - a slot linking an article on the path saying so in its tooltip
 - The infobox's tabs showing one panel and switching
@@ -202,9 +202,10 @@ So a new snapshot that changes one fails there by name rather than leaving a che
 - Links by difficulty:
   - version and list pages and redirects to them dead in Relaxed and Hard, titled as off limits
   - hubs and redirects to them dead in Hard, titled as Hard's overview pages, the target's hub live
+  - a navbox's and a requirement list's links dead in Hard, titled as counting as a navbox
   - no left-out page in the data
 - A left-out page typed in or named in a challenge link not taken, a typed-in one saying the game leaves it out, as it does a page that isn't an article, and one that doesn't exist saying there's no article by that name
-- A failure saying whose it is: the wiki's (a request not answered), the link data's (a graph file that doesn't load) or the game's (a card none of whose draws exists)
+- A failure saying whose it is: the wiki's (an error it sent back, or no answer at all), the link data's (a graph file that doesn't load) or the game's (a card none of whose draws exists)
 - The difficulty a link's rules give
 - The Timer box:
   - on by default
@@ -362,6 +363,7 @@ A round trip:
 - reaching the target clearing Back and showing the banner
 - the way there dead, titled as part of the way there, with other links live
 - Back working again on the way back
+- the peek on the way back headed "Back to Diamond"
 - the win recorded by its cards
 - a target with no way back saying so
 
@@ -389,7 +391,7 @@ Scavenger's round trip:
 Exact clicks:
 
 - a route of exactly par + 2 on no page twice found before Start
-- the header's count
+- the header's count, shown only by the clicks, with the rule beside the labels and the target's chip saying just Target
 - Back gone
 - visited pages dead, titled as already visited
 - the target too soon losing as Too soon

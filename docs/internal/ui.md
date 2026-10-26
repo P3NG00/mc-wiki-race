@@ -352,7 +352,7 @@ Text straight on the background on the setup screen has a halo of `--bg`, so the
 
 ### Labels
 
-The game header (`renderObjective`, redrawn when the objective changes) has the game and its extra rules as labels (`#hudTags`) with how far along it is ("1 of 2 checkpoints reached", "Found 1 of 3", "On the way back", Exact clicks's count), and with Distance on the latest arrival's count beside them (`#hudHint`, from `renderHud`).
+The game header (`renderObjective`, redrawn when the objective changes) has the game and its extra rules as labels (`#hudTags`) with how far along it is ("1 of 2 checkpoints reached", "Found 1 of 3", "On the way back", Exact clicks's "Land on the target with your last click, not before"), and with Distance on the latest arrival's count beside them (`#hudHint`, from `renderHud`).
 
 ### The route
 
@@ -366,7 +366,7 @@ For Scavenger the things to find, found ones ticked with what found them.
 
 A route of more than `ROUTE_FULL` (3) stops shrinks the done chips to their ✓ (their names stay in a tooltip), and a click on one opens them all (`.route.open`).
 The row scrolls sideways when it still doesn't fit, kept on the objective by `scrollRouteToNow` (also on resize).
-The ? button beside it is the peek: the objective's picture and description, or Scavenger's list of what is left. Its button says "Back to the hunt" in Scavenger and "Back to the article" otherwise.
+The ? button beside it is the peek: the objective's picture and description under its label and name ("Target: Zombie", or "Back to Diamond" on a round trip's way home), or Scavenger's list of what is left. Its button says "Back to the hunt" in Scavenger and "Back to the article" otherwise.
 
 ### The right side
 

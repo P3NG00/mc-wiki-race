@@ -45,7 +45,7 @@ The result also shows one shortest route. `showPar` fills, once it knows, unless
 ## The result window
 
 The result window (`finish`, `.result`) goes:
-1. the outcome as the heading (a loss in the target colour, with its reason under it; giving up grey, as Recent games marks it) and the golf score beside it;
+1. the outcome as the heading (a loss orange, with its reason under it, and giving up grey, as Recent games marks them) and the golf score beside it;
 2. the game and its extra rules as labels, like the header's, with a daily's day (`shortDate`), the route and the settings the labels don't say;
 3. four tiles (clicks, or "2 of 4" for Exact clicks, par, time, time per click);
 4. the personal best (a green bar when it is a new one);
@@ -83,6 +83,7 @@ Then Share, Copy challenge link, Play again and New game.
 
 ### Share and the challenge link
 
+- A copy the browser refuses turns its button to "Copy failed" and shows the text under the buttons (`#mCopyBox`), selected, to copy by hand, until a copy works.
 - Share and Copy challenge link both copy `game.link`, made at `startGame` from the setup that started the game by `gameLink`, which the setup screen's Copy challenge link uses too.
   - `game.link` is the sealed challenge link, or for a daily `#daily=<date>`, since the blob never holds a daily and its game wouldn't count as one.
 - Share (`shareText`) copies:

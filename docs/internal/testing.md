@@ -201,6 +201,7 @@ So a new snapshot that changes one fails there by name rather than leaving a che
 
 - Links by difficulty:
   - version and list pages and redirects to them dead in Relaxed and Hard, titled as off limits
+  - a link to a page that doesn't exist, without the red link's class, dead and titled so, by the reply's links
   - hubs and redirects to them dead in Hard, titled as Hard's overview pages, the target's hub live
   - a navbox's and a requirement list's links dead in Hard, titled as counting as a navbox
   - no left-out page in the data
@@ -403,7 +404,7 @@ Exact clicks:
 - par + 4 and par + 2 being two games for personal bests
 - a pair with no route of exactly its count keeping Start off, the strip saying to reroll or pick another number of clicks
 - Random rolling par + 1 to 5 with each roll, and the line above the cards saying only "par + random"
-- running out losing
+- running out losing, headed in orange
 - Six clicks and Round trip greyed out with the reason and left out even if ticked, and back with another game
 - a link with several games' rules playing Exact clicks only
 
@@ -527,6 +528,7 @@ Par:
 - Share:
   - the game, the result, the path and a link that opens to the game
   - under Blind target only the start, with no path
+  - a refused copy, Share's or Copy challenge link's, showing its text under the buttons, selected, to copy by hand, and a copy that works putting it away
   - a daily's naming its day with the year, as the result names it without, and with its setup screen's challenge link linking its day
 - Random game:
   - eight clicks each filling the cards its settings use, the start alone under Blind target, with the line above the cards naming the game

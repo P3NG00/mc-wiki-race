@@ -111,7 +111,7 @@ On the right are your **Clicks** ("of 6" with a dot a click under Six clicks), *
 ## Links in the article
 
 - Live links light up on hover. Links to a page already on your path are purple and dotted, and say "Already on your path".
-- Dead links are dimmed and do nothing but a villager's "hrmm": files, categories, tutorials and other non-article pages, red links, links off the wiki, version pages, and the few big list pages of game data that link to nearly everything ("Off limits: a version or list page"). The rules' dead links say why too: Hard's overview pages ("Off limits on Hard: a big overview page"), the lists of what an advancement asks for on Normal and Hard, since they count as navboxes ("Off limits on Normal and Hard: this list counts as a navbox"), everything below the top under Top links only, the pages you've visited under Exact clicks, and your way there once a Round trip turns back.
+- Dead links are dimmed and do nothing but a villager's "hrmm": files, categories, tutorials and other non-article pages, red links, other links to pages that don't exist ("Off limits: this page doesn't exist"), links off the wiki, version pages, and the few big list pages of game data that link to nearly everything ("Off limits: a version or list page"). The rules' dead links say why too: Hard's overview pages ("Off limits on Hard: a big overview page"), the lists of what an advancement asks for on Normal and Hard, since they count as navboxes ("Off limits on Normal and Hard: this list counts as a navbox"), everything below the top under Top links only, the pages you've visited under Exact clicks, and your way there once a Round trip turns back.
 - A redirect to the target counts as reaching it.
 - A page with no live links says so in a banner: go Back, or give up.
 - The wiki's own features work: crafting grids cycle through their recipes, tabs switch, folding boxes fold, and the speakers in a Sounds table play.
@@ -171,7 +171,7 @@ The line under the daily shows your streak, your best, and the days won of those
 
 ## Challenge links
 
-**Copy challenge link**, on the setup screen or in the result, copies a link that opens this exact game: its cards, game, rules, difficulty and count. If your browser won't let the setup screen copy it, the link shows under the buttons to copy by hand.
+**Copy challenge link**, on the setup screen or in the result, copies a link that opens this exact game: its cards, game, rules, difficulty and count. If your browser won't let the page copy it, the link (or in the result, Share's text too) shows under the buttons to copy by hand.
 It looks like `https://mcwikirace.com/#g=…`, sealed so the cards aren't readable at a glance. The target topic, target par and Content aren't in it: whoever opens it plays with their own Content boxes, though a card's own spin-off always counts.
 Under Blind target it picks the hidden cards first, and they stay hidden for whoever opens the link. A link cut short rolls new cards instead, and says it's damaged.
 

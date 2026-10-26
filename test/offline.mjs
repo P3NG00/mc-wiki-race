@@ -28,7 +28,8 @@ function check(name, ok, extra = '') {
 // what the wiki would send.
 const escHtml = s => s.replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 // Every article is this one: a link in the text, links to a hub, to a redirect to a hub, to the target hub Crafting, to a
-// Tutorial and to a Dungeons page, to a version page, to a redirect to one and to a list page, a table of contents as the
+// Tutorial and to a Dungeons page, to a version page, to a redirect to one and to a list page, to a page that doesn't exist
+// written as a template can, without the red link's class (the reply's links say it doesn't), a table of contents as the
 // live wiki has (with a heading of its own) and a link after it, then a section heading with a link under it, and one link
 // in a navbox.
 // Hubs Only, which isn't in the snapshot, links only two hubs (as Bee Our Guest does on the wiki), so on Hard nothing on
@@ -38,7 +39,7 @@ const ARTICLE = title => title === HUBS_ONLY
   ? `<div class="mw-parser-output"><p>${HUBS.slice(0, 2).map(h => `<a href="/w/${encodeURIComponent(h.replace(/ /g, '_'))}">${escHtml(h)}</a>`).join(' and ')}.</p></div>` : `<div class="mw-parser-output"><p>${escHtml(title)}: <a href="/w/Diamond_Pickaxe">pickaxe</a> <a href="/w/Block">Block</a>
   <a href="/w/Blocks">Blocks</a> <a href="/w/Crafting">Crafting</a> <a href="/w/Tutorial:Mining">tutorial</a> <a href="/w/Dungeons:Creeper">dungeons</a>
   <a href="/w/Java_Edition_version_history">versions</a> <a href="/w/Pocket_Edition_version_history">old versions</a>
-  <a href="/w/Closed_captions">captions</a></p>
+  <a href="/w/Closed_captions">captions</a> <a href="/w/No_such_page">gone</a></p>
   <div id="toc" class="toc"><div class="toctitle"><h2 id="mw-toc-heading">Contents</h2></div><ul><li><a href="#Uses">Uses</a></li></ul></div>
   <p><a href="/w/Gold_Ingot">gold</a></p>
   <div class="mw-heading mw-heading2"><h2 id="Uses">Uses</h2></div><p><a href="/w/Iron_Ingot">iron</a></p>
@@ -58,7 +59,7 @@ function answer(request, url) {
   if (p.get('action') === 'parse') {
     const t = p.get('page');
     return reply(request, JSON.stringify({ parse: { title: t, displaytitle: escHtml(t), text: ARTICLE(t),
-      categories: (LIVE_CATEGORIES[t] ?? []).map(category => ({ sortkey: '', category })) } }));
+      categories: (LIVE_CATEGORIES[t] ?? []).map(category => ({ sortkey: '', category })), links: [{ ns: 0, title: 'No such page', exists: false }, { ns: 0, title: 'Diamond Pickaxe', exists: true }] } }));
   }
   if (p.get('action') === 'query' && p.has('titles')) {
     return reply(request, JSON.stringify({ query: { pages: p.get('titles').split('|').map(t => t.startsWith('No such ') ? { title: t, missing: true } : { title: t, ns: nsOf(t), pageprops: {}, extract: `About ${t}.` }) } }));
@@ -165,6 +166,8 @@ const leftOut = "['Java_Edition_version_history', 'Pocket_Edition_version_histor
 check('Relaxed: hubs and navboxes live, other namespaces, version and list pages and redirects to them dead', links.Block === 'live' && links.Creeper === 'live'
   && links['Tutorial:Mining'] === 'dead' && links['Dungeons:Creeper'] === 'dead' && links.Java_Edition_version_history === 'dead'
   && links.Pocket_Edition_version_history === 'dead' && links.Closed_captions === 'dead' && await ev(leftOut, await frameCtx()), JSON.stringify(links));
+check('a link to a page that doesn’t exist, though without the red link’s class, is dead, saying so', links.No_such_page === 'dead' && links.Diamond_Pickaxe === 'live'
+  && await ev("document.querySelector('a[href=\"/w/No_such_page\"]').title === 'Off limits: this page doesn’t exist'", await frameCtx()), JSON.stringify(links));
 await open('#start=Diamond&target=Crafting&rules=nohubs');
 check('No hubs alone is Hard', await ev("level() === 'hard' && rules().join() === 'nohubs,nonav'"));
 // Golf: par shows beside Start once the link graph has loaded, and in the header while playing.
@@ -193,6 +196,15 @@ const shared = "shareText(savedGames()[0], game.link)";
 check('Share gives the game, the result, the path and the game\'s link', await ev(`(t => document.querySelector('#mShare') && document.querySelector('#mLink')
   && t.startsWith('MC Wiki Race\\nRace · Distance · Hard\\nDiamond → Crafting\\n❌ Gave up after ') && t.includes('\\nMy path: Diamond\\n') && t.endsWith('\\nPlay it: ' + game.link)
   && openLink(new URL(game.link).hash.slice(3)) === 'start=Diamond&target=Crafting&rules=nohubs,nonav,distance')(${shared})`), await ev(shared));
+// A copy the browser refuses shows the text under the buttons, selected, to copy by hand.
+await ev("navigator.clipboard.writeText = () => Promise.reject(new Error('Refused')); $('#mShare').click()");
+const byHand = "(b => [$('#mShare').textContent, !$('#mCopyBox').classList.contains('hidden'), b.value.startsWith('MC Wiki Race\\n') && b.value.endsWith('\\nPlay it: ' + game.link), b.selectionStart === 0 && b.selectionEnd === b.value.length].join())($('#mCopyText'))";
+check('a refused Share says Copy failed and shows the text, selected, to copy by hand', await until(`${byHand} === 'Copy failed,true,true,true'`), await ev(byHand));
+await ev("$('#mLink').click()");
+check('and so does Copy challenge link, with the link alone', await until("$('#mLink').textContent === 'Copy failed' && $('#mCopyText').value === game.link"), await ev("$('#mCopyText').value"));
+await ev("navigator.clipboard.writeText = () => Promise.resolve(); $('#mShare').click()");
+check('a copy that works then puts the box away', await until("$('#mShare').textContent === 'Copied!' && $('#mCopyBox').classList.contains('hidden')"), await ev("$('#mShare').textContent"));
+await ev("delete navigator.clipboard.writeText");
 check('the record keeps par, and the history shows it', await ev("Number.isInteger(savedGames()[0].par)") && await until(
   "toSetup(), document.querySelector('#history tbody tr .h-result .note').textContent.endsWith('par ' + savedGames()[0].par)"),
   await ev("document.querySelector('#history tbody tr .h-result')?.textContent"));
@@ -666,7 +678,8 @@ for (const [i, t] of wander.entries()) {
   await ev(`navigate(${JSON.stringify(t)}, null)`);
   await until(`game.path.length === ${i + 2} && !game.loading || !game.active`);
 }
-check('running out loses: Out of clicks', await until('!game.active') && await ev("store.get('mwr.history', [])[0].outOfClicks === true && document.querySelector('#modal h2').textContent === 'Out of clicks'"));
+check('running out loses: Out of clicks, headed in orange as Recent games marks a loss', await until('!game.active') && await ev(`store.get('mwr.history', [])[0].outOfClicks === true && document.querySelector('#modal h2').textContent === 'Out of clicks'
+  && (probe => (document.body.append(probe), probe.style.color = 'var(--warm)', (c => (probe.remove(), c))(getComputedStyle(probe).color)))(document.createElement('i')) === getComputedStyle(document.querySelector('#modal h2')).color`));
 await ev("closeModal(); toSetup()");
 check('Exact clicks greys out Six clicks and Round trip and says why', await ev(`gameMode() === 'exact' && ['limit', 'roundtrip'].every(k =>
   document.querySelector(\`input.rule[value=\${k}]\`).disabled && document.querySelector(\`[data-desc=\${k}]\`).textContent.startsWith('Off: Exact clicks'))`));
@@ -1806,7 +1819,7 @@ const framePoint = async href => JSON.parse(await ev(`(() => { const r = documen
   return JSON.stringify({ x: Math.round(r.left + r.width / 2), y: Math.round(r.top + r.height / 2) }); })()`, await frameCtx()));
 const pointer = actions => send('input.performActions', { context: ctx, actions: [{ type: 'pointer', id: 'mouse', parameters: { pointerType: 'mouse' }, actions }] });
 const frameAt = JSON.parse(await ev("(r => JSON.stringify({ x: Math.round(r.left), y: Math.round(r.top) }))($('#frame').getBoundingClientRect())"));
-const parses = () => requests.get('parse prop=text|displaytitle|categories') ?? 0;
+const parses = () => requests.get('parse prop=text|displaytitle|categories|links') ?? 0;
 let before = parses(), at = await framePoint('/w/Diamond_Pickaxe');
 await pointer([{ type: 'pointerMove', x: frameAt.x + at.x, y: frameAt.y + at.y }, { type: 'pointerDown', button: 0 }, { type: 'pause', duration: 120 }, { type: 'pointerUp', button: 0 }]);
 check('a link pressed and clicked is asked for once, at the press, and arrives', await until("game.path.length === 2 && !game.loading") && parses() - before === 1,
@@ -1845,7 +1858,7 @@ await ev('closeModal(); toSetup()');
 check('markup titles run nothing anywhere a title shows', peeked === true && frameClean === true && await ev(injected)
   && await ev(`document.querySelector('#history tbody').textContent.includes(${JSON.stringify(payloads[2])})`), JSON.stringify([peeked, frameClean]));
 
-check('only page info, the advancements\' and items\' pictures and articles are asked for', [...requests.keys()].every(k => ['query prop=pageprops|pageimages|extracts', 'query prop=pageimages', 'query prop=imageinfo', 'parse prop=text|displaytitle|categories'].includes(k)),
+check('only page info, the advancements\' and items\' pictures and articles are asked for', [...requests.keys()].every(k => ['query prop=pageprops|pageimages|extracts', 'query prop=pageimages', 'query prop=imageinfo', 'parse prop=text|displaytitle|categories|links'].includes(k)),
   JSON.stringify(Object.fromEntries(requests)));
 check('no uncaught errors', jsErrors.length === 0, jsErrors.slice(0, 3).join(' | '));
 console.log(failures ? `${failures} check(s) failed` : 'All checks passed');

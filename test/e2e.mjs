@@ -633,7 +633,8 @@ await ev("document.querySelector('#btnPlay').click()");
 await until("game.active && game.path.length === 1 && !game.loading");
 await ev("document.querySelector('#btnGiveUp').click()");
 await ev("document.querySelector('#gQuit').click()");
-check('daily result is recorded', await ev("(r => r.daily === '2026-01-06' && r.vias.join() === setup.via0.title && r.rules.join() === 'nonav,checkpoint')(store.get('mwr.history', [])[0]) && document.querySelector('#modal').textContent.includes('Daily 2026-01-06')"));
+check('daily result is recorded, the result naming its day as the page does', await ev("(r => r.daily === '2026-01-06' && r.vias.join() === setup.via0.title && r.rules.join() === 'nonav,checkpoint')(store.get('mwr.history', [])[0]) && document.querySelector('#modal').textContent.includes('Daily ' + shortDate(localDay('2026-01-06')) + ':')"),
+  await ev("document.querySelector('#modal .result-game')?.textContent"));
 await ev("document.querySelector('#mNew').click()");
 await until('setup.busy === 0', 60000);
 check('New game leaves the daily without the notice', await ev("setup.daily === null && document.querySelector('#setupStatus').textContent !== LEFT_DAILY"));
@@ -928,7 +929,7 @@ const actions = [
 ];
 const state = `JSON.stringify({ active: game.active, path: game.path.map(p => p.title), stack: game.stack,
   hud: document.querySelector('#hudClicks').textContent, listed: document.querySelectorAll('#pathList li').length,
-  overlay: !document.querySelector('#overlay').classList.contains('hidden'), running: !!game.runningSince, now: now() })`;
+  overlay: !document.querySelector('#overlay').classList.contains('hidden') && document.querySelector('#overlay').textContent.trim().replace(/\\s+/g, ' '), running: !!game.runningSince, now: now() })`;
 await playPair();
 const steps = [], problems = [];
 let wins = 0, lastNow = 0;
@@ -942,7 +943,7 @@ for (let i = 0; i < 30 && problems.length === 0; i++) {
   if (!s.active) { wins++; lastNow = 0; await playPair(); continue; }
   const heading = await ev("document.querySelector('#firstHeading')?.textContent", await frameCtx());
   const expected = await ev(shownTitle);
-  const bad = [!settled && 'stuck loading', s.overlay && 'overlay still shown', s.hud !== String(s.path.length - 1) && 'HUD clicks',
+  const bad = [!settled && 'stuck loading', s.overlay && `overlay still shown ("${s.overlay}")`, s.hud !== String(s.path.length - 1) && 'HUD clicks',
     s.listed !== s.path.length && 'path list', s.stack.at(-1) !== s.path.at(-1) && 'Back stack', heading !== expected && `heading "${heading}"`,
     s.now < lastNow && 'clock went back', !s.running && 'clock stopped'].filter(Boolean);
   if (bad.length) problems.push(`step ${i + 1} (${action[1]}): ${bad.join(', ')} at ${s.path.at(-1)}`);

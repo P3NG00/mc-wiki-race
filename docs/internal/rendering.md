@@ -19,7 +19,7 @@ Calls used:
   - thumbnail,
   - redirect resolution,
   - and the description: the first paragraph of the TextExtracts plain-text intro, since `pageprops.description` is often an infobox caption and keeps HTML entities.
-- `action=parse` (article HTML, plus its live categories for Scavenger).
+- `action=parse` (article HTML, plus its live categories for Scavenger and its links with whether each page exists).
 
 Nothing polls; every request comes from a player action, and a roll makes one request.
 
@@ -57,6 +57,8 @@ Everything else gets the `mwr-dead` class (dimmed) and does nothing:
 - red links (`.new`),
 - external links
 - and `?query` links.
+
+So are links to pages that don't exist, by the parse reply's `links` (`MISSING`), titled "Off limits: this page doesn’t exist": a template can write one without the red link's class (on Minecraft (Dark Horse Comics), a link to Pips).
 
 So are links to the left-out version and list pages and the redirects to them, in every difficulty (`LEFT_OUT`; see [wiki-data.md](wiki-data.md)), titled "Off limits: a version or list page": the frame gets them as a list written once at load (`LEFT_OUT_JSON`, about 160 KB).
 

@@ -611,8 +611,9 @@
   .result { display: flex; flex-direction: column; gap: 12px; }
   .result-head { display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: center; }
   .result-head h2 { margin: 0; font-size: 26px; letter-spacing: -.01em; }
-  .result-head h2.lost { color: var(--target); }
-  .result-head h2.gave-up { color: var(--muted); }   /* grey, as Recent games marks giving up */
+  /* A loss orange and giving up grey, as Recent games marks them. */
+  .result-head h2.lost { color: var(--warm); }
+  .result-head h2.gave-up { color: var(--muted); }
   .result .reason { margin: -6px 0 0; }
   .score { font-size: 15px; font-weight: 700; border-radius: var(--radius-pill); padding: 3px 12px; background: var(--accent-soft); color: var(--accent); }
   .score .note { font-weight: 400; color: inherit; opacity: .85; }
@@ -635,6 +636,8 @@
   .routes .shortcut summary { cursor: pointer; color: var(--accent); width: fit-content; }
   .routes .shortcut p { margin: 4px 0 0; }
   .result .actions { border-top: 1px solid var(--line); padding-top: 12px; }
+  .copy-by-hand textarea { box-sizing: border-box; width: 100%; resize: vertical; font: inherit; font-size: 13px; color: var(--ink); background: var(--bg);
+    border: 1px solid var(--line); border-radius: var(--radius); padding: 6px 8px; }
   .note { color: var(--muted); font-size: 13px; }
 
   @media (max-width: 720px) {
@@ -2320,7 +2323,9 @@ function cacheParse(keys, page) {
   while (parseCache.size > new Set(keys).size && (parseCache.size > PARSE_CACHE_MAX || text() > PARSE_CACHE_TEXT)) parseCache.delete(parseCache.keys().next().value);
 }
 // An article from the wiki. A reply without one fails here, so it fails inside navigate's try.
-const askParse = title => api({ action: 'parse', page: title, prop: 'text|displaytitle|categories', redirects: '1', disableeditsection: '1', disablelimitreport: '1' })
+// links: every link with whether its page exists, since a template can write a link to a missing page without the red
+// link's class (see classify).
+const askParse = title => api({ action: 'parse', page: title, prop: 'text|displaytitle|categories|links', redirects: '1', disableeditsection: '1', disablelimitreport: '1' })
   .then(d => d.parse || Promise.reject(Object.assign(new Error('no article in its reply'), { wiki: true, reached: true })));
 // A live link pressed with a mouse or pen (the frame posts {mwr:'press'}): its article is asked for at once, the request
 // its click would make, sent the 50 to 150 ms sooner that a click comes after the press. The next navigation takes it if
@@ -4271,6 +4276,7 @@ function renderArticle(page, fragment, token, { dead = [], hubs = [] } = {}, see
     const DEAD = new Set(${js(dead)}), DEAD_WHY = ${js(game.exact ? 'already visited (Exact clicks)' : 'part of your way there (Round trip)')};
     const HUBS = new Set(${js(hubs)});
     const LEFT_OUT = new Set(${LEFT_OUT_JSON});
+    const MISSING = new Set(${js((page.links ?? []).filter(l => !l.exists).map(l => l.title))});
     const SEEN = new Set(${js(seen)});
     const NO_NAV = ${noNav};
     let CALM = ${calm()};   // the page's Reduce motion, sent again when it changes ({mwr:'calm'})
@@ -4301,6 +4307,7 @@ function renderArticle(page, fragment, token, { dead = [], hubs = [] } = {}, see
       if (c > 0 && NS.has(t.slice(0, c).trim().toLowerCase())) return null;
       t = t.charAt(0).toUpperCase() + t.slice(1);   // as MediaWiki does, so titles match the dead, hub and seen lists
       // A dead link's note says why it is dead.
+      if (MISSING.has(t)) return { kind: 'blocked', note: 'Off limits: this page doesn’t exist' };
       if (LEFT_OUT.has(t)) return { kind: 'blocked', note: 'Off limits: a version or list page' };
       if (DEAD.has(t)) return { kind: 'blocked', note: 'Off limits: ' + DEAD_WHY };
       if (HUBS.has(t)) return { kind: 'blocked', note: 'Off limits on Hard: a big overview page' };
@@ -5384,7 +5391,8 @@ function finish(won, lost = null) {
       <button id="mLink" title="Copy a link that opens this exact game">Copy challenge link</button>
       <button id="mSame">Play again</button>
       <button class="primary" id="mNew">New game</button>
-    </div></div>`, false);
+    </div>
+    <div class="copy-by-hand hidden" id="mCopyBox"><p class="note">Couldn’t copy, so copy it from here:</p><textarea readonly id="mCopyText" aria-label="Text to copy"></textarea></div></div>`, false);
   if (won) effect(newBest ? 'best' : 'win', { ...middleOf($('.result-head h2')), daily: dailyFirst });
   showPar(rec, game.parReady);
   const ol = $('#mPath');
@@ -5403,11 +5411,18 @@ function finish(won, lost = null) {
         : `${on} linked straight to ${next}${quicker}.`;
     }
   });
-  // Share's text is made on the click, since showPar may only have rec.par by then.
+  // A copy the browser refuses shows the text under the buttons, selected, to copy by hand, until a copy works.
   const copy = async (id, text) => {
-    try { await navigator.clipboard.writeText(text); $(id).textContent = 'Copied!'; }
-    catch { $(id).textContent = 'Copy failed'; }
+    try { await navigator.clipboard.writeText(text); $(id).textContent = 'Copied!'; $('#mCopyBox').classList.add('hidden'); }
+    catch {
+      $(id).textContent = 'Copy failed';
+      const box = $('#mCopyText');
+      Object.assign(box, { value: text, rows: Math.min(text.split('\n').length, 8) });
+      $('#mCopyBox').classList.remove('hidden');
+      box.select();
+    }
   };
+  // Share's text is made on the click, since showPar may only have rec.par by then.
   $('#mShare').onclick = () => copy('#mShare', shareText(rec, game.link, path));
   $('#mLink').onclick = () => copy('#mLink', game.link);
   $('#mSame').onclick = () => { closeModal(); startGame(); };

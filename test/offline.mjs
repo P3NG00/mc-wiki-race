@@ -1449,9 +1449,13 @@ await ev("$('#btnRebuild').click()");
 check('Rebuild puts every piece back', await until("!items.broken && !document.querySelector('#setup [data-broke-style], #setup .brk-word, #setup .brk-run, #setup .brk-thrown')", 4000));
 // Splitting the text into pieces lays nothing out anew (the rules' own spans are columns), and blasts all down the
 // page, twice over, where pieces already lie, leave it ending where it did.
-await ev("$('#rules').scrollIntoView(); window.sizes = new Map([...document.querySelectorAll('#setup *')].map(el => [el, el.getBoundingClientRect().height]))");
-await ev("holdItem('crystal'); dropItem()");
-check('taking an item in hand, the text in view split into pieces, moves nothing', await ev("document.querySelector('#rules .brk-word') && [...sizes].every(([el, h]) => Math.abs(el.getBoundingClientRect().height - h) < .5)"));
+// Measured and split in one go, so nothing else on the page (a picture failing to its label) can move meanwhile.
+await ev("$('#rules').scrollIntoView()");
+check('taking an item in hand, the text in view split into pieces, moves nothing', await ev(`(() => {
+  const sizes = new Map([...document.querySelectorAll('#setup *')].map(el => [el, el.getBoundingClientRect().height]));
+  holdItem('crystal'); dropItem();
+  return !!document.querySelector('#rules .brk-word') && [...sizes].every(([el, h]) => Math.abs(el.getBoundingClientRect().height - h) < .5);
+})()`));
 await send('browsingContext.setViewport', { context: ctx, viewport: { width: 800, height: 800 } }); await sleep(300);
 const narrowHeight = await ev('document.documentElement.scrollHeight');   // the page whole at 800 px, for after
 await send('browsingContext.setViewport', { context: ctx, viewport: null }); await sleep(300);

@@ -55,7 +55,7 @@ Adding one is an entry there and its check; it is earned from then on.
     - Hello, Wiki (a win),
     - Daily Bread (any daily finished),
     - Relay Racer, Treasure Hunter, Measure Twice and There and Back Again (a win at each game),
-    - Accepted (a win from a challenge link: `setup.challenge`, set when a link's cards load and cleared by `leaveDaily`, so by any change to them, and copied to `game.challenge`),
+    - Accepted (a win from a challenge link: `setup.challenge`, set when a link's cards load and cleared by `leaveDaily`, so by any change to them, and by `loadDaily`, and copied to `game.challenge`),
     - Self-Improvement (a new personal best),
     - Hot Streak (a win at par 4+ with Distance on, every click but those reaching a checkpoint or find, and the last, getting closer: `gotCloser`),
     - Rags to Riches (a Race from Dirt to Diamond),

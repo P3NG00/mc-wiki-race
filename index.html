@@ -1972,7 +1972,7 @@ async function loadDaily(date = today()) {
   await withBusy(async () => {
     const { rule, hunt, start, vias, goal, kinds } = await dailyPair(date);
     if (keys.some((w, i) => tokens[i] !== setup.rolls[w])) return;
-    Object.assign(setup, { start, goal, daily: date }, setVias(vias));
+    Object.assign(setup, { start, goal, daily: date, challenge: false }, setVias(vias));   // no challenge link's game now, for Accepted
     setRules(['nonav', rule]);
     if (hunt) $('#huntMode').value = hunt;
     if (rule === 'exact') setExtra(dailyExtra(date));

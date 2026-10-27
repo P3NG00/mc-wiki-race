@@ -1129,8 +1129,11 @@ await play();
 await ev("finish(false); closeModal(); toSetup()");
 check('giving up a daily keeps its day as played', await ev("JSON.stringify(savedDailies()) === JSON.stringify({ [today()]: { won: false, onDay: false } })"), await ev("JSON.stringify(savedDailies())"));
 check('the daily box counts it', await ev("document.querySelector('#dailyStats').textContent === 'Won 0 of 1 day'"), await ev("document.querySelector('#dailyStats').textContent"));
-// Past dailies: this month, today marked, later days off, back to DAILY_FIRST's month and no further, a day loading its daily.
+// Past dailies: this month, today marked, later days off, back to DAILY_FIRST's month and no further, a day loading its
+// daily in place of a challenge link's cards.
 await ev(`localStorage.setItem('mwr.dailies', JSON.stringify({ [${ago(1)}]: { won: true, onDay: true, clicks: 2 }, [today()]: { won: false, onDay: false } }))`);
+await open('#start=Diamond&target=Diamond%20Pickaxe');
+const wasChallenge = await ev('setup.challenge');
 await ev("document.querySelector('#btnPastDailies').click()");
 const calOk = `(() => { const c = document.querySelector('#modal .cal'), b = [...c.querySelectorAll('button')], t = c.querySelector('.today');
   return !document.querySelector('#modalBg').classList.contains('hidden') && t?.dataset.day === today() && t.classList.contains('played')
@@ -1146,6 +1149,7 @@ check('it goes back to the first daily\'s month and no further', await ev(`(() =
 await ev("document.querySelector('#modal .cal button:not(:disabled)').click()");
 check('a day loads its daily', await until("setup.daily !== null && setup.daily < today() && document.querySelector('#modalBg').classList.contains('hidden')") && await until(ready)
   && await ev("document.querySelector('#setupStatus').textContent.startsWith('Daily challenge for ' + shortDate(localDay(setup.daily)) + ': ')"), await ev('setup.daily'));
+check('and is no challenge link\'s game then, for Accepted', wasChallenge === true && await ev('setup.challenge === false'), await ev('setup.challenge'));
 check('Clear history empties the dailies too', await ev(`(() => {
   document.querySelector('#btnClearHistory').click(); document.querySelector('#hClear').click();
   return localStorage.getItem('mwr.dailies') === '{}' && document.querySelector('#dailyStats').textContent === '';

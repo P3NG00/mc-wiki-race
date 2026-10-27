@@ -475,7 +475,7 @@ The daily:
 - Past dailies:
   - opening on this month with today marked and the days to come off
   - going back to `DAILY_FIRST`'s month and no further
-  - a day loading its daily
+  - a day loading its daily in place of a challenge link's cards, and no longer a challenge's game, for Accepted
 - Clear history emptying the dailies
 
 ### Content and the target par

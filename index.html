@@ -1631,6 +1631,9 @@ async function reroll(which, atStart = false) {
   }
   if (isBlind() && !atStart) dropHidden();
   const targets = (which === 'all' ? cardKeys() : [which].flat()).filter(w => !hidden.includes(w));
+  // A target at a par is drawn from the start's search, so with no start (its roll still going, or one that failed) the
+  // start rolls with it, in place of any roll of it still going.
+  if (reach() !== 'any' && targets.includes('goal') && !targets.includes('start') && !setup.start) targets.unshift('start');
   if (which === 'all') for (const w of VIA_KEYS) if (!targets.includes(w)) setup[w] = null;
   if (which === 'all' && tripRelay()) { setup.back = rollBack(viaKeys().length); placeTarget(); }
   const tokens = Object.fromEntries(targets.map(w => [w, ++setup.rolls[w]]));

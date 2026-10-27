@@ -138,6 +138,7 @@ Its cost and cache:
   - That one is kept, and with no target at the par it gets one at the par nearest the asked one (`near`) and says so, as a start kept through another difficulty or Content does when only the target is rerolled.
 - Only a start that reaches nothing gets no target, and the status line asks for another.
 - Rerolling only the start keeps the target (`kept`): the start is drawn from those at the par from it, found by one search back from the target (`distancesTo`), or at the nearest par if none is, and says so.
+- Rerolling the target with no start (its roll still going, or one that failed) rolls the start with it, taking over a roll still going, since the target is drawn from the start's search.
 
 ### Stamped and recorded
 

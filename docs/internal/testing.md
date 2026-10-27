@@ -489,6 +489,7 @@ The target par:
 - Par 3 in Popular on Relaxed, where only six starts have a target at that par, rolling five times at that par, and so does a Relay of three with its checkpoints round the start's topic
 - a start whose only target at the par is a checkpoint kept (Charcoal and Stony Shore) getting one at the nearest par, saying so
 - rerolling only the start keeping the target at the par, or with none at it the nearest par and saying so
+- rerolling the target while the start rolls, or with no start, giving a pair at the par
 - Popular Blocks targets on Relaxed, which have no pair at par 3, rolling at par 2, saying why and disabling the option until the topic changes
 - a typed-in start with none at the par kept with a target at the nearest par
 - a typed-in start that reaches nothing saying so

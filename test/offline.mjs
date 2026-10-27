@@ -912,6 +912,12 @@ const keptGoal = await ev('setup.goal.title'), oldStart = await ev('setup.start.
 await ev("reroll('start')");
 check('rerolling only the start keeps the target at the par', await until(ready, 30000) && await ev(`setup.goal.title === ${JSON.stringify(keptGoal)}`)
   && / -> .*: par 3$/.test(await ev(pairAtPar)), `${oldStart} then ${await ev(pairAtPar)}`);
+// The target rerolled while the start's roll is still going, or after one failed, has no start to draw from: the start
+// rolls again with it, giving a pair at the par.
+await ev("reroll('start'); reroll('goal')");
+check('rerolling the target while the start rolls gives a pair at the par', await until(ready, 30000) && / -> .*: par 3$/.test(await ev(pairAtPar)), await ev(pairAtPar));
+await ev("setup.start = null; renderCard('start'); reroll('goal')");
+check('and so does rerolling it with no start', await until(ready, 30000) && / -> .*: par 3$/.test(await ev(pairAtPar)), await ev(pairAtPar));
 await ev("setCustom('goal', 'Zombie')");
 await until("setup.goal?.title === 'Zombie' && setup.busy === 0");
 await ev("reroll('start')");

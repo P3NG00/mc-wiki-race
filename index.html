@@ -5923,7 +5923,9 @@ async function bgPair() {
 // settings say, both through the same pages.
 async function bgRoll() {
   const token = ++bg.pairToken, graph = await bgGraph().catch(() => null);
-  if (token !== bg.pairToken) return;
+  // Given up (Reduce motion ticked meanwhile marks the cards), it lets the next roll come as soon as one may: bgFrame
+  // holds the next one off until this one is done.
+  if (token !== bg.pairToken) { bg.nextRoll = 0; return; }
   let a, b, dist;
   const usable = routeUsable({ keep: [], rules: rules(), content: contentInPlay([]) });
   for (let tries = 0; graph && !b && tries < 20; tries++) {

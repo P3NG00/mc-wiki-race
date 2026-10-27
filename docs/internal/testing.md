@@ -552,6 +552,7 @@ The background:
 - Roll by itself:
   - marking pairs of its own
   - staying on through a change in its box and turning off, saved, at a change on the page
+  - rolling on after Reduce motion is ticked and unticked while a roll waits for the graph
   - then the cards marked
 - the wave counting clicks as par does
 - the route only as a spoiler

@@ -283,7 +283,7 @@ Its settings, as checkboxes in the box:
   - a flash as it arrives, then a glow that weakens with each click, like a redstone signal (`waveLight`).
   - A stop after the start shows faint until the wave reaches it.
 - *Show the route (spoiler)* (off by default): the setup's par route (`setup.route`, kept by `setupPar`, and none under Blind target), dashed.
-- *Roll by itself* (on by default): the background marks pool pairs of its own (`bgRoll`), at least two clicks apart on the setup's difficulty, with their wave and route as the settings say, a new one once the wave has settled.
+- *Roll by itself* (on by default): the background marks pool pairs of its own (`bgRoll`), at least two clicks apart on the setup's difficulty, with their wave and route as the settings say, a new one once the wave has settled. A roll given up for the cards (Reduce motion ticked while it waits for the graph) leaves the next to come as soon as it may.
   - Any change on the setup screen outside the Background box, Reduce motion and the items' button (a click on a button, link or control, a change, typing) turns it off (`bgSetting`), saved, so it stays off until it is ticked again.
   - The background then follows the cards.
 

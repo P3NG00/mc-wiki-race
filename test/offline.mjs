@@ -1738,6 +1738,11 @@ check('so does Reduce motion, which is saved and stops the effects', await ev(`(
   && store.get('mwr.reduceMotion') === true && document.documentElement.classList.contains('calm'))`));
 check('and lets them play again unticked', await ev(`($('#motionToggle').click(), effect('puff', { x: 100, y: 100 }), bgSet.roll && fx.parts.length === 7
   && store.get('mwr.reduceMotion') === false && !document.documentElement.classList.contains('calm'))`));
+// Reduce motion ticked and unticked while a roll waits for the graph leaves it rolling pairs of its own (ticked, it
+// marks the cards meanwhile).
+await ev("window.pairBefore = bg.pair; bg.nextRoll = Infinity; bgRoll(); setCalm(true); setCalm(false)");
+check('Reduce motion ticked and unticked while it rolls leaves it rolling', await until("bg.pair !== pairBefore && bg.pair.stops.length === 2 && !bg.pair.stops[0].label.startsWith('Start')", 5000),
+  await ev('JSON.stringify([bg.nextRoll, bg.pair === pairBefore])'));
 await ev("$('#btnRerollAll').click()");
 check('a change on the page turns it off, saved, and the cards are marked', await until(`${ready} && !bgSet.roll && store.get('mwr.background').roll === false
   && bg.pair?.stops[0].label === 'Start · ' + setup.start.title && bg.pair.stops[1].label === 'Target · ' + setup.goal.title`), await ev('JSON.stringify(bg.pair?.stops)'));

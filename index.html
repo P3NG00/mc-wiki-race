@@ -1631,9 +1631,13 @@ async function reroll(which, atStart = false) {
   }
   if (isBlind() && !atStart) dropHidden();
   const targets = (which === 'all' ? cardKeys() : [which].flat()).filter(w => !hidden.includes(w));
-  // A target at a par is drawn from the start's search, so with no start (its roll still going, or one that failed) the
-  // start rolls with it, in place of any roll of it still going.
-  if (reach() !== 'any' && targets.includes('goal') && !targets.includes('start') && !setup.start) targets.unshift('start');
+  // At a par the target is drawn from the start's search, and the checkpoints go round them, so a target with no start
+  // (its roll still going, or one that failed) rolls one, and a start rolls the cards left empty (by a roll that lost its
+  // start to this one), in place of any roll of them still going.
+  if (reach() !== 'any') {
+    if (targets.includes('goal') && !targets.includes('start') && !setup.start) targets.unshift('start');
+    if (targets.includes('start')) targets.push(...cardKeys().filter(w => !targets.includes(w) && !setup[w] && !hidden.includes(w)));
+  }
   if (which === 'all') for (const w of VIA_KEYS) if (!targets.includes(w)) setup[w] = null;
   if (which === 'all' && tripRelay()) { setup.back = rollBack(viaKeys().length); placeTarget(); }
   const tokens = Object.fromEntries(targets.map(w => [w, ++setup.rolls[w]]));
@@ -1796,6 +1800,9 @@ async function setCustom(which, raw) {
     const left = leaveDaily();
     renderCard(which);
     setStatus([info.disambig && 'Heads up: “' + info.title + '” is a disambiguation page.', left && LEFT_DAILY].filter(Boolean).join(' '));
+    // At a par, cards left empty (by a roll that lost its start to this one) are rolled round the start typed in.
+    const empty = which === 'start' && reach() !== 'any' ? cardKeys().filter(w => w !== 'start' && !setup[w] && !hiddenKeys().includes(w)) : [];
+    if (empty.length) await reroll(empty);
   });
 }
 

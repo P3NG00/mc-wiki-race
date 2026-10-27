@@ -934,6 +934,12 @@ await ev("reroll('start'); reroll('goal')");
 check('rerolling the target while the start rolls gives a pair at the par', await until(ready, 30000) && / -> .*: par 3$/.test(await ev(pairAtPar)), await ev(pairAtPar));
 await ev("setup.start = null; renderCard('start'); reroll('goal')");
 check('and so does rerolling it with no start', await until(ready, 30000) && / -> .*: par 3$/.test(await ev(pairAtPar)), await ev(pairAtPar));
+// A start rerolled, or typed in, while Reroll all searches takes the cards that roll left empty with it.
+await ev("reroll('all'); reroll('start')");
+check('rerolling the start while all roll gives a pair at the par', await until(ready, 30000) && / -> .*: par 3$/.test(await ev(pairAtPar)), await ev(pairAtPar));
+await ev("reroll('all'); setCustom('start', 'Diamond')");
+check('and so does typing one in, with a target from it', await until(ready, 30000) && await ev("setup.start.title === 'Diamond' && !!setup.goal"),
+  await ev('JSON.stringify([setup.start?.title, setup.goal?.title, document.querySelector("#setupStatus").textContent])'));
 await ev("setCustom('goal', 'Zombie')");
 await until("setup.goal?.title === 'Zombie' && setup.busy === 0");
 await ev("reroll('start')");

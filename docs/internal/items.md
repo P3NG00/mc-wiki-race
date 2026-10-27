@@ -87,6 +87,7 @@ While an item is in hand or the page is in pieces, the article can't get the whe
   - The ghast faces the page it fires at, and turns left to leave.
   - Putting the fireball away sends the ghast off its own side of the screen, facing the way it goes (`ghastLeaves`). It waits first while any fireball is in flight, so one sent back still finds it, and 1.5 s after its last shot. Then it floats off at 160 px a second until it is gone.
   - Taking the fireball up again before then calls it back to its place, and a blast it is knocked back by leaves it on its way again.
+  - Knocked aside while it stays, it comes back to its place for its next shot.
   - Taking a fireball in hand again keeps it.
 - *Creeper*: walks in from the far side, facing the way it walks (its picture faces left, so it is flipped going right), and follows the pointer (`items.pointer`; over the article the frame reports it, `{mwr:'move', x, y}`, at most every 40 ms).
   - Within 70 px it hisses, swells and flashes for 1.5 s unless the pointer gets more than 150 px away, then blows.

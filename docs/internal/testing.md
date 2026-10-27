@@ -276,6 +276,7 @@ The items:
   - coming back when taken up again
   - a blast reaching it on its way off
   - a blast out of its reach as it floats in leaving it where it floats to
+  - knocked aside, coming back to its place for its next shot
 - the item advancements earned
 
 ### Advancements

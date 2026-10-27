@@ -3915,13 +3915,13 @@ function lightTnt(t, ms) {
 }
 const ghastSpot = left => ({ x: left ? 90 : innerWidth - 90, y: Math.max(180, innerHeight * .3) });   // where it fires from
 function spawnGhast() {
-  // One on the screen comes back to its side, floating off or not.
+  // One on the screen comes back to its place on its side: floating off, or knocked aside by a blast.
   const there = [...items.things].find(t => t.kind === 'ghast' && (p => p.x > -100 && p.x < innerWidth + 100)(whereNow(t)));
   if (there) {
     const home = ghastSpot(whereNow(there).x < innerWidth / 2);
     there.leaving = false; clearTimeout(there.timer);
     there.el.classList.toggle('right', home.x < innerWidth / 2);
-    if (performance.now() < (there.until ?? 0)) moveThing(there, home, 600);
+    if (there.p.x !== home.x || there.p.y !== home.y) moveThing(there, home, 600);
     return there;
   }
   const left = items.pointer.x > innerWidth / 2, at = ghastSpot(left);

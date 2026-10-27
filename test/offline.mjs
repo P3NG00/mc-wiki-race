@@ -1527,6 +1527,12 @@ const midway = await ev(`new Promise(ok => {
 await sleep(800);
 check('a blast out of reach of a ghast floating in leaves it where it floats to', midway && await ev(`(gs => gs.length === 1 && gs[0].p.x === innerWidth - 90
   && Math.abs(middleOf(gs[0].el).x - gs[0].p.x) < 2)(${ghasts})`), await ev(`JSON.stringify([${midway}, ${ghasts}.map(g => [g.p.x, middleOf(g.el).x, innerWidth])])`));
+// Knocked aside by a blast near the edge of its reach, it comes back to its place for its next shot.
+await ev(`(g => blast({ x: g.p.x - 190, y: g.p.y }, 1))(${ghasts}[0])`); await sleep(500);
+const knocked = await ev(`(g => g ? g.p.x - (innerWidth - 90) : null)(${ghasts}[0])`);   // how far from its place
+await ev('spawnGhast()'); await sleep(700);
+check('knocked aside, a ghast comes back to its place for its next shot', knocked > 5 && await ev(`(gs => gs.length === 1 && gs[0].p.x === innerWidth - 90
+  && Math.abs(middleOf(gs[0].el).x - gs[0].p.x) < 2)(${ghasts})`), await ev(`JSON.stringify([${knocked}, ${ghasts}.map(g => [g.p.x, middleOf(g.el).x])])`));
 await ev('itemsReset()');
 await until("!document.querySelector('#setup [data-broke-style]')", 3000);
 

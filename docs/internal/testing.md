@@ -424,6 +424,8 @@ Exact clicks:
 - a pair with no route of exactly its count keeping Start off, the strip saying to reroll or pick another number of clicks
 - Random rolling par + 1 to 5 with each roll, and the line above the cards saying only "par + random"
 - running out losing, headed in orange
+- Six clicks: the target on the sixth click winning, and running out saying what was left (no target yet, something still to find on a hunt, the way back on a round trip)
+- Share saying how a loss ended: out of clicks with the time, too soon with Exact clicks's count, the clicks with the Timer off
 - Six clicks and Round trip greyed out with the reason and left out even if ticked, and back with another game
 - a link with several games' rules playing Exact clicks only
 

@@ -109,6 +109,15 @@ const play = async () => {
   await ev("document.querySelector('#btnPlay').click()");
   return until('game.active && game.path.length === 1 && !game.loading');
 };
+// Opens a link and plays its route, each title after the start by a click, to the last arrival.
+const playRoute = async (hash, route) => {
+  await open(hash);
+  await play();
+  for (const t of route.slice(1)) {
+    await ev(`navigate(${JSON.stringify(t)}, null)`);
+    await until(`game.path.at(-1).title === ${JSON.stringify(t)} && !game.loading`);
+  }
+};
 
 // Links by difficulty. A challenge link without rules is Relaxed: everything but other namespaces and the left-out pages
 // is live. No hubs alone (from an older link) is Hard: hubs and redirects to them are dead, the target hub stays live,
@@ -715,6 +724,28 @@ for (const [i, t] of wander.entries()) {
 check('running out loses: Out of clicks, headed in orange as Recent games marks a loss', await until('!game.active') && await ev(`store.get('mwr.history', [])[0].outOfClicks === true && document.querySelector('#modal h2').textContent === 'Out of clicks'
   && (probe => (document.body.append(probe), probe.style.color = 'var(--warm)', (c => (probe.remove(), c))(getComputedStyle(probe).color)))(document.createElement('i')) === getComputedStyle(document.querySelector('#modal h2')).color`));
 await ev("closeModal(); toSetup()");
+// Six clicks: the target on the sixth click wins; running out says what was left: no target yet, something still to find
+// on a hunt, or the way back on a round trip. The detours are made-up pages, no target or find. Share says how a loss
+// ended: out of clicks with the time, too soon with Exact clicks's count, the clicks with the Timer off.
+const detours = Array.from({ length: 6 }, (_, i) => `Detour ${i + 1}`);
+await playRoute('#start=Diamond&target=Zombie&rules=nonav,limit', ['Diamond', ...detours.slice(0, 5), 'Zombie']);
+check('Six clicks: the target on the sixth click wins', await until('!game.active') && await ev("(r => r.won && r.clicks === 6 && !r.outOfClicks)(store.get('mwr.history', [])[0])"),
+  await ev("JSON.stringify(store.get('mwr.history', [])[0])"));
+await ev('closeModal(); toSetup()');
+const outReasons = [];
+for (const hash of ['#start=Diamond&target=Zombie&rules=nonav,limit', '#start=Diamond&kind=Hostile%20mobs&kind=Enchantments&kind=Potions&rules=nonav,scavenger,limit',
+  '#start=Diamond&target=Zombie&rules=nonav,roundtrip,limit']) {
+  await playRoute(hash, ['Diamond', ...detours]);
+  outReasons.push(await until('!game.active') && await ev("document.querySelector('#modal .reason')?.textContent"));
+  await ev('closeModal(); toSetup()');
+}
+check('running out says what was left: the target, something to find, or the way back', outReasons.join('|')
+  === 'All 6 clicks used, and no target yet.|All 6 clicks used, with something still to find.|All 6 clicks used, and not back at Diamond yet.', outReasons.join(' | '));
+check('Share says how a loss ended: out of clicks with the time, too soon with Exact clicks\'s count, the clicks with the Timer off', await ev(`(r => [
+  { outOfClicks: true, clicks: 6, ms: 83000 }, { tooSoon: true, exact: 5, clicks: 3, ms: 12000 }, { clicks: 4, ms: undefined }]
+  .map(x => shareText({ ...r, won: false, par: undefined, outOfClicks: undefined, tooSoon: undefined, ...x }, '#').split('\\n').find(l => l.startsWith('❌'))).join('|'))(store.get('mwr.history', [])[0])`)
+  === '❌ Out of clicks after 1:23|❌ Too soon after 3 of 5 clicks, 0:12|❌ Gave up after 4 clicks');
+await open('#start=Diamond&target=Zombie&rules=exact');   // the Exact clicks game again, which the checks below change
 check('Exact clicks greys out Six clicks and Round trip and says why', await ev(`gameMode() === 'exact' && ['limit', 'roundtrip'].every(k =>
   document.querySelector(\`input.rule[value=\${k}]\`).disabled && document.querySelector(\`[data-desc=\${k}]\`).textContent.startsWith('Off: Exact clicks'))`));
 await ev("['limit', 'roundtrip'].forEach(k => (b => { b.checked = true; b.dispatchEvent(new Event('change', { bubbles: true })); })(document.querySelector(`input.rule[value=${k}]`)))");
@@ -1698,14 +1729,6 @@ const long = JSON.parse(await ev(`(async () => {
 })()`));
 check('the snapshot has a pool pair three or more clicks apart on Normal', long?.length >= 4, JSON.stringify(long));
 const earnedKeys = "JSON.stringify(Object.keys(adv.got).sort())";
-const playRoute = async (hash, route) => {
-  await open(hash);
-  await play();
-  for (const t of route.slice(1)) {
-    await ev(`navigate(${JSON.stringify(t)}, null)`);
-    await until(`game.path.at(-1).title === ${JSON.stringify(t)} && !game.loading`);
-  }
-};
 await playRoute(`#start=${encodeURIComponent(long[0])}&target=${encodeURIComponent(long.at(-1))}&rules=nonav`, long);
 const firsts = ['accepted', 'firstClick', 'hello', 'par', 'quick', 'speedrunner', ...long.length > 4 ? ['sprinter'] : []];
 check('a par 3+ pair\'s first game, won at par from a challenge link, earns the firsts, Par for the Course and the speed ones',

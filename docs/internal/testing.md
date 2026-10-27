@@ -17,7 +17,7 @@ What it checks, by area:
 
 ### Rendering and navigation
 
-- Rendering
+- Rendering, with the wiki's stylesheets loaded
 - Link classification
 - The hover tint on live links (a real pointer move over BiDi)
 - Links to visited articles being marked
@@ -59,9 +59,11 @@ What it checks, by area:
 - The Checkpoint rule with one checkpoint:
   - card shown and hidden
   - the target not counting before the checkpoint
+  - the target passed before it not marked as seen
   - the HUD and the picture behind the path switching objective
   - reaching it being celebrated
   - the checkpoint in the link, the record and the personal-best key
+- Scavenger: a real article coming with its live categories, and a member of a kind being a find
 - Top links only on a real article:
   - the bar over the first section heading, outside the live wiki's table of contents, which the ZIM lacks
   - the rest folded away
@@ -75,6 +77,7 @@ What it checks, by area:
 - Book and comic objects
 - Joke and removed features being left out of the pool
 - Each pool keeping to its tier with the start and target from different topics (with `planGroups` and `candidate` called directly)
+- A Chaos target linked well enough to be reached (`MIN_BACKLINKS`)
 - A topic target (recorded with the result)
 - The daily's cards from different topics
 
@@ -188,8 +191,9 @@ It checks the game's own logic, by area:
 
 The snapshot still holding what the checks take from it by name:
 
-- Block and Crafting hubs
+- Block and Crafting hubs, Blocks a redirect to Block
 - the pages used being articles and not hubs
+- Minecraft Dungeons an article, Dungeons:Creeper a Dungeons page
 - Blaze, Sharpness and Potion of Swiftness in their kinds
 - Chicken left out of Nether mobs
 - Java Edition version history, Pocket Edition version history (a redirect to one) and Closed captions left out
@@ -259,6 +263,7 @@ The items:
 - Give up giving up with the page whole under the result, headed You gave up in grey
 - the respawn anchor's four charges and its blast on the fifth click leaving the footer whole
 - the pieces coming to rest on what is left of the page rather than the bottom of the window
+- scrolled down, a blast breaking the page there too, its shake leaving what is fixed on the screen where it is
 - an item in hand splitting the text in view without moving anything
 - blasts all down the page and again on its pieces leaving it no longer, nor any wider (its pieces clipped, so a phone doesn't lay it out wider) and still scrolling down
 - the page made narrower in pieces taking the new width and ending about where it would whole, and wide again ending as before
@@ -277,6 +282,13 @@ The items:
   - a blast reaching it on its way off
   - a blast out of its reach as it floats in leaving it where it floats to
   - knocked aside, coming back to its place for its next shot
+  - a fireball taken up again coming from the ghast that is there, not one floating off
+- while an item is in hand, a click on Rebuild being Rebuild's
+- a blast while the pieces fly back breaking nothing and marking nothing broken
+- a placed block scrolling with the page, and with the article, out of sight once scrolled out of the frame
+- a blast on a scrolled article leaving it scrolled where it was and unable to scroll sideways, the wheel scrolling it while it is in pieces, and Rebuild giving it its own overflow back
+- a broken page taking no clicks but on the hotbar's button, and taking them again once rebuilt
+- a click to another article taking the blocks on this one with it
 - the item advancements earned
 
 ### Advancements
@@ -581,8 +593,9 @@ The background:
   - Nothing taking it off
   - every pick leaving the window the same size with its label unclipped
   - a click outside closing the window
-  - a saved pick that isn't one the harp
-- with Sound off no sound fetched drawing a still frame with the wave already passed
+  - a saved pick that isn't one being the harp with nothing on top
+- with Sound off no sound fetched
+- with motion reduced a still frame drawn, the wave already passed
 - hidden during play and back on the setup screen
 - Off hiding it and the facts line
 - the cursor:

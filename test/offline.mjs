@@ -47,6 +47,7 @@ const ARTICLE = title => title === HUBS_ONLY
 // The live categories a parse reply gives, as the API writes them: Brand New Mob is only in the live wiki's Nether mobs,
 // and Chicken is in it too but excluded from the kind.
 const REACH_LABEL = { p1: 'Par 1', p2: 'Par 2', p3: 'Par 3', p4: 'Par 4', p5: 'Par 5+' };
+const failParse = new Set();   // articles whose requests fail, as with no connection
 const LIVE_CATEGORIES = { 'Brand New Mob': ['Nether_mobs', 'Verify'], Chicken: ['Nether_mobs', 'Passive_mobs'] };
 const reply = (request, body, type = 'application/json') => send('network.provideResponse', { request, statusCode: 200, body: { type: 'string', value: body },
   headers: [['Access-Control-Allow-Origin', '*'], ['Content-Type', type]].map(([name, value]) => ({ name, value: { type: 'string', value } })) });
@@ -58,6 +59,7 @@ function answer(request, url) {
   requests.set(kind, (requests.get(kind) || 0) + 1);
   if (p.get('action') === 'parse') {
     const t = p.get('page');
+    if (failParse.has(t)) return send('network.failRequest', { request });
     return reply(request, JSON.stringify({ parse: { title: t, displaytitle: escHtml(t), text: ARTICLE(t),
       categories: (LIVE_CATEGORIES[t] ?? []).map(category => ({ sortkey: '', category })), links: [{ ns: 0, title: 'No such page', exists: false }, { ns: 0, title: 'Diamond Pickaxe', exists: true }] } }));
   }
@@ -166,6 +168,26 @@ check('a failure says whose it is: the wiki’s (an error it sent back, or no an
   && failMessages[1] === 'The game’s link data didn’t load (no-such-file.js). Reload the page.' && failMessages[2] === 'Couldn’t find an article that fits. Try Reroll again.',
   failMessages.join(' | '));
 await ev("setStatus('')");
+// An article that fails to load mid-game offers Retry and Cancel: Cancel keeps the page you were on, with the clock
+// going again and Give up on; Retry, once the wiki answers, loads it.
+await play();
+await ev("navigate('Gold Ingot', null)");
+await until("game.path.length === 2 && !game.loading");
+failParse.add('Iron Ingot');
+await ev("navigate('Iron Ingot', null)");
+const failedShown = await until("!!document.querySelector('#btnCancelNav') && !game.loading");
+await ev("document.querySelector('#btnCancelNav').click()");
+const cancelledAt = await ev('now()');
+await sleep(600);
+check('Cancel on an article that failed mid-game keeps the page you were on, the clock going again', failedShown && await ev(`game.path.length === 2
+  && game.path.at(-1).title === 'Gold Ingot' && $('#overlay').classList.contains('hidden') && !$('#btnGiveUp').disabled && now() > ${cancelledAt} + 400`),
+  await ev("JSON.stringify([game.path.map(p => p.title), $('#overlay').className, now()])"));
+await ev("navigate('Iron Ingot', null)");
+await until("!!document.querySelector('#btnRetry') && !game.loading");
+failParse.delete('Iron Ingot');
+await ev("document.querySelector('#btnRetry').click()");
+check('and Retry, once the wiki answers, loads it', await until("game.path.length === 3 && game.path.at(-1).title === 'Iron Ingot' && !game.loading"));
+await ev('finish(false); closeModal(); toSetup()');
 await play();
 let links = await linkStates();
 const leftOut = "['Java_Edition_version_history', 'Pocket_Edition_version_history', 'Closed_captions'].every(t => document.querySelector(`a[href='/w/${t}']`).title === 'Off limits: a version or list page')";

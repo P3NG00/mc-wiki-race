@@ -183,7 +183,7 @@ The test also fails on any uncaught error or rejection in the page or the articl
   - a version page, and a redirect to one
   - a list page
   - a navbox link
-- Stylesheets come back empty and images fail.
+- Stylesheets come back empty and images fail, and so do the articles a check names (`failParse`), as with no connection.
 
 It checks the game's own logic, by area:
 
@@ -238,6 +238,7 @@ Rolls in every pool:
 
 ### Live links and dead ends
 
+- An article that fails to load mid-game: Cancel keeping the page you were on with the clock going again and Give up on, and Retry, once the wiki answers, loading it
 - A live link pressed with the mouse being asked for at the press and its click taking that request (one pressed and let go elsewhere asked for once, its later click asking no more)
 - A page with no live links (a made-up page linking two hubs, on Hard) getting a banner that stays, to go Back or give up, or only give up on the start, and none on Normal
 - Rerolls from the Pool row

@@ -998,6 +998,13 @@ for (const route of ['game.parReady', "Promise.resolve(['A', 'B'])"]) {
 }
 check('finished before its par is known, a game keeps the target par, unless the par is off it', parLater.join() === '[3,"p3"],[1,null]', parLater.join(' '));
 await ev("document.querySelector('#reach').value = 'any'; setRules(['nonav'])");
+// Recent games shows the newest 15 games of the 50 the browser keeps (the history put back after).
+await ev("window.histWas = localStorage.getItem('mwr.history'); (r => store.set('mwr.history', Array.from({ length: 55 }, (_, i) => ({ ...r, at: r.at - i - 1 }))))(store.get('mwr.history', [])[0]); renderHistory()");
+check('Recent games shows the newest 15 games', await ev("document.querySelectorAll('#history tbody tr').length === 15"), await ev("document.querySelectorAll('#history tbody tr').length"));
+await play();
+await ev('finish(false); closeModal(); toSetup()');
+check('of the 50 the browser keeps', await ev("store.get('mwr.history', []).length === 50"), await ev("store.get('mwr.history', []).length"));
+await ev("localStorage.setItem('mwr.history', histWas); renderHistory()");
 
 // Rolls: each pool keeps to its tier, starts and targets come from different topics (Chaos aside), and targets are linked
 // well enough to be reached. planGroups and rollOne are called directly, with the pool's button set without a change event.

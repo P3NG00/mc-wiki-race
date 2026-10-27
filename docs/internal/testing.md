@@ -501,6 +501,7 @@ The target par:
 - a typed-in start that reaches nothing saying so
 - the record and the history keeping it
 - a game finished before its par is worked out keeping it, unless the par turns out off it
+- Recent games showing the newest 15 games of the 50 the browser keeps
 
 ### The record and par
 

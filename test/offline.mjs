@@ -963,6 +963,17 @@ await play();
 await until('game.par !== null');
 await ev("finish(false); closeModal(); toSetup()");
 check('the record and the history keep the target par, when the game is at it', await ev("store.get('mwr.history', [])[0].reach === 'p3' && document.querySelector('#history tbody tr').textContent.includes('Par 3')"));
+// Finished before the par is worked out, the game keeps the target par, and drops it if the par turns out off it.
+const parLater = [];
+for (const route of ['game.parReady', "Promise.resolve(['A', 'B'])"]) {
+  await play();
+  await until('game.par !== null');
+  await ev(`game.parReady = ${route}; game.par = null; finish(false)`);
+  await until("store.get('mwr.history', [])[0].par !== undefined", 3000);
+  parLater.push(await ev("JSON.stringify((r => [r.par, r.reach ?? null])(store.get('mwr.history', [])[0]))"));
+  await ev('closeModal(); toSetup()');
+}
+check('finished before its par is known, a game keeps the target par, unless the par is off it', parLater.join() === '[3,"p3"],[1,null]', parLater.join(' '));
 await ev("document.querySelector('#reach').value = 'any'; setRules(['nonav'])");
 
 // Rolls: each pool keeps to its tier, starts and targets come from different topics (Chaos aside), and targets are linked

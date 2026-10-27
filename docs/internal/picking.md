@@ -143,7 +143,7 @@ Its cost and cache:
 ### Stamped and recorded
 
 - Like the topic, the target par is stamped on a rolled target (`reach`), shown in the settings text unless Any, and not carried in challenge links.
-- It is recorded only if the game's par still fits it, since a new start or difficulty can move the pair off it.
+- It is recorded only if the game's par still fits it, since a new start or difficulty can move the pair off it: for a game finished before its par is worked out, once it is (`showPar`).
 
 ## Checks on every card
 

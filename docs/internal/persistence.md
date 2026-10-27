@@ -25,6 +25,7 @@ Storage is shared with every page on the origin and open to the player, so it is
 - A Checkpoint game has `vias` (the checkpoints' titles, in order), with `back` on a round trip when some come after the target.
 - Each record has `rules` (an array of rule keys).
 - A rolled target's `topic` and `reach` are recorded too, and so is `game.content` as `content` when anything was on, and `par` once known.
+  - A game finished before its par is worked out gets it from `showPar`, which drops `reach` then if the par is off it.
   - None of them are part of the personal-best key, since the cards already fix the game.
   - `isRecord` only accepts `TOPICS` and `CONTENT` keys and a whole number for `par`.
 

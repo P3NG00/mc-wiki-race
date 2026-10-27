@@ -496,6 +496,7 @@ The target par:
 - a typed-in start with none at the par kept with a target at the nearest par
 - a typed-in start that reaches nothing saying so
 - the record and the history keeping it
+- a game finished before its par is worked out keeping it, unless the par turns out off it
 
 ### The record and par
 

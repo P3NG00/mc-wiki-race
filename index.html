@@ -5301,10 +5301,12 @@ async function showPar(rec, routeReady) {
   } catch (e) {
     text = `Couldn’t work out the fewest clicks: ${e.message}.`;
   }
-  if (par !== null && rec.par === undefined) {
-    rec.par = par;
+  // The par, for a game finished before it was worked out, which drops the target par if the game is off it.
+  const add = par !== null && rec.par === undefined, off = rec.reach && REACHES[rec.reach].fits?.(par) === false;
+  if (add || off) {
     const saved = savedGames(), mine = saved.find(r => r.at === rec.at && r.start === rec.start);
-    if (mine) { mine.par = par; store.set('mwr.history', saved); }
+    for (const r of [rec, mine].filter(Boolean)) { if (add) r.par = par; if (off) delete r.reach; }
+    if (mine) store.set('mwr.history', saved);
   }
   if (!el.isConnected) return;
   el.textContent = text;
@@ -5345,8 +5347,10 @@ function finish(won, lost = null) {
   const hunt = game.hunt && (game.hunt[0].kind ? { kinds: game.hunt.map(h => h.kind) } : { finds: game.hunt.map(h => h.info.title) });
   const rec = { start: game.start.title, ...(target && { goal: target.title }), ...hunt, ...(vias.length && { vias: vias.map(v => v.title) }), ...(back && { back }),
     ...(game.daily && { daily: game.daily }),
-    // The par the target was rolled at, unless a new start or difficulty has moved the game off it since.
-    ...(target?.topic && { topic: target.topic }), ...(target?.reach && REACHES[target.reach].fits?.(game.par) !== false && { reach: target.reach }),
+    // The par the target was rolled at, unless a new start or difficulty has moved the game off it since (with the par
+    // not worked out yet, showPar sees to it).
+    ...(target?.topic && { topic: target.topic }),
+    ...(target?.reach && (game.par === null || REACHES[target.reach].fits?.(game.par) !== false) && { reach: target.reach }),
     ...(game.content.length && { content: game.content }), ...(game.par !== null && { par: game.par }), ...(game.exact && { exact: game.limit }), rules: game.rules, won, ...(lost && { [lost]: true }), clicks: clicks(), ...(game.timed && { ms }), at: Date.now(), path: game.path.map(p => p.title) };
   const hist = savedGames(), first = !hist.some(r => recordKey(r) === recordKey(rec));   // the pair's first game, for advancements
   const best = hist.filter(r => r.won && recordKey(r) === recordKey(rec) && sameRules(r, rec))

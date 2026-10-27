@@ -130,7 +130,7 @@ Its cost and cache:
 
 - When no start has one (Popular on Relaxed has no Blocks target at par 3 from any of its starts, and none at all for Mobs or Enchantments & effects, even from Everyday's starts), the roll takes the nearest par that has one, the lower first (`tries`), sets Target par to it and says why.
 - Only with none at any par does it go back to Any par.
-- Unless a checkpoint kept from before held a topic, a par with no start is certain, so the option is disabled, with the reason in its tooltip, while the pool, rules, Content and topic stay the same (`noPair`, `pairKey`, `syncReach` on focus).
+- Unless a checkpoint kept from before held a topic, a par with no start is certain, so the option is disabled, with the reason in its tooltip, while the pool, rules, Content and topic stay the same (`noPair`, `pairKey`, `syncReach` on focus): the ones `startPars` searched with, read as it is asked, so one changed while it searches isn't marked.
 
 ### Kept and typed-in cards
 

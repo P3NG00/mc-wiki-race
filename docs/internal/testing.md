@@ -493,6 +493,7 @@ The target par:
 - rerolling only the start keeping the target at the par, or with none at it the nearest par and saying so
 - rerolling the target while the start rolls, or with no start, giving a pair at the par
 - Popular Blocks targets on Relaxed, which have no pair at par 3, rolling at par 2, saying why and disabling the option until the topic changes
+- a topic changed while that roll searches leaving the option on for it, the mark going to the topic searched
 - a typed-in start with none at the par kept with a target at the nearest par
 - a typed-in start that reaches nothing saying so
 - the record and the history keeping it

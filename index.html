@@ -1670,8 +1670,9 @@ async function reroll(which, atStart = false) {
       const toKept = kept && distancesTo(graph, PAGE_IDS.get(kept.title),
         routeUsable({ keep: [kept.title], rules: rules(), content: contentInPlay([kept.title]) }));
       const keptPar = s => toKept[PAGE_IDS.get(s)] ?? -1;
-      // Otherwise the pars each start has a target at, worked out once for these settings.
-      const pars = !kept && await startPars(topic);
+      // Otherwise the pars each start has a target at, worked out once for these settings (parsKey, read as startPars
+      // reads them, so a setting changed meanwhile can't take noPair's mark below).
+      const parsKey = pairKey(''), pars = !kept && await startPars(topic);
       if (!current('start')) return;
       const fitsSome = r => kept ? s => REACHES[r].fits(keptPar(s)) : s => (pars.get(s) & 1 << REACHES[r].near - 1) !== 0;
       // The par chosen, then, if no start has a target at it, the others by how near they are to it, the lower first.
@@ -1696,7 +1697,7 @@ async function reroll(which, atStart = false) {
           break;
         }
         // Unless a kept card held a topic, there is certainly none, so the option is off until the settings change.
-        if (!kept && !taken.length) noPair.add(pairKey(r));
+        if (!kept && !taken.length) noPair.add(parsKey + r);
       }
       if (!start && kept) {
         // None has the kept target at the par: a start at the nearest par to it instead.

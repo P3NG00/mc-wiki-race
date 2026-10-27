@@ -939,6 +939,13 @@ const nearPar = await until(ready, 30000) && await ev(`cardsRoute([setup.start.t
 check('settings with no pair at the par roll at the nearest par, saying why, and the option is off', await ev(`${status} === 'With Popular articles on Relaxed, no start has a target at par 3 in Blocks, so this one is par 2.'
     && $('#reach').value === 'p2' && groupOf(setup.goal.title) === 'blocks' && ${p3Off}`) && nearPar === 2, `${await ev(status)} (par ${nearPar})`);
 check('until the settings change', await ev(`(document.querySelector('#topic').value = 'world', !${p3Off})`));
+// A setting changed while the roll searches leaves the option on for it: the mark goes to the settings searched.
+await ev("noPair.clear(); document.querySelector('#topic').value = 'blocks'; document.querySelector('#reach').value = 'p3'");
+const searched = await ev("pairKey('p3')");
+await ev("window.realStartPars = startPars; startPars = topic => { const p = realStartPars(topic); document.querySelector('#topic').value = 'world'; return p; }; reroll('all')");
+check('a setting changed while a roll searches leaves the option on, marking the settings searched', await until(ready, 30000)
+  && await ev(`noPair.has(${JSON.stringify(searched)}) && !${p3Off}`), await ev('JSON.stringify([...noPair])'));
+await ev('startPars = realStartPars');
 // A start typed in is kept when a par is picked, and with no target at it (in Popular on Relaxed no start has a Mobs
 // target at par 3) gets one at the nearest par it has.
 await ev("document.querySelector('input[name=level][value=relaxed]').click()");

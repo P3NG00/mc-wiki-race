@@ -484,7 +484,7 @@ The daily:
 
 The target par:
 
-- every start's pars, worked out at once, matching a search from it in Relaxed and Hard
+- every start's pars, worked out at once, matching a search from it to the targets that join the web: with Top links only in Deep cuts with spin-offs (Dungeons:Multishot, whose only par 2 target in Magic doesn't), in a Round trip, in Relaxed and in Hard
 - Par 1, 2 and 3 in Normal, Par 3 in Relaxed, Par 4 in Hard and Par 5+ in Normal with every family and spin-off on giving a pair at exactly that par
 - Par 3 in Popular on Relaxed, where only six starts have a target at that par, rolling five times at that par, and so does a Relay of three with its checkpoints round the start's topic
 - a start whose only target at the par is a checkpoint kept (Charcoal and Stony Shore) getting one at the nearest par, saying so

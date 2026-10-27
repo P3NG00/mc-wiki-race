@@ -1725,8 +1725,8 @@ async function reroll(which, atStart = false) {
     let unreached = null;
     if (par && targets.includes('goal') && setup.start && current('goal')) {
       const s = setup.start.title, dist = distancesFrom(graph, s), parOf = t => dist[PAGE_IDS.get(t)] ?? -1;
-      const held = cardKeys().filter(w => w !== 'goal').map(w => setup[w]?.title);
-      const reached = aims.filter(t => apart(s, t) && parOf(t) > 0 && !held.includes(t));
+      const held = cardKeys().filter(w => w !== 'goal').map(w => setup[w]?.title), joined = await joinsWeb('goal');
+      const reached = aims.filter(t => apart(s, t) && parOf(t) > 0 && !held.includes(t) && joined(t));
       let titles = reached.filter(t => par(parOf(t)));
       if (!titles.length && reached.length) {
         const off = t => Math.abs(parOf(t) - REACHES[reach()].near), least = Math.min(...reached.map(off));
@@ -5013,15 +5013,15 @@ function distancesFrom(graph, title, usable = routeUsable({ keep: [], rules: rul
   return dist;
 }
 
-// Target par: the pars each start the setup's pool and Content can roll has a target at, from the targets it can roll in
-// topic (null: any), under its difficulty, as a bitmask: bit k - 1 for one exactly k clicks away, and bit PAR_TOP - 1 for
-// one PAR_TOP or more away, which is any target the web of links reaches that is further (a start has to join the web
-// too, which rollOne checks next). The target can't be from the start's group, unless a topic is chosen or in Chaos. It
-// is one search for every start at once: each page's bitset of the targets it reaches within k clicks is its links'
-// within k - 1, for k up to PAR_TOP - 1. Searching from each start in turn took seconds when few have a target at the
-// par. Kept per settings (the search under way, so two rolls share it, and none once it fails), which are all read before
-// the graph is waited for, so a change meanwhile can't mix them. A large pool takes up to a second (every page in Chaos
-// with all the Content), so it stops every SLICE_MS to let the page draw.
+// Target par: the pars each start the setup's pool and Content can roll has a target at, from the targets it can roll
+// in topic (null: any), which join the web of links (rollOne takes no other), under its difficulty, as a bitmask:
+// bit k - 1 for one exactly k clicks away, and bit PAR_TOP - 1 for one PAR_TOP or more away, which is any of them that
+// is further (a start has to join the web too, which rollOne checks next). The target can't be from the start's group,
+// unless a topic is chosen or in Chaos. It is one search for every start at once: each page's bitset of the targets it
+// reaches within k clicks is its links' within k - 1, for k up to PAR_TOP - 1. Searching from each start in turn took
+// seconds when few have a target at the par. Kept per settings (the search under way, so two rolls share it, and none
+// once it fails), which are all read before the graph is waited for, so a change meanwhile can't mix them. A large pool
+// takes up to a second (every page in Chaos with all the Content), so it stops every SLICE_MS to let the page draw.
 const startParsCache = new Map();
 function startPars(topic) {
   const key = pairKey('');
@@ -5029,23 +5029,27 @@ function startPars(topic) {
   return startParsCache.get(key);
 }
 async function searchStartPars(topic) {
-  const r = rules(), usable = routeUsable({ keep: [], rules: r, content: contentInPlay([]) });
+  const r = rules(), content = contentInPlay([]), usable = routeUsable({ keep: [], rules: r, content });
   const aims = candidates(topic, true), starts = candidates(null, false), group = topic || mode() === 'chaos' ? null : groupOf;
   const graph = await linkGraph(r), n = graph.links.length, W = Math.ceil(aims.length / 32), breathe = slicer();
   const set = (bits, at, i) => { bits[at + (i >> 5)] |= 1 << (i & 31); };
-  const own = new Uint32Array(n * W), web = distancesFrom(graph, WEB_HEART, usable), far = new Uint32Array(W), groups = new Map();
+  // A target joins the web where WEB_HEART reaches it, and in a round trip it reaches WEB_HEART too, as joinsWeb has it.
+  const { from, to } = webOf(graph, r, content), both = r.includes('roundtrip');
+  const own = new Uint32Array(n * W), joins = new Uint32Array(W), groups = new Map();
   aims.forEach((t, i) => {
-    set(own, PAGE_IDS.get(t) * W, i);
-    if (web[PAGE_IDS.get(t)] >= 0) set(far, 0, i);
+    const v = PAGE_IDS.get(t);
+    set(own, v * W, i);
+    if (from[v] >= 0 && (!both || to[v] >= 0)) set(joins, 0, i);
     const g = group?.(t);
     if (group) set(groups.get(g) ?? groups.set(g, new Uint32Array(W)).get(g), 0, i);
   });
   const pars = new Map(starts.map(s => [s, 0]));
   let within = own;   // the aims each page reaches within k - 1 clicks
-  // Gives par k to the starts with an aim in word w of reach(at, w) that isn't within k - 1 clicks nor in their group.
+  // Gives par k to the starts with an aim in word w of reach(at, w) that joins the web, isn't within k - 1 clicks nor in
+  // their group.
   const mark = (k, reach) => starts.forEach(s => {
     const at = PAGE_IDS.get(s) * W, same = group && groups.get(group(s));
-    for (let w = 0; w < W; w++) if (reach(at, w) & ~within[at + w] & ~(same?.[w] ?? 0)) { pars.set(s, pars.get(s) | 1 << k - 1); break; }
+    for (let w = 0; w < W; w++) if (reach(at, w) & joins[w] & ~within[at + w] & ~(same?.[w] ?? 0)) { pars.set(s, pars.get(s) | 1 << k - 1); break; }
   });
   // Each navbox's targets, and each page's, from b and v up to the end of their range: the work comes in ranges, the page
   // given a turn between them, and in functions of their own, since the same loops in an async function took twice as long.
@@ -5067,7 +5071,7 @@ async function searchStartPars(topic) {
     mark(k, (at, w) => next[at + w]);
     within = next;
   }
-  mark(PAR_TOP, (at, w) => far[w]);
+  mark(PAR_TOP, () => ~0);
   return pars;
 }
 

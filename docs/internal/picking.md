@@ -100,7 +100,8 @@ A target whose start's only ones at the par are on cards kept is rolled at the n
 Which pars each start has a target at comes from `startPars`, worked out for every start at once and kept per settings (`pairKey`):
 
 - Each page gets a bitset of the targets it reaches within k clicks, its links' bitsets for k − 1, for k up to `PAR_TOP` − 1.
-- So a start has par k where its bitset for k has a target its bitset for k − 1 hasn't (outside its own group), and par 5+ where the web of links (`WEB_HEART`'s own search) reaches one it hasn't within 4, since a rolled start joins the web too.
+- Only targets that join the web of links count (reached from `WEB_HEART`, and in a round trip reaching it too, as `joinsWeb` has it), since no other rolls: with Top links only, a start may reach a target nothing else does (Dungeons:Multishot's only Magic target at par 2, Piercing).
+- So a start has par k where its bitset for k has such a target its bitset for k − 1 hasn't (outside its own group), and par 5+ where it has one not within 4, since a rolled start joins the web too and so reaches them all.
 
 Its cost and cache:
 
@@ -121,7 +122,7 @@ Its cost and cache:
 
 ### Drawing the target
 
-- The target is drawn by the start's whole search, since a start typed in hasn't been checked to join the web of links.
+- The target is drawn by the start's whole search, since a start typed in hasn't been checked to join the web of links, from the targets that join it (`joinsWeb`), so a draw can't miss the few that do among many that don't.
 - Drawing the target at random instead would miss: in Relaxed a start may have one or two par 3 targets among a thousand.
 - Unless a topic is chosen the target may then come from any topic but the start's (`candidates`), since some topics have no far targets from most starts.
 

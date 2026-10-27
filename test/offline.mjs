@@ -833,26 +833,39 @@ for (const [level, value, ok, content = []] of [['normal', 'p1', p => p === 1], 
     got ? `${got.pair}: par ${got.par}` : await ev("document.querySelector('#setupStatus').textContent"));
 }
 await ev('setContent([])');
-// Every start's pars, worked out at once with bitsets (startPars), match a search from each start: in Relaxed, through
-// navboxes, and in Hard, around hubs.
+// Every start's pars, worked out at once with bitsets (startPars), match a search from each start to the targets that join
+// the web of links, as only those roll: with Top links only in Deep cuts with spin-offs, where Dungeons:Multishot's only
+// par 2 target in Magic, Piercing, doesn't; in a Round trip, whose target has to get back to the web too; in Relaxed,
+// through navboxes; and in Hard, around hubs, which the heart's search goes around too, so none is a par roll's target.
 const parsOff = JSON.parse(await ev(`(async () => {
-  const off = [];
-  for (const level of ['relaxed', 'hard']) {
-    document.querySelector('input[name=level][value=' + level + ']').click();
-    const pars = await startPars(null), graph = await linkGraph(LEVELS[level].rules), web = distancesFrom(graph, WEB_HEART);
-    for (let i = 0; i < 25; i++) {
-      const s = pick(candidates(null, false)), d = distancesFrom(graph, s);
+  const off = [], was = [rules(), mode(), document.querySelector('#topic').value];
+  for (const [level, more, topic, picks, also] of [['relaxed', ['lead'], 'magic', ['joke', 'removed', 'variants', 'Dungeons', 'Legends', 'Story Mode'], ['Dungeons:Multishot']],
+    ['normal', ['roundtrip'], null, [], []], ['relaxed', null, null, [], []], ['hard', null, null, [], []]]) {
+    if (more) {
+      setRules([...LEVELS[level].rules, ...more]);
+      document.querySelector('input[name=mode][value=' + (picks.length ? 'deep' : was[1]) + ']').checked = true;
+      setContent(picks);
+    } else {
+      setRules(was[0]); document.querySelector('input[name=mode][value=' + was[1] + ']').checked = true; setContent([]);
+      document.querySelector('input[name=level][value=' + level + ']').click();
+    }
+    document.querySelector('#topic').value = topic ?? 'any';   // the table's key, which startPars reads from the select
+    const pars = await startPars(topic), graph = await linkGraph(rules()), joined = await joinsWeb('goal'), web = distancesFrom(graph, WEB_HEART);
+    for (const s of [...also, ...Array.from({ length: 25 }, () => pick(candidates(null, false)))]) {
+      const d = distancesFrom(graph, s);
       let m = 0;
-      for (const t of candidates(null, true)) {
+      for (const t of candidates(topic, true)) {
         const p = d[PAGE_IDS.get(t)];
-        if (groupOf(t) !== groupOf(s)) m |= p >= 1 && p < PAR_TOP ? 1 << p - 1 : web[PAGE_IDS.get(t)] >= 0 ? 1 << PAR_TOP - 1 : 0;
+        if (p !== 0 && (topic || groupOf(t) !== groupOf(s)) && joined(t) && web[PAGE_IDS.get(t)] >= 0) m |= p >= 1 && p < PAR_TOP ? 1 << p - 1 : 1 << PAR_TOP - 1;
       }
-      if (m !== pars.get(s)) off.push(level + ': ' + s);
+      if (m !== pars.get(s)) off.push(level + (more ? '+' + more : '') + ': ' + s);
     }
   }
+  document.querySelector('#topic').value = was[2];
   return JSON.stringify(off);
 })()`));
-check('every start\'s pars, worked out at once, match a search from it, in Relaxed and Hard', !parsOff.length, parsOff.slice(0, 3).join(', '));
+check('every start\'s pars, worked out at once, match a search from it to the targets that join the web, with Top links only and spin-offs, in a Round trip, in Relaxed and Hard',
+  !parsOff.length, parsOff.slice(0, 3).join(', '));
 await until(ready, 30000);
 // A topic with no start at the par gives way to another: in Popular on Relaxed only six starts have a target at par 3,
 // none of them Blocks or Mobs, so stopping at the planned topic would often give up.
@@ -1517,6 +1530,8 @@ check('out of sight once scrolled out of the frame', await until("[...items.thin
 // The wiki's pages scroll through their body (overflow on it, none on <html>): a blast on a scrolled article leaves it
 // where it was, and the wheel, passed on, scrolls it while it is in pieces.
 await ev("document.body.style.overflowY = 'scroll'; scrollTo(0, 300)", await frameCtx());
+// The frame tells its scroll on its next frame: the sparks take it as it is when the blast goes off.
+await until(`items.frameScroll.y === ${await ev('scrollY', await frameCtx())}`, 2000);
 await ev(`(r => { holdItem('crystal'); $('.hold').onclick({ clientX: r.left + 200, clientY: r.top + 200 }); dropItem(); $('.thing.crystal').click(); })($('#frame').getBoundingClientRect())`);
 check('a blast on the article has its sparks go with the article', await ev("fx.parts.length > 0 && fx.parts.every(p => p.on === 'frame' && p.at.y === items.frameScroll.y)"));
 await sleep(300);

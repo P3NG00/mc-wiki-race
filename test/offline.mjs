@@ -48,6 +48,7 @@ const ARTICLE = title => title === HUBS_ONLY
 // and Chicken is in it too but excluded from the kind.
 const REACH_LABEL = { p1: 'Par 1', p2: 'Par 2', p3: 'Par 3', p4: 'Par 4', p5: 'Par 5+' };
 const failParse = new Set();   // articles whose requests fail, as with no connection
+const REDIRECTS = { 'Crafting recipe': 'Crafting' };   // titles a parse follows to another article, as the wiki's redirects do
 const LIVE_CATEGORIES = { 'Brand New Mob': ['Nether_mobs', 'Verify'], Chicken: ['Nether_mobs', 'Passive_mobs'] };
 const reply = (request, body, type = 'application/json') => send('network.provideResponse', { request, statusCode: 200, body: { type: 'string', value: body },
   headers: [['Access-Control-Allow-Origin', '*'], ['Content-Type', type]].map(([name, value]) => ({ name, value: { type: 'string', value } })) });
@@ -58,7 +59,7 @@ function answer(request, url) {
   const kind = [p.get('action'), ...['list', 'generator', 'prop'].filter(k => p.has(k)).map(k => `${k}=${p.get(k)}`)].join(' ');
   requests.set(kind, (requests.get(kind) || 0) + 1);
   if (p.get('action') === 'parse') {
-    const t = p.get('page');
+    const t = REDIRECTS[p.get('page')] ?? p.get('page');
     if (failParse.has(t)) return send('network.failRequest', { request });
     return reply(request, JSON.stringify({ parse: { title: t, displaytitle: escHtml(t), text: ARTICLE(t),
       categories: (LIVE_CATEGORIES[t] ?? []).map(category => ({ sortkey: '', category })), links: [{ ns: 0, title: 'No such page', exists: false }, { ns: 0, title: 'Diamond Pickaxe', exists: true }] } }));
@@ -187,7 +188,12 @@ await until("!!document.querySelector('#btnRetry') && !game.loading");
 failParse.delete('Iron Ingot');
 await ev("document.querySelector('#btnRetry').click()");
 check('and Retry, once the wiki answers, loads it', await until("game.path.length === 3 && game.path.at(-1).title === 'Iron Ingot' && !game.loading"));
-await ev('finish(false); closeModal(); toSetup()');
+// A link that redirects to the target reaches it and wins, the link's title and the target's both counted as seen.
+await ev("navigate('Crafting recipe', null)");
+check('a link redirecting to the target wins, its title seen as the target\'s', await until('!game.active') && await ev(`game.path.at(-1).title === 'Crafting'
+  && game.seen.get('Crafting recipe') === 'Crafting' && game.seen.get('Crafting') === 'Crafting' && store.get('mwr.history', [])[0].won === true`),
+  await ev("JSON.stringify([game.path.map(p => p.title), [...game.seen]])"));
+await ev('closeModal(); toSetup()');
 await play();
 let links = await linkStates();
 const leftOut = "['Java_Edition_version_history', 'Pocket_Edition_version_history', 'Closed_captions'].every(t => document.querySelector(`a[href='/w/${t}']`).title === 'Off limits: a version or list page')";

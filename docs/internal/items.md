@@ -236,8 +236,10 @@ What stays whole (`keepWhole`, a selector, so a box holding one of them gives it
 - the checkpoint banner,
 - the loading overlay,
 - the hotbar's buttons,
+- the note block's buttons and its window,
 - the background's button,
-- the facts line.
+- the facts line,
+- the room under the setup screen's footer (`#setupRoom`).
 
 ## Rebuild, or Give up
 
@@ -306,7 +308,7 @@ The sparks are all on the effects canvas (see [ui.md](ui.md)), a rocket's sparks
 
 A challenge's toast gets one, bursting below it (see [advancements.md](advancements.md)).
 
-Each waits up to 1.5 s for the pictures, and none goes up with motion reduced by then.
+Each waits up to 1.5 s for the pictures, and none goes up with motion reduced or Effects unticked by then.
 
 ## Pictures and sounds from the wiki
 

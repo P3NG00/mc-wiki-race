@@ -48,8 +48,8 @@ The research behind it: with navboxes almost any sensible click gets closer ([RE
 *No hubs* makes links to the hubs (`hubs` in `tools/wikidata/config.json`) dead:
 
 - `HUB_TITLES` maps every hub and its redirects, those to sections included (about 1,000 titles, from `wiki-data.js`), to the hub.
-- `navigate` passes all of them except the target's hub to `renderArticle` as `hubs`, whose links say "Off limits on Hard: a big overview page".
-- Going Back to a hub start is allowed, and a hub that is a checkpoint stays live too.
+- `navigate` passes all of them to `renderArticle` as `hubs`, whose links say "Off limits on Hard: a big overview page", except the hubs of the cards the game is after (`cardTitles`: the target, the checkpoints and Scavenger's articles), which stay live.
+- Going Back to a hub start is allowed.
 
 ### Blind target
 

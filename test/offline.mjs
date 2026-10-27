@@ -1484,6 +1484,23 @@ await ev(`(p => blast({ x: p.x - 40, y: p.y }, 1.2))(whereNow(${ghasts}[0]))`);
 check('and a blast reaches it on its way off', await ev(`${ghasts}.length === 0`));
 await ev('itemsReset()');
 await until("!document.querySelector('#setup [data-broke-style]')", 3000);
+// A blast out of reach of a ghast floating in leaves it going where it was, where its fireballs come from.
+// The blast goes off on the first frame it is well on its way, which a poll from here can miss.
+const midway = await ev(`new Promise(ok => {
+  items.pointer = { x: 100, y: 400 }; holdItem('fireball');
+  const t0 = performance.now(), frame = () => {
+    const g = ${ghasts}[0];
+    if (g && performance.now() < (g.until ?? 0) && middleOf(g.el).x - g.p.x > 20) { blast({ x: 100, y: innerHeight - 40 }, 0.3); ok(true); }
+    else if (performance.now() - t0 > 2000) ok(false);
+    else requestAnimationFrame(frame);
+  };
+  frame();
+})`);
+await sleep(800);
+check('a blast out of reach of a ghast floating in leaves it where it floats to', midway && await ev(`(gs => gs.length === 1 && gs[0].p.x === innerWidth - 90
+  && Math.abs(middleOf(gs[0].el).x - gs[0].p.x) < 2)(${ghasts})`), await ev(`JSON.stringify([${midway}, ${ghasts}.map(g => [g.p.x, middleOf(g.el).x, innerWidth])])`));
+await ev('itemsReset()');
+await until("!document.querySelector('#setup [data-broke-style]')", 3000);
 
 // A blast while Rebuild puts the pieces back breaks nothing and marks nothing broken; while an item is in hand, a click
 // on the bar is the bar's; a fireball taken up again comes from the ghast that is there, not one floating off.

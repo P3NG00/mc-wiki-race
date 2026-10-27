@@ -64,7 +64,7 @@ Things placed on the page are fixed over it (`placeThing`, `items.things`, each 
 
 - They can't be selected or dragged however often they are clicked: `user-select: none`, and `pointerdown` is cancelled.
 - `moveThing` moves one (knocked away, drifting off) and removes it once it is off the screen, unless moved again first.
-- While it moves, where it is is read off the screen (`whereNow`), so a blast reaches it where it has got to, not where it is going.
+- While it moves, where it is is read off the screen (`whereNow`), so a blast reaches it where it has got to, not where it is going, and one out of its reach leaves it going there.
 
 A placed block (TNT, crystal, bed, anchor) sits on what it was placed on (`anchorThing`, `t.anchor`), so a blast starts where it is seen:
 - On the setup screen it scrolls with the page.

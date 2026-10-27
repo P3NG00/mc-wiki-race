@@ -275,6 +275,7 @@ The items:
   - a ghast on the right leaving off the right, facing it
   - coming back when taken up again
   - a blast reaching it on its way off
+  - a blast out of its reach as it floats in leaving it where it floats to
 - the item advancements earned
 
 ### Advancements

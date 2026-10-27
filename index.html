@@ -3926,7 +3926,8 @@ function spawnGhast() {
   const g = placeThing('ghast', { x: left ? -80 : innerWidth + 80, y: at.y }, itemPic('Ghast'));
   g.p = at;   // where it fires from, while it floats in
   g.el.classList.toggle('right', left);   // facing the page it fires at (the picture faces left)
-  requestAnimationFrame(() => moveThing(g, at, 600));
+  void g.el.offsetWidth;   // its style where it starts, or it shows at the end without floating in
+  moveThing(g, at, 600);
   play('ghast');
   return g;
 }
@@ -4056,9 +4057,9 @@ function blast(p, power) {
   }
   const reach = BLAST_REACH * power;
   for (const t of [...items.things]) {
-    t.p = whereNow(t);   // one moving, where it has got to
-    const d = Math.hypot(t.p.x - p.x, t.p.y - p.y), k = 1 - d / reach;
-    if (k <= 0 || t.gone || hiddenThing(t)) continue;
+    const at = whereNow(t), d = Math.hypot(at.x - p.x, at.y - p.y), k = 1 - d / reach;
+    if (k <= 0 || t.gone || hiddenThing(t)) continue;   // one moving out of reach goes on where it was going
+    t.p = at;   // one moving, where it has got to
     const away = (by, ms) => { const n = d || 1; moveThing(t, { x: t.p.x + (t.p.x - p.x) / n * by * k, y: t.p.y + (t.p.y - p.y) / n * by * k }, ms); };
     if (t.kind.startsWith('tnt')) { if (t.lit) away(120, 300); else lightTnt(t, 300 + 1500 * (1 - k)); }
     else if (t.kind === 'crystal') { removeThing(t); items.timers.add(setTimeout(() => blast(t.p, 1.6), 50)); }

@@ -132,7 +132,7 @@ Its reach is `BLAST_REACH` (220 px) × power. What it reaches reacts as in Minec
 
 An easter egg: on the TNT article a blast that reaches the infobox's big picture of TNT lights it, as a blast lights TNT in Minecraft (the frame's `tntEgg`, told it is the TNT article by `{mwr:'boom', egg}`).
 
-- It hisses and flashes where it is, kept whole (`.mwr-lit`, with motion reduced not flashing), for 0.5 to 1.5 s.
+- It hisses and flashes where it is, kept whole (`.mwr-lit`, with motion reduced not flashing), for 0.5 to 1.5 s: the frame posts `{mwr:'tntEgg', lit, ms}` with the fuse it picked, and the page hisses that long.
 - Then the frame posts `{mwr:'tntEgg', x, y}` and the page blows it up at power 2.6, bigger than any item, earning Light Reading.
 - Once, until Rebuild puts it back, unlit if its fuse is still burning.
 

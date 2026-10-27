@@ -4378,12 +4378,13 @@ function renderArticle(page, fragment, token, { dead = [], hubs = [] } = {}, see
       eggLit = true;
       img.classList.add('mwr-lit');
       img.classList.toggle('mwr-still', CALM);   // with motion reduced, no flashing
-      parent.postMessage({ mwr: 'tntEgg', lit: true }, '*');
+      const ms = 500 + Math.random() * 1000;
+      parent.postMessage({ mwr: 'tntEgg', lit: true, ms }, '*');
       eggFuse = setTimeout(() => {
         img.classList.remove('mwr-lit', 'mwr-still');
         const r = img.getBoundingClientRect();
         parent.postMessage({ mwr: 'tntEgg', x: r.left + r.width / 2, y: r.top + r.height / 2 }, '*');
-      }, 500 + Math.random() * 1000);
+      }, ms);
     }
     addEventListener('message', e => {
       if (e.source !== parent) return;
@@ -4868,8 +4869,9 @@ window.addEventListener('message', e => {
   if (e.data.mwr === 'nav' || e.data.mwr === 'dead') { closeHotbar(); closeNoteBox(); }   // a click in the article
   if (e.data.mwr === 'move') { const p = fromFrame(e.data); if (p) items.pointer = p; }   // for the creeper
   if (e.data.mwr === 'scroll' && Number.isFinite(e.data.x) && Number.isFinite(e.data.y)) { items.frameScroll = { x: e.data.x, y: e.data.y }; positionThings(); }
-  // The TNT article's easter egg (the frame's tntEgg): lit, it hisses; then it goes off, bigger than any item.
-  if (e.data.mwr === 'tntEgg' && e.data.lit) play('fuse');
+  // The TNT article's easter egg (the frame's tntEgg): lit, it hisses as long as its fuse (ms); then it goes off, bigger
+  // than any item.
+  if (e.data.mwr === 'tntEgg' && e.data.lit) play('fuse', Number.isFinite(e.data.ms) ? e.data.ms / 1000 : 1);
   else if (e.data.mwr === 'tntEgg') { const p = fromFrame(e.data); if (p) { advEarn({ lightReading: true }); blast(p, 2.6); } }
 });
 

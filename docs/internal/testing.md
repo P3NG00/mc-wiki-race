@@ -264,7 +264,7 @@ The items:
 - a drag and fast clicks on the page in pieces or with an item in hand selecting nothing (real pointer input), and selecting again once it is put back and the item put down
 - a blast's sparks staying on the page and the article as they scroll
 - a firework rocket going up from a click on the page and breaking nothing
-- on the TNT article a blast lighting its picture of TNT, which goes off bigger and earns Light Reading (and not on another article)
+- on the TNT article a blast lighting its picture of TNT, which hisses as long as its fuse (the game's own hiss, the wiki's sound not being in) and goes off bigger and earns Light Reading (and not on another article)
 - with motion reduced the pieces only fading
 - the ✕ on the tip and picking it again in the hotbar putting the item away
 - with a finger the item in hand not shown and the tip saying tap

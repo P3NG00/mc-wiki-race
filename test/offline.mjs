@@ -148,6 +148,12 @@ check('so is a page that isn’t an article', await until("setup.busy === 0 && d
 await ev("setCustom('start', 'No such page')");
 check('and one that doesn’t exist says there’s no article by that name', await until("setup.busy === 0 && document.querySelector('#setupStatus').textContent === 'No article named “No such page” on minecraft.wiki.'")
   && await ev("setup.start.title === 'Diamond'"), await ev("document.querySelector('#setupStatus').textContent"));
+// What comes last wins: a card rerolled, or the daily loaded, while a title typed in is being looked up.
+await ev("setCustom('start', 'Creeper'); reroll('start')");
+check('a reroll while a typed-in title is looked up wins', await until(ready, 30000) && await ev("!setup.start.typed"), await ev('JSON.stringify(setup.start)'));
+await ev("setCustom('start', 'Creeper'); loadDaily()");
+check('and so does the daily', await until(ready, 30000) && await ev("setup.daily === today() && !setup.start.typed"), await ev('JSON.stringify([setup.daily, setup.start])'));
+await open('#start=Diamond&target=Crafting');   // the Relaxed challenge again, which the checks below play
 // A failure says whose it is: the wiki's (here a request the suite doesn't answer), the link data's, or the game's own
 // (a card none of whose draws exists).
 const failSays = async fn => ev(`withBusy(${fn}).then(() => document.querySelector('#setupStatus').textContent)`);

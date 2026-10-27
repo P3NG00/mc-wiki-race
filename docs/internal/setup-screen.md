@@ -20,7 +20,8 @@ The setup screen puts playing first.
     - each day from `DAILY_FIRST` to today a button that loads its daily (`loadDaily`), named with its game and result in its tooltip, and marked won on its day, won later or not won.
 - Your game (`#gameSum`, filled by `updateGameSum`): the game with its option, the extra rules, the articles and the difficulty.
 - The cards.
-  - A title typed into a card's box (`setCustom`) that `pageInfo` refuses says why: "No article named “X” on minecraft.wiki.", or for a page the game leaves out (see [rules.md](rules.md)) "“X” is on minecraft.wiki, but the game leaves it out (a version, list or non-article page)."
+  - A title typed into a card's box (`setCustom`) takes the card's roll (`setup.rolls`) as the lookup starts, so a reroll or the daily after it wins, and it wins over a roll going already.
+  - One that `pageInfo` refuses says why: "No article named “X” on minecraft.wiki.", or for a page the game leaves out (see [rules.md](rules.md)) "“X” is on minecraft.wiki, but the game leaves it out (a version, list or non-article page)."
 - Start game and par.
 - Reroll all.
 - Copy challenge link (`#btnCopy`): "Challenge link copied.", or when the browser refuses the copy, the link in the status line to copy by hand.

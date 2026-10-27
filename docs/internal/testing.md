@@ -205,6 +205,7 @@ So a new snapshot that changes one fails there by name rather than leaving a che
   - hubs and redirects to them dead in Hard, titled as Hard's overview pages, the target's hub live
   - a navbox's and a requirement list's links dead in Hard, titled as counting as a navbox
   - no left-out page in the data
+- A reroll, or the daily, while a typed-in title is looked up winning
 - A left-out page typed in or named in a challenge link not taken, a typed-in one saying the game leaves it out, as it does a page that isn't an article, and one that doesn't exist saying there's no article by that name
 - A failure saying whose it is: the wiki's (an error it sent back, or no answer at all), the link data's (a graph file that doesn't load) or the game's (a card none of whose draws exists)
 - The difficulty a link's rules give

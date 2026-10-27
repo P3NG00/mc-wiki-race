@@ -1780,15 +1780,17 @@ async function setCustom(which, raw) {
   const text = raw.trim();
   if (!text) return;
   setStatus('Looking up “' + text + '”…');
+  // The card's roll from now, so a roll, lookup or daily after it wins, and it wins over one going already.
+  const token = ++setup.rolls[which];
   await withBusy(async () => {
     const info = await pageInfo(text);
+    if (token !== setup.rolls[which]) return;
     if (!info) {
       setStatus(info === false ? '“' + text + '” is on minecraft.wiki, but the game leaves it out (a version, list or non-article page).'
         : 'No article named “' + text + '” on minecraft.wiki.', true);
       return;
     }
     if (isBlind()) dropHidden();   // a new start, so a game fixed beforehand isn't any more
-    setup.rolls[which]++;
     setup[which] = Object.assign(info, { typed: true });   // kept when a target par is picked (see the #target listener)
     const left = leaveDaily();
     renderCard(which);

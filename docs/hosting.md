@@ -68,7 +68,7 @@ If your server sends a Content-Security-Policy, it has to allow:
 | Directive | Needs |
 | --- | --- |
 | `connect-src` | `https://minecraft.wiki` (the API, and the sounds) |
-| `img-src` | `https://minecraft.wiki` |
+| `img-src` | `https://minecraft.wiki`, `data:` (the textures of the hotbar, tooltips and windows, and Reduce motion's still pictures, which the game draws itself), and your own origin for the icon |
 | `style-src` | `https://minecraft.wiki`, inline styles, and your own origin for a theme stylesheet |
 | `font-src` | `https://minecraft.wiki` |
 | `media-src` | `https://minecraft.wiki` (sounds played in an article) |

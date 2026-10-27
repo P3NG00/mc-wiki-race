@@ -1703,6 +1703,23 @@ check('landing on Cake earns its secret, its toast once the article shows', awai
 await ev("navigate('Diamond', null)");
 check('and clicking back to the start, without Back, Full Circle', await until('!game.loading && !!adv.got.fullCircle'));
 await ev('finish(false); closeModal(); toSetup()');
+// A personal best: a pair's first win has no note; a win in fewer clicks is a new best, earning Self-Improvement, and
+// Recent games' Best tag moves to it; a win in more says the best, which keeps the tag.
+const bestPair = '#start=Diamond&target=Crafting&rules=nonav', bestNote = "document.querySelector('#modal .best')?.textContent ?? ''";
+const bestTags = "JSON.stringify([...document.querySelectorAll('#history tbody tr')].slice(0, 3).map(tr => !!tr.querySelector('.best-tag')))";
+await playRoute(bestPair, ['Diamond', 'Gold Ingot', 'Crafting']);
+check('a pair\'s first win has no personal best note', await until('!game.active') && await ev(bestNote) === '' && await ev('!adv.got.selfImprovement'), await ev(bestNote));
+await ev('closeModal(); toSetup()');
+await playRoute(bestPair, ['Diamond', 'Crafting']);
+check('a win in fewer clicks is a new personal best, earning Self-Improvement', await until('!game.active') && await ev(bestNote) === 'New personal best for this game!'
+  && await until('!!adv.got.selfImprovement', 3000), await ev(bestNote));
+await ev('closeModal(); toSetup()');
+check('and Recent games\' Best tag moves to it', await ev(bestTags) === '[true,false,false]', await ev(bestTags));
+await playRoute(bestPair, ['Diamond', 'Gold Ingot', 'Iron Ingot', 'Crafting']);
+const moreNote = await until('!game.active') && await ev(bestNote);
+await ev('closeModal(); toSetup()');
+check('a win in more clicks says the best, which keeps the tag', `${moreNote}`.startsWith('Your best for this game: 1 click in ') && await ev(bestTags) === '[false,true,false]',
+  `${moreNote} ${await ev(bestTags)}`);
 const earnedN = await ev('advEarned()');
 check('the button by Recent games counts them', await ev(`$('#advCount').textContent === '${earnedN} / ' + Object.keys(ADVANCEMENTS).length && !$('#btnAdv').closest('.hidden')`), await ev("$('#advCount').textContent"));
 await ev("$('#btnAdv').click()");
@@ -1711,7 +1728,8 @@ check('the panel has every one in its group, the earned in gold and the unearned
   && [...document.querySelectorAll('.adv-tile .label')].filter(l => l.textContent === '???').length === Object.entries(ADVANCEMENTS).filter(([k, a]) => a.secret && !adv.got[k]).length
   && document.querySelector('.adv-tile[data-adv-key=cake]').textContent.includes('The Cake Is Real')`));
 await ev("document.querySelector('.adv-tile[data-adv-key=regular]').click()");
-check('picking a count shows how far along it is', await ev("$('#aDetail').textContent.includes('Win 10 games.') && $('#aDetail').textContent.includes('3 of 10 wins')"), await ev("$('#aDetail').textContent"));
+check('picking a count shows how far along it is', await ev("$('#aDetail').textContent.includes('Win 10 games.') && adv.wins > 0 && adv.wins < 10 && $('#aDetail').textContent.includes(adv.wins + ' of 10 wins')"),
+  await ev("$('#aDetail').textContent.replace(/\\s+/g, ' ')"));
 await ev("document.querySelector('.adv-tile[data-adv-key=birdie]').click()");
 check('and an unearned secret says nothing of itself', await ev("$('#aDetail').textContent.includes('???') && !$('#aDetail').textContent.includes('Birdie') && !$('#aDetail').textContent.includes('par')"),
   await ev("$('#aDetail').textContent"));

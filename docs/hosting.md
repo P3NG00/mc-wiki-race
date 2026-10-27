@@ -10,7 +10,7 @@ Serve these side by side, from the same folder:
 | --- | --- | --- |
 | `index.html` | The whole game. | Nothing to serve. |
 | `wiki-data.js` | What rolls pick from: the pool, link counts, hub redirects, left-out pages, namespaces. | The game doesn't start. |
-| `wiki-links.js` | The link graph, for every game but Top links only. | No par, no [Distance or Target par](how-to-play.md#extra-rules), and the daily fails to load. Rolls skip their check that the cards are linked up, and the background has no constellation. |
+| `wiki-links.js` | The link graph, for every game but Top links only. | No par, no [Distance](how-to-play.md#extra-rules) or [Target par](how-to-play.md#target-topic-and-par), and the daily fails to load. Rolls skip their check that the cards are linked up, and the background has no constellation. |
 | `wiki-navboxes.js` | The navboxes' links, for Relaxed. | On Relaxed: no par, no Distance or Target par, and rolls skip their check that the cards are linked up. |
 | `wiki-lead.js` | The links above each first heading, for Top links only. | Under Top links only: no par, no Distance or Target par, and rolls skip their check that the cards are linked up. |
 | `favicon.ico`, `apple-touch-icon.png` | The icon. | No icon. |

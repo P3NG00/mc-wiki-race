@@ -24,14 +24,14 @@ Under those come three steps: **1 · Choose a game**, **2 · Extra rules** and *
 
 ## The four games
 
-Pick one of the tiles. The strip under them explains the game and holds its one option.
+Pick one of the tiles; Race is the default. The strip under them explains the game and holds its one option.
 
 | Game | Tile | What you do | Option |
 |---|---|---|---|
 | **Race** | A → B | Get from the start to the target in as few clicks as you can. | |
-| **Relay** | A → 1 → 2 → B | Visit each checkpoint, in order, before the target counts. A later checkpoint reached early is just an ordinary page. | **Checkpoints**: 1, 2 or 3 |
-| **Scavenger hunt** | A → ✓ ✓ ✓ | Instead of one target, find 3 things in any order: one of each of 3 kinds, or 3 articles. | **Find**: 3 kinds or 3 articles |
-| **Exact clicks** | A → → → → B | Reach the target in exactly par + the clicks you pick, never on a page twice. | **Clicks**: par + 1 to par + 5, or Random |
+| **Relay** | A → 1 → 2 → B | Visit each checkpoint, in order, before the target counts. A later checkpoint reached early is just an ordinary page. | **Checkpoints**: 1, 2 or 3 (1 by default) |
+| **Scavenger hunt** | A → ✓ ✓ ✓ | Instead of one target, find 3 things in any order: one of each of 3 kinds, or 3 articles. | **Find**: 3 kinds or 3 articles (kinds by default) |
+| **Exact clicks** | A → → → → B | Reach the target in exactly par + the clicks you pick, never on a page twice. | **Clicks**: par + 1 to par + 5, or Random (par + 2 by default) |
 
 - A kind is a wiki category, such as Hostile mobs, shown with a few of its best-known members as examples. One page can find several kinds at once, and the start never counts.
 - In Exact clicks there's no Back, every page you've visited goes dead, and landing on the target too soon loses, as does running out of clicks. There's always a route of the count: the result shows one.
@@ -54,7 +54,7 @@ A few don't combine, and their box greys out with the reason. Six clicks is off 
 - **Round trip**: in a Relay some checkpoints come after the target, on the way back. Once you reach the target, the pages of the way there go dead and Back starts again from there. If there's no way back that doesn't retrace your steps, the page is marked ⛔ and only giving up is left.
 - **Blind target**: the hidden cards say Hidden and when they'll show. Par waits until the game starts, and the ? peek button is gone.
 - **Top links only**: the rest of each article folds away under a bar; **Show it** opens it to read, but its links stay dead.
-- **Distance**: the header shows "3 clicks to go" or "No route from here", and a click that gets closer dings and sparkles. A click that doesn't gets nothing.
+- **Distance**: the header shows "3 clicks to go", "No route from here", or "Distance unknown" on a page the wiki's offline copy doesn't have, and a click that gets closer dings and sparkles. A click that doesn't gets nothing.
 
 ## Articles
 
@@ -81,7 +81,7 @@ The **Difficulty** row decides which links work. Normal is the default.
 
 ## Target topic and par
 
-The **Target** row has two choices. The topic (**Any topic**, **Blocks**, **Items**, **Mobs**, **Biomes & structures**, **Enchantments & effects**) takes targets only from that topic. Outside Chaos the start always comes from another topic. The par (**Any par**, **Par 1** to **Par 4**, **Par 5+**) picks how many clicks the target is from the start, at the fewest.
+The **Target** row has two choices, both Any by default. The topic (**Any topic**, **Blocks**, **Items**, **Mobs**, **Biomes & structures**, **Enchantments & effects**) takes targets only from that topic. Outside Chaos the start always comes from another topic. The par (**Any par**, **Par 1** to **Par 4**, **Par 5+**) picks how many clicks the target is from the start, at the fewest.
 
 Most pairs are par 2, and par 3 or more is rare in Relaxed. When no start has a target at the par you picked, the roll takes the nearest par that has one and says so, and a par no start can have is greyed out. Scavenger has no target, so it hides the par choice.
 
@@ -104,9 +104,9 @@ The **Spin-offs** row does the same for Dungeons, Dungeons II, Legends, Earth, S
 
 ## During a game
 
-The header shows the game and its rules as labels, with how far along you are ("1 of 2 checkpoints reached", "Found 1 of 3", "On the way back"). Under them is your route: stops done (✓), the one you're heading for, and those ahead (dashed). The **?** button shows the description of what you're looking for, and reaching a checkpoint or a find shows a banner naming what comes next.
+The header shows the game and its rules as labels, with how far along you are ("1 of 2 checkpoints reached", "Found 1 of 3", "On the way there", "On the way back"), and under Exact clicks a reminder to land on the target with your last click, not before. Under them is your route: stops done (✓), the one you're heading for, and those ahead (dashed). The **?** button shows the description of what you're looking for, and reaching a checkpoint or a find shows a banner naming what comes next.
 
-On the right are your **Clicks** ("of 6" with a dot a click under Six clicks), **Par**, **Time**, the items and note block buttons, sound, **← Back** and **Give up**. **Your path** runs down the side; **Hide** folds it away. On a phone held upright it becomes one line of breadcrumbs.
+On the right are your **Clicks** ("of 6" under Six clicks, "of exactly 7" under Exact clicks, with a dot a click), **Par**, **Time**, the items and note block buttons, sound, **← Back** and **Give up**. **Your path** runs down the side; **Hide** folds it away. On a phone held upright it becomes one line of breadcrumbs.
 
 ## Links in the article
 
@@ -201,7 +201,7 @@ A link without `rules` plays on Relaxed. `#rules=…` on its own sets the rules 
 | **Reduce motion** | Stops everything that moves by itself: sparks, the background, moving pictures (shown as their first frame), and the crafting grids, which get a ↻ button instead. Sounds still play. |
 | **Theme** | **Auto** follows your system, or **Light** or **Dark**. The article is drawn in the wiki's matching theme. |
 
-These sit beside the title. When your system asks for reduced motion, **Reduce motion** is ticked and held. While **Reduce motion** is on, either way, **Effects** shows unticked and can't be changed.
+These sit beside the title. By default **Sound**, **Timer** and **Effects** are on, **Reduce motion** is off and **Theme** is **Auto**. When your system asks for reduced motion, **Reduce motion** is ticked and held. While **Reduce motion** is on, either way, **Effects** shows unticked and can't be changed.
 
 ## The background
 
@@ -209,7 +209,7 @@ Behind the setup screen is a picture of the wiki itself, picked in the **Backgro
 
 - The constellation is each topic's best-linked articles as stars, joined to those they link with, with pulses playing games of their own along the links. Stars near your mouse make way and the nearest shows its name.
 - The redstone map is every article but subpages and spin-off pages as one block, grouped like a world map's biomes, brighter the more it's linked. Your mouse is a torch.
-- **Wave from the start** lights every page by how many clicks it is from the start. **Show the route (spoiler)** draws the shortest route between your cards. **Roll by itself** marks random pairs of its own until you change anything on the setup screen, then marks your cards.
+- **Wave from the start** lights every page by how many clicks it is from the start. **Show the route (spoiler)** draws the shortest route between your cards. **Roll by itself** marks random pairs of its own until you change anything on the setup screen, then marks your cards. By default **Show** is **Auto**, with **Roll by itself** on and the other two off.
 
 The ✦ button in the bottom-right corner hides everything but the background; ✕ or Escape brings it back. Above the footer, a line of facts about the wiki and your cards changes every 7 seconds.
 

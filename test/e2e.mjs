@@ -4,6 +4,7 @@
 import fs from 'node:fs';
 
 const [port, fileUrl, shotDir] = process.argv.slice(2);
+if (shotDir) fs.mkdirSync(shotDir, { recursive: true });   // made if it isn't there
 const ws = new WebSocket(`ws://127.0.0.1:${port}/session`);
 let id = 0;
 const pending = new Map();

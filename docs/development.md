@@ -25,7 +25,7 @@ They need `firefox` and Node 22 or newer.
 | Live, `test/e2e.mjs` | `test/run-e2e.sh [screenshot-dir]` | Plays real games against the live wiki: rendering, links, navigation, the result. Needs network access. |
 | Offline, `test/offline.mjs` | `test/run-e2e.sh --offline` | The game's own logic: rolls, the daily, Content, difficulty, which links are live, every rule, items, advancements. About two and a half minutes. |
 
-The live suite saves screenshots to `screenshot-dir` if you give one. Either suite fails on any uncaught error in the page or the article frame.
+The live suite saves screenshots to `screenshot-dir` if you give one, making the folder if it isn't there. Either suite fails on any uncaught error in the page or the article frame.
 
 Details: [internal/testing.md](internal/testing.md#live-suite-teste2emjs)
 

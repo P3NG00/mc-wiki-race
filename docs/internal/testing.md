@@ -5,7 +5,7 @@ For people: [development.md](../development.md).
 ## Live suite (`test/e2e.mjs`)
 
 `test/run-e2e.sh [--offline] [screenshot-dir]` starts headless Firefox with WebDriver BiDi and runs `test/e2e.mjs`.
-The test opens `index.html` from `file://` and plays a real game against the live wiki.
+The test opens `index.html` from `file://` and plays a real game against the live wiki, saving screenshots to `screenshot-dir` if one is given (`shot`), made if it isn't there.
 What it checks, by area:
 
 ### Loading, sounds and textures

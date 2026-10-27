@@ -434,6 +434,7 @@ Scavenger with kinds:
 - an excluded page in the live category not counting
 - a page only the live wiki puts in the category counting
 - a page of two kinds finding both
+- the start no find, coming back to it either, though the live wiki puts it in a kind's category
 - the win recorded by its kinds and named in the history
 - rolled kinds from three topics with none holding the start
 - a new start in one of them rolling them again

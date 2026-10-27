@@ -2382,7 +2382,8 @@ async function navigate(title, fragment, { back = false, from = null } = {}) {
   cacheParse([title, page.title], page);
   if (back) game.stack.pop(); else game.stack.push(page.title);
   const via = page.title === game.vias[game.viaNext]?.title ? ++game.viaNext : 0;   // the checkpoint's number, from 1
-  const finds = hunting() && game.path.length ? huntFinds(page) : [];   // the start never counts
+  // The start never counts, coming back to it either: the live wiki may have put it in a kind's category since.
+  const finds = hunting() && game.path.length && page.title !== game.start.title ? huntFinds(page) : [];
   game.path.push({ title: page.title, back, ...(via && { via }), ...(finds.length && { found: finds.map(h => h.label) }) });
   for (const h of finds) h.found = page.title;
   advArrive(page.title, back);

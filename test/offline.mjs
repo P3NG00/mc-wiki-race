@@ -778,6 +778,16 @@ await ev("navigate('Blaze', null)");
 check('a page of two kinds finds both', await until("game.path.length === 2 && !game.loading") &&
   await ev(`game.path[1].found.join() === 'a hostile mob,a flying mob' && ${toast} === '✓ Found a hostile mob and a flying mob: Blaze (2 of 3)'`), await ev(toast));
 await ev("finish(false); closeModal(); toSetup()");
+// The start is no find, coming back to it either, though the live wiki puts it in a kind's category.
+await open('#start=Brand%20New%20Mob&kind=Nether%20mobs&kind=Enchantments&kind=Potions&rules=scavenger');
+await until(ready);
+await play();
+await ev("navigate('Diamond', null)");
+await until('game.path.length === 2 && !game.loading');
+await ev("navigate('Brand New Mob', null)");
+check('the start is no find, coming back to it either', await until('game.path.length === 3 && !game.loading') && await ev('game.hunt.every(h => !h.found) && !game.path[2].found'),
+  await ev('JSON.stringify(game.path.map(e => e.found ?? null))'));
+await ev("finish(false); closeModal(); toSetup()");
 const rolled = JSON.parse(await ev(`(() => {
   setup.start = { title: 'Blaze' };
   const rolls = Array.from({ length: 40 }, rollKinds);

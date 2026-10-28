@@ -20,7 +20,7 @@ Open `index.html` directly in a browser (`file://` works; no server needed). `py
 
 ## Testing
 
-`test/run-e2e.sh [--offline] [screenshot-dir]` runs the suites in headless Firefox with WebDriver BiDi: `test/e2e.mjs` plays real games against the live wiki, and with `--offline`, `test/offline.mjs` checks the game's own logic in about two and a half minutes with every request answered by the test. They need `firefox` and Node ≥ 22.
+`test/run-e2e.sh [--offline] [screenshot-dir]` runs the suites in headless Firefox with WebDriver BiDi: `test/e2e.mjs` plays real games against the live wiki, and with `--offline`, `test/offline.mjs` checks the game's own logic in about three and a half minutes with every request answered by the test. They need `firefox` and Node ≥ 22.
 
 The git pre-commit hook (`git config core.hooksPath .githooks` once per clone) runs on every commit:
 - `tools/check-docs.test.mjs`, when the check itself changes.

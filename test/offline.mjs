@@ -1046,9 +1046,10 @@ for (let i = 0; i < 5; i++) {
 }
 check('and in a Relay of three, the checkpoints go round the start\'s topic', relayRolls.every(r => / -> .*: par 3$/.test(r)), relayRolls.join(' | '));
 // Charcoal has one target at par 3 here, Stony Shore: with Stony Shore a checkpoint kept, a new target is the nearest par
-// it has, saying so, rather than giving up.
-await ev("setCustom('via0', 'Stony Shore')"); await until(ready, 30000);
-await ev("setCustom('start', 'Charcoal')"); await until(ready, 30000);
+// it has, saying so, rather than giving up. Start stays off while Stony Shore is the target too, as the last roll may have
+// left it, so these wait only for the lookups.
+await ev("setCustom('via0', 'Stony Shore')"); await until('setup.busy === 0', 30000);
+await ev("setCustom('start', 'Charcoal')"); await until('setup.busy === 0', 30000);
 await ev("reroll('goal')"); await until(ready, 30000);
 check('a start whose only target at the par is a checkpoint kept gets one at the nearest par, saying so', await ev(`setup.via0?.title === 'Stony Shore' && !!setup.goal && setup.goal.title !== 'Stony Shore'
   && ${status}.startsWith('Charcoal has no other target at par 3')`), await ev(`JSON.stringify([setup.start?.title, setup.via0?.title, setup.goal?.title, ${status}])`));

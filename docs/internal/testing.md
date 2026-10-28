@@ -168,7 +168,7 @@ The test also fails on any uncaught error or rejection in the page or the articl
 
 ## Offline suite (`test/offline.mjs`)
 
-`test/run-e2e.sh --offline` runs `test/offline.mjs` instead, in about two and a half minutes without network: every request to minecraft.wiki is answered by the test.
+`test/run-e2e.sh --offline` runs `test/offline.mjs` instead, in about three and a half minutes without network: every request to minecraft.wiki is answered by the test.
 
 ### Made-up replies
 

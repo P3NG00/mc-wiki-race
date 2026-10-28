@@ -1387,12 +1387,14 @@ function renderKinds() {
   $('#cardHunt .kinds').innerHTML = isBlind() ? `<li><b>${HUNT_SIZE} hidden kinds</b><br><span class="note">Blind target: picked and shown when you start.</span></li>`
     : (setup.kinds ?? []).map(k => `<li><b>${esc(KINDS[k].label)}</b><br><span class="note">e.g. ${esc(kindExamples(k).join(', '))}</span></li>`).join('');
 }
-// The first kinds in an order that come from different topics, none holding the start. Rolled in a random order, and
-// the daily's in the day's ranking.
+// The first kinds in an order that come from different topics and share no page, none holding the start, so each find
+// counts once (a vehicle and a way to get around both hold Boat). Rolled in a random order, and the daily's in the day's
+// ranking.
+const kindsShare = (a, b) => KINDS[a].members.some(t => KIND_MEMBERS.get(b).has(t));
 function firstKinds(order, start) {
   const picked = [];
   for (const k of order) {
-    if (picked.length < HUNT_SIZE && !picked.some(p => KINDS[p].topic === KINDS[k].topic) && !KIND_MEMBERS.get(k).has(start)) picked.push(k);
+    if (picked.length < HUNT_SIZE && !picked.some(p => KINDS[p].topic === KINDS[k].topic || kindsShare(p, k)) && !KIND_MEMBERS.get(k).has(start)) picked.push(k);
   }
   return picked;
 }

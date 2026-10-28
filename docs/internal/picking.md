@@ -191,7 +191,7 @@ Every daily plays on Normal plus one rule (`dailyRule`), ranked the same way ove
 
 - An Exact clicks day ranks its clicks over par over `DAILY_EXTRAS` (2, 3 or 4, salt `extra`: not the strip's par + 1 or 5), which `dailyText` names ("Exact clicks, par + 3") and `loadDaily` sets in the strip, and only takes a target with a route of exactly its count (`exactRoute`, with no Content).
 - A Scavenger day ranks its mode over `DAILY_HUNTS` (salt `hunt`):
-  - kinds are the first in the day's ranking (salt `kind`) from three topics, none holding the start
+  - kinds are the first in the day's ranking (salt `kind`) from three topics, sharing no page, none holding the start
   - articles are the target and two more taken like checkpoints, needing a route in any order.
 - On a Checkpoint day `dailyPair` also ranks the count over `DAILY_CHECKPOINTS` (1 or 2, salt `checkpoints`: three would use every topic and make a long daily) and picks the checkpoints (salts `via`, `via1`).
 - A kinds daily has no target, so `init` checks `cardsLoaded()`, not the target, before rolling a pair instead.

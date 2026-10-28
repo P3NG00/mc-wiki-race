@@ -33,7 +33,7 @@ Pick one of the tiles; Race is the default. The strip under them explains the ga
 | **Scavenger hunt** | A → ✓ ✓ ✓ | Instead of one target, find 3 things in any order: one of each of 3 kinds, or 3 articles. | **Find**: 3 kinds or 3 articles (kinds by default) |
 | **Exact clicks** | A → → → → B | Reach the target in exactly par + the clicks you pick, never on a page twice. | **Clicks**: par + 1 to par + 5, or Random (par + 2 by default) |
 
-- A kind is a wiki category, such as Hostile mobs, shown with a few of its best-known members as examples. One page can find several kinds at once, and the start never counts.
+- A kind is a wiki category, such as Hostile mobs, shown with a few of its best-known members as examples. Rolled kinds come from different topics and share no page, so a page usually finds just one (kinds you write into a link yourself may share), and the start never counts.
 - In Exact clicks there's no Back, every page you've visited goes dead, and landing on the target too soon loses, as does running out of clicks. There's always a route of the count: the result shows one.
 
 ## Extra rules

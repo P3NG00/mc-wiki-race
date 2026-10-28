@@ -899,10 +899,12 @@ check('the start is no find, coming back to it either', await until('game.path.l
 await ev("finish(false); closeModal(); toSetup()");
 const rolled = JSON.parse(await ev(`(() => {
   setup.start = { title: 'Blaze' };
-  const rolls = Array.from({ length: 40 }, rollKinds);
-  return JSON.stringify(rolls.filter(ks => ks.length !== 3 || new Set(ks.map(k => KINDS[k].topic)).size !== 3 || ks.some(k => KIND_MEMBERS.get(k).has('Blaze'))));
+  // Forty random rolls, and one in an order putting kinds that share pages first (Boat is a vehicle and a way to get around).
+  const rolls = [...Array.from({ length: 40 }, rollKinds), firstKinds(['Transport', 'Vehicles', 'Storage', 'Effects', 'Food', 'Climbable blocks', ...Object.keys(KINDS)], 'Blaze')];
+  return JSON.stringify(rolls.filter(ks => ks.length !== 3 || new Set(ks.map(k => KINDS[k].topic)).size !== 3 || ks.some(k => KIND_MEMBERS.get(k).has('Blaze'))
+    || ks.some(a => ks.some(b => a !== b && KINDS[a].members.some(t => KIND_MEMBERS.get(b).has(t))))));
 })()`));
-check('rolled kinds are three from three topics, none holding the start', rolled.length === 0, JSON.stringify(rolled.slice(0, 2)));
+check('rolled kinds are three from three topics sharing no page, none holding the start', rolled.length === 0, JSON.stringify(rolled.slice(0, 2)));
 await open('#start=Diamond&kind=Hostile%20mobs&kind=Enchantments&kind=Potions&rules=scavenger');
 await until(ready);
 await ev("setCustom('start', 'Blaze')");

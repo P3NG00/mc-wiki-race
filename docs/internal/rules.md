@@ -127,10 +127,10 @@ The count can always be done: `updateSetupPar` finds a route of exactly that man
 
 - *Articles* (`huntMode() === 'articles'`) puts them on the two checkpoint cards and the target card, labelled Find and joined by +.
 - *Kinds* puts three kinds (`KINDS`, from `wiki-data.js`) on a card of their own (`#cardHunt`, `setup.kinds`, `setKinds`), each with its best-known members as examples.
-  - `rollKinds` takes them from three topics, none holding the start (`firstKinds`, which the daily uses too), and a new start in one of them rolls them again (`renderCard`), since the start never counts.
+  - `rollKinds` takes them from three topics, sharing no page (`kindsShare`: a vehicle and a way to get around both hold Boat) and none holding the start (`firstKinds`, which the daily uses too), and a new start in one of them rolls them again (`renderCard`), since the start never counts.
 - `startGame` puts them in `game.hunt` (`{ info }` or `{ kind }`, with a label), with `game.goal` null, so the code that reads the objective asks `game.hunt` first (`huntLeft`, `ahead`, `cardTitles`).
 - An arrival finds (`huntFinds`) an article by its title and a kind by its snapshot members or the page's live categories (`parse.categories`, asked for with every article) less the kind's exclusions, so a page added to a category since the snapshot counts.
-- A page can find several kinds at once.
+- A page can find several kinds at once, though rolled kinds share no page: only through its live categories, or a challenge link's kinds.
 - The start finds nothing, coming back to it either, though the live wiki may have put it in a kind's category since the snapshot, or a challenge link's kinds hold it.
 - Each find gets the checkpoint's banner ("✓ Found a Nether mob: Blaze (2 of 3)") and its path entry `found`; finding all wins.
 - Distance counts to the nearest of what is left.

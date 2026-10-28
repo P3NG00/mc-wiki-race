@@ -433,7 +433,7 @@ Scavenger with kinds:
 - a page of two kinds finding both
 - the start no find, coming back to it either, though the live wiki puts it in a kind's category
 - the win recorded by its kinds and named in the history
-- rolled kinds from three topics with none holding the start
+- rolled kinds from three topics sharing no page, with none holding the start, also in an order putting kinds that share pages first
 - a new start in one of them rolling them again
 
 And with articles:

@@ -196,7 +196,7 @@ Rolls in every pool:
 
 - An article that fails to load mid-game: Cancel keeping the page you were on with the clock going again and Give up on, and Retry, once the wiki answers, loading it
 - An article whose frame never says it's ready (the ready message dropped, the 15 s wait shortened) loading with the clock held and Give up off until then, then going on with both and no stuck banner
-- Give up asking first, saying the time is paused, which it is; Keep going going on with the clock running; Give up ending the game given up, its Clicks tile the clicks it took; and without the Timer saying nothing of time
+- Give up asking first, saying the time is paused, which it is, with Keep going the main button and focused and Give up in a loss's colour (`button.danger`); Keep going going on with the clock running; Give up ending the game given up, its Clicks tile the clicks it took; and without the Timer saying nothing of time
 - A link redirecting to the target winning, its title seen as the target's
 - A win headed You made it!, with the shortest route and its par
 - A live link pressed with the mouse being asked for at the press and its click taking that request (one pressed and let go elsewhere asked for once, its later click asking no more)
@@ -269,6 +269,7 @@ The advancements:
 - the panel's tiles, gold and ??? ones
 - a count's progress and a secret's detail saying nothing
 - stored advancements keeping only what would be written
+- Reset asking first, Cancel focused and Reset in a loss's colour
 - Clear history leaving them, as the panel's foot says, with the heading and the button and a line saying no games yet, and Reset forgetting them, Recent games still showing the button with no games, as on a first visit
 - a toast headed by its tier (Advancement Made!, Goal Reached!, Challenge Complete!), those shown together playing the highest tier's sound
 - after Reset, what earns the rest, each game its pair's first:
@@ -483,7 +484,7 @@ The daily:
   - opening on this month with today marked and the days to come off, its key naming won on the day, won later, not won and not played
   - going back to `DAILY_FIRST`'s month and no further
   - a day loading its daily in place of a challenge link's cards, and no longer a challenge's game, for Accepted
-- Clear history asking first, counting the games (the 1 recorded game for one), Cancel keeping them
+- Clear history asking first, counting the games (the 1 recorded game for one), Cancel focused and keeping them, Clear history in a loss's colour
 - Clear history emptying the dailies
 
 ### Content and the target par
@@ -555,7 +556,7 @@ The background:
 - the corner's buttons clear of the setup screen at 1400, 1280, 1024 and 820 px, in a row beside the title at a phone's width, and Background only's back in the corner, under the Background box
 - Auto the constellation on a wide screen and the redstone map at a phone's width
 - the sky laid out the same every time
-- no name drawn under the setup screen's cards and panels or past the screen's edge, over three seconds of the sky at the top of the page and at its foot, and with motion reduced a scroll painting it again
+- no name drawn under the setup screen's cards and panels or past the screen's edge, over fifteen frames at the top of the page and fifteen at its foot, and with motion reduced a scroll painting it again
 - the facts line starting with the snapshot's pages and getting how far apart articles are on the difficulty
 - Roll by itself:
   - marking pairs of its own, in grey where the cards' markers are green and red

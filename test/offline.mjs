@@ -200,8 +200,8 @@ await ev("removeEventListener('message', dropReady, true); setTimeout = realSetT
 await ev("$('#btnGiveUp').click()");
 const askedAt = await ev('now()');
 await sleep(300);
-check('Give up asks first, saying the time is paused, which it is', await ev(`$('#modal h2').textContent === 'Give up?' && $('#modal').textContent.includes('Your time is paused.')
-  && now() === ${askedAt}`), await ev("$('#modal').textContent"));
+check('Give up asks first, saying the time is paused, which it is, Keep going the main button and focused, Give up in a loss\'s colour', await ev(`$('#modal h2').textContent === 'Give up?' && $('#modal').textContent.includes('Your time is paused.')
+  && now() === ${askedAt} && document.activeElement === $('#gKeep') && $('#gKeep').matches('.primary') && $('#gQuit').matches('.danger:not(.primary)')`), await ev("$('#modal').textContent"));
 await ev("$('#gKeep').click()");
 await sleep(300);
 check('Keep going goes on, the clock running', await ev(`game.active && $('#modalBg').classList.contains('hidden') && now() > ${askedAt} + 200`));
@@ -1374,7 +1374,7 @@ check('a day loads its daily', await until("setup.daily !== null && setup.daily 
   && await ev("document.querySelector('#setupStatus').textContent.startsWith('Daily challenge for ' + shortDate(localDay(setup.daily)) + ': ')"), await ev('setup.daily'));
 check('and is no challenge link\'s game then, for Accepted', wasChallenge === true && await ev('setup.challenge === false'), await ev('setup.challenge'));
 // Clear history asks first, counting the games; Cancel keeps them.
-const clearAsks = "(() => { $('#btnClearHistory').click(); const p = $('#modal p').textContent; $('#hKeep').click(); return p; })()";
+const clearAsks = "(() => { $('#btnClearHistory').click(); const p = $('#modal p').textContent + (document.activeElement === $('#hKeep') && $('#hClear.danger') ? '' : ' (Cancel not focused, or Clear history not in a loss\\'s colour)'); $('#hKeep').click(); return p; })()";
 const games = await ev('savedGames().length'), asksMany = await ev(clearAsks);
 check('Clear history asks first, counting the games, and Cancel keeps them', games > 1 && asksMany === `This deletes all ${games} recorded games, personal bests, dailies and the daily streak included. It can’t be undone.`
   && await ev(`savedGames().length === ${games} && $('#modalBg').classList.contains('hidden')`), asksMany);
@@ -1938,7 +1938,9 @@ check('Clear history leaves them, the heading and the button still there with no
 await ev("$('#btnAdv').click()");
 check('the panel\'s foot says Clear history keeps them and XP', await ev("document.querySelector('.adv-foot .note').textContent === 'Clear history keeps your advancements and XP. Only Reset advancements clears them.'"),
   await ev("document.querySelector('.adv-foot .note').textContent"));
-await ev("$('#aReset').click(); $('#aWipe').click()");
+await ev("$('#aReset').click()");
+check('Reset advancements asks first, Cancel focused and Reset in a loss\'s colour', await ev("document.activeElement === $('#aKeep') && $('#aWipe').matches('.danger:not(.primary)')"));
+await ev("$('#aWipe').click()");
 check('Reset advancements forgets them and the counts', await ev(`advEarned() === 0 && adv.wins === 0 && adv.xp === 0 && adv.pages.size === 0 && JSON.stringify(store.get('mwr.advancements').got) === '{}'
   && $('#advCount').textContent.startsWith('0 / ') && document.querySelectorAll('.adv-tile.got').length === 0`));
 check('and with no games either, as on a first visit, Recent games still shows the button', await ev("!$('#btnAdv').closest('.hidden') && !$('#historyNone').classList.contains('hidden') && $('#xpSetup').classList.contains('hidden')"));
@@ -2190,12 +2192,10 @@ check('Auto is the redstone map at a phone\'s width', await until("bgStyle() ===
 await send('browsingContext.setViewport', { context: ctx, viewport: null });
 check('and the constellation again on a wide screen', await until("bgStyle() === 'constellation'"));
 // No name the background draws is under the setup screen's cards, tiles or panels, nor past the screen's edge, even in
-// part: over three seconds of the sky, its labels, pulses and markers, half at the top of the page and half at its foot,
-// where it is open enough that some are drawn. And with motion reduced a scroll paints it again,
-// as what covers it moved.
+// part: its labels, pulses and markers over fifteen frames at the top of the page and fifteen at its foot, where it is
+// open enough that some are drawn. And with motion reduced a scroll paints it again, as what covers it moved.
 await until('!!bg.sky');
-const underCards = JSON.parse(await ev(`new Promise(done => {
-  scrollTo(0, 0);
+const underCards = JSON.parse(await ev(`(async () => {
   const boxes = () => [...document.querySelectorAll('.daily-box, .card, .games label, .game-help, .extras label, .settings')].map(el => el.getBoundingClientRect()).filter(r => r.width);
   const real = bgCtx.fillText, hits = new Set();
   let drawn = 0;
@@ -2205,9 +2205,14 @@ const underCards = JSON.parse(await ev(`new Promise(done => {
     if (l < 0 || l + w > bg.W || y - 10 < 0 || y > bg.H || boxes().some(r => l < r.right && r.left < l + w && y - 10 < r.bottom && r.top < y + 2)) hits.add(text);
     return real.apply(this, arguments);
   };
-  setTimeout(() => scrollTo(0, document.documentElement.scrollHeight), 1500);
-  setTimeout(() => { bgCtx.fillText = real; scrollTo(0, 0); done(JSON.stringify({ drawn, hits: [...hits] })); }, 3000);
-})`));
+  // Painted here, a frame every 100 ms, so the check doesn't hang on the background's own frames coming.
+  for (const y of [0, document.documentElement.scrollHeight]) {
+    scrollTo(0, y);
+    for (let i = 0; i < 15; i++) { bgPaint(bgNow()); await new Promise(r => setTimeout(r, 100)); }
+  }
+  bgCtx.fillText = real; scrollTo(0, 0);
+  return JSON.stringify({ drawn, hits: [...hits], style: bgStyle(), live: bgLive(), calm: calm(), covers: bg.covers.length, W: bg.W, H: bg.H });
+})()`));
 check('the background draws no name under the setup screen\'s cards and panels, nor past the screen\'s edge', underCards.drawn > 0 && !underCards.hits.length, JSON.stringify(underCards));
 check('and with motion reduced a scroll paints it again', await ev(`(async () => {
   const was = calmBox;

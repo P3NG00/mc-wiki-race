@@ -129,7 +129,7 @@ Then each group's grid with its count and, for Skill and Speed, their rules: eac
 
 ### Reset
 
-At the foot, beside "Clear history keeps your advancements and XP. Only Reset advancements clears them.", Reset advancements (`#aReset`) asks first, then forgets everything in `mwr.advancements` (`advEmpty`).
+At the foot, beside "Clear history keeps your advancements and XP. Only Reset advancements clears them.", Reset advancements (`#aReset`) asks first (Cancel focused, Reset in a loss's colour, `button.danger`), then forgets everything in `mwr.advancements` (`advEmpty`).
 
 ## XP
 

@@ -120,7 +120,7 @@ On the right are your **Clicks** ("of 6" under Six clicks, "of exactly 7" under 
 
 Back returns to the previous article and counts as a click. The clock pauses while an article loads, and while the Give up dialog is open, but keeps running while you peek. If an article fails to load you get **Retry** and **Cancel**, with the clock stopped, and whether the wiki couldn't be reached or sent back an error.
 
-**Give up** asks first ("Give up?"), with **Keep going** to change your mind. While a game is on, closing the tab, reloading or the browser's Back asks first with the browser's own dialog (except on iOS Safari, which never shows it).
+**Give up** asks first ("Give up?"), with **Keep going**, the main button, to change your mind. While a game is on, closing the tab, reloading or the browser's Back asks first with the browser's own dialog (except on iOS Safari, which never shows it).
 
 ## The result
 

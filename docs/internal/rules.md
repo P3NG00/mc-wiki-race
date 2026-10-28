@@ -209,7 +209,7 @@ An item's blast (see [items.md](items.md)) throws the pieces of the page around 
 ## The clock and loading
 
 - The clock runs in every game, but with the Timer off (`game.timed`, see [ui.md](ui.md)) it is hidden and its time isn't recorded.
-- It pauses while an article is loading and rendering, and while the Give-up confirmation is open.
+- It pauses while an article is loading and rendering, and while the Give-up confirmation is open (Keep going its main button and focused, so Enter plays on; Give up in a loss's colour, `button.danger`, as are Clear history's and Reset advancements' own).
 - It keeps running while the player peeks at the target description.
 - `game.loading` stays set until the frame posts `{mwr:'ready', token}`.
 - That message comes from its own `<script>` after the main frame script, so it is sent only after the render-blocking stylesheets have loaded.

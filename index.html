@@ -80,7 +80,11 @@
   button:hover:not(:disabled) { border-color: var(--muted); }
   button:disabled { opacity: .5; cursor: default; }
   button.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); font-weight: 600; }
+  /* What a dialog asks before: ending the game or deleting what's saved, outlined in the colour of a loss, never filled as
+     the main action is. */
+  button.danger { color: var(--warm); border-color: var(--warm); font-weight: 600; }
   button.primary:hover:not(:disabled) { filter: brightness(1.07); border-color: var(--accent); }
+  button.danger:hover:not(:disabled) { background: var(--warm-soft); border-color: var(--warm); }
   button.link { border: 0; background: none; padding: 0; color: var(--accent); text-decoration: underline; }
   .mono { font-variant-numeric: tabular-nums; }
   .hidden { display: none !important; }
@@ -3270,8 +3274,9 @@ function openAdvancements() {
   };
   $('#aReset').onclick = () => {
     openModal(`<h2>Reset advancements?</h2><p>This forgets every advancement you’ve earned, your XP and level, and the counts toward the rest (wins, articles visited, blasts, instruments heard). Your history and dailies stay.</p>
-      <div class="actions"><button id="aKeep">Cancel</button><button class="primary" id="aWipe">Reset advancements</button></div>`);
+      <div class="actions"><button id="aKeep">Cancel</button><button class="danger" id="aWipe">Reset advancements</button></div>`);
     $('#aKeep').onclick = openAdvancements;
+    $('#aKeep').focus();
     $('#aWipe').onclick = () => { adv = advEmpty(); saveAdv(); renderHistory(); openAdvancements(); };
   };
   advPictures();
@@ -6454,16 +6459,18 @@ $('#btnGiveUp').onclick = () => {
   if (!game.active) return;
   pauseClock();
   openModal(`<h2>Give up?</h2>${game.timed ? '<p>Your time is paused.</p>' : ''}
-    <div class="actions"><button id="gKeep">Keep going</button><button class="primary" id="gQuit">Give up</button></div>`);
+    <div class="actions"><button class="danger" id="gQuit">Give up</button><button class="primary" id="gKeep">Keep going</button></div>`);
   $('#gKeep').onclick = closeModal;
+  $('#gKeep').focus();   // Enter goes on playing
   $('#gQuit').onclick = () => { $('#modalBg').classList.add('hidden'); finish(false); };
 };
 $('#btnAdv').onclick = openAdvancements;
 $('#btnClearHistory').onclick = () => {
   const n = savedGames().length;
   openModal(`<h2>Clear history?</h2><p>This deletes ${n === 1 ? 'the 1 recorded game' : `all ${n} recorded games`}, personal bests, dailies and the daily streak included. It can’t be undone.</p>
-    <div class="actions"><button id="hKeep">Cancel</button><button class="primary" id="hClear">Clear history</button></div>`);
+    <div class="actions"><button id="hKeep">Cancel</button><button class="danger" id="hClear">Clear history</button></div>`);
   $('#hKeep').onclick = closeModal;
+  $('#hKeep').focus();
   $('#hClear').onclick = () => { store.set('mwr.history', []); store.set('mwr.dailies', {}); renderHistory(); closeModal(); };
 };
 $('#btnPeek').onclick = () => {

@@ -185,6 +185,7 @@ The test also fails on any uncaught error or rejection in the page or the articl
   - a navbox link
 - Stylesheets come back empty and images fail, and so do the articles a check names (`failParse`), as with no connection.
 - A made-up redirect, Crafting recipe, leads to Crafting (`REDIRECTS`).
+- Page info marks a title ending in "(disambiguation)" as a disambiguation page, as the wiki's does.
 
 It checks the game's own logic, by area:
 
@@ -212,6 +213,8 @@ So a new snapshot that changes one fails there by name rather than leaving a che
   - no left-out page in the data
 - A reroll, or the daily, while a typed-in title is looked up winning
 - A left-out page typed in or named in a challenge link not taken, a typed-in one saying the game leaves it out, as it does a page that isn't an article, and one that doesn't exist saying there's no article by that name
+- A disambiguation page typed in taken, with a heads-up
+- A challenge link saying it's loaded, with its rules unless it's Normal with none
 - A failure saying whose it is: the wiki's (an error it sent back, or no answer at all), the link data's (a graph file that doesn't load) or the game's (a card none of whose draws exists)
 - The difficulty a link's rules give
 - The Timer box:
@@ -243,6 +246,7 @@ Rolls in every pool:
 - An article whose frame never says it's ready (the ready message dropped, the 15 s wait shortened) loading with the clock held and Give up off until then, then going on with both and no stuck banner
 - Give up asking first, saying the time is paused, which it is; Keep going going on with the clock running; Give up ending the game given up; and without the Timer saying nothing of time
 - A link redirecting to the target winning, its title seen as the target's
+- A win headed You made it!, with the shortest route and its par
 - A live link pressed with the mouse being asked for at the press and its click taking that request (one pressed and let go elsewhere asked for once, its later click asking no more)
 - A page with no live links (a made-up page linking two hubs, on Hard) getting a banner that stays, to go Back or give up, or only give up on the start, and none on Normal
 - Rerolls from the Pool row
@@ -369,8 +373,11 @@ Blind target:
 - Start picking them from different topics
 - Copy challenge link picking them unseen
 - a copy the browser refuses saying so, with the link to copy by hand
+- a copy that works saying so
 - turning the rule off dropping them and rolling new ones, and on again dropping them
 - Exact clicks's count hidden and Start picking a target with a route of exactly par + 2
+- with no target of exactly its count, Start saying so and not starting
+- a held card the same as the start keeping Start from starting, saying so
 - a target par holding
 - a Blind target daily held unseen, and turning the rule off leaving it with a new target
 
@@ -401,6 +408,7 @@ A round trip:
 - the peek on the way back headed "Back to Diamond"
 - the win recorded by its cards
 - a target with no way back saying so
+- with a checkpoint still to come on the way back, no way on to it
 
 A Relay round trip:
 
@@ -419,7 +427,7 @@ Scavenger's round trip:
 
 - the peek going back to the hunt
 - the last find heading home
-- the win and its record
+- the win and its record, headed You made it!
 
 ### Exact clicks
 
@@ -430,7 +438,9 @@ Exact clicks:
 - Back gone
 - visited pages dead, titled as already visited
 - the target too soon losing as Too soon
+- the history giving a loss's clicks of the count, and par
 - on the count winning with no golf score and its path counted with no click marked as getting no closer
+- the history marking the win as the pair's best, played Today; a game from yesterday saying Yesterday, and one before that its day
 - a link's `extra=4`:
   - making the count par + 4 with a route of it
   - the challenge link carrying it
@@ -478,7 +488,7 @@ And with articles:
 - three Find cards joined by +
 - par the best of the orders
 - Distance counting to the nearest
-- finds in any order winning
+- finds in any order winning, headed You found them all!, with the shortest hunt and its par
 - the record
 
 Also:
@@ -519,6 +529,7 @@ The daily:
   - opening on this month with today marked and the days to come off
   - going back to `DAILY_FIRST`'s month and no further
   - a day loading its daily in place of a challenge link's cards, and no longer a challenge's game, for Accepted
+- Clear history asking first, counting the games (the 1 recorded game for one), Cancel keeping them
 - Clear history emptying the dailies
 
 ### Content and the target par
@@ -557,7 +568,7 @@ Par:
 - a round trip goes there and back with the way back off the way there, almost always at the lower bound
 - a Relay round trip goes round its loop in order
 - Scavenger's goes home after the hunt
-- a page missing from the snapshot named in the result's par line, a start with no route saying so, and the line otherwise naming the offline copy and its date as the footer does
+- a page missing from the snapshot named in the result's par line, a start with no route saying so, and the line otherwise naming the offline copy and its date as the footer does, and a search that fails saying why
 - the setup screen, the header, the result, the record and the history show par, with golf's names for the score
 
 ### Report link, sealed links, Share and Random game

@@ -65,7 +65,7 @@ function answer(request, url) {
       categories: (LIVE_CATEGORIES[t] ?? []).map(category => ({ sortkey: '', category })), links: [{ ns: 0, title: 'No such page', exists: false }, { ns: 0, title: 'Diamond Pickaxe', exists: true }] } }));
   }
   if (p.get('action') === 'query' && p.has('titles')) {
-    return reply(request, JSON.stringify({ query: { pages: p.get('titles').split('|').map(t => t.startsWith('No such ') ? { title: t, missing: true } : { title: t, ns: nsOf(t), pageprops: {}, extract: `About ${t}.` }) } }));
+    return reply(request, JSON.stringify({ query: { pages: p.get('titles').split('|').map(t => t.startsWith('No such ') ? { title: t, missing: true } : { title: t, ns: nsOf(t), pageprops: t.endsWith(' (disambiguation)') ? { disambiguation: '' } : {}, extract: `About ${t}.` }) } }));
   }
   return reply(request, JSON.stringify({ error: { code: 'offline', info: 'Not answered offline: ' + kind } }));
 }
@@ -96,6 +96,7 @@ const until = async (expr, ms = 15000) => {
 };
 const frameCtx = async () => (await send('browsingContext.getTree', {})).result.contexts[0].children[0]?.context;
 const ready = "!document.querySelector('#btnPlay').disabled && setup.busy === 0";   // a pair on the cards, nothing rolling
+const status = "document.querySelector('#setupStatus').textContent";
 // A hash change alone wouldn't reload the page, so go through about:blank.
 const open = async hash => {
   await send('browsingContext.navigate', { context: ctx, url: 'about:blank', wait: 'complete' });
@@ -164,12 +165,19 @@ check('so is a page that isn’t an article', await until("setup.busy === 0 && d
 await ev("setCustom('start', 'No such page')");
 check('and one that doesn’t exist says there’s no article by that name', await until("setup.busy === 0 && document.querySelector('#setupStatus').textContent === 'No article named “No such page” on minecraft.wiki.'")
   && await ev("setup.start.title === 'Diamond'"), await ev("document.querySelector('#setupStatus').textContent"));
+await ev("setCustom('goal', 'Mob (disambiguation)')");
+check('a disambiguation page typed in comes with a heads-up', await until("setup.busy === 0 && setup.goal?.title === 'Mob (disambiguation)'")
+  && await ev("$('#setupStatus').textContent === 'Heads up: “Mob (disambiguation)” is a disambiguation page.'"), await ev("$('#setupStatus').textContent"));
 // What comes last wins: a card rerolled, or the daily loaded, while a title typed in is being looked up.
 await ev("setCustom('start', 'Creeper'); reroll('start')");
 check('a reroll while a typed-in title is looked up wins', await until(ready, 30000) && await ev("!setup.start.typed"), await ev('JSON.stringify(setup.start)'));
 await ev("setCustom('start', 'Creeper'); loadDaily()");
 check('and so does the daily', await until(ready, 30000) && await ev("setup.daily === today() && !setup.start.typed"), await ev('JSON.stringify([setup.daily, setup.start])'));
+// A challenge link says it's loaded, with its rules unless it's Normal with none.
+await open('#start=Diamond&target=Crafting&rules=nonav');
+check('a challenge link on Normal with no rule says it\'s loaded', await ev(status) === 'Challenge loaded. Start the game when you’re ready.', await ev(status));
 await open('#start=Diamond&target=Crafting');   // the Relaxed challenge again, which the checks below play
+check('and with its rules otherwise', await ev(status) === 'Challenge loaded with Relaxed. Start the game when you’re ready.', await ev(status));
 // A failure says whose it is: the wiki's (here a request the suite doesn't answer), the link data's, or the game's own
 // (a card none of whose draws exists).
 const failSays = async fn => ev(`withBusy(${fn}).then(() => document.querySelector('#setupStatus').textContent)`);
@@ -237,6 +245,8 @@ await ev("navigate('Crafting recipe', null)");
 check('a link redirecting to the target wins, its title seen as the target\'s', await until('!game.active') && await ev(`game.path.at(-1).title === 'Crafting'
   && game.seen.get('Crafting recipe') === 'Crafting' && game.seen.get('Crafting') === 'Crafting' && store.get('mwr.history', [])[0].won === true`),
   await ev("JSON.stringify([game.path.map(p => p.title), [...game.seen]])"));
+check('a win is headed You made it!, with the shortest route and its par', await ev("$('.result-head h2').textContent === '🎉 You made it!'")
+  && await until("/^Shortest route · par \\d+$/.test($('#mBestTitle').textContent)", 3000), await ev("$('.result-head h2').textContent + ' ' + $('#mBestTitle').textContent"));
 await ev("closeModal(); toSetup(); $('#timerToggle').click()");
 await play();
 let links = await linkStates();
@@ -596,6 +606,8 @@ await ev("navigator.clipboard.writeText = () => Promise.reject(new Error('Refuse
 check('a refused copy says so, with the link to copy by hand', await until(`(([, link]) => link && openLink(new URL(link).hash.slice(3)) === openLink(new URL(gameLink()).hash.slice(3)))
   (document.querySelector('#setupStatus').textContent.split('Couldn’t copy, so copy the link from here: '))`),
   await ev("document.querySelector('#setupStatus').textContent"));
+await ev("navigator.clipboard.writeText = () => Promise.resolve(); document.querySelector('#btnCopy').click()");
+check('and a copy that works says so', await until("document.querySelector('#setupStatus').textContent === 'Challenge link copied.'"), await ev("document.querySelector('#setupStatus').textContent"));
 await ev("delete navigator.clipboard.writeText");
 await ev("window.held = [setup.via0, setup.goal]; document.querySelector('#rules input[value=blind]').click()");
 check('turning Blind target off drops them and rolls new ones to show', await until(ready)
@@ -609,6 +621,13 @@ await play();
 check('Start picks a target with a route of exactly par + 2', await ev(`!!game.exact && game.exact.at(-1) === game.goal.title && game.limit === game.exact.length - 1`)
   && await until(`game.par !== null && game.limit === game.par + 2`), await ev('JSON.stringify([game.par, game.limit])'));
 await ev("finish(false); closeModal(); toSetup()");
+// With no target that can be done in exactly its count (here the search made to find none), Start says so. Blind target
+// off and on again drops the target the game held.
+for (let i = 0; i < 2; i++) { await ev("document.querySelector('#rules input[value=blind]').click()"); await until(ready); }
+await ev("window.realExactRoute = exactRoute; exactRoute = async () => null; document.querySelector('#btnPlay').click()");
+check('Start with no target of exactly its count says so, and doesn\'t start', await until("document.querySelector('#setupStatus').textContent === 'No target came up that can be reached in exactly its count. Try again, or reroll the start.'", 30000)
+  && await ev('!game.active'), await ev("document.querySelector('#setupStatus').textContent"));
+await ev('exactRoute = realExactRoute');
 // A target topic and par under Blind target: the start is rolled with a target at that par, which Start then picks.
 await ev("document.querySelector('input[name=game][value=race]').click()");
 await ev("document.querySelector('#topic').value = 'blocks'; (s => { s.value = 'p3'; s.dispatchEvent(new Event('change', { bubbles: true })); })(document.querySelector('#reach'))");
@@ -617,6 +636,11 @@ await play();
 check('Start picks a target from the topic at the par chosen', await until('game.par !== null') && await ev("game.par === 3 && game.goal.reach === 'p3' && groupOf(game.goal.title) === 'blocks'"),
   await ev("game.par + ' ' + game.goal.title"));
 await ev("finish(false); closeModal(); toSetup(); document.querySelector('#reach').value = 'any'; document.querySelector('#topic').value = 'any'");
+// A held card that is the start's article (here put there by hand) keeps Start from starting, saying so.
+await open('#start=Diamond&target=Crafting&rules=nonav,blind');
+await ev("setup.goal = setup.start; document.querySelector('#btnPlay').click()");
+check('Start under Blind target with a held card the same as the start says so, and doesn\'t start', await until("document.querySelector('#setupStatus').textContent === 'The same article is on two cards. Reroll the start.'", 5000)
+  && await ev('!game.active'), await ev("document.querySelector('#setupStatus').textContent"));
 // A Blind target daily is held unseen, the same for everyone, and leaving it drops its cards.
 const blindDay = await ev("(() => { for (let d = new Date(today()); ; d.setDate(d.getDate() - 1)) { const s = d.toISOString().slice(0, 10); if (dailyRule(s) === 'blind') return s; } })()");
 await open('#daily=' + blindDay);
@@ -659,6 +683,7 @@ check('the last find heads home', await ev(`game.active && ${toast} === '✓ Fou
 await ev("navigate('Diamond', null)");
 check('back home wins the hunt, recorded with the way home', await until('!game.active') && await ev(`(r => r.won && r.finds.length === 3 && r.rules.join() === 'roundtrip,scavenger')(store.get('mwr.history', [])[0])
   && document.querySelector('#modal').textContent.includes('Diamond → Creeper, Zombie, Crafting (any order) → Diamond')`));
+check('a hunt won back home is headed You made it!', await ev("$('.result-head h2').textContent === '🎉 You made it!'"), await ev("$('.result-head h2').textContent"));
 await ev("closeModal(); toSetup()");
 // A target with no way back that doesn't retrace (a dead end has no way back at all) says so as it is reached.
 await open(`#start=Diamond&target=${encodeURIComponent(deadEnd)}&rules=roundtrip`);
@@ -667,6 +692,13 @@ await play();
 await ev(`navigate(${JSON.stringify(deadEnd)}, null)`);
 check('a target with no way back says so', await until("game.path.at(-1).stranded && !game.loading") &&
   await ev(`${toast} === '✓ Target reached, but there’s no way back to Diamond that doesn’t retrace your steps.'`), await ev(toast));
+await ev("finish(false); closeModal(); toSetup()");
+// With a checkpoint still to come on the way back, it's the way on to that.
+await open(`#start=Diamond&via=Creeper&target=${encodeURIComponent(deadEnd)}&back=1&rules=checkpoint,roundtrip`);
+await play();
+await ev(`navigate(${JSON.stringify(deadEnd)}, null)`);
+check('and with a checkpoint still to come on the way back, no way on to it', await until("game.path.at(-1).stranded && !game.loading") &&
+  await ev(`${toast} === '✓ Target reached, but there’s no way on to Creeper that doesn’t retrace your steps.'`), await ev(toast));
 await ev("finish(false); closeModal(); toSetup()");
 
 // Exact clicks: Start waits for a route of exactly par + 2 that is on no page twice; the header counts toward it, Back
@@ -696,6 +728,8 @@ check('reaching the target sooner loses: Too soon', await until('!game.active') 
   && document.querySelector('#modal h2').textContent === 'Too soon' && document.querySelector('#modal').textContent.includes('it had to be exactly ${n}')`));
 await ev("closeModal(); toSetup()");
 check('the history says too soon, under the game\'s label', await ev("document.querySelector('#history tbody tr .res.lost').textContent === '✗ Too soon' && document.querySelector('#history tbody tr .tag.game').textContent === 'Exact clicks'"));
+check('with the clicks of its count and par', await ev("(r => document.querySelector('#history tbody tr .h-result .note').textContent === `${r.clicks} of exactly ${r.exact} · par ${r.par}`)(savedGames()[0])"),
+  await ev("document.querySelector('#history tbody tr .h-result .note').textContent"));
 await open('#start=Diamond&target=Zombie&rules=exact');
 await until(ready);
 await play();
@@ -715,6 +749,8 @@ await ev("closeModal(); toSetup()");
 check('the history marks the win as the pair\'s best, played today', await ev(`(tr => tr.querySelector('.res.won').textContent === '✓ ${n} clicks' && !!tr.querySelector('.best-tag')
   && tr.querySelector('.h-when').textContent === 'Today' && tr.querySelector('.h-route').textContent.startsWith('Diamond → Zombie'))(document.querySelector('#history tbody tr'))`),
   await ev("document.querySelector('#history tbody tr').textContent.replace(/\\s+/g, ' ').trim()"));
+check('a game from yesterday says Yesterday, and one before that its day', await ev(`(d => (k => whenText(k(1)) === 'Yesterday' && whenText(k(2)) === shortDate(new Date(k(2))))
+  (k => new Date(d.getFullYear(), d.getMonth(), d.getDate() - k, 12).getTime()))(new Date())`));
 // The count: a link's extra= sets it, and a challenge link carries it, so par + 4 needs a route of exactly that many and
 // is a game of its own for personal bests. Random rolls one of par + 1 to 5 with every roll of the cards.
 await open('#start=Diamond&target=Zombie&rules=exact&extra=4');
@@ -918,6 +954,8 @@ for (const [i, t] of ['Sharpness', 'Bamboo', 'Ghast'].entries()) {
 }
 check('all three in any order wins, recorded by its articles', await until('!game.active') && await ev(`(r => r.won && r.finds.join() === 'Ghast,Sharpness,Bamboo'
   && r.goal === undefined)(store.get('mwr.history', [])[0]) && document.querySelector('#modal').textContent.includes('Diamond → Ghast, Sharpness, Bamboo (any order)')`));
+check('headed You found them all!, with the shortest hunt and its par', await ev("$('.result-head h2').textContent === '🎉 You found them all!'")
+  && await until(`$('#mBestTitle').textContent === 'Shortest hunt · par ${best[0]}'`, 3000), await ev("$('.result-head h2').textContent + ' ' + $('#mBestTitle').textContent"));
 await ev("closeModal(); toSetup()");
 await ev("(s => { s.value = 'kinds'; s.dispatchEvent(new Event('change', { bubbles: true })); })(document.querySelector('#huntMode'))");
 check('switching to kinds rolls them onto the hunt card', await until(ready) && await ev(`setup.kinds?.length === 3 && cardKeys().join() === 'start'
@@ -979,7 +1017,7 @@ check('every start\'s pars, worked out at once, match a search from it to the ta
 await until(ready, 30000);
 // A topic with no start at the par gives way to another: in Popular on Relaxed only six starts have a target at par 3,
 // none of them Blocks or Mobs, so stopping at the planned topic would often give up.
-const pool = await ev("mode()"), status = "document.querySelector('#setupStatus').textContent";
+const pool = await ev("mode()");
 await ev("document.querySelector('input[name=mode][value=popular]').click(); document.querySelector('input[name=level][value=relaxed]').click()");
 await until(ready, 30000);
 await ev("document.querySelector('#reach').value = 'p3'; document.querySelector('#topic').value = 'any'");
@@ -1343,6 +1381,13 @@ await ev("document.querySelector('#modal .cal button:not(:disabled)').click()");
 check('a day loads its daily', await until("setup.daily !== null && setup.daily < today() && document.querySelector('#modalBg').classList.contains('hidden')") && await until(ready)
   && await ev("document.querySelector('#setupStatus').textContent.startsWith('Daily challenge for ' + shortDate(localDay(setup.daily)) + ': ')"), await ev('setup.daily'));
 check('and is no challenge link\'s game then, for Accepted', wasChallenge === true && await ev('setup.challenge === false'), await ev('setup.challenge'));
+// Clear history asks first, counting the games; Cancel keeps them.
+const clearAsks = "(() => { $('#btnClearHistory').click(); const p = $('#modal p').textContent; $('#hKeep').click(); return p; })()";
+const games = await ev('savedGames().length'), asksMany = await ev(clearAsks);
+check('Clear history asks first, counting the games, and Cancel keeps them', games > 1 && asksMany === `This deletes all ${games} recorded games, personal bests, dailies and the daily streak included. It can’t be undone.`
+  && await ev(`savedGames().length === ${games} && $('#modalBg').classList.contains('hidden')`), asksMany);
+await ev("store.set('mwr.history', savedGames().slice(0, 1)); renderHistory()");
+check('one game it calls the 1 recorded game', (await ev(clearAsks)).startsWith('This deletes the 1 recorded game, personal bests'), await ev(clearAsks));
 check('Clear history empties the dailies too', await ev(`(() => {
   document.querySelector('#btnClearHistory').click(); document.querySelector('#hClear').click();
   return localStorage.getItem('mwr.dailies') === '{}' && document.querySelector('#dailyStats').textContent === '';
@@ -1452,6 +1497,13 @@ await open(`#start=${encodeURIComponent(deadEnd)}&target=Diamond`);
 await play();
 await ev('finish(false)');
 check('par says when the offline copy has no route', await until("document.querySelector('#par')?.textContent === 'No route in the wiki’s offline copy from ' + shortDate(localDay(WIKI_DATA.snapshot), true) + ' with these settings.'"),
+  await ev("document.querySelector('#par')?.textContent"));
+await ev('closeModal(); toSetup()');
+// A search that fails says why.
+await open('#start=Diamond&target=Crafting');
+await play();
+await ev("game.parReady = Promise.reject(new Error('Out of memory')); finish(false)");
+check('par says when working it out failed', await until("document.querySelector('#par')?.textContent === 'Couldn’t work out the fewest clicks: Out of memory.'"),
   await ev("document.querySelector('#par')?.textContent"));
 await ev('closeModal(); toSetup()');
 

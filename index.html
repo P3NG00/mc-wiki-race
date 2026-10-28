@@ -95,7 +95,9 @@
   .art[src*="/thumb/"] { mask-image: radial-gradient(closest-side, #000 65%, transparent); }   /* softens a screenshot's hard edges */
 
   /* ---------- Setup screen ---------- */
-  #setup { max-width: 1200px; margin: 0 auto; padding: 32px 16px 48px; }
+  /* The right padding keeps the page clear of the corner's buttons (40 px, 16 px from the edge, with a gap of 8 px or a
+     scrollbar's half less) wherever the window is too narrow for them to fit beside it. */
+  #setup { max-width: 1200px; margin: 0 auto; padding: 32px clamp(16px, 672px - 50vw, 64px) 48px 16px; }
   #setup .sub, .mode-help, .noscript { max-width: 760px; }   /* the cards use the width, prose keeps a readable line */
   .setup-head { display: flex; justify-content: space-between; align-items: baseline; gap: 4px 16px; flex-wrap: wrap; }
   #setup h1 { font-size: 28px; margin: 0 0 4px; letter-spacing: -.01em; }
@@ -474,6 +476,18 @@
   #btnBgView[hidden] + #btnItems { bottom: 16px; }
   #btnNotes { position: fixed; right: 16px; bottom: 112px; z-index: 5; border-radius: 50%; box-shadow: var(--shadow); }
   #btnBgView[hidden] ~ #btnNotes { bottom: 64px; }
+  /* A phone has no room beside the page for them, so they sit in a row level with the title, which keeps clear of them,
+     and scroll with it (the bottoms above give way to top, as each has a height). Background only keeps its button in
+     the corner, clear of the box at the top. */
+  @media (max-width: 720px) {
+    #setup { position: relative; padding-right: 16px; }
+    #setup h1 { padding-right: 132px; }
+    #btnBgView, #btnItems, #btnNotes { position: absolute; top: 28px; }
+    #btnItems, #btnBgView[hidden] ~ #btnNotes { right: 60px; }
+    #btnNotes { right: 104px; }
+    #btnBgView[hidden] + #btnItems { right: 16px; }
+    body.bg-view #btnBgView { position: fixed; top: auto; }
+  }
   :is(#btnNotes, #hudNotes)[aria-expanded="true"] { outline: 2px solid var(--accent); outline-offset: 1px; }
   /* The hotbar, as Minecraft's, in its pixels (--px): its slots, the item in hand in its selection frame, each item's name
      in Minecraft's tooltip on hover or focus, which also lights the slot as a container's does. The textures are the
@@ -4168,7 +4182,7 @@ function openNoteBox(btn) {
     + Object.entries(NOTE_HEADS).map(([k, h]) => noteSlot('head', k, h, h.block, `plays ${h.plays}, at one pitch`)).join('');
   box.querySelector('.unders').innerHTML = Object.entries(NOTE_UNDER).map(([k, u]) => noteSlot('under', k, u, u.block, u.name + (u.also ? ` (${u.also})` : ''))).join('');
   drawNoteBox();
-  // Under the header's button; beside the corner's buttons, or over them where there's no room.
+  // Under the header's button, or the title's row on a phone; beside the corner's buttons, or over them where there's no room.
   const r = btn.getBoundingClientRect(), w = box.offsetWidth, W = document.documentElement.clientWidth;
   if (r.top < innerHeight / 2) Object.assign(box.style, { top: r.bottom + 10 + 'px', right: Math.max(16, Math.min(W - r.right, W - w - 16)) + 'px', maxHeight: innerHeight - r.bottom - 26 + 'px' });
   else if (r.left - 12 - w >= 16) Object.assign(box.style, { right: W - r.left + 12 + 'px', bottom: '16px' });

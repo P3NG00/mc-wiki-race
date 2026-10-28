@@ -15,7 +15,7 @@ The rest of the page goes on working, and several blasts can follow one another.
 ### The buttons
 
 - The hotbar's button is `#hudItems` in the game header, and `#btnItems` on the setup screen.
-- `#btnItems` is fixed above the background's button `#btnBgView`, or in its place when that is hidden (the background Off), with the note block's button above it (see [ui.md](ui.md#note-block)).
+- `#btnItems` is fixed above the background's button `#btnBgView`, or in its place when that is hidden (the background Off), with the note block's button above it (see [ui.md](ui.md#note-block)). At 720 px and below the three are a row beside the title instead.
 - Both show the wiki's TNT picture, or say TNT if it doesn't come.
 
 ### The hotbar

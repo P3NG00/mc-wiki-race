@@ -100,7 +100,7 @@ With Distance on, a click that got closer also dings (`closer`), a step higher t
 
 The note block's buttons:
 
-- the round button above the items' in the setup screen's bottom-right corner (`#btnNotes`; it drops to the items' place when the background's button is hidden)
+- the round button above the items' in the setup screen's bottom-right corner (`#btnNotes`; it drops to the items' place when the background's button is hidden), or left of it in the row beside the title at 720 px and below
 - the one beside the items' in the game header (`#hudNotes`).
 
 Each is the wiki's Note Block picture, or ♪ if it doesn't come.
@@ -108,6 +108,7 @@ They open a window like a Minecraft container (`openNoteBox`, in the screen show
 The window opens:
 
 - under the header's button
+- under the title's row of buttons on a phone
 - beside the corner's buttons, or over them where there is no room.
 
 ### Underneath
@@ -322,7 +323,7 @@ Once the cards are known their facts take turns with those (`bgPairFacts`):
 
 ### Background only
 
-*Background only* (`bgView`): the round button fixed in the setup screen's bottom right corner (`#btnBgView`, ✦, hidden with Off) hides everything on the setup screen but:
+*Background only* (`bgView`): the round button fixed in the setup screen's bottom right corner (`#btnBgView`, ✦, hidden with Off; beside the title on a phone, but back in the corner while the background shows, clear of the Background box) hides everything on the setup screen but:
 
 - the Background box, open and fixed at the top right
 - the facts line, fixed along the bottom
@@ -387,6 +388,7 @@ At 720 px and below:
 
 - the setup cards stack
 - the options at the top wrap
+- the corner's buttons (the note block's, the items' and Background only's) sit in a row beside the title, scrolling with the page, since there is no room for them beside it
 - the Background box opens in the page
 - Auto's background is the redstone map
 - Start game spans the width

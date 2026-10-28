@@ -8,6 +8,7 @@ The setup screen puts playing first.
 
 - Beside the title are Sound, Timer, Effects, Reduce motion, Theme and the Background box (see [ui.md](ui.md)).
 - In the bottom-right corner, above the background's button, is the items' hotbar button (see [items.md](items.md)), and above that the note block's, which picks what clicks play (see [ui.md](ui.md#note-block)).
+- Where the window is too narrow for the corner's buttons to fit beside the page, `#setup`'s right padding grows (up to 64 px) to keep the page clear of them. At 720 px and below they sit in a row beside the title instead and scroll with the page (see [ui.md](ui.md#720-px-and-below)).
 
 ## Top to bottom
 
@@ -78,7 +79,7 @@ The spinners are transform animations, so they keep turning while a search runs,
 
 ## Background view
 
-A round button in the bottom right corner (`#btnBgView`) hides it all but the background and its settings (see [ui.md](ui.md)).
+A round button in the bottom right corner (`#btnBgView`, beside the title on a phone) hides it all but the background and its settings (see [ui.md](ui.md)).
 
 ## Facts line and footer
 

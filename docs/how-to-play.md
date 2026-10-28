@@ -211,11 +211,11 @@ Behind the setup screen is a picture of the wiki itself, picked in the **Backgro
 - The redstone map is every article but subpages and spin-off pages as one block, grouped like a world map's biomes, brighter the more it's linked. Your mouse is a torch.
 - **Wave from the start** lights every page by how many clicks it is from the start. **Show the route (spoiler)** draws the shortest route between your cards. **Roll by itself** marks random pairs of its own until you change anything on the setup screen, then marks your cards. By default **Show** is **Auto**, with **Roll by itself** on and the other two off.
 
-The ✦ button in the bottom-right corner hides everything but the background; ✕ or Escape brings it back. Above the footer, a line of facts about the wiki and your cards changes every 7 seconds.
+The ✦ button in the bottom-right corner (beside the title on a phone) hides everything but the background; ✕ or Escape brings it back. Above the footer, a line of facts about the wiki and your cards changes every 7 seconds.
 
 ## The note block
 
-The note block button, in the bottom-right corner on the setup screen and in the game header, picks what your clicks play. Each click climbs a scale, Back falls two notes (a mob head plays its sound once), and a win plays a fanfare on the instrument underneath. In its window, **Underneath** picks the block it stands on, and so the instrument:
+The note block button, in the bottom-right corner on the setup screen (beside the title on a phone) and in the game header, picks what your clicks play. Each click climbs a scale, Back falls two notes (a mob head plays its sound once), and a win plays a fanfare on the instrument underneath. In its window, **Underneath** picks the block it stands on, and so the instrument:
 
 | Block | Instrument | Block | Instrument | Block | Instrument |
 |---|---|---|---|---|---|

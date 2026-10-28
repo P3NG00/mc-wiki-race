@@ -2133,7 +2133,31 @@ check('the sound button mutes and unmutes, saved, the Sound box following and th
   setSound(was);
   return unmuted && muted && boxed;
 })()`));
-await send('browsingContext.setViewport', { context: ctx, viewport: { width: 390, height: 844 } });
+// The corner's buttons never cover the setup screen: a window too narrow for them beside it gets a wider right margin,
+// and a phone has them in a row beside the title instead, scrolling with it.
+const cornerClear = `(() => { const s = $('#setup'), right = s.getBoundingClientRect().right - parseFloat(getComputedStyle(s).paddingRight);
+  return ['#btnNotes', '#btnItems', '#btnBgView'].every(b => $(b).hidden || $(b).getBoundingClientRect().left >= right); })()`;
+const cornerWidths = [];
+for (const width of [1400, 1280, 1024, 820]) {
+  await send('browsingContext.setViewport', { context: ctx, viewport: { width, height: 800 } }); await sleep(100);
+  if (await ev(cornerClear) !== true) cornerWidths.push(width);
+}
+check('the corner\'s buttons stay clear of the setup screen at 1400, 1280, 1024 and 820 px', !cornerWidths.length, cornerWidths.join(', '));
+await send('browsingContext.setViewport', { context: ctx, viewport: { width: 390, height: 844 } }); await sleep(100);
+check('on a phone they are a row beside the title, scrolling with the page', await ev(`(() => {
+  const r = ['#btnNotes', '#btnItems', '#btnBgView'].map(b => $(b).getBoundingClientRect()), t = document.createRange();
+  t.selectNodeContents($('#setup h1'));
+  const title = t.getBoundingClientRect();
+  return r.every(b => b.top === r[0].top && b.top < title.bottom && b.bottom > title.top) && r[0].left > title.right && r[0].right <= r[1].left
+    && r[1].right <= r[2].left && r[2].right <= innerWidth - 16 && getComputedStyle($('#btnItems')).position === 'absolute'
+    && document.documentElement.scrollWidth <= document.documentElement.clientWidth;
+})()`), await ev("JSON.stringify(['#btnNotes', '#btnItems', '#btnBgView', '#setup h1'].map(b => $(b).getBoundingClientRect()))"));
+check('but Background only\'s goes back to the corner, clear of the Background box at the top', await ev(`(() => {
+  bgView(true);
+  const b = $('#btnBgView').getBoundingClientRect(), box = $('#bgOpts').getBoundingClientRect();
+  bgView(false);
+  return Math.abs(b.bottom - (innerHeight - 16)) < 1 && Math.abs(b.right - (innerWidth - 16)) < 1 && b.top > box.bottom;
+})()`));
 check('Auto is the redstone map at a phone\'s width', await until("bgStyle() === 'redstone' && bg.W <= 390 && bg.grid?.W === bg.W"), await ev('JSON.stringify([bgStyle(), bg.W, bg.grid?.W])'));
 await send('browsingContext.setViewport', { context: ctx, viewport: null });
 check('and the constellation again on a wide screen', await until("bgStyle() === 'constellation'"));

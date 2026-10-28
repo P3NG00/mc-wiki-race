@@ -200,6 +200,9 @@
   .card .desc { color: var(--muted); font-size: 13.5px; margin: 0;
     display: -webkit-box; -webkit-line-clamp: 4; line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; }
   .card .actions { margin-top: auto; display: flex; gap: 8px; flex-wrap: wrap; }
+  .card .card-facts { margin: auto 0 0; font-size: 12.5px; }
+  .card .card-facts:not(:empty) + .actions { margin-top: 0; }   /* the facts at the foot, just above the buttons */
+  .card .card-facts:empty { display: none; }
   .card input[type=text] { flex: 1; min-width: 0; padding: 6px 10px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--bg); }
   /* A narrow card (three side by side in a smaller window) puts the picture above the text and the input under the button. */
   @container (max-width: 300px) {
@@ -815,6 +818,7 @@ const THEMES = [...new Set(['auto', 'light', 'dark', ...Array.from(document.quer
     <div class="card start" id="cardStart">
       <span class="tag">Start</span>
       <div class="row"><img alt="" class="icon hidden"><div><p class="title">…</p><p class="desc"></p></div></div>
+      <p class="note card-facts"></p>
       <div class="actions">
         <button data-reroll="start">🎲 Reroll</button>
         <input type="text" placeholder="or type an article…" data-custom="start" aria-label="Custom start article">
@@ -826,6 +830,7 @@ const THEMES = [...new Set(['auto', 'light', 'dark', ...Array.from(document.quer
     <div class="card goal" id="cardGoal">
       <span class="tag">Target</span>
       <div class="row"><img alt="" class="icon hidden"><div><p class="title">…</p><p class="desc"></p></div></div>
+      <p class="note card-facts"></p>
       <div class="actions">
         <button data-reroll="goal">🎲 Reroll</button>
         <input type="text" placeholder="or type an article…" data-custom="goal" aria-label="Custom target article">
@@ -1391,12 +1396,26 @@ function renderCard(which) {
   $('.actions', card).classList.toggle('hidden', blind);
   setImg($('img.icon', card), blind ? '' : info?.img);
   setImg($('img.art', card), blind ? '' : info?.img);
+  cardFacts(which, card, blind ? null : info);
   // A start in one of Scavenger's kinds would be a find before the first click, so the kinds are rolled again.
   if (which === 'start' && huntMode() === 'kinds' && setup.kinds?.some(k => KIND_MEMBERS.get(k).has(info?.title))) setKinds(rollKinds());
   updateSetupPar();   // first, so Start waits for an Exact clicks route
   updatePlay();
 }
 
+// What the offline copy says of a card's article, above its buttons: how many articles link to it, and, once
+// wiki-links.js is in, how many pages it links to (outside navboxes, as the facts line counts). Nothing for a hidden
+// card or one the copy doesn't have.
+const counted = (n, what) => `${fmtCount(n)} ${what}${n === 1 ? '' : 's'}`;
+function cardFacts(which, card, info) {
+  const page = info ? PAGE_IDS.get(info.title) : undefined, el = $('.card-facts', card);
+  if (page === undefined) { el.textContent = ''; return; }
+  const linked = `Linked from ${counted(WIKI_DATA.articles[page][1], 'article')}`;
+  el.textContent = linked;
+  loadGraphFile('wiki-links.js', () => WIKI_LINKS).then(g => {
+    if (setup[which] === info) el.textContent = `${linked} · links to ${counted(g.links[page] ? g.links[page].split(',').length : 0, 'page')}`;
+  }, () => {});
+}
 // Under Blind target the cards after the start are hidden until the game starts, and in a Relay each until the stop
 // before it is reached, in the order they are played (the target among the checkpoints on a round trip). Scavenger's
 // are all shown at the start, since they go in any order.
@@ -6256,6 +6275,7 @@ $('#vias').innerHTML = VIA_KEYS.map((w, i) => `
       <div class="card via" id="card-${w}">
         <span class="tag">Checkpoint</span>
         <div class="row"><img alt="" class="icon hidden"><div><p class="title">…</p><p class="desc"></p></div></div>
+        <p class="note card-facts"></p>
         <div class="actions">
           <button data-reroll="${w}">🎲 Reroll</button>
           <input type="text" placeholder="or type an article…" data-custom="${w}" aria-label="Custom checkpoint ${i + 1} article">

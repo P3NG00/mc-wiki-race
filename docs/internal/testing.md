@@ -569,6 +569,7 @@ The background:
   - then the cards marked
 - the wave counting clicks as par does
 - the route only as a spoiler
+- each card saying how many articles link to its article and how many pages it links to, and a hidden one nothing
 - only the start under Blind target with no route and no fact about the target
 - saved settings loading with junk left out
 - Reduce motion:

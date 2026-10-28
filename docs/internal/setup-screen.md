@@ -21,6 +21,7 @@ The setup screen puts playing first.
     - each day from `DAILY_FIRST` to today a button that loads its daily (`loadDaily`), named with its game and result in its tooltip, and marked won on its day, won later, not won or (plain) not played, with a key under the month naming all four.
 - Your game (`#gameSum`, filled by `updateGameSum`): the game with its option, the extra rules, the articles and the difficulty.
 - The cards.
+  - Each article card says above its buttons what the offline copy has of its links (`cardFacts`): "Linked from 56 articles · links to 23 pages", the second once `wiki-links.js` is in (outside navboxes, as the facts line counts); nothing on a hidden card or a page the copy doesn't have.
   - A title typed into a card's box (`setCustom`) takes the card's roll (`setup.rolls`) as the lookup starts, so a reroll or the daily after it wins, and it wins over a roll going already.
   - One that `pageInfo` refuses says why: "No article named “X” on minecraft.wiki.", or for a page the game leaves out (see [rules.md](rules.md)) "“X” is on minecraft.wiki, but the game leaves it out (a version, list or non-article page)."
 - Start game and par.

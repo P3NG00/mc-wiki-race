@@ -14,7 +14,7 @@ Open [mcwikirace.com](https://mcwikirace.com/): a start and a target are already
 
 - **Daily challenge**: today's game, the same for everyone, with what its rule asks in plain words (on a phone, once you press Play the daily) (see [The daily](#the-daily)).
 - **Your game**: one line that sums up the game, the extra rules, the articles and the difficulty.
-- The cards: **Start** and **Target**, plus **Checkpoint** cards in a Relay, or a **Find one of each** card in a Scavenger hunt of kinds. Each shows its article's picture and description.
+- The cards: **Start** and **Target**, plus **Checkpoint** cards in a Relay, or a **Find one of each** card in a Scavenger hunt of kinds. Each shows its article's picture and description, and how many articles link to it and how many pages it links to, going by the wiki's offline copy.
 - **🎲 Reroll** on a card rolls a new article for it. Or type almost any article on the wiki into the box under it ("or type an article…") and press Enter (version pages, the big lists of game data and pages that aren't articles, such as tutorials, are left out).
 - **Start game**, with par beside it: the fewest clicks the game can be done in.
 - **🎲 Reroll all** rolls every card, and **⇄ Swap** swaps the start and the target: a Relay's checkpoints go in reverse, and a Round trip goes round the same loop from the target (it's hidden under Blind target and in a hunt of kinds). **🎲 Random game** sets every setting below the cards at random, then rolls new cards; the settings beside the title stay as they are.

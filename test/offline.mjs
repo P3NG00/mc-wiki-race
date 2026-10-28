@@ -2102,9 +2102,12 @@ check('a change on the page turns it off, saved, and the cards are marked', awai
 check('the wave counts clicks from the start as par does', await until("!!bg.pair?.wave") && await ev(`linkGraph(rules()).then(g => (d => bg.pair.wave.dist.every((x, i) => x === d[i]))(distancesFrom(g, setup.start.title)))`));
 check('the route only shows as a spoiler', await ev('bg.pair.route === null') && await ev("$('#bgRoute').click(), true")
   && await until("JSON.stringify(bg.pair?.route) === JSON.stringify(setup.route.map(t => PAGE_IDS.get(t)))"));
+check('each card says above its buttons how many articles link to its article, and how many pages it links to', await until(`[['#cardStart', 'start'], ['#cardGoal', 'goal']].every(([c, w]) =>
+  (p => $(c + ' .card-facts').textContent === 'Linked from ' + counted(WIKI_DATA.articles[p][1], 'article') + ' · links to ' + counted(WIKI_LINKS.links[p] ? WIKI_LINKS.links[p].split(',').length : 0, 'page'))(PAGE_IDS.get(setup[w].title)))`),
+  await ev("$('#cardStart .card-facts').textContent + ' | ' + $('#cardGoal .card-facts').textContent"));
 await ev("document.querySelector('#rules input[value=blind]').click()");
-check('under Blind target only the start is marked, with no route, and the facts leave the target out', await until("bg.pair?.stops.length === 1 && bg.pair.stops[0].start && bg.pair.route === null && !!bg.pair.wave")
-  && await until("bg.pairFacts.length === 2"), await ev('JSON.stringify(bg.pairFacts)'));
+check('under Blind target only the start is marked, with no route, and the facts leave the target out, its card too', await until("bg.pair?.stops.length === 1 && bg.pair.stops[0].start && bg.pair.route === null && !!bg.pair.wave")
+  && await until("bg.pairFacts.length === 2 && $('#cardGoal .card-facts').textContent === '' && $('#cardStart .card-facts').textContent !== ''"), await ev('JSON.stringify(bg.pairFacts)'));
 await ev("document.querySelector('#rules input[value=blind]').click()");
 await until(ready);
 await ev("localStorage.setItem('mwr.background', JSON.stringify({ style: 'redstone', wave: true, route: false, roll: false, junk: 1 })), localStorage.setItem('mwr.reduceMotion', 'true')");

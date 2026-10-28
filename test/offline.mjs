@@ -48,9 +48,10 @@ const ARTICLE = title => title === HUBS_ONLY
 // and Chicken is in it too but excluded from the kind.
 const REACH_LABEL = { p1: 'Par 1', p2: 'Par 2', p3: 'Par 3', p4: 'Par 4', p5: 'Par 5+' };
 const failParse = new Set();   // articles whose requests fail, as with no connection
+const faultReplies = new Map();   // articles answered with [status, body] in place of the article, as a wiki in trouble can
 const REDIRECTS = { 'Crafting recipe': 'Crafting' };   // titles a parse follows to another article, as the wiki's redirects do
 const LIVE_CATEGORIES = { 'Brand New Mob': ['Nether_mobs', 'Verify'], Chicken: ['Nether_mobs', 'Passive_mobs'] };
-const reply = (request, body, type = 'application/json') => send('network.provideResponse', { request, statusCode: 200, body: { type: 'string', value: body },
+const reply = (request, body, type = 'application/json', statusCode = 200) => send('network.provideResponse', { request, statusCode, body: { type: 'string', value: body },
   headers: [['Access-Control-Allow-Origin', '*'], ['Content-Type', type]].map(([name, value]) => ({ name, value: { type: 'string', value } })) });
 function answer(request, url) {
   const u = new URL(url), p = u.searchParams;
@@ -61,6 +62,8 @@ function answer(request, url) {
   if (p.get('action') === 'parse') {
     const t = REDIRECTS[p.get('page')] ?? p.get('page');
     if (failParse.has(t)) return send('network.failRequest', { request });
+    const fault = faultReplies.get(t);
+    if (fault) return reply(request, fault[1], 'application/json', fault[0]);
     return reply(request, JSON.stringify({ parse: { title: t, displaytitle: escHtml(t), text: ARTICLE(t),
       categories: (LIVE_CATEGORIES[t] ?? []).map(category => ({ sortkey: '', category })), links: [{ ns: 0, title: 'No such page', exists: false }, { ns: 0, title: 'Diamond Pickaxe', exists: true }] } }));
   }
@@ -70,11 +73,13 @@ function answer(request, url) {
   return reply(request, JSON.stringify({ error: { code: 'offline', info: 'Not answered offline: ' + kind } }));
 }
 
+let onEvent = () => {};   // other events a check subscribes to
 ws.onmessage = m => {
   const d = JSON.parse(m.data);
   if (d.id && pending.has(d.id)) { pending.get(d.id)(d); pending.delete(d.id); }
   else if (d.method === 'script.message') jsErrors.push(d.params.data.value);
   else if (d.method === 'network.beforeRequestSent' && d.params.isBlocked) answer(d.params.request.request, d.params.request.url);
+  else if (d.method) onEvent(d);
 };
 await new Promise(r => ws.onopen = r);
 await send('session.new', { capabilities: {} });
@@ -803,7 +808,11 @@ await ev("closeModal(); toSetup()");
 // on a hunt, or the way back on a round trip. The detours are made-up pages, no target or find. Share says how a loss
 // ended: out of clicks with the time, too soon with Exact clicks's count, the clicks with the Timer off.
 const detours = Array.from({ length: 6 }, (_, i) => `Detour ${i + 1}`);
-await playRoute('#start=Diamond&target=Zombie&rules=nonav,limit', ['Diamond', ...detours.slice(0, 5), 'Zombie']);
+await open('#start=Diamond&target=Zombie&rules=nonav,limit');
+await play();
+check('Six clicks counts down to the limit in the header', await ev("$('#hudClicks').textContent === '0' && $('#hudClicksK').textContent === 'of 6' && document.querySelectorAll('#hudMeter i').length === 6"),
+  await ev("$('.hud .stat').textContent"));
+await walk(['Diamond', ...detours.slice(0, 5), 'Zombie']);
 check('Six clicks: the target on the sixth click wins', await until('!game.active') && await ev("(r => r.won && r.clicks === 6 && !r.outOfClicks)(store.get('mwr.history', [])[0])"),
   await ev("JSON.stringify(store.get('mwr.history', [])[0])"));
 await ev('closeModal(); toSetup()');
@@ -1148,6 +1157,8 @@ await ev("localStorage.setItem('mwr.history', histWas); renderHistory()");
 // Rolls: each pool keeps to its tier, starts and targets come from different topics (Chaos aside), and targets are linked
 // well enough to be reached. planGroups and rollOne are called directly, with the pool's button set without a change event.
 check('a page without a hash rolls a pair on Normal', await open('') && await ev("level() === 'normal' && mode() === 'everyday'"));
+// Book and comic objects, joke and removed features are filed in game categories too: the pool leaves them out, Chaos doesn't.
+check('fictional, joke and removed things are left out of the pool', await ev("['Frostgate', 'Ankle Monitor', 'Steppe dirt'].every(t => ARTICLES.has(t) && !POOL_TITLES.includes(t) && CHAOS_TITLES.includes(t)) && POOL_TITLES.includes('Diamond')"));
 const rolls = JSON.parse(await ev(`(async () => {
   const out = {};
   for (const m of ['popular', 'everyday', 'deep', 'chaos']) {
@@ -2292,6 +2303,200 @@ const frameClean = await ev(injected, await frameCtx());
 await ev('closeModal(); toSetup()');
 check('markup titles run nothing anywhere a title shows', peeked === true && frameClean === true && await ev(injected)
   && await ev(`document.querySelector('#history tbody').textContent.includes(${JSON.stringify(payloads[2])})`), JSON.stringify([peeked, frameClean]));
+
+// Collapsing the path keeps the credit in view, widens the article and is remembered across a reload. Back comes from the
+// parse cache, asking for nothing. Escape pressed inside the frame keeps the result open.
+await open('#start=Diamond&target=Crafting');
+await play();
+const frameWidth = "$('#frame').clientWidth", wide = await ev(frameWidth), onScreen = sel => `!!$('${sel}').offsetParent`;
+await ev("$('#btnPath').click()");
+check('collapsing the path hides it, keeps the credit and widens the article', await ev(`!${onScreen('#pathList')} && ${onScreen('#credit')} && store.get('mwr.pathCollapsed') === true
+  && ${frameWidth} > ${wide}`), `frame ${wide} -> ${await ev(frameWidth)}`);
+await open('#start=Diamond&target=Crafting');
+await play();
+check('a collapsed path stays collapsed after a reload', await ev("$('.main').classList.contains('collapsed') && $('#btnPath').getAttribute('aria-expanded') === 'false'"));
+await ev("$('#btnPath').click()");
+check('expanding the path shows it again', await ev(`${onScreen('#pathList')} && store.get('mwr.pathCollapsed') === false && ${frameWidth} === ${wide}`));
+await ev("navigate('Gold Ingot', null)");
+await until("game.path.length === 2 && !game.loading");
+before = parses();
+await ev("$('#btnBack').click()");
+check('Back loads from the parse cache', await until("game.path.length === 3 && !game.loading") && parses() === before, await ev("game.path.map(p => p.title).join(' > ')"));
+await ev("navigate('Crafting', null)");
+await until("!game.active && !$('#modalBg').classList.contains('hidden')");
+await ev("document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))", await frameCtx());
+await sleep(300);
+check('Escape in the article keeps the result open', await ev("!$('#modalBg').classList.contains('hidden')"));
+// No Back: in the challenge link, no Back button and goBack() doing nothing, and in the record and the result. The
+// 3-click win above, without the rule, isn't this pair's best (this 2-click one would otherwise be a new best).
+await ev("$('#rules input[value=noback]').click()");
+check('the challenge link carries the rules', await ev("openLink(new URL(challengeLink()).hash.slice(3)).endsWith('&rules=noback')"), await ev('openLink(new URL(challengeLink()).hash.slice(3))'));
+await ev("$('#mSame').click()");
+await until("game.active && game.path.length === 1 && !game.loading");
+check('No Back hides Back', await ev("$('#btnBack').classList.contains('hidden')"));
+await ev("navigate('Gold Ingot', null)");
+await until("game.path.length === 2 && !game.loading");
+await ev('goBack()');
+await sleep(300);
+check('No Back blocks goBack()', await ev("game.path.length === 2 && !game.loading"), await ev("game.path.map(p => p.title).join(' > ')"));
+await ev("navigate('Crafting', null)");
+await until("!game.active && !$('#modalBg').classList.contains('hidden')");
+const noBackResult = await ev("$('#modal').textContent");
+check('the result records the rule, and the best ignores games with other rules', await ev("savedGames()[0].rules.join() === 'noback'") && noBackResult.includes('No Back')
+  && !/personal best|Your best/.test(noBackResult), await ev("savedGames()[0].rules.join()"));
+await ev("$('#rules input[value=noback]').click(); closeModal(); toSetup()");
+
+// At most API_CONCURRENCY requests are in flight at once, the rest waiting their turn: ten pages asked for together.
+await ev(`window.inFlight = 0; window.maxInFlight = 0; window.fetch = Object.assign(async (...a) => {
+  maxInFlight = Math.max(maxInFlight, ++inFlight);
+  try { return await fetch.orig(...a); } finally { inFlight--; }
+}, { orig: fetch.bind(window) })`);
+await ev("Promise.all(Array.from({ length: 10 }, (_, i) => pageInfo('At once ' + i)))");
+await ev('window.fetch = fetch.orig');
+check('at most API_CONCURRENCY requests at once', await ev('maxInFlight === API_CONCURRENCY'), `max=${await ev('maxInFlight')}`);
+
+// The setup screen: the Rules row leaves the difficulty's rules to the Difficulty row, Normal by default; the same
+// article on two cards keeps Start off; a target topic picked in its box rerolls only the target, from that topic, which
+// the result keeps and names.
+check('the Rules row leaves the difficulty\'s rules to the Difficulty row, Normal by default',
+  await ev("!$('#rules input[value=nonav]') && !$('#rules input[value=nohubs]') && $('input[name=level][value=normal]').defaultChecked"));
+await ev("setCustom('goal', setup.start.title)");
+check('the same article as start and target keeps Start off, saying so', await until('setup.busy === 0') && await ev(`$('#btnPlay').disabled && ${status} === 'The same article is on two cards. Pick a different one.'`),
+  await ev(status));
+await ev("reroll('goal')");
+await until(ready);
+const startBefore = await ev('setup.start.title');
+await ev("(s => { s.value = 'mobs'; s.dispatchEvent(new Event('change', { bubbles: true })); })($('#topic'))");
+check('a topic picked rerolls only the target, from it', await until(ready) && await ev('setup.start.title') === startBefore && await ev("ARTICLES.get(setup.goal.title)?.topic === 'mobs'"),
+  await ev('setup.goal.title'));
+await play();
+await ev("$('#btnGiveUp').click(); $('#gQuit').click()");
+check('the result keeps the topic and names it', await ev("savedGames()[0].topic === 'mobs' && $('#modal .note').textContent.endsWith('· Mobs, Relaxed')"), await ev("$('#modal .note').textContent"));
+await ev("closeModal(); toSetup(); (s => { s.value = 'any'; s.dispatchEvent(new Event('change', { bubbles: true })); })($('#topic'))");
+await until(ready);
+
+// The daily's own rule wins over a link's, and the daily, played and given up, is marked in Recent games; New game leaves
+// it without the notice, and another rule, Swap or a card rerolled leave it with the notice.
+await open('#daily=2026-01-06&rules=limit');
+check('the daily\'s rule wins over the link\'s', await ev("setup.daily === '2026-01-06' && rules().join() === 'nonav,checkpoint' && !!setup.via0"), await ev('rules().join()'));
+await play();
+await ev("$('#btnGiveUp').click(); $('#gQuit').click()");
+await ev("$('#mNew').click()");
+await until('setup.busy === 0');
+check('New game leaves the daily without the notice', await ev(`setup.daily === null && ${status} !== LEFT_DAILY`), await ev(status));
+check('Recent games marks the daily', await ev("$('#history tbody tr .tag.game').textContent === 'Relay' && $('#history tbody tr .tag.daily').textContent === 'Daily ' + shortDate(new Date(2026, 0, 6))"),
+  await ev("$('#history tbody tr .h-game').textContent"));
+for (const [what, act, undo] of [['another rule', "$('#rules input[value=limit]').click()", "$('#rules input[value=limit]').click()"],
+  ['swapping', "$('#btnSwap').click()", ''], ['rerolling a card', "reroll('goal')", '']]) {
+  await ev('loadDaily(\'2026-01-06\')');
+  await until("setup.daily === '2026-01-06' && setup.busy === 0", 30000);
+  await ev(act);
+  check(`${what} leaves the daily`, await until('setup.busy === 0') && await ev(`setup.daily === null && ${status} === LEFT_DAILY`), await ev(status));
+  if (undo) await ev(undo);
+}
+await until(ready);
+
+// Storage is shared with the rest of the origin: history that isn't a list, or entries that aren't records, are left out
+// instead of stopping the setup screen.
+await ev(`localStorage.setItem('mwr.history', '{"oops":1}')`);
+check('history that isn’t a list doesn’t stop the setup screen', await open('#start=Diamond&target=Crafting') && await ev("$('.history-wrap').classList.contains('hidden')"));
+const rec = JSON.stringify({ start: 'Diamond', goal: 'Iron Ingot', rules: [], won: true, clicks: 2, ms: 5000, at: Date.now() });
+await ev(`store.set('mwr.history', [null, 5, { ...${rec}, clicks: '<b>2</b>' }, { ...${rec}, rules: ['nope'] }, { ...${rec}, topic: 'constructor' }, ${rec}]); renderHistory()`);
+check('only real records are shown', await ev("document.querySelectorAll('#history tbody tr').length === 1 && !$('#history tbody b')"),
+  `rows=${await ev("document.querySelectorAll('#history tbody tr').length")}`);
+await ev("localStorage.removeItem('mwr.history')");
+
+// A theme stylesheet added by the host page shows up in the picker and, marked data-mwr-default, wins over a saved theme
+// that no longer exists. A preload script stands in for the host page putting it in <head>.
+await ev("localStorage.setItem('mwr.theme', JSON.stringify('Gone'))");
+const hostTheme = (await send('script.addPreloadScript', { functionDeclaration: `() => {
+  const add = () => document.head.insertAdjacentHTML('beforeend', '<style data-mwr-theme="Test" data-mwr-default>:root[data-theme="Test"] { --bg: #000; color-scheme: dark; }</style>');
+  if (document.head) add(); else new MutationObserver((_, o) => { if (document.head) { o.disconnect(); add(); } }).observe(document, { childList: true, subtree: true });
+}` })).result.script;
+await open('#start=Diamond&target=Crafting');
+const themed = await ev("[...document.querySelectorAll('#themeSelect option')].map(o => o.value).join(',') + ' ' + $('#themeSelect').value + ' ' + document.documentElement.dataset.theme + ' ' + themeIsDark() + ' ' + getComputedStyle(document.body).backgroundColor");
+check('a host page\'s theme is listed and used as the default', themed === 'auto,light,dark,Test Test Test true rgb(0, 0, 0)', themed);
+await send('script.removePreloadScript', { script: hostTheme });
+await ev("localStorage.removeItem('mwr.theme')");
+
+// Challenge links carry any title intact: ones with &, +, ?, %, =, /, :, quotes and accents survive challengeLink()'s
+// sealed blob, load unchanged through a link as start, checkpoint and target, and the frame reads the same title back
+// from a link to it as wikiUrl writes one.
+const tricky = ['Gravelly Mountains+', 'How did we get here? (block)', 'Village & Pillage', 'Oxygène',
+  'Java Edition guides/Caves & Cliffs: Part I', '100% A=B; c+d', 'Steve\'s "quote"'];
+const trip = JSON.parse(await ev(`(() => {
+  const saved = { ...setup }, savedRules = rules(), savedCount = viaCount();
+  const linkFor = (start, via, goal, r) =>
+    (Object.assign(setup, { start: { title: start }, goal: { title: goal } }, setVias([{ title: via }])), setRules(r), challengeLink());
+  const bad = ${JSON.stringify(tricky)}.filter(t => {
+    const h = new URLSearchParams(openLink(new URL(linkFor(t, t + ' via', t + ' goal', ['noback', 'checkpoint'])).hash.slice(3)));
+    return h.get('start') !== t || h.get('via') !== t + ' via' || h.get('target') !== t + ' goal' || h.get('rules') !== rules().join();
+  });
+  const link = linkFor(...${JSON.stringify(tricky.slice(0, 3))}, ['checkpoint']);
+  Object.assign(setup, saved);
+  setRules(savedRules);
+  $('#viaCount').value = savedCount;
+  return JSON.stringify({ bad, link });
+})()`));
+check('challenge links keep awkward titles intact', trip.bad.length === 0, JSON.stringify(trip.bad));
+const trickyLoaded = "[setup.start?.title, setup.via0?.title, setup.goal?.title].join(' | ')";
+check('a challenge link with awkward titles loads them unchanged', await open(trip.link.slice(trip.link.indexOf('#'))) && await ev(trickyLoaded) === tricky.slice(0, 3).join(' | '),
+  await ev(trickyLoaded));
+await play();
+const trickyHrefs = await ev(`JSON.stringify(${JSON.stringify(tricky)}.map(t => wikiUrl(t).slice(WIKI.length)))`);
+const readBack = await ev(`JSON.stringify(${trickyHrefs}.map(h => { const a = document.createElement('a'); a.setAttribute('href', h); return classify(a)?.title; }))`, await frameCtx());
+check('the frame reads awkward titles back from their links', readBack === JSON.stringify(tricky), readBack);
+await ev('finish(false); closeModal(); toSetup()');
+
+// The wiki failing: Cancel on a start that didn't load goes back to the setup screen; an HTTP error, a MediaWiki error, a
+// reply that isn't JSON and one with no article each offer Retry with the clock stopped, and Retry loads the article.
+await open('#start=Diamond&target=Crafting');
+failParse.add('Diamond');
+await ev("$('#btnPlay').click()");
+const startFailed = await until("!!$('#btnCancelNav') && !game.loading");
+await ev("$('#btnCancelNav').click()");
+check('Cancel on a start that failed goes back to the setup screen', startFailed && await ev("!$('#setup').classList.contains('hidden') && !game.active"));
+failParse.delete('Diamond');
+await play();
+for (const [kind, fault, title, message] of [['HTTP 500', [500, 'oops'], 'Fault 500', 'HTTP 500'],
+  ['a MediaWiki error', [200, '{"error":{"code":"maxlag","info":"Waiting for a database server"}}'], 'Fault maxlag', 'Waiting for a database server'],
+  ['a reply that isn’t JSON', [200, '<html>'], 'Fault html', 'JSON'], ['a reply with no article', [200, '{}'], 'Fault empty', 'no article']]) {
+  faultReplies.set(title, fault);
+  const steps = await ev('game.path.length');
+  await ev(`navigate(${JSON.stringify(title)}, null)`);
+  const offered = await until("!!$('#btnRetry') && !game.loading");
+  const said = await ev("$('#overlayBox').textContent.trim().replace(/\\s+/g, ' ')"), t0 = await ev('now()');
+  await sleep(300);
+  const stopped = await ev(`now() === ${t0}`);
+  faultReplies.delete(title);
+  await ev("$('#btnRetry').click()");
+  check(`${kind} offers Retry with the clock stopped, and Retry loads the article`, offered && said.includes(message) && stopped
+    && await until(`game.path.length === ${steps + 1} && game.path.at(-1).title === ${JSON.stringify(title)} && !game.loading`), said);
+}
+await ev('finish(false); closeModal(); toSetup()');
+
+// Leaving the page during a game asks first, and after the game it doesn't. Browsers only ask once the page has had a
+// real click, so Start is pressed with one. BiDi accepts the "Leave page?" dialog and reports it as
+// browsingContext.userPromptOpened.
+let prompts = [];
+onEvent = d => { if (d.method === 'browsingContext.userPromptOpened') prompts.push(d.params.type); };
+await send('session.subscribe', { events: ['browsingContext.userPromptOpened'] });
+const leaveAfter = async giveUp => {
+  await open('#start=Diamond&target=Crafting');
+  const startAt = JSON.parse(await ev("(b => (b.scrollIntoView({ block: 'center' }), (r => JSON.stringify({ x: Math.round(r.left + r.width / 2), y: Math.round(r.top + r.height / 2) }))(b.getBoundingClientRect())))($('#btnPlay'))"));
+  await pointer([{ type: 'pointerMove', x: startAt.x, y: startAt.y }, { type: 'pointerDown', button: 0 }, { type: 'pointerUp', button: 0 }]);
+  await until("game.active && game.path.length === 1 && !game.loading");
+  if (giveUp) await ev("$('#btnGiveUp').click(); $('#gQuit').click()");
+  prompts = [];
+  await send('browsingContext.navigate', { context: ctx, url: 'about:blank', wait: 'complete' });
+  await sleep(300);
+  return prompts.join();
+};
+const leftDuring = await leaveAfter(false), leftAfter = await leaveAfter(true);
+check('leaving the page during a game asks first', leftDuring === 'beforeunload', leftDuring);
+check('leaving after the game doesn’t ask', leftAfter === '', leftAfter);
+await send('session.unsubscribe', { events: ['browsingContext.userPromptOpened'] });
+onEvent = () => {};
 
 check('only page info, the advancements\' and items\' pictures and articles are asked for', [...requests.keys()].every(k => ['query prop=pageprops|pageimages|extracts', 'query prop=pageimages', 'query prop=imageinfo', 'parse prop=text|displaytitle|categories|links'].includes(k)),
   JSON.stringify(Object.fromEntries(requests)));

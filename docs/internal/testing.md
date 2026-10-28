@@ -28,9 +28,7 @@ What it checks, by area:
   - the slot under the pointer showing its item in a Minecraft-style tooltip that goes with the pointer
   - a slot linking an article on the path saying so in its tooltip
 - The infobox's tabs showing one panel and switching
-- Back served from the parse cache
 - Switching the article's theme in place (also mid-load)
-- Collapsing the path sidebar (the credit stays, remembered across reloads)
 - The phone layout at 390 px:
   - header and "what is it?" not overlapping
   - the path on one line
@@ -38,26 +36,17 @@ What it checks, by area:
   - a wide wiki table scrolling within itself
 - The win condition
 - The result scoring the win against par and showing a route
-- Escape handling
 
-### Rules and difficulty
+### Rules on real articles
 
-- The No Back rule: in the challenge link and the result, and kept out of the personal best of games without it
-- The difficulty:
-  - a link's rules giving its difficulty
-  - none being Relaxed and No hubs alone Hard
-  - the extra rules without its two rules
-  - Normal by default
-  - the settings text naming it unless Normal
 - The No hubs rule:
   - every hub link and redirect in the article text dead
   - a hub target live
 - Links to left-out pages dead
-- The Blind target rule: a link's target held unseen on the card with par hidden, then named in the HUD with no picture there or behind the path
-- The Six clicks rule: lost on the sixth click, recorded as `outOfClicks`
+- The Blind target rule: the target named in the HUD with no picture there or behind the path, and no peek
 - The No navboxes rule
 - The Checkpoint rule with one checkpoint:
-  - card shown and hidden
+  - card shown
   - the target not counting before the checkpoint
   - the target passed before it not marked as seen
   - the HUD and the picture behind the path switching objective
@@ -69,46 +58,21 @@ What it checks, by area:
   - the rest folded away
   - every live link above the bar
 
-### Rolls and pools
+### Rolls
 
-- Random rolls in all four pools (asking the wiki only for page info)
-- The request limit (ten requests sent at once, with no more than `API_CONCURRENCY` in flight)
+- Random rolls in all four pools, their pages looked up on the live wiki
 - Descriptions taken from the intro's first paragraph rather than an infobox caption
-- Book and comic objects
-- Joke and removed features being left out of the pool
-- Each pool keeping to its tier with the start and target from different topics (with `planGroups` and `candidate` called directly)
-- A Chaos target linked well enough to be reached (`MIN_BACKLINKS`)
-- A topic target (recorded with the result)
-- The daily's cards from different topics
 
-### Content and Spin-offs
+### Spin-offs
 
-Content and Spin-offs:
-
-- Everyday rolling Dungeons pages only with Dungeons on
-- Chaos fixing the Content boxes as ticked and giving them back
-- All's dash and switching every spin-off
-- Links into a spin-off dead when it is off, and live, its version pages aside, when it is on or a card's page is in it
+- Links into a spin-off dead in a game without it, and live, its version pages aside, when a card's page is in it
 - A challenge link starting on a spin-off page
-- The record and its settings text
-- History with an unknown Content key being left out
-
-### The daily pair and rule
-
-- Deterministic
-- Its checkpoints on a Checkpoint day
-- Overriding the hash's rules
-- Recorded, marked in the history
-- Left by New game without a notice, and by changing a rule or the difficulty, swapping the cards or rerolling one, with the same notice each time
-- Normal plus one rule; No hubs making it Hard
-- A Six clicks day's par 4 or less
 
 ### Images and article markup
 
 - A failed image being retried and one that fails twice hiding its alt text (requests intercepted over BiDi)
 - A link fragment that opens an HTML comment and a script tag (the wiki renders one from `[[X#&lt;!--&lt;script&gt;]]`) not stopping the next article's scripts
 - Interwiki titles
-- The same-article guard
 - Image-map links
 - On Beacon:
   - Beacon's layered blueprint (choosing a layer hides the ones above it)
@@ -120,25 +84,9 @@ Content and Spin-offs:
   - each toggle folding or opening its box without a click
   - the links inside working once opened
 
-### Setup screen, history and challenge links
+### Random play
 
-- A host-page theme (injected with a BiDi preload script) becoming the default
-- Clear history (Cancel keeps it, confirming empties it)
-- Challenge links carrying awkward titles (`&`, `+`, `?`, `%`, `/`, `:`, quotes, accents) intact through the sealed link, a real load of it and the frame's link reading
-- Damaged history in storage (not a list, or entries that aren't records) being left out without stopping the setup screen
-
-### Faked API failures
-
-Faked API failures, by an intercept on `api.php` that fails a request or answers it with a made-up reply:
-
-- a network error, HTTP 500, a MediaWiki error, a reply that isn't JSON and one with no article each offer Retry with the clock stopped
-- Cancel on a failed start returns to setup
-- a failed roll says so and the next one works
-
-### Leaving the page and random play
-
-- Leaving the page asking first during a game and not after it (Start pressed with a real click, since browsers only ask after one; BiDi accepts the dialog and reports it as `browsingContext.userPromptOpened`)
-- Random play (below)
+[Random play](#random-play), below.
 
 ### Live pages it depends on
 
@@ -186,6 +134,7 @@ It also fails, as its last check, on any wait that ran out, naming the lines tha
   - a list page
   - a navbox link
 - Stylesheets come back empty and images fail, and so do the articles a check names (`failParse`), as with no connection.
+- The articles a check names in `faultReplies` get its made-up error reply instead, as from a wiki in trouble.
 - A made-up redirect, Crafting recipe, leads to Crafting (`REDIRECTS`).
 - Page info marks a title ending in "(disambiguation)" as a disambiguation page, as the wiki's does.
 
@@ -231,6 +180,7 @@ So a new snapshot that changes one fails there by name rather than leaving a che
 
 Rolls in every pool:
 
+- book and comic objects, joke and removed features left out of the pool but not Chaos's
 - tiers
 - different topics
 - the link minimum
@@ -451,7 +401,7 @@ Exact clicks:
 - a pair with no route of exactly its count keeping Start off, the strip saying to reroll or pick another number of clicks
 - Random rolling par + 1 to 5 with each roll, and the line above the cards saying only "par + random"
 - running out losing, headed in orange
-- Six clicks: the target on the sixth click winning, and running out saying what was left (no target yet, something still to find on a hunt, the way back on a round trip)
+- Six clicks: the header counting down to the limit, the target on the sixth click winning, and running out saying what was left (no target yet, something still to find on a hunt, the way back on a round trip)
 - Share saying how a loss ended: out of clicks with the time, too soon with Exact clicks's count, the clicks with the Timer off
 - Six clicks and Round trip greyed out with the reason and left out even if ticked, and back with another game
 - a link with several games' rules playing Exact clicks only
@@ -662,6 +612,23 @@ The setup screen holding still:
 - a choice in Articles clicked at the bottom of the page, where its help under it gets shorter, not moving while the cards roll, measured by a ResizeObserver made after the game's
 - a real click on a rule's text with its box above the window not scrolling to the box
 - scrolling with the wheel letting go
+
+### The setup screen, the game and storage
+
+- The path sidebar collapsing (the credit stays, the article widens, remembered across a reload) and expanding
+- Back served from the parse cache, asking for nothing
+- Escape pressed in the article keeping the result open
+- The No Back rule: in the challenge link, Back hidden and `goBack` doing nothing, in the result and the record, and kept out of the personal best of games without it
+- The request limit: ten pages asked for at once, with no more than `API_CONCURRENCY` in flight
+- The Rules row leaving the difficulty's rules to the Difficulty row, Normal by default
+- The same article as start and target keeping Start off, saying so
+- A target topic picked in its box rerolling only the target, from it, and the result keeping and naming it
+- The daily's own rule winning over a link's `rules=`, the daily marked in Recent games, left by New game without the notice, and by another rule, Swap or a card rerolled with it
+- Damaged history in storage (not a list, or entries that aren't records) left out without stopping the setup screen
+- A host-page theme (added by a BiDi preload script) listed and becoming the default
+- Challenge links carrying awkward titles (`&`, `+`, `?`, `%`, `/`, `:`, quotes, accents) intact through the sealed link, a load of it and the frame's link reading
+- The wiki failing, by made-up replies (`faultReplies`): Cancel on a start that didn't load going back to the setup screen, and an HTTP error, a MediaWiki error, a reply that isn't JSON and one with no article each offering Retry with the clock stopped, Retry loading the article
+- Leaving the page asking first during a game and not after it (Start pressed with a real click, since browsers only ask after one; BiDi accepts the dialog and reports it as `browsingContext.userPromptOpened`)
 
 ### Requests
 

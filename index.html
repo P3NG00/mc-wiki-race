@@ -252,19 +252,20 @@
   .site-foot a { color: var(--accent); }
   /* The background (see the Background section of the script): the picture, its settings box and the facts line. */
   #bgCanvas { position: fixed; inset: 0; width: 100%; height: 100%; z-index: -1; pointer-events: none; }
-  .bg-opts { position: relative; }
-  .bg-opts summary { cursor: pointer; list-style: none; }
-  .bg-opts summary::-webkit-details-marker { display: none; }
-  .bg-opts summary::after { content: ' ▾'; }
-  .bg-opts[open] summary::after { content: ' ▴'; }
-  .bg-panel {
+  /* The boxes beside the title that open over the page: ⚙ Settings, and the Background box. */
+  .drop { position: relative; }
+  .drop summary { cursor: pointer; list-style: none; }
+  .drop summary::-webkit-details-marker { display: none; }
+  .drop summary::after { content: ' ▾'; }
+  .drop[open] summary::after { content: ' ▴'; }
+  .drop-panel {
     position: absolute; right: 0; top: calc(100% + 6px); z-index: 20; display: grid; gap: 8px; width: max-content;
     max-width: calc(100vw - 32px); padding: 12px 14px; background: var(--panel); color: var(--ink);
     border: 1px solid var(--line); border-radius: var(--radius-lg); box-shadow: var(--shadow);
   }
   @media (max-width: 720px) {   /* on a phone the box opens in the page, the whole width */
-    .bg-opts[open] { flex-basis: 100%; }
-    .bg-panel { position: static; width: auto; margin-top: 8px; white-space: normal; }
+    .drop[open] { flex-basis: 100%; }
+    .drop-panel { position: static; width: auto; margin-top: 8px; white-space: normal; }
   }
   .bg-facts { margin: 28px 0 0; color: var(--muted); font-size: 13.5px; min-height: 1.45em; transition: opacity .5s; }
   .bg-facts b { color: var(--ink); font-weight: 600; }
@@ -767,14 +768,19 @@ const THEMES = [...new Set(['auto', 'light', 'dark', ...Array.from(document.quer
   <div class="setup-head">
     <h1>MC Wiki Race</h1>
     <div class="head-opts">
-      <label><input type="checkbox" id="soundToggle"> Sound</label>
-      <label title="A clock while you play, and your time in the result. Off: no clock, and no time is recorded."><input type="checkbox" id="timerToggle"> Timer</label>
-      <label id="effectsLabel"><input type="checkbox" id="effectsToggle"> Effects</label>
-      <label id="motionLabel"><input type="checkbox" id="motionToggle"> Reduce motion</label>
-      <label>Theme <select id="themeSelect"></select></label>
-      <details class="bg-opts" id="bgOpts">
+      <details class="drop" id="setOpts">
+        <summary>⚙ Settings</summary>
+        <div class="drop-panel">
+          <label><input type="checkbox" id="soundToggle"> Sound</label>
+          <label title="A clock while you play, and your time in the result. Off: no clock, and no time is recorded."><input type="checkbox" id="timerToggle"> Timer</label>
+          <label id="effectsLabel"><input type="checkbox" id="effectsToggle"> Effects</label>
+          <label id="motionLabel"><input type="checkbox" id="motionToggle"> Reduce motion</label>
+          <label>Theme <select id="themeSelect"></select></label>
+        </div>
+      </details>
+      <details class="drop" id="bgOpts">
         <summary>Background</summary>
-        <div class="bg-panel">
+        <div class="drop-panel">
           <label>Show <select id="bgStyle">
             <option value="auto">Auto: constellation, redstone map on phones</option>
             <option value="constellation">Constellation</option>
@@ -5964,7 +5970,7 @@ const bgLabelX = (x, w) => Math.min(bg.W - w / 2 - 6, Math.max(w / 2 + 6, x));
 // one, or past the screen's edge, reads as broken text, so a name that would be is left out. Where they are on the
 // screen, measured at each paint (bgCovers), and painted again as the page scrolls while the background is still
 // (motion reduced).
-const BG_COVERS = '.daily-box, .card, .games label, .game-help, .extras label, .settings, .history table, .setup-actions button, .head-opts select, #bgOpts[open] .bg-panel, #setup .items-btn, .bg-view-btn';
+const BG_COVERS = '.daily-box, .card, .games label, .game-help, .extras label, .settings, .history table, .setup-actions button, .head-opts select, #bgOpts[open] .drop-panel, #setOpts[open] .drop-panel, #setup .items-btn, .bg-view-btn';
 const BG_TEXT = '#setup :is(.setup-head, .sub, .your-game, .step, .setup-par, .status, .history-head, #historyNone, .bg-facts, .site-foot)';   // the CSS's with a halo
 function bgCovers() {
   const viewing = bgViewing(), covers = [...document.querySelectorAll(viewing ? '#bgOpts, #btnBgView' : BG_COVERS)].map(el => el.getBoundingClientRect());
@@ -6355,8 +6361,11 @@ for (const type of ['click', 'change', 'input']) $('#setup').addEventListener(ty
   if (!bgSet.roll || e.target.closest('#bgOpts, #btnBgView, #motionLabel, #btnItems, #btnNotes, .note-box') || (type === 'click' && !e.target.closest('button, a, input, select'))) return;
   bgSetting('roll', false);
 }, true);
-document.addEventListener('click', e => { if (!e.target.closest('#bgOpts, #btnBgView')) $('#bgOpts').open = false; });
-document.addEventListener('keydown', e => { if (e.key === 'Escape') { $('#bgOpts').open = false; bgView(false); } });
+document.addEventListener('click', e => {
+  if (!e.target.closest('#bgOpts, #btnBgView')) $('#bgOpts').open = false;
+  if (!e.target.closest('#setOpts')) $('#setOpts').open = false;
+});
+document.addEventListener('keydown', e => { if (e.key === 'Escape') { $('#bgOpts').open = false; $('#setOpts').open = false; bgView(false); } });
 bgView(false);
 $('#btnBgView').onclick = () => bgView(!bgViewing());
 addEventListener('resize', bgDraw);

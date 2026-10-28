@@ -91,7 +91,7 @@ The game's:
 ### Audio context and muting
 
 The `AudioContext` is made on the first sound, which always follows a click or key press, as browsers require, and any audio error is swallowed.
-Sound is on by default, muted with the Sound checkbox beside Theme or the speaker button in the game header (`setSound`).
+Sound is on by default, muted with the Sound checkbox in ⚙ Settings or the speaker button in the game header (`setSound`).
 With Distance on, a click that got closer also dings (`closer`), a step higher the fewer clicks are left: see Effects.
 
 ## Note block
@@ -254,7 +254,7 @@ The wiki's own animated pictures in the article stay as the wiki shows them: som
 
 ## Background
 
-Behind the setup screen is a picture of the wiki on a fixed canvas (`#bgCanvas`), picked in the Background box at the top right (`#bgOpts`, a `<details>` beside Theme; on a phone it opens in the page).
+Behind the setup screen is a picture of the wiki on a fixed canvas (`#bgCanvas`), picked in the Background box at the top right (`#bgOpts`, a `<details>` beside ⚙ Settings; on a phone it opens in the page).
 All of it is worked out in the page from `wiki-data.js` and the link graph, which the setup screen loads for par anyway: no generated file holds any of it.
 
 ### The pictures

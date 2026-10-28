@@ -2297,6 +2297,17 @@ await move('innerWidth - 40', 'innerHeight - 40');
 await ev('bgDraw(), true');   // a still frame drawn with the cursor in
 check('reduce motion leaves the cursor alone', await ev(`bg.glow === 0 && ${corner} < ${cold} + 30`), await ev(`JSON.stringify([bg.glow, ${corner}, ${cold}])`));
 await ev("setCalm(false), bgSetting('style', 'auto'), document.dispatchEvent(new PointerEvent('pointerout', { relatedTarget: null }))");
+// ⚙ Settings holds Sound, Timer, Effects, Reduce motion and Theme, out of sight until opened; a click elsewhere or
+// Escape closes it, and opening the Background box closes it too.
+check('⚙ Settings holds the settings, closed until opened, and a click elsewhere, the Background box or Escape closes it', await ev(`(() => {
+  const box = $('#setOpts'), held = ['#soundToggle', '#timerToggle', '#effectsToggle', '#motionToggle', '#themeSelect'].every(s => box.contains($(s)));
+  const hidden = !box.open && !$('#soundToggle').checkVisibility();
+  $('#setOpts summary').click(); const opened = box.open && $('#soundToggle').checkVisibility();
+  document.body.click(); const outside = !box.open;
+  $('#setOpts summary').click(); $('#bgOpts summary').click(); const other = !box.open && $('#bgOpts').open;
+  $('#bgOpts').open = false; $('#setOpts summary').click(); document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+  return held && hidden && opened && outside && other && !box.open;
+})()`));
 // Background only: the corner button hides the setup screen but the Background box (open), the facts line and itself,
 // with the picture stronger, and doesn't turn Roll by itself off; Escape or the button brings the screen back, and Off
 // leaves it and hides the button.

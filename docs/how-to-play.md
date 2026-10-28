@@ -201,11 +201,11 @@ A link without `rules` plays on Relaxed. `#rules=…` on its own sets the rules 
 | **Reduce motion** | Stops everything that moves by itself: sparks, the background, moving pictures (shown as their first frame), and the crafting grids, which get a ↻ button instead. Sounds still play. |
 | **Theme** | **Auto** follows your system, or **Light** or **Dark**. The article is drawn in the wiki's matching theme. |
 
-These sit beside the title. By default **Sound**, **Timer** and **Effects** are on, **Reduce motion** is off and **Theme** is **Auto**. When your system asks for reduced motion, **Reduce motion** is ticked and held. While **Reduce motion** is on, either way, **Effects** shows unticked and can't be changed.
+These are in **⚙ Settings**, beside the title. By default **Sound**, **Timer** and **Effects** are on, **Reduce motion** is off and **Theme** is **Auto**. When your system asks for reduced motion, **Reduce motion** is ticked and held. While **Reduce motion** is on, either way, **Effects** shows unticked and can't be changed.
 
 ## The background
 
-Behind the setup screen is a picture of the wiki itself, picked in the **Background** box beside **Theme**. **Show** picks **Auto: constellation, redstone map on phones**, **Constellation**, **Redstone map** or **Off**.
+Behind the setup screen is a picture of the wiki itself, picked in the **Background** box beside **⚙ Settings**. **Show** picks **Auto: constellation, redstone map on phones**, **Constellation**, **Redstone map** or **Off**.
 
 - The constellation is each topic's best-linked articles as stars, joined to those they link with, with pulses playing games of their own along the links. Stars near your mouse make way and the nearest shows its name.
 - The redstone map is every article but subpages and spin-off pages as one block, grouped like a world map's biomes, brighter the more it's linked. Your mouse is a torch.

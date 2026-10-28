@@ -6,7 +6,7 @@ The setup screen puts playing first.
 
 ## Beside the title and in the corner
 
-- Beside the title are Sound, Timer, Effects, Reduce motion, Theme and the Background box (see [ui.md](ui.md)).
+- Beside the title are ⚙ Settings (`#setOpts`, a `<details>` holding Sound, Timer, Effects, Reduce motion and Theme) and the Background box (`#bgOpts`, see [ui.md](ui.md)), both opening over the page (`.drop`, `.drop-panel`; on a phone in the page, the whole width), and closed by a click elsewhere or Escape.
 - In the bottom-right corner, above the background's button, is the items' hotbar button (see [items.md](items.md)), and above that the note block's, which picks what clicks play (see [ui.md](ui.md#note-block)).
 - Where the window is too narrow for the corner's buttons to fit beside the page, `#setup`'s right padding grows (up to 64 px) to keep the page clear of them. At 720 px and below they sit in a row beside the title instead and scroll with the page (see [ui.md](ui.md#720-px-and-below)).
 

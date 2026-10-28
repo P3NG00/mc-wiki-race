@@ -555,6 +555,7 @@ Par:
 The background:
 
 - its defaults and its box showing them
+- ⚙ Settings holding Sound, Timer, Effects, Reduce motion and Theme, closed until opened, and a click elsewhere, opening the Background box or Escape closing it
 - the corner's buttons clear of the setup screen at 1400, 1280, 1024 and 820 px, in a row beside the title at a phone's width, and Background only's back in the corner, under the Background box
 - Auto the constellation on a wide screen and the redstone map at a phone's width
 - the sky laid out the same every time

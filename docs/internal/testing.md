@@ -311,6 +311,16 @@ The advancements:
 - a count's progress and a secret's detail saying nothing
 - stored advancements keeping only what would be written
 - Clear history leaving them, as the panel's foot says, and Reset forgetting them
+- after Reset, what earns the rest, each game its pair's first:
+  - the counts from one short of each, nothing earned until the next blast (Demolition Expert), arrivals (Tourist, Bookworm, Cartographer) or win (Regular, Veteran, Wiki Legend) reaches them, and Around the World on the last topic arriving
+  - a Hard game with No Back, Blind target and Six clicks won at par: Hardcore, No Take-Backs, Blindfolded, Full Kit, Six Shooter
+  - Top links only won by a click straight to the target, under the snapshot's par: Top Notch, Birdie
+  - Distance's cheers: not On a Roll after two in a row, On a Roll after three, and Hot Streak for a par 4 win cheered every click
+  - Exact clicks at par + 5: Measure Twice, Long Way Round
+  - a Round trip Relay of three checkpoints: Relay Racer, There and Back Again, Grand Tour
+  - a hunt of kinds: Treasure Hunter, Kind Collector
+  - Dirt to Diamond in 15 clicks by Herobrine, an April Fools page and a spin-off: Rags to Riches, Scenic Route, He Is Watching, April Fools!, Spin Doctor
+  - out of Six clicks one click from the target: So Close
 
 ### Effects
 

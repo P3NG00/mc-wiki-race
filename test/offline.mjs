@@ -1737,14 +1737,16 @@ await ev('closeModal(); toSetup()');
 // Cake and back on the start earn their secrets once the article shows; the panel, its counts and a count's progress;
 // storage only keeping what advancements would write; Clear history leaving them and Reset clearing them.
 await ev("['mwr.advancements', 'mwr.history', 'mwr.dailies'].forEach(k => localStorage.removeItem(k))");
-const long = JSON.parse(await ev(`(async () => {
-  const graph = await linkGraph(['nonav']), usable = routeUsable({ keep: [], rules: ['nonav'] });
+// The par route of a pool pair at least min clicks apart under rules, and at most max.
+const pairFor = async (rules, min = 3, max = Infinity) => JSON.parse(await ev(`(async () => {
+  const rules = ${JSON.stringify(rules)}, graph = await linkGraph(rules), usable = routeUsable({ keep: [], rules });
   for (const start of POOL_TITLES) {
-    const d = distancesFrom(graph, start, usable), goal = POOL_TITLES.find(t => d[PAGE_IDS.get(t)] >= 3);
-    if (goal) return JSON.stringify(await parRoute({ start, goal, rules: ['nonav'] }));
+    const d = distancesFrom(graph, start, usable), goal = POOL_TITLES.find(t => d[PAGE_IDS.get(t)] >= ${min} && d[PAGE_IDS.get(t)] <= ${max});
+    if (goal) return JSON.stringify(await parRoute({ start, goal, rules }));
   }
   return 'null';
 })()`));
+const long = await pairFor(['nonav']);
 check('the snapshot has a pool pair three or more clicks apart on Normal', long?.length >= 4, JSON.stringify(long));
 const earnedKeys = "JSON.stringify(Object.keys(adv.got).sort())";
 await playRoute(`#start=${encodeURIComponent(long[0])}&target=${encodeURIComponent(long.at(-1))}&rules=nonav`, long);
@@ -1818,6 +1820,70 @@ await ev("$('#aReset').click(); $('#aWipe').click()");
 check('Reset advancements forgets them and the counts', await ev(`advEarned() === 0 && adv.wins === 0 && adv.xp === 0 && adv.pages.size === 0 && JSON.stringify(store.get('mwr.advancements').got) === '{}'
   && $('#advCount').textContent.startsWith('0 / ') && document.querySelectorAll('.adv-tile.got').length === 0 && $('#history').classList.contains('hidden')`));
 await ev('closeModal()');
+// What earns the rest, after Reset, so each game is its pair's first. Each count from one short of it, reached by the
+// next blast, win or arrival; the last of the five topics arriving. A Hard game with No Back, Blind target and Six
+// clicks won at par; Top links only won by a click straight to the target, which the made-up articles allow, under the
+// snapshot's par (Birdie); Distance cheering three clicks in a row, and every click of a par 4 win; Exact clicks at
+// par + 5; a Round trip Relay of three checkpoints; a hunt of kinds; Dirt to Diamond in 15 clicks, by Herobrine, an
+// April Fools page and a spin-off; running out of Six clicks one click from the target.
+const got = keys => `${JSON.stringify(keys)}.every(k => adv.got[k])`, enc = encodeURIComponent;
+const hard = await pairFor(['nonav', 'nohubs']), lead = await pairFor(['nonav', 'lead']), four = await pairFor(['nonav'], 4, 4);
+check('the snapshot has pairs for them: par 3+ on Hard and under Top links only, par 4 on Normal', hard?.length >= 4 && lead?.length >= 4 && four?.length === 5,
+  JSON.stringify([hard, lead, four]));
+await ev("adv.blasts = 49; holdItem('bed'); $('.hold').onclick({ clientX: 300, clientY: 300 }); dropItem()");
+check('the 50th blast earns Demolition Expert', await ev("!adv.got.demolition && ($('.thing.bed').click(), !!adv.got.demolition && adv.blasts === 50)"), await ev('adv.blasts'));
+await ev('itemsReset()');
+await until("!document.querySelector('#setup [data-broke-style]')", 3000);
+await ev(`adv.wins = 9; adv.visits = 1000 - ${hard.length}; adv.pages = new Set(Array.from({ length: 100 - ${hard.length} }, (_, i) => 'Seen ' + i));
+  adv.topics = WIKI_DATA.topics.filter(t => t !== ARTICLES.get(${JSON.stringify(hard.at(-1))}).topic); advEarn({})`);
+check('one short of a count earns nothing', await ev("!['regular', 'tourist', 'bookworm', 'aroundWorld'].some(k => adv.got[k])"), await ev(earnedKeys));
+await playRoute(`#start=${enc(hard[0])}&target=${enc(hard.at(-1))}&rules=nonav,nohubs,noback,blind,limit`, hard);
+check('a Hard game with No Back, Blind target and Six clicks, won at par, earns Hardcore, No Take-Backs, Blindfolded, Full Kit and Six Shooter',
+  await until(`!game.active && ${got(['hardcore', 'noTakeBacks', 'blindfolded', 'fullKit', 'sixShooter', 'par'])}`, 5000), await ev(earnedKeys));
+check('its arrivals make 100 different articles and 1,000 visits, the last topic Around the World, and its win 10 wins',
+  await ev(`${got(['tourist', 'bookworm', 'aroundWorld', 'regular'])} && !adv.got.veteran && adv.pages.size === 100`), await ev(earnedKeys));
+await ev(`closeModal(); toSetup(); adv.wins = 49; adv.pages = new Set([...adv.pages, ...Array.from({ length: 999 - adv.pages.size }, (_, i) => 'More ' + i)]); saveAdv()`);
+await playRoute(`#start=${enc(lead[0])}&target=${enc(lead.at(-1))}&rules=nonav,lead`, [lead[0], lead.at(-1)]);
+check('Top links only, won under par, earns Top Notch and Birdie', await until(`!game.active && savedGames()[0].clicks < savedGames()[0].par && ${got(['topNotch', 'birdie'])}`, 5000),
+  await ev(earnedKeys));
+check('a new article makes 1,000 different, Cartographer, and a win 50, Veteran', await ev(`${got(['cartographer', 'veteran'])} && !adv.got.legend`), await ev(earnedKeys));
+await ev('closeModal(); toSetup(); adv.wins = 99; saveAdv()');
+await open(`#start=${enc(four[0])}&target=${enc(four.at(-1))}&rules=nonav,distance`);
+await play();
+for (const [i, t] of four.slice(1, -1).entries()) {
+  await ev(`navigate(${JSON.stringify(t)}, null)`);
+  await until(`game.cheerRun === ${i + 1}`, 5000);
+  if (i === 1) check('Distance cheering two clicks in a row isn\'t On a Roll', await ev('game.cheerRun === 2 && !adv.got.onARoll'));
+}
+check('and three is', await ev('!!adv.got.onARoll'), await ev('game.cheerRun'));
+await ev(`navigate(${JSON.stringify(four.at(-1))}, null)`);
+check('a par 4 win with Distance cheering every click earns Hot Streak, and the 100th win Wiki Legend', await until(`!game.active && ${got(['hotStreak', 'legend'])}`, 5000), await ev(earnedKeys));
+await ev('closeModal(); toSetup()');
+await playRoute(`#start=${enc(four[0])}&target=${enc(four.at(-1))}&rules=nonav,exact&extra=5`, [four[0], ...detours.slice(0, 5), ...four.slice(1)]);
+check('Exact clicks won at par + 5 earns Measure Twice and Long Way Round', await until(`!game.active && savedGames()[0].won && ${got(['measure', 'longWay'])}`, 5000), await ev(earnedKeys));
+await ev('closeModal(); toSetup()');
+await playRoute('#start=Diamond&via=Creeper&via=Zombie&via=Bamboo&target=Crafting&back=1&rules=checkpoint,roundtrip', ['Diamond', 'Creeper', 'Zombie', 'Crafting', 'Bamboo', 'Diamond']);
+check('a Round trip Relay of three checkpoints earns Relay Racer, There and Back Again and Grand Tour', await until(`!game.active && savedGames()[0].won && ${got(['relay', 'thereBack', 'grandTour'])}`, 5000),
+  await ev(earnedKeys));
+await ev('closeModal(); toSetup()');
+await open('#start=Diamond&kind=Nether%20mobs&kind=Enchantments&kind=Potions&rules=scavenger');
+const kindsRoute = JSON.parse(await ev('cardsRoute([setup.start.title], rules(), setup.kinds).then(r => JSON.stringify(r))'));
+await play();
+for (const t of kindsRoute.slice(1)) {
+  await ev(`navigate(${JSON.stringify(t)}, null)`);
+  await until(`game.path.at(-1).title === ${JSON.stringify(t)} && !game.loading || !game.active`);
+}
+check('a hunt of kinds earns Treasure Hunter and Kind Collector', await until(`!game.active && ${got(['treasure', 'kinds'])}`, 5000), `${kindsRoute.join(' → ')} ${await ev(earnedKeys)}`);
+await ev('closeModal(); toSetup()');
+const joke = await ev("[...ARTICLES].find(([, a]) => a.fams.includes('joke'))[0]");
+const scenic = ['Herobrine', joke, 'Dungeons:Creeper', ...detours, ...detours.slice(0, 5)];
+await playRoute('#start=Dirt&target=Diamond&rules=nonav', ['Dirt', ...scenic, 'Diamond']);
+check('Dirt to Diamond in 15 clicks earns Rags to Riches and Scenic Route, and on the way Herobrine, April Fools and a spin-off theirs',
+  await until(`!game.active && savedGames()[0].clicks === 15 && ${got(['rags', 'scenic', 'herobrine', 'aprilFools', 'spinDoctor'])}`, 5000), await ev(earnedKeys));
+await ev('closeModal(); toSetup()');
+await playRoute(`#start=${enc(four[0])}&target=${enc(four.at(-1))}&rules=nonav,limit`, [four[0], ...detours.slice(0, 5), four.at(-2)]);
+check('running out of Six clicks one click from the target earns So Close', await until(`!game.active && savedGames()[0].outOfClicks && !!adv.got.soClose`, 5000), await ev(earnedKeys));
+await ev("closeModal(); toSetup(); ['mwr.advancements', 'mwr.history'].forEach(k => localStorage.removeItem(k))");
 
 // The background: its settings and their defaults, Roll by itself turning off at a change on the page but not in its
 // own box, the cards marked with the route only as a spoiler and nothing past the start under Blind target, the facts

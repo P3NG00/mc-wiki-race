@@ -286,6 +286,8 @@ The items:
   - a blast out of its reach as it floats in leaving it where it floats to
   - knocked aside, coming back to its place for its next shot
   - a fireball taken up again coming from the ghast that is there, not one floating off
+  - a fireball hit in flight going back and blowing up on the ghast, earning Return to Sender
+- the creeper: hit while it hisses, knocked back and earning Shoo!, and left to hiss, blowing up
 - while an item is in hand, a click on Rebuild being Rebuild's
 - a blast while the pieces fly back breaking nothing and marking nothing broken
 - a placed block scrolling with the page, and with the article, out of sight once scrolled out of the frame

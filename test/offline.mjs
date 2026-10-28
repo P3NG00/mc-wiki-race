@@ -1611,6 +1611,24 @@ check('knocked aside, a ghast comes back to its place for its next shot', knocke
   && Math.abs(middleOf(gs[0].el).x - gs[0].p.x) < 2)(${ghasts})`), await ev(`JSON.stringify([${knocked}, ${ghasts}.map(g => [g.p.x, middleOf(g.el).x])])`));
 await ev('itemsReset()');
 await until("!document.querySelector('#setup [data-broke-style]')", 3000);
+// A fireball hit in flight goes back and blows up on the ghast: Return to Sender.
+await ev("items.pointer = { x: 100, y: 400 }; holdItem('fireball')"); await sleep(800);
+await ev("$('.hold').onclick({ clientX: 120, clientY: innerHeight - 60 }); $('.thing.fireball').click()");
+check('a fireball hit in flight goes back and blows up on the ghast: Return to Sender', await until(`!!adv.got.returnSender && ${ghasts}.length === 0 && !$('.thing.fireball')`, 4000),
+  await ev(`JSON.stringify([!!adv.got.returnSender, ${ghasts}.length])`));
+await ev('itemsReset()');
+await until("!document.querySelector('#setup [data-broke-style]')", 3000);
+// A creeper hisses once the pointer is near: hit then, it's knocked back (Shoo!); left to hiss, it blows up.
+const creeper = "[...items.things].find(t => t.kind === 'creeper')", nearIt = `(c => items.pointer = { x: c.p.x + 40, y: c.p.y })(${creeper})`;
+await ev("holdItem('creeper'); $('.hold').onclick({ clientX: 300, clientY: 300 }); dropItem()");
+await ev(nearIt); await sleep(500);
+await ev(`${creeper}.el.click()`);
+check('hit while it hisses, a creeper is knocked back: Shoo!', await ev(`!!adv.got.shoo && (c => Math.hypot(c.p.x - items.pointer.x, c.p.y - items.pointer.y) > 150)(${creeper})`),
+  await ev(`JSON.stringify([!!adv.got.shoo, ${creeper}?.p, items.pointer])`));
+await ev(nearIt);
+check('and left to hiss, it blows up', await until(`!${creeper} && items.broken`, 4000));
+await ev('itemsReset()');
+await until("!document.querySelector('#setup [data-broke-style]')", 3000);
 
 // A blast while Rebuild puts the pieces back breaks nothing and marks nothing broken; while an item is in hand, a click
 // on the bar is the bar's; a fireball taken up again comes from the ghast that is there, not one floating off.

@@ -472,7 +472,7 @@ Top links only:
 
 Scavenger with kinds:
 
-- a link's kinds on the hunt card
+- a link's kinds on the hunt card, with no Swap
 - par through a member of each
 - the HUD listing them
 - an excluded page in the live category not counting
@@ -485,7 +485,7 @@ Scavenger with kinds:
 
 And with articles:
 
-- three Find cards joined by +
+- three Find cards joined by +, with Swap
 - par the best of the orders
 - Distance counting to the nearest
 - finds in any order winning, headed You found them all!, with the shortest hunt and its par
@@ -513,6 +513,7 @@ The daily:
   - Scavenger days with three kinds or three articles
 - a Round trip day as a Race there and back, an Exact clicks day (its par + number in the status line and the strip) and Scavenger days of both kinds loading ready to start
 - left by a difficulty change
+- left by a card typed in
 - the streak counting only days won on their day, up to today or to yesterday while today's is due, with the best run
 - a day's best win kept
 - a loss or a later win not mending a streak
@@ -614,6 +615,7 @@ The background:
   - beside Effects, saved
   - leaving Roll by itself on
   - stopping the effects and playing them again unticked
+  - ticked and held, saying why, with Effects held too, while the system asks for reduced motion, the saved box left as it was
 - Effects unticked:
   - saved
   - stopping the game's effects but not the items'
@@ -634,6 +636,7 @@ The background:
   - a click outside closing the window
   - a saved pick that isn't one being the harp with nothing on top
 - with Sound off no sound fetched
+- the header's sound button muting and unmuting, saved, the Sound box following and the button saying which, and the box doing the same
 - with motion reduced a still frame drawn, the wave already passed
 - hidden during play and back on the setup screen
 - Off hiding it and the facts line

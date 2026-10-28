@@ -880,6 +880,7 @@ check('Scavenger: a kinds link puts its kinds on the hunt card in place of the t
   && setup.kinds.join() === 'Nether mobs,Enchantments,Potions' && !document.querySelector('#cardHunt').classList.contains('hidden')
   && document.querySelector('#cardGoal').classList.contains('hidden') && document.querySelector('#cardHunt .kinds').textContent.includes('a mob found in the Nether')
   && openLink(new URL(challengeLink()).hash.slice(3)) === 'start=Diamond&kind=Nether%20mobs&kind=Enchantments&kind=Potions&rules=scavenger'`));
+check('with no Swap, there being nothing to swap the start with', await ev("!document.querySelector('#btnSwap').checkVisibility()"));
 const kindsPar = JSON.parse(await ev(`cardsRoute(['Diamond'], rules(), setup.kinds).then(r => JSON.stringify({ route: r,
   each: setup.kinds.every(k => r.slice(1).some(t => KIND_MEMBERS.get(k).has(t))) }))`));
 check('its par is a route through a member of each kind', kindsPar.each && await until(`document.querySelector('#setupPar').textContent === 'Par ${kindsPar.route.length - 1}'`),
@@ -936,6 +937,7 @@ check('Scavenger: an articles link shows three Find cards joined by +', await un
   && ['#card-via0', '#card-via1', '#cardGoal'].every(c => document.querySelector(c + ' .tag').textContent === 'Find')
   && document.querySelector('#slot-via0 .arrow').textContent === '+' && openLink(new URL(challengeLink()).hash.slice(3)).endsWith('&target=Bamboo&via=Ghast&via=Sharpness&rules=distance,scavenger')`),
   await ev('openLink(new URL(challengeLink()).hash.slice(3))'));
+check('an articles hunt has Swap', await ev("document.querySelector('#btnSwap').checkVisibility()"));
 const best = JSON.parse(await ev(`Promise.all(orders(['Ghast', 'Sharpness', 'Bamboo']).map(o => parRoute({ start: 'Diamond', vias: o.slice(0, -1), goal: o.at(-1), rules: ['nonav'] })))
   .then(rs => JSON.stringify([Math.min(...rs.map(r => r.length - 1)), document.querySelector('#setupPar').textContent]))`));
 check('its par is the best of the orders', await until(`document.querySelector('#setupPar').textContent === 'Par ${best[0]}'`), best.join(' / '));
@@ -1286,6 +1288,9 @@ for (const [date, rules, cards, what] of [['2026-01-24', 'nonav,exact', 'start,g
 }
 await ev("document.querySelector('input[name=level][value=hard]').click()");
 check('another difficulty leaves the daily', await ev("setup.daily === null && document.querySelector('#setupStatus').textContent === LEFT_DAILY"));
+await open('#daily=2026-01-06');
+await ev("setCustom('goal', 'Creeper')");
+check('so does a card typed in', await until("setup.busy === 0 && setup.goal?.title === 'Creeper'") && await ev(`setup.daily === null && ${status} === LEFT_DAILY`), await ev(status));
 
 // The daily streak and stats, from mwr.dailies: only days won on their day make a streak, which lasts until today's is
 // due, and anything finish wouldn't write is left out.
@@ -2074,6 +2079,19 @@ check('Effects unticked stops the game\'s effects but not the items\', and is sa
   fx.parts.length === 0 && store.get('mwr.effects') === false && (effect('poof', { x: 100, y: 100, colours: ['#ffffff'] }), fx.parts.length === 14))`));
 check('Reduce motion holds it unticked, and back off leaves it as it was', await ev(`(() => { $('#effectsToggle').click(); setCalm(true); const held = $('#effectsToggle').disabled && !$('#effectsToggle').checked;
   setCalm(false); return held && $('#effectsToggle').checked && !$('#effectsToggle').disabled && store.get('mwr.effects') === true; })()`));
+// While the system asks for reduced motion (made to here), Reduce motion is on, ticked and held, saying why, and Effects
+// held with it; the saved box is left as it was, for when the system stops asking.
+check('the system asking for reduced motion ticks and holds Reduce motion, saying why, and Effects with it', await ev(`(() => {
+  const was = calmBox;
+  setCalm(false);
+  Object.defineProperty(SYSTEM_CALM, 'matches', { get: () => true, configurable: true }); SYSTEM_CALM.dispatchEvent(new Event('change'));
+  const held = calm() && document.documentElement.classList.contains('calm') && $('#motionToggle').checked && $('#motionToggle').disabled
+    && $('#motionLabel').title === 'Your system asks for reduced motion.' && !$('#effectsToggle').checked && $('#effectsToggle').disabled && store.get('mwr.reduceMotion') === false;
+  delete SYSTEM_CALM.matches; SYSTEM_CALM.dispatchEvent(new Event('change'));
+  const back = !calm() && !$('#motionToggle').checked && !$('#motionToggle').disabled && $('#motionLabel').title === 'No sparks, no moving banners and a still background.';
+  setCalm(was);
+  return held && back;
+})()`));
 await ev('fx.parts = []');
 check('with motion reduced a moving picture of the game\'s is caught to be stilled, and put back after', await ev(`(async () => {
   setCalm(true); const img = Object.assign(new Image(), { src: 'https://minecraft.wiki/images/Chest.gif' }); $('#cardStart').append(img);
@@ -2121,6 +2139,20 @@ const music = await ev(`(() => {
 check('Sound of Music is earned on hearing the 20th instrument, and only instruments are kept toward it', music === true, music);
 check('a saved note block that isn\'t one is the harp with nothing on top', await ev(`[noteChoice({ under: 'bedrock', head: 'steve' }), noteChoice('x'), noteChoice({ under: 'bell', head: 'dragon' })].map(c => c.under + ' ' + c.head).join() === 'harp null,harp null,bell dragon'`));
 check('with Sound off no sound is fetched', await ev("(() => { const was = soundOn; setSound(false); soundsAsked.clear(); play('click', 0); loadSounds(ITEM_SOUNDS); const none = soundsAsked.size === 0; setSound(was); return none; })()"));
+// The header's sound button and the Sound box are one setting, saved, the button showing which and what a click does.
+check('the sound button mutes and unmutes, saved, the Sound box following and the button saying which, and the box does too', await ev(`(() => {
+  const was = soundOn, b = $('#btnSound');
+  const shows = on => soundOn === on && store.get('mwr.sound') === on && $('#soundToggle').checked === on && b.textContent === (on ? '🔊' : '🔇')
+    && b.title === (on ? 'Sound on (click to mute)' : 'Sound off (click to unmute)') && b.getAttribute('aria-pressed') === String(on);
+  setSound(false); b.click();
+  const unmuted = shows(true);
+  b.click();
+  const muted = shows(false);
+  $('#soundToggle').click();
+  const boxed = shows(true);
+  setSound(was);
+  return unmuted && muted && boxed;
+})()`));
 await send('browsingContext.setViewport', { context: ctx, viewport: { width: 390, height: 844 } });
 check('Auto is the redstone map at a phone\'s width', await until("bgStyle() === 'redstone' && bg.W <= 390 && bg.grid?.W === bg.W"), await ev('JSON.stringify([bgStyle(), bg.W, bg.grid?.W])'));
 await send('browsingContext.setViewport', { context: ctx, viewport: null });

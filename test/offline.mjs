@@ -2032,6 +2032,16 @@ check('the sky is laid out the same every time', await ev("JSON.stringify(buildS
 check('the facts line starts with the snapshot\'s pages, and gets how far apart articles are on the difficulty', await ev(`bg.facts[0].includes(fmtCount(WIKI_DATA.articles.length)) && bg.facts[0].includes(WIKI_DATA.snapshot)`)
   && await until("bg.sampled.has(level()) && bg.facts.some(f => f.startsWith('On ' + LEVELS[level()].label))", 30000), await ev('bg.facts.at(-1)'));
 check('Roll by itself marks pairs of its own', await until("!!bg.pair && bg.pair.stops.length === 2 && !bg.pair.stops[0].label.startsWith('Start')"), await ev('JSON.stringify(bg.pair?.stops)'));
+// In grey, both ends, where the cards' markers are the start's green and the target's red.
+check('in grey, where the cards\' are the start\'s green and the target\'s red', await ev(`(() => {
+  const real = bgMarker, was = bg.pair, cols = [], c = bg.colors;
+  bgMarker = (p, col, ...a) => (cols.push(col), real(p, col, ...a));
+  drawPair(bgNow(), () => [100, 100]);
+  bg.pair = { ...was, rolled: false };
+  drawPair(bgNow(), () => [100, 100]);
+  bgMarker = real; bg.pair = was;
+  return JSON.stringify(cols) === JSON.stringify([c.muted, c.muted, c.accent, c.target]);
+})()`));
 await ev("$('#bgWave').click()");
 check('a change in the Background box leaves it on', await ev("bgSet.roll && bgSet.wave && store.get('mwr.background').wave === true"));
 check('so does Reduce motion, which is saved and stops the effects', await ev(`($('#motionToggle').click(), effect('win', { x: 100, y: 100 }), bgSet.roll && fx.parts.length === 0

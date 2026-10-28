@@ -558,7 +558,7 @@ The background:
 - no name drawn under the setup screen's cards and panels or past the screen's edge, over three seconds of the sky, and with motion reduced a scroll painting it again
 - the facts line starting with the snapshot's pages and getting how far apart articles are on the difficulty
 - Roll by itself:
-  - marking pairs of its own
+  - marking pairs of its own, in grey where the cards' markers are green and red
   - staying on through a change in its box and turning off, saved, at a change on the page
   - rolling on after Reduce motion is ticked and unticked while a roll waits for the graph
   - then the cards marked

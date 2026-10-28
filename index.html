@@ -5910,7 +5910,8 @@ function drawPair(t, spot) {
     if (!p) continue;
     // a stop after the start shows faint until the wave reaches it
     const reached = !pair.wave || stop.start || waveLight(pair.wave, stop.page, t);
-    bgMarker(p, stop.start ? c.accent : c.target, stop.label, t, reached ? 1 : .45);
+    // A pair of its own (bgRoll) in grey, so only the cards' markers have their colours.
+    bgMarker(p, pair.rolled ? c.muted : stop.start ? c.accent : c.target, stop.label, t, reached ? 1 : .45);
   }
 }
 // Where a marker's label of width w goes over x: centred on it, but kept on the screen.
@@ -5989,7 +5990,7 @@ async function bgRoll() {
   }
   if (!b) { bg.nextRoll = bgNow() + 5000; return; }
   const route = bgSet.route && shortestRoute(graph, a, b, usable);
-  bg.pair = { stops: [{ page: PAGE_IDS.get(a), start: true, label: a }, { page: PAGE_IDS.get(b), start: false, label: b }],
+  bg.pair = { stops: [{ page: PAGE_IDS.get(a), start: true, label: a }, { page: PAGE_IDS.get(b), start: false, label: b }], rolled: true,
     route: route ? route.map(t => PAGE_IDS.get(t)) : null, wave: bgSet.wave ? makeWave(dist, bgNow() + 300) : null };
   bg.nextRoll = bgNow() + Math.max(9000, (bg.pair.wave?.end ?? 0) - bgNow() + 6000);
 }

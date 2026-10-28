@@ -209,7 +209,7 @@ Behind the setup screen is a picture of the wiki itself, picked in the **Backgro
 
 - The constellation is each topic's best-linked articles as stars, joined to those they link with, with pulses playing games of their own along the links. Stars near your mouse make way and the nearest shows its name.
 - The redstone map is every article but subpages and spin-off pages as one block, grouped like a world map's biomes, brighter the more it's linked. Your mouse is a torch.
-- **Wave from the start** lights every page by how many clicks it is from the start. **Show the route (spoiler)** draws the shortest route between your cards. **Roll by itself** marks random pairs of its own until you change anything on the setup screen, then marks your cards. By default **Show** is **Auto**, with **Roll by itself** on and the other two off.
+- **Wave from the start** lights every page by how many clicks it is from the start. **Show the route (spoiler)** draws the shortest route between your cards. **Roll by itself** marks random pairs of its own, in grey, until you change anything on the setup screen, then marks your cards in their own colours. By default **Show** is **Auto**, with **Roll by itself** on and the other two off.
 
 The ✦ button in the bottom-right corner (beside the title on a phone) hides everything but the background; ✕ or Escape brings it back. Above the footer, a line of facts about the wiki and your cards changes every 7 seconds.
 

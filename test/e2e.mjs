@@ -42,9 +42,13 @@ const ev = async (expr, c = ctx) => {
   return r.result?.result?.value ?? JSON.stringify(r.error || r.result?.exceptionDetails?.text);
 };
 const frameCtx = async () => (await send('browsingContext.getTree', {})).result.contexts[0].children[0]?.context;
+// A wait that runs out is recorded by the line that waited, and fails the last check: one whose condition never comes
+// true costs its whole timeout even where the checks after it pass.
+const timedOut = [];
 const until = async (expr, ms = 30000, c = ctx) => {
-  const t = Date.now();
+  const t = Date.now(), from = new Error();
   while (Date.now() - t < ms) { if (await ev(expr, c) === true) return true; await sleep(300); }
+  timedOut.push(from.stack.match(/\w+\.mjs:\d+/g)?.[1]);
   return false;
 };
 const shot = async name => {
@@ -954,6 +958,7 @@ check(`random play stays consistent (seed ${seed})`, problems.length === 0, `${s
 await ev("localStorage.removeItem('mwr.theme'); localStorage.removeItem('mwr.pathCollapsed')");
 
 check('no uncaught script errors', jsErrors.length === 0, jsErrors.slice(0, 5).join(' | '));
+check('no wait timed out', !timedOut.length, timedOut.join(', '));
 
 await send('session.end', {});
 console.log(failures ? `${failures} check(s) failed` : 'All checks passed');

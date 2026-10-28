@@ -89,9 +89,13 @@ const ev = async (expr, c = ctx) => {
   const r = await send('script.evaluate', { target: { context: c }, expression: expr, awaitPromise: true });
   return r.result?.result?.value ?? JSON.stringify(r.error || r.result?.exceptionDetails?.text);
 };
+// A wait that runs out is recorded by the line that waited, and fails the last check: one whose condition never comes
+// true costs its whole timeout even where the checks after it pass.
+const timedOut = [];
 const until = async (expr, ms = 15000) => {
-  const t = Date.now();
+  const t = Date.now(), from = new Error();
   while (Date.now() - t < ms) { if (await ev(expr) === true) return true; await sleep(200); }
+  timedOut.push(from.stack.match(/\w+\.mjs:\d+/g)?.[1]);
   return false;
 };
 const frameCtx = async () => (await send('browsingContext.getTree', {})).result.contexts[0].children[0]?.context;
@@ -2292,5 +2296,6 @@ check('markup titles run nothing anywhere a title shows', peeked === true && fra
 check('only page info, the advancements\' and items\' pictures and articles are asked for', [...requests.keys()].every(k => ['query prop=pageprops|pageimages|extracts', 'query prop=pageimages', 'query prop=imageinfo', 'parse prop=text|displaytitle|categories|links'].includes(k)),
   JSON.stringify(Object.fromEntries(requests)));
 check('no uncaught errors', jsErrors.length === 0, jsErrors.slice(0, 3).join(' | '));
+check('no wait timed out', !timedOut.length, timedOut.join(', '));
 console.log(failures ? `${failures} check(s) failed` : 'All checks passed');
 process.exit(failures ? 1 : 0);

@@ -166,6 +166,8 @@ An edit on the wiki that changes one fails there by name, so a check further dow
 
 The test also fails on any uncaught error or rejection in the page or the article frame, reported by a BiDi preload script whose listeners are on the window, so failed images, fonts and requests, which Firefox also logs as errors, don't count.
 
+It also fails, as its last check, on any wait that ran out, naming the lines that waited: a wait whose condition never comes true costs its whole timeout even when the checks after it pass, so it would otherwise go unseen. The offline suite does the same.
+
 ## Offline suite (`test/offline.mjs`)
 
 `test/run-e2e.sh --offline` runs `test/offline.mjs` instead, in about three and a half minutes without network: every request to minecraft.wiki is answered by the test.

@@ -54,7 +54,7 @@ Every setup card and the path sidebar also show a large faded copy (`.art`, at `
 - the card's article
 - in the sidebar `objective()`.
 
-The sidebar's is hidden on narrow screens.
+A card's fades out toward the text at its top left (a diagonal mask in place of the radial one), so it shows in the card's empty corner. The sidebar's is hidden on narrow screens, and a card's where the card is 440 px wide or less (three Relay cards side by side, a tablet, a phone), where it would lie under the description and the box to type in.
 
 Pictures are drawn with hard edges (`image-rendering: pixelated`), except ones whose URL has `/thumb/`: the wiki serves small sprites at their own size (Diamond is 160 px), so a thumbnail URL means it scaled down a bigger render or screenshot, and those are drawn smoothly.
 A `/thumb/` `.art` also gets a radial mask, which softens a screenshot's rectangular edges.

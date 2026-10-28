@@ -2203,12 +2203,18 @@ check('the sound button mutes and unmutes, saved, the Sound box following and th
 const cornerClear = `(() => { const s = $('#setup'), right = s.getBoundingClientRect().right - parseFloat(getComputedStyle(s).paddingRight);
   return ['#btnNotes', '#btnItems', '#btnBgView'].every(b => $(b).hidden || $(b).getBoundingClientRect().left >= right); })()`;
 const cornerWidths = [];
+// The cards' faded pictures (as if loaded, the class that hides one without a picture set aside): shown on a wide card,
+// left out of one 440 px wide or less, where they would lie under the text.
+const artShown = "(a => (a.classList.remove('hidden'), (s => (a.classList.add('hidden'), s))(getComputedStyle(a).display !== 'none')))($('#cardStart img.art'))";
+let artWide = null;
 for (const width of [1400, 1280, 1024, 820]) {
   await send('browsingContext.setViewport', { context: ctx, viewport: { width, height: 800 } }); await sleep(100);
   if (await ev(cornerClear) !== true) cornerWidths.push(width);
+  if (width === 1280) artWide = await ev(artShown);
 }
 check('the corner\'s buttons stay clear of the setup screen at 1400, 1280, 1024 and 820 px', !cornerWidths.length, cornerWidths.join(', '));
 await send('browsingContext.setViewport', { context: ctx, viewport: { width: 390, height: 844 } }); await sleep(100);
+check('a card\'s faded picture shows on a wide card, and not on a phone\'s', artWide === true && await ev(`${artShown} === false && $('#cardStart').offsetWidth <= 440`));
 check('on a phone they are a row beside the title, scrolling with the page', await ev(`(() => {
   const r = ['#btnNotes', '#btnItems', '#btnBgView'].map(b => $(b).getBoundingClientRect()), t = document.createRange();
   t.selectNodeContents($('#setup h1'));

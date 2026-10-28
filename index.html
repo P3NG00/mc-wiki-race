@@ -194,7 +194,8 @@
   .card .kinds b { font-size: 17px; }
   .card .row { display: flex; gap: 12px; align-items: flex-start; }
   .card img { width: 72px; height: 72px; object-fit: contain; image-rendering: pixelated; flex: none; }
-  .card img.art { width: 220px; height: 220px; right: -28px; bottom: -28px; }
+  /* Faded out toward the text at the top left, so it shows in the card's empty corner and not under the words. */
+  .card img.art { width: 220px; height: 220px; right: -28px; bottom: -28px; mask-image: linear-gradient(135deg, transparent 35%, #000 72%); }
   .card .title { font-size: 19px; font-weight: 650; margin: 0; overflow-wrap: anywhere; }
   .card .desc { color: var(--muted); font-size: 13.5px; margin: 0;
     display: -webkit-box; -webkit-line-clamp: 4; line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; }
@@ -205,6 +206,8 @@
     .card .row { flex-direction: column; gap: 8px; }
     .card input[type=text] { flex-basis: 100%; }
   }
+  /* The faded picture only where the card is wide enough to have room for it beside the text, not under it. */
+  @container (max-width: 440px) { .card img.art { display: none; } }
   .setup-actions { display: flex; gap: 10px; align-items: center; margin-top: 20px; flex-wrap: wrap; }
   .status { color: var(--muted); font-size: 13.5px; }
   .setup-par { font-weight: 600; }

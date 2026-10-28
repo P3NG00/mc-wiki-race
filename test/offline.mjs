@@ -1827,6 +1827,20 @@ await ev('closeModal()');
 // par + 5; a Round trip Relay of three checkpoints; a hunt of kinds; Dirt to Diamond in 15 clicks, by Herobrine, an
 // April Fools page and a spin-off; running out of Six clicks one click from the target.
 const got = keys => `${JSON.stringify(keys)}.every(k => adv.got[k])`, enc = encodeURIComponent;
+// A toast is headed by its tier, and those shown together play the highest tier's sound.
+await ev(`advQueue.length = 0; $('#advToasts').replaceChildren(); window.plays = []; window.realPlay = play; play = (k, ...a) => (plays.push(k), realPlay(k, ...a));
+  advEarn({ cake: true, returnSender: true, chain: true }); advPump(); play = realPlay`);
+check('a toast is headed by its tier: Advancement Made!, Goal Reached!, Challenge Complete!, together playing the challenge\'s sound', await ev(`[...document.querySelectorAll('#advToasts .adv-toast')]
+  .map(t => t.classList[1] + ': ' + t.querySelector('.t').textContent).join() === 'task: Advancement Made!,goal: Goal Reached!,challenge: Challenge Complete!'
+  && plays.filter(k => ['checkpoint', 'toast', 'best'].includes(k)).join() === 'best'`), await ev("$('#advToasts').textContent + ' ' + plays.join()"));
+// A result's XP, the game's own lines first: the win, 2 × par; at par 3 or under par 6; 2 for each rule that makes it
+// harder (Hard for No hubs), none for Distance, which helps; an XP for each article seen for the first time. Then each
+// advancement's, its tier's, and the total.
+const xpUntil = () => until("!!document.querySelector('#mXp:not(.hidden) .total')", 5000), xpOwn = `[...document.querySelectorAll('#mXp li:not(.total)')]
+  .map(li => li.textContent).filter(l => !l.startsWith('Advancement: '))`;
+const xpRest = `(lis => lis.filter(li => li.textContent.startsWith('Advancement: ')).every(li => li.textContent.endsWith('+' + ADV_XP[Object.values(ADVANCEMENTS)
+  .find(a => li.textContent.startsWith('Advancement: ' + a.name + '+')).tier])) && +lis.at(-1).textContent.split('+')[1] === lis.slice(0, -1)
+  .reduce((s, li) => s + +li.textContent.split('+').at(-1), 0))([...document.querySelectorAll('#mXp li')])`;
 const hard = await pairFor(['nonav', 'nohubs']), lead = await pairFor(['nonav', 'lead']), four = await pairFor(['nonav'], 4, 4);
 check('the snapshot has pairs for them: par 3+ on Hard and under Top links only, par 4 on Normal', hard?.length >= 4 && lead?.length >= 4 && four?.length === 5,
   JSON.stringify([hard, lead, four]));
@@ -1842,10 +1856,15 @@ check('a Hard game with No Back, Blind target and Six clicks, won at par, earns 
   await until(`!game.active && ${got(['hardcore', 'noTakeBacks', 'blindfolded', 'fullKit', 'sixShooter', 'par'])}`, 5000), await ev(earnedKeys));
 check('its arrivals make 100 different articles and 1,000 visits, the last topic Around the World, and its win 10 wins',
   await ev(`${got(['tourist', 'bookworm', 'aroundWorld', 'regular'])} && !adv.got.veteran && adv.pages.size === 100`), await ev(earnedKeys));
+const hardXp = [`Win (par ${hard.length - 1})+${2 * (hard.length - 1)}`, 'At par+3', 'No Back+2', 'Blind target+2', 'Six clicks+2', 'Hard+2', `New articles seen (${hard.length})+${hard.length}`];
+check('its XP: the win at 2 × par, at par, each rule that makes it harder and the new articles, then each advancement its tier\'s, and the total',
+  await xpUntil() && await ev(`${xpOwn}.join('|') === ${JSON.stringify(hardXp.join('|'))} && ${xpRest}`), await ev(`${xpOwn}.join('|')`));
 await ev(`closeModal(); toSetup(); adv.wins = 49; adv.pages = new Set([...adv.pages, ...Array.from({ length: 999 - adv.pages.size }, (_, i) => 'More ' + i)]); saveAdv()`);
 await playRoute(`#start=${enc(lead[0])}&target=${enc(lead.at(-1))}&rules=nonav,lead`, [lead[0], lead.at(-1)]);
 check('Top links only, won under par, earns Top Notch and Birdie', await until(`!game.active && savedGames()[0].clicks < savedGames()[0].par && ${got(['topNotch', 'birdie'])}`, 5000),
   await ev(earnedKeys));
+check('its XP has 6 for under par, none for at par, and 2 for Top links only', await xpUntil() && await ev(`(l => l.includes('Under par+6') && !l.includes('At par+3') && l.includes('Top links only+2'))(${xpOwn})`),
+  await ev(`${xpOwn}.join('|')`));
 check('a new article makes 1,000 different, Cartographer, and a win 50, Veteran', await ev(`${got(['cartographer', 'veteran'])} && !adv.got.legend`), await ev(earnedKeys));
 await ev('closeModal(); toSetup(); adv.wins = 99; saveAdv()');
 await open(`#start=${enc(four[0])}&target=${enc(four.at(-1))}&rules=nonav,distance`);
@@ -1858,6 +1877,7 @@ for (const [i, t] of four.slice(1, -1).entries()) {
 check('and three is', await ev('!!adv.got.onARoll'), await ev('game.cheerRun'));
 await ev(`navigate(${JSON.stringify(four.at(-1))}, null)`);
 check('a par 4 win with Distance cheering every click earns Hot Streak, and the 100th win Wiki Legend', await until(`!game.active && ${got(['hotStreak', 'legend'])}`, 5000), await ev(earnedKeys));
+check('its XP has nothing for Distance', await xpUntil() && await ev(`(l => l.includes('At par+3') && !l.some(x => x.startsWith('Distance')))(${xpOwn})`), await ev(`${xpOwn}.join('|')`));
 await ev('closeModal(); toSetup()');
 await playRoute(`#start=${enc(four[0])}&target=${enc(four.at(-1))}&rules=nonav,exact&extra=5`, [four[0], ...detours.slice(0, 5), ...four.slice(1)]);
 check('Exact clicks won at par + 5 earns Measure Twice and Long Way Round', await until(`!game.active && savedGames()[0].won && ${got(['measure', 'longWay'])}`, 5000), await ev(earnedKeys));

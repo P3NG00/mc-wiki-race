@@ -311,6 +311,7 @@ The advancements:
 - a count's progress and a secret's detail saying nothing
 - stored advancements keeping only what would be written
 - Clear history leaving them, as the panel's foot says, and Reset forgetting them
+- a toast headed by its tier (Advancement Made!, Goal Reached!, Challenge Complete!), those shown together playing the highest tier's sound
 - after Reset, what earns the rest, each game its pair's first:
   - the counts from one short of each, nothing earned until the next blast (Demolition Expert), arrivals (Tourist, Bookworm, Cartographer) or win (Regular, Veteran, Wiki Legend) reaches them, and Around the World on the last topic arriving
   - a Hard game with No Back, Blind target and Six clicks won at par: Hardcore, No Take-Backs, Blindfolded, Full Kit, Six Shooter
@@ -602,6 +603,7 @@ The background:
 - XP on Minecraft's levels
 - a win listing its XP in the result and filling the bar
 - a game given up listing only its new articles' XP
+- in the advancements' games: 2 × par for the win, 3 at par, 6 under par and not 3, 2 for each rule that makes it harder (Hard for No hubs) and none for Distance, an XP for each new article, each advancement its tier's, and the total their sum
 - stored XP only a whole number of none or more, and Reset advancements clearing it
 - the note block:
   - a pick saved and what a click and Back play, as the window's foot says

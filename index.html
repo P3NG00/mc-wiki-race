@@ -5535,7 +5535,7 @@ const bgCanvas = $('#bgCanvas'), bgCtx = bgCanvas.getContext('2d');
 // difficulty (sampling: under way).
 const bg = { shown: true, W: 0, H: 0, dpr: 1, raf: 0, last: 0, colors: null, sky: null, skyWait: false, grid: null, nebulae: null, pulses: [], nextPulse: 0,
   pair: null, pairToken: 0, nextRoll: 0, links: null, linkFacts: null, facts: [], pairFacts: [], factsToken: 0, factTurn: 0, factTimer: 0,
-  fadeTimer: 0, sampled: new Map(), sampling: false, cursor: { x: 0, y: 0, in: false }, glow: 0 };
+  fadeTimer: 0, sampled: new Map(), sampling: false, cursor: { x: 0, y: 0, in: false }, glow: 0, covers: [] };
 const bgNow = () => performance.now();
 const BG_MAX_LINKS = Math.log1p(Math.max(...WIKI_DATA.articles.map(r => r[1])));
 const bgWeight = page => Math.log1p(WIKI_DATA.articles[page][1]) / BG_MAX_LINKS;   // 0 to 1, by how many articles link to it
@@ -5718,7 +5718,7 @@ function drawSky(t) {
   for (const i of labelled) {
     if (marked.has(i) || ends.has(i)) continue;
     const text = name(i), w = ctx.measureText(text).width, x = P[i][0] - w / 2, y = P[i][1] - nodes[i].r - 5;
-    if (taken.some(([tx, ty, tw]) => x < tx + tw + 6 && tx < x + w + 6 && Math.abs(y - ty) < 14)) continue;
+    if (taken.some(([tx, ty, tw]) => x < tx + tw + 6 && tx < x + w + 6 && Math.abs(y - ty) < 14) || !bgClear(P[i][0], w, y)) continue;
     taken.push([x, y, w]);
     if (nodes[i].lit < .02) ctx.fillText(text, P[i][0], y);   // else named under the cursor (bgNamed), not twice
   }
@@ -5739,7 +5739,10 @@ function drawSky(t) {
     ctx.stroke();
     ctx.fillStyle = bgRgba(c.accent, .9 * fade * s); ctx.beginPath(); ctx.arc(...head, 3.2, 0, 7); ctx.fill();
   }
-  for (const [i, a] of ends) { ctx.fillStyle = bgRgba(c.ink, .45 * a * s); ctx.fillText(name(i), P[i][0], P[i][1] - nodes[i].r - 5); }
+  for (const [i, a] of ends) {
+    const y = P[i][1] - nodes[i].r - 5;
+    if (bgClear(P[i][0], ctx.measureText(name(i)).width, y)) { ctx.fillStyle = bgRgba(c.ink, .45 * a * s); ctx.fillText(name(i), P[i][0], y); }
+  }
   drawPair(t, spot);
 }
 
@@ -5866,8 +5869,8 @@ function bgNamed(P, marked) {   // marked: the stars with a marker, which names 
     ctx.stroke();
     ctx.fillStyle = bgRgba(col, .35 * n.lit); ctx.beginPath(); ctx.arc(sx, sy, n.r + 5 * n.lit, 0, 7); ctx.fill();
     ctx.fillStyle = bgRgba(col, .9 * n.lit); ctx.beginPath(); ctx.arc(sx, sy, n.r, 0, 7); ctx.fill();
-    if (marked.has(i)) return;
     ctx.font = `600 12px ${c.font}`; ctx.textAlign = 'center';
+    if (marked.has(i) || !bgClear(sx, ctx.measureText(text).width, sy - n.r - 8)) return;
     ctx.lineWidth = 4; ctx.strokeStyle = bgRgba(c.bg, .8 * n.lit); ctx.strokeText(text, sx, sy - n.r - 8);
     ctx.fillStyle = bgRgba(c.ink, .85 * n.lit); ctx.fillText(text, sx, sy - n.r - 8);
   });
@@ -5912,12 +5915,38 @@ function drawPair(t, spot) {
 }
 // Where a marker's label of width w goes over x: centred on it, but kept on the screen.
 const bgLabelX = (x, w) => Math.min(bg.W - w / 2 - 6, Math.max(w / 2 + 6, x));
+// What covers the background: the setup screen's cards, tiles, panels and buttons, and the lines of its text straight on
+// the picture, each as far as its words go (in Background only, its box, button and facts line). A name drawn half under
+// one, or past the screen's edge, reads as broken text, so a name that would be is left out. Where they are on the
+// screen, measured at each paint (bgCovers), and painted again as the page scrolls while the background is still
+// (motion reduced).
+const BG_COVERS = '.daily-box, .card, .games label, .game-help, .extras label, .settings, .history table, .setup-actions button, .head-opts select, #bgOpts[open] .bg-panel, #setup .items-btn, .bg-view-btn';
+const BG_TEXT = '#setup :is(.setup-head, .sub, .your-game, .step, .setup-par, .status, .history-head, .bg-facts, .site-foot)';   // with a halo
+function bgCovers() {
+  const viewing = bgViewing(), covers = [...document.querySelectorAll(viewing ? '#bgOpts, #btnBgView' : BG_COVERS)].map(el => el.getBoundingClientRect());
+  const range = document.createRange();
+  for (const el of document.querySelectorAll(viewing ? '#bgFacts' : BG_TEXT)) {
+    const box = el.getBoundingClientRect();
+    if (box.bottom < 0 || box.top > bg.H) continue;   // the footer, most of the time
+    for (let walk = document.createTreeWalker(el, NodeFilter.SHOW_TEXT), n; (n = walk.nextNode());) {
+      if (n.data.trim()) { range.selectNodeContents(n); covers.push(...range.getClientRects()); }
+    }
+  }
+  bg.covers = covers.filter(r => r.width && r.height);
+}
+// Whether a name of width w centred on x, its baseline at y (give or take slack), is clear of them and on the screen,
+// its halo included.
+const bgClear = (x, w, y, slack = 0) => {
+  const l = x - w / 2 - 2, r = x + w / 2 + 2, t = y - 13 - slack, b = y + 5 + slack;
+  return l >= 0 && r <= bg.W && t >= 0 && b <= bg.H && !bg.covers.some(c => l < c.right && c.left < r && t < c.bottom && c.top < b);
+};
 function bgMarker([x, y], col, text, t, a) {
   const ctx = bgCtx, c = bg.colors, r = 7 + (calm() ? 0 : 1.5 * Math.sin(t / 400));
   ctx.font = `600 12px ${c.font}`; ctx.textAlign = 'center';
-  const tx = bgLabelX(x, ctx.measureText(text).width);
+  const w = ctx.measureText(text).width, tx = bgLabelX(x, w);
   ctx.strokeStyle = bgRgba(col, .85 * a); ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(x, y, r, 0, 7); ctx.stroke();
   ctx.fillStyle = bgRgba(col, .9 * a); ctx.beginPath(); ctx.arc(x, y, 3, 0, 7); ctx.fill();
+  if (!bgClear(tx, w, y - 14, 1.5)) return;   // as the ring breathes, the label moves 1.5 px either way
   ctx.lineWidth = 4; ctx.strokeStyle = bgRgba(c.bg, .8 * a); ctx.strokeText(text, tx, y - r - 7);
   ctx.fillStyle = bgRgba(col, a); ctx.fillText(text, tx, y - r - 7);
 }
@@ -6078,6 +6107,7 @@ function bgPaint(t) {
   bgCtx.clearRect(0, 0, bg.W, bg.H);
   if (!bg.W || !bg.H || !bg.colors) return;
   if (calm()) bg.glow = 0;   // bgFrame eases it, but doesn't run then
+  bgCovers();
   if (style === 'redstone') drawGrid(t);
   else if (style === 'constellation' && bg.sky) drawSky(t);
 }
@@ -6361,6 +6391,7 @@ for (const type of ['click', 'change']) $('#setup').addEventListener(type, e => 
   if (keep?.el === el && e.target !== el && Math.abs(scrollY - keep.y) >= 1) scrollTo({ top: keep.y, behavior: 'instant' });
   setKeep({ el, top: el.getBoundingClientRect().top, y: scrollY });
 }, true);
+let bgScrolled = 0;
 addEventListener('scroll', () => {
   // Up at the bottom of the page is the browser holding the scroll to a page that got shorter, not the player scrolling.
   if (keep && Math.abs(scrollY - keep.y) >= 1) {
@@ -6368,6 +6399,8 @@ addEventListener('scroll', () => {
     else setKeep(null);
   }
   if (!keep && $('#setupRoom').offsetHeight) roomFor(scrollY);
+  // What covers a still background moved, so the names it leaves out did: painted again, once a frame.
+  if (calm() && bgLive()) bgScrolled ||= requestAnimationFrame(() => { bgScrolled = 0; bgPaint(bgNow()); });
 }, { passive: true });
 addEventListener('resize', () => { setKeep(null); $('#setupRoom').style.height = ''; });
 // Swap plays the whole chain backwards, checkpoints included. A round trip goes round the same loop from its target

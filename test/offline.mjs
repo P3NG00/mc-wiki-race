@@ -2173,6 +2173,34 @@ check('but Background only\'s goes back to the corner, clear of the Background b
 check('Auto is the redstone map at a phone\'s width', await until("bgStyle() === 'redstone' && bg.W <= 390 && bg.grid?.W === bg.W"), await ev('JSON.stringify([bgStyle(), bg.W, bg.grid?.W])'));
 await send('browsingContext.setViewport', { context: ctx, viewport: null });
 check('and the constellation again on a wide screen', await until("bgStyle() === 'constellation'"));
+// No name the background draws is under the setup screen's cards, tiles or panels, nor past the screen's edge, even in
+// part: over three seconds of the sky, its labels, pulses and markers. And with motion reduced a scroll paints it again,
+// as what covers it moved.
+await until('!!bg.sky');
+const underCards = JSON.parse(await ev(`new Promise(done => {
+  scrollTo(0, 0);
+  const boxes = () => [...document.querySelectorAll('.daily-box, .card, .games label, .game-help, .extras label, .settings')].map(el => el.getBoundingClientRect()).filter(r => r.width);
+  const real = bgCtx.fillText, hits = new Set();
+  let drawn = 0;
+  bgCtx.fillText = function (text, x, y) {
+    const w = this.measureText(text).width, l = this.textAlign === 'center' ? x - w / 2 : x;
+    drawn++;
+    if (l < 0 || l + w > bg.W || y - 10 < 0 || y > bg.H || boxes().some(r => l < r.right && r.left < l + w && y - 10 < r.bottom && r.top < y + 2)) hits.add(text);
+    return real.apply(this, arguments);
+  };
+  setTimeout(() => { bgCtx.fillText = real; done(JSON.stringify({ drawn, hits: [...hits] })); }, 3000);
+})`));
+check('the background draws no name under the setup screen\'s cards and panels, nor past the screen\'s edge', underCards.drawn > 0 && !underCards.hits.length, JSON.stringify(underCards));
+check('and with motion reduced a scroll paints it again', await ev(`(async () => {
+  const was = calmBox;
+  setCalm(true);
+  const before = bg.covers[0]?.top;
+  scrollTo(0, 300); dispatchEvent(new Event('scroll'));
+  await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+  const moved = Math.abs(before - bg.covers[0]?.top - 300) < 1;
+  setCalm(was); scrollTo(0, 0);
+  return moved;
+})()`));
 // The cursor (a mouse, by the pointer events' type): stars near it make way and the nearest is named,
 // a touch does nothing, leaving the window takes it away, and on the map a torch lights the blocks around it, warmer (on a
 // light theme the torch's orange is darker than the blocks, so it is told by how much redder than blue a block is).
@@ -2184,16 +2212,20 @@ check('a touch doesn\'t move the stars', await ev('!bg.cursor.in'));
 await move(star[1] + 12, star[2] + 8);
 check('the stars near the cursor make way, and the nearest is named', await until(`bg.sky.nodes[${star[0]}].lit > .5 && Math.hypot(bg.sky.nodes[${star[0]}].lx, bg.sky.nodes[${star[0]}].ly) > 5`),
   await ev(`JSON.stringify(bg.sky.nodes[${star[0]}])`));
-// A star has one name at a time: hovering a card's star names it only by its marker, over a couple of frames.
-const card = JSON.parse(await ev(`JSON.stringify((P => (bg.pair?.stops ?? []).map(st => bg.sky.at.get(st.page)).filter(i => i !== undefined)
-  .map(i => [i, ...P[i]]).find(([, x, y]) => x > 20 && x < innerWidth - 20 && y > 40 && y < innerHeight - 20))(bg.sky.nodes.map(n => skyStar(n, bgNow()))) ?? null)`));
+// A star has one name at a time: hovering a card's star names it only by its marker, over a couple of frames. In
+// Background only, so the cards don't cover the marker's label, and a star whose label has room as the cursor pushes it.
+await ev('bgView(true), bgCovers(), true');
+const card = JSON.parse(await ev(`JSON.stringify((P => (bg.pair?.stops ?? []).flatMap(st => bg.sky.at.has(st.page) ? [[bg.sky.at.get(st.page), st.label]] : [])
+  .map(([i, label]) => [i, ...P[i], (bgCtx.font = '600 12px ' + bg.colors.font, bgCtx.measureText(label).width)])
+  .find(([, x, y, w]) => y > 40 && bgClear(bgLabelX(x, w), w + 50, y - 14, 25)))(bg.sky.nodes.map(n => skyStar(n, bgNow()))) ?? null)`));
 if (card) await move(card[1] + 6, card[2] + 4);
 const cardNames = card && await until(`bg.sky.nodes[${card[0]}].lit > .5`) && JSON.parse(await ev(`new Promise(done => {
   const name = WIKI_DATA.articles[bg.sky.nodes[${card[0]}].page][0], seen = [], fill = bgCtx.fillText;
   bgCtx.fillText = function (text, ...a) { if (text === name || text.endsWith(' · ' + name)) seen.push(text); return fill.call(this, text, ...a); };
   setTimeout(() => { delete bgCtx.fillText; done(JSON.stringify(seen)); }, 300);
 })`));
-check('hovering a card\'s star leaves its marker\'s label its only name', !!cardNames?.length && cardNames.every(t => t.includes(' · ')), JSON.stringify(cardNames));
+check('hovering a card\'s star leaves its marker\'s label its only name', !!cardNames?.length && cardNames.every(t => t.includes(' · ')), JSON.stringify([card, cardNames]));
+await ev('bgView(false), true');
 await ev("document.dispatchEvent(new PointerEvent('pointerout', { relatedTarget: null })), true");
 check('leaving the window puts them back', await until(`bg.glow < .02 && bg.sky.nodes[${star[0]}].lit < .02 && Math.hypot(bg.sky.nodes[${star[0]}].lx, bg.sky.nodes[${star[0]}].ly) < 1`));
 await ev("bgSetting('style', 'redstone'), bgSetting('wave', false)");   // no wave lighting the blocks meanwhile

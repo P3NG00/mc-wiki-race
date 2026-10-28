@@ -264,6 +264,9 @@ All of it is worked out in the page from `wiki-data.js` and the link graph, whic
   - It is made in an idle moment the first time it shows once the graph is in (not for the map or Off), and turns a quarter on an upright screen.
   - The best-linked stars are named where the names don't overlap, and pulses (`skyPulse`) play games of their own along the links, from a star to one at least three clicks away, naming the star they start from and, once there, the one they reach.
   - A star shows one name at a time, always above it: a start or target marker's first, then the cursor's, then a pulse's, then its plain label, and the plain labels also keep clear of the markers' and pulses' names.
+- On both pictures a name (a star's, a pulse's, the cursor's or a marker's label) that would be under what covers the background, even in part, or past the screen's edge, is left out (`bgClear`), as half a name reads as broken text; a marker keeps its ring.
+  - What covers it (`bgCovers`, measured at each paint): the setup screen's cards, tiles, panels and buttons (`BG_COVERS`), and the lines of its text straight on the picture, as far as their words go (`BG_TEXT`); in Background only, its box, button and facts line.
+  - With motion reduced the picture is painted again as the page scrolls (once a frame), since what covers it moved.
 - *Redstone map* (`buildGrid`): every article but the subpages and spin-off pages (`MAP_PAGES`) as one block, laid along a Gilbert curve (a Hilbert curve for any rectangle) sized to the screen, in patches of about 40 of one group (each topic, the Content families together, the rest), with every group's patches spread along the curve, so it reads as a world map's biomes.
   - A block is brighter the more articles link to it.
 - *Auto*, the default, is the constellation, and the redstone map at a phone's width (720 px and below, `BG_PHONE`), where the clusters are cramped.

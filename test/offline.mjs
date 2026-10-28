@@ -201,12 +201,43 @@ await until("!!document.querySelector('#btnRetry') && !game.loading");
 failParse.delete('Iron Ingot');
 await ev("document.querySelector('#btnRetry').click()");
 check('and Retry, once the wiki answers, loads it', await until("game.path.length === 3 && game.path.at(-1).title === 'Iron Ingot' && !game.loading"));
+// An article whose frame never says it's ready (a stalled stylesheet) stops loading after 15 s (here 1.5 s), the clock
+// held till then, and then going again with Give up on and no stuck banner.
+await ev(`window.dropReady = e => { if (e.data?.mwr === 'ready') e.stopImmediatePropagation(); }; addEventListener('message', dropReady, true);
+  window.realSetTimeout = setTimeout; setTimeout = (f, ms, ...a) => realSetTimeout(f, ms === 15000 ? 1500 : ms, ...a)`);
+await ev("navigate('Diamond Pickaxe', null)");
+const stalledAt = await until("game.path.at(-1).title === 'Diamond Pickaxe' && game.loading", 3000) && await ev('now()');
+await sleep(300);
+const stalled = stalledAt !== false && await ev(`game.loading && $('#btnGiveUp').disabled && now() === ${stalledAt}`);
+const unstuck = stalled && await until("!game.loading", 3000) && await ev("$('#overlay').classList.contains('hidden') && !$('#btnGiveUp').disabled && !game.stuck");
+await sleep(300);
+check('an article whose frame never says it\'s ready stops loading after 15 s, the clock going again, with Give up and no stuck banner', unstuck
+  && await ev(`now() > ${stalledAt} + 200`), JSON.stringify([stalled, unstuck]));
+await ev("removeEventListener('message', dropReady, true); setTimeout = realSetTimeout");
+// Give up asks first, saying the time is paused, which it is: Keep going goes on with the clock running, and Give up
+// ends the game given up. Without the Timer it says nothing of time.
+await ev("$('#btnGiveUp').click()");
+const askedAt = await ev('now()');
+await sleep(300);
+check('Give up asks first, saying the time is paused, which it is', await ev(`$('#modal h2').textContent === 'Give up?' && $('#modal').textContent.includes('Your time is paused.')
+  && now() === ${askedAt}`), await ev("$('#modal').textContent"));
+await ev("$('#gKeep').click()");
+await sleep(300);
+check('Keep going goes on, the clock running', await ev(`game.active && $('#modalBg').classList.contains('hidden') && now() > ${askedAt} + 200`));
+await ev("$('#btnGiveUp').click(); $('#gQuit').click()");
+check('and Give up ends the game given up', await ev("!game.active && (r => !r.won && !Object.keys(LOSSES).some(k => r[k]))(savedGames()[0]) && $('.result-head h2').textContent === 'You gave up'"),
+  await ev("$('.result-head h2').textContent"));
+await ev("closeModal(); toSetup(); $('#timerToggle').click()");
+await play();
+await ev("$('#btnGiveUp').click()");
+check('without the Timer it says nothing of time', await ev("!game.timed && $('#modal h2').textContent === 'Give up?' && !$('#modal').textContent.includes('time')"), await ev("$('#modal').textContent"));
+await ev("$('#gKeep').click()");
 // A link that redirects to the target reaches it and wins, the link's title and the target's both counted as seen.
 await ev("navigate('Crafting recipe', null)");
 check('a link redirecting to the target wins, its title seen as the target\'s', await until('!game.active') && await ev(`game.path.at(-1).title === 'Crafting'
   && game.seen.get('Crafting recipe') === 'Crafting' && game.seen.get('Crafting') === 'Crafting' && store.get('mwr.history', [])[0].won === true`),
   await ev("JSON.stringify([game.path.map(p => p.title), [...game.seen]])"));
-await ev('closeModal(); toSetup()');
+await ev("closeModal(); toSetup(); $('#timerToggle').click()");
 await play();
 let links = await linkStates();
 const leftOut = "['Java_Edition_version_history', 'Pocket_Edition_version_history', 'Closed_captions'].every(t => document.querySelector(`a[href='/w/${t}']`).title === 'Off limits: a version or list page')";

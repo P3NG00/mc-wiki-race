@@ -240,6 +240,8 @@ Rolls in every pool:
 ### Live links and dead ends
 
 - An article that fails to load mid-game: Cancel keeping the page you were on with the clock going again and Give up on, and Retry, once the wiki answers, loading it
+- An article whose frame never says it's ready (the ready message dropped, the 15 s wait shortened) loading with the clock held and Give up off until then, then going on with both and no stuck banner
+- Give up asking first, saying the time is paused, which it is; Keep going going on with the clock running; Give up ending the game given up; and without the Timer saying nothing of time
 - A link redirecting to the target winning, its title seen as the target's
 - A live link pressed with the mouse being asked for at the press and its click taking that request (one pressed and let go elsewhere asked for once, its later click asking no more)
 - A page with no live links (a made-up page linking two hubs, on Hard) getting a banner that stays, to go Back or give up, or only give up on the start, and none on Normal

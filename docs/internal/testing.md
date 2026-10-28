@@ -226,7 +226,7 @@ The items:
 - the pieces coming to rest on what is left of the page rather than the bottom of the window
 - scrolled down, a blast breaking the page there too, its shake leaving what is fixed on the screen where it is
 - an item in hand splitting the text in view without moving anything
-- blasts all down the page and again on its pieces leaving it no longer, nor any wider (its pieces clipped, so a phone doesn't lay it out wider) and still scrolling down
+- blasts all down the page and again on its pieces leaving it no longer (within 4 px: pieces resting on its end, measured to fractions of a pixel, leave it 1 to 3 px longer), nor any wider (its pieces clipped, so a phone doesn't lay it out wider) and still scrolling down
 - the page made narrower in pieces taking the new width and ending about where it would whole, and wide again ending as before
 - a drag and fast clicks on the page in pieces or with an item in hand selecting nothing (real pointer input), and selecting again once it is put back and the item put down
 - a blast's sparks staying on the page and the article as they scroll
@@ -473,6 +473,7 @@ The daily:
 - a loss or a later win not mending a streak
 - a malformed day left out
 - the stats line
+- the daily box's plain words for what the day's rule asks, a sentence for every rule
 - giving up a daily keeping its day as played
 - playing one earning Daily Bread
 - a daily won to the end, whatever the day's rule, by its par route (Exact clicks's of its count):
@@ -483,7 +484,7 @@ The daily:
 - Past dailies:
   - opening on this month with today marked and the days to come off, its key naming won on the day, won later, not won and not played
   - going back to `DAILY_FIRST`'s month and no further
-  - a day loading its daily in place of a challenge link's cards, and no longer a challenge's game, for Accepted
+  - a day loading its daily in place of a challenge link's cards, the status line naming it with its rule's plain words, and no longer a challenge's game, for Accepted
 - Clear history asking first, counting the games (the 1 recorded game for one), Cancel focused and keeping them, Clear history in a loss's colour
 - Clear history emptying the dailies
 

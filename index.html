@@ -131,6 +131,9 @@
   .game-settings { margin-top: 36px; padding-top: 24px; border-top: 1px solid var(--line); }
   .kicker, .step { font-size: 12px; font-weight: 700; letter-spacing: .07em; text-transform: uppercase; color: var(--muted); }
   .daily-box .kicker { display: block; }
+  .daily-how { display: block; font-size: 14px; }
+  /* On a phone the line would push Start game off the first screen; the status line says it once the daily is loaded. */
+  @media (max-width: 720px) { .daily-how { display: none; } }
   .daily-stats { display: block; margin-top: 2px; }
   .daily-stats button.link { font-size: 13px; }
   #dailyStats:not(:empty) { margin-right: 10px; }
@@ -781,6 +784,7 @@ const THEMES = [...new Set(['auto', 'light', 'dark', ...Array.from(document.quer
 
   <div class="daily-box">
     <div><span class="kicker">Daily challenge · <span id="dailyDate"></span></span><b id="dailyWhat"></b> <span class="note" id="dailyDone"></span>
+      <span class="daily-how" id="dailyHow"></span>
       <span class="daily-stats note"><span id="dailyStats"></span><button class="link" id="btnPastDailies">Past dailies</button></span></div>
     <button id="btnDaily" title="Today’s challenge: the same for everyone">📅 Play the daily</button>
   </div>
@@ -1878,6 +1882,21 @@ function dailyText(date) {
   if (rule === 'exact') return `Exact clicks, par + ${dailyExtra(date)}`;
   return RULES[rule].label;
 }
+// What a day's rule asks, in plain words, for whoever doesn't know the rules' names yet: under its name in the daily box
+// (not on a phone), and in the status line once it's loaded.
+function dailyHow(date) {
+  const rule = dailyRule(date);
+  if (rule === 'checkpoint') return (n => n > 1 ? `Visit ${n} checkpoints on the way, in order, then the target.` : 'Visit the checkpoint on the way, then the target.')(ranked(date, 'checkpoints', DAILY_CHECKPOINTS)[0]);
+  if (rule === 'scavenger') return ranked(date, 'hunt', DAILY_HUNTS)[0] === 'kinds' ? `Find one of each of ${HUNT_SIZE} kinds of thing, in any order.` : `Find ${HUNT_SIZE} articles, in any order.`;
+  if (rule === 'exact') return `Take exactly ${dailyExtra(date)} more clicks than the shortest route, never on a page twice: reaching the target sooner loses.`;
+  return {
+    noback: 'There’s no Back button: every click is final.',
+    blind: 'The target stays hidden until you start.',
+    nohubs: 'No link tables at the foot of articles, and links to big overview pages like Block and Mob are dead.',
+    limit: `Reach the target in ${CLICK_LIMIT} clicks or fewer.`,
+    roundtrip: 'Reach the target, then get back to the start without going through the same pages.',
+  }[rule];
+}
 // Each day's daily as played, by date (mwr.dailies), kept apart from the history, which holds only the last 50 games:
 // whether it was won, whether on its own day (onDay: only those make a streak, so a past day played from the calendar
 // catches up without mending one), and its best win's clicks and time. A loss or giving up keeps the day as played.
@@ -1916,6 +1935,7 @@ function renderDailyBox() {
   const date = today(), all = savedDailies(), done = all[date]?.won ? all[date] : null;
   $('#dailyDate').textContent = shortDate(new Date());
   $('#dailyWhat').textContent = dailyText(date);
+  $('#dailyHow').textContent = dailyHow(date);
   $('#dailyDone').textContent = done ? `· done in ${wonText(done, true)}` : '';
   $('#dailyStats').textContent = dailyStatsText(all);
 }
@@ -2019,7 +2039,7 @@ async function loadDaily(date = today()) {
     syncVia();
     keys.forEach(renderCard);
     const day = savedDailies()[date], done = day?.won ? day : null;
-    setStatus(`Daily challenge for ${shortDate(localDay(date))}: ${dailyText(date)}.` + (done ? ` You did it in ${wonText(done, true)}.` : ' Start the game when you’re ready.'));
+    setStatus(`Daily challenge for ${shortDate(localDay(date))}: ${dailyText(date)}. ${dailyHow(date)}` + (done ? ` You did it in ${wonText(done, true)}.` : ' Start the game when you’re ready.'));
   });
 }
 

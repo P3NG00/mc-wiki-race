@@ -12,7 +12,7 @@ Open [mcwikirace.com](https://mcwikirace.com/): a start and a target are already
 
 ## The setup screen
 
-- **Daily challenge**: today's game, the same for everyone (see [The daily](#the-daily)).
+- **Daily challenge**: today's game, the same for everyone, with what its rule asks in plain words (on a phone, once you press Play the daily) (see [The daily](#the-daily)).
 - **Your game**: one line that sums up the game, the extra rules, the articles and the difficulty.
 - The cards: **Start** and **Target**, plus **Checkpoint** cards in a Relay, or a **Find one of each** card in a Scavenger hunt of kinds. Each shows its article's picture and description.
 - **🎲 Reroll** on a card rolls a new article for it. Or type almost any article on the wiki into the box under it ("or type an article…") and press Enter (version pages, the big lists of game data and pages that aren't articles, such as tutorials, are left out).

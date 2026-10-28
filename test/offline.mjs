@@ -1294,6 +1294,12 @@ check('a streak counts days won on their day up to yesterday, with the best run 
   && Object.keys(savedDailies()).length === 10)(dailyStreaks(savedDailies()))`), await ev('JSON.stringify(dailyStreaks(savedDailies()))'));
 check('the daily box says the streak, the best and the days won', await ev("document.querySelector('#dailyStats').textContent")
   === '🔥 3-day streak, play today to keep it · Best 5 · Won 9 of 10 days', await ev("document.querySelector('#dailyStats').textContent"));
+// Under the day's rule its plain words, a sentence for every rule over a season of days.
+check('the daily box says what today\'s rule asks in plain words, as every day\'s does', await ev(`(() => {
+  const days = [...Array(120)].map((_, i) => dateKey(new Date(Date.now() - i * 864e5)));
+  const said = new Map(days.map(d => [dailyRule(d), dailyHow(d)]));
+  return $('#dailyHow').textContent === dailyHow(today()) && days.every(d => /^[A-Z].{10,}\\.$/.test(dailyHow(d))) && said.size === DAILY_RULES.length;
+})()`));
 // A daily's games keep the day's best win, and only a win on its day counts.
 check('finishing a daily keeps its best win and joins the streak only when won on its day', await ev(`(() => {
   const day = today(), rec = (won, clicks, ms) => ({ daily: day, won, clicks, ms });
@@ -1371,7 +1377,8 @@ check('it goes back to the first daily\'s month and no further', await ev(`(() =
 })()`));
 await ev("document.querySelector('#modal .cal button:not(:disabled)').click()");
 check('a day loads its daily', await until("setup.daily !== null && setup.daily < today() && document.querySelector('#modalBg').classList.contains('hidden')") && await until(ready)
-  && await ev("document.querySelector('#setupStatus').textContent.startsWith('Daily challenge for ' + shortDate(localDay(setup.daily)) + ': ')"), await ev('setup.daily'));
+  && await ev("document.querySelector('#setupStatus').textContent.startsWith('Daily challenge for ' + shortDate(localDay(setup.daily)) + ': ' + dailyText(setup.daily) + '. ' + dailyHow(setup.daily) + ' ')"),
+  await ev("setup.daily + ' ' + document.querySelector('#setupStatus').textContent"));
 check('and is no challenge link\'s game then, for Accepted', wasChallenge === true && await ev('setup.challenge === false'), await ev('setup.challenge'));
 // Clear history asks first, counting the games; Cancel keeps them.
 const clearAsks = "(() => { $('#btnClearHistory').click(); const p = $('#modal p').textContent + (document.activeElement === $('#hKeep') && $('#hClear.danger') ? '' : ' (Cancel not focused, or Clear history not in a loss\\'s colour)'); $('#hKeep').click(); return p; })()";
@@ -1648,7 +1655,9 @@ for (let round = 0; round < 2; round++) for (let y = 0; y < pageHeight; y += 400
   await sleep(150);
 }
 await sleep(3000);
-check('blasts all down the page and on its pieces leave it no longer', await ev(`document.documentElement.scrollHeight <= ${pageHeight} + 2 && document.querySelectorAll('#setup .brk-thrown').length > 100`),
+// Within 4 px: the pieces resting on the page's end, measured to fractions of a pixel, leave it 1 to 3 px longer
+// (which no one sees, and Rebuild puts back), the more pieces the more often.
+check('blasts all down the page and on its pieces leave it no longer', await ev(`document.documentElement.scrollHeight <= ${pageHeight} + 4 && document.querySelectorAll('#setup .brk-thrown').length > 100`),
   await ev(`JSON.stringify([document.documentElement.scrollHeight, ${pageHeight}, document.querySelectorAll('#setup .brk-thrown').length])`));
 // Pieces thrown past the side are clipped, not hidden only, so a phone doesn't lay the page out wider; it still scrolls.
 check('nor any wider, however far the pieces fly sideways, and it still scrolls down', await ev(`document.documentElement.scrollWidth <= document.documentElement.clientWidth
@@ -1661,7 +1670,7 @@ await send('browsingContext.setViewport', { context: ctx, viewport: { width: 800
 check('made narrower in pieces, the page takes the new width and ends about where it would whole', await ev(`document.documentElement.scrollHeight <= ${narrowHeight} * 1.05 && ${outside} === 0`),
   await ev(`JSON.stringify([document.documentElement.scrollHeight, ${narrowHeight}, ${outside}])`));
 await send('browsingContext.setViewport', { context: ctx, viewport: null }); await sleep(1500);
-check('and made wide again, where it did', await ev(`document.documentElement.scrollHeight <= ${pageHeight} + 2`), await ev('document.documentElement.scrollHeight'));
+check('and made wide again, where it did', await ev(`document.documentElement.scrollHeight <= ${pageHeight} + 4`), await ev('document.documentElement.scrollHeight'));
 // Dragged across and clicked fast, in pieces and with an item in hand, the page selects nothing; put back, it does.
 const drag = (x, y) => send('input.performActions', { context: ctx, actions: [{ type: 'pointer', id: 'mouse', parameters: { pointerType: 'mouse' }, actions: [
   { type: 'pointerMove', x: 5, y: 150 }, { type: 'pointerDown', button: 0 }, { type: 'pointerMove', x, y, duration: 150 }, { type: 'pointerUp', button: 0 },

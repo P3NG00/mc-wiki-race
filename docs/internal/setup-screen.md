@@ -13,7 +13,7 @@ The setup screen puts playing first.
 ## Top to bottom
 
 - The daily (`.daily-box`):
-  - today's game in words, from `dailyText`, how you did if you won it, and a stats line, `#dailyStats`, with the streak, the best streak and the days won (see [persistence.md](persistence.md)), all from `renderDailyBox`, called by `renderHistory`
+  - today's game in words, from `dailyText`, with what its rule asks in plain words under it (`dailyHow`, `#dailyHow`: "Reach the target in 6 clicks or fewer."; not on a phone, where it would push Start game off the first screen, but in the status line once the daily is loaded, on every screen), how you did if you won it, and a stats line, `#dailyStats`, with the streak, the best streak and the days won (see [persistence.md](persistence.md)), all from `renderDailyBox`, called by `renderHistory`
   - Play the daily is `#btnDaily`
   - Past dailies beside the stats, `#btnPastDailies`, opens a calendar, `openCalendar`:
     - a month at a time from `DAILY_FIRST`'s to this one

@@ -169,7 +169,8 @@
   .extras label { display: flex; gap: 10px; align-items: flex-start; padding: 10px 14px; border: 1px solid var(--line);
     border-radius: var(--radius-lg); background: var(--panel); cursor: pointer; }
   .extras label:has(input:checked) { border-color: var(--accent); background: var(--accent-soft); }
-  .extras label:has(input:disabled) { opacity: .6; cursor: default; }
+  .extras label:has(input:disabled) { cursor: default; }
+  .extras label:has(input:disabled) > * { opacity: .6; }   /* what's in it, so the box stays opaque over the background */
   .extras input { accent-color: var(--accent); margin: 3px 0 0; flex: none; }
   .extras span { display: flex; flex-direction: column; gap: 2px; }
   .settings { padding: 16px 16px 2px; border: 1px solid var(--line); border-radius: var(--radius-lg); background: var(--panel); }
@@ -1245,19 +1246,19 @@ function updateGameSum() {
 
 // Rules, stored with each result (personal bests only compare games with the same rules) and carried in challenge links.
 // No hubs and No navboxes are set by the difficulty (LEVELS), the games' rules by the game tiles (GAMES), and the extra
-// rules (EXTRA_RULES) are checkboxes, whose boxes show their help. A sealed link holds them by their place here, so a new
-// rule goes at the end.
+// rules (EXTRA_RULES) are checkboxes, whose boxes say them in a line (blurb), the whole (help) their tooltip. A sealed
+// link holds them by their place here, so a new rule goes at the end.
 const RULES = {
-  noback: { label: 'No Back', help: 'The Back button is gone: every click is final.' },
+  noback: { label: 'No Back', blurb: 'No Back button: every click is final.', help: 'The Back button is gone: every click is final.' },
   nohubs: { label: 'No hubs' },
   nonav: { label: 'No navboxes' },
-  blind: { label: 'Blind target', help: 'The target is hidden until you start, then you only get its name. A Relay shows each stop once you reach the one before.' },
-  lead: { label: 'Top links only', help: 'Only the links above an article’s first heading work: its opening text, infobox and the notes at the top. Routes get much longer.' },
-  distance: { label: 'Distance', help: 'Always shows how many clicks your next stop is from your page, by the shortest route: the target, a checkpoint, the nearest find or the start on the way back. A click that gets you closer is cheered.' },
+  blind: { label: 'Blind target', blurb: 'The target stays hidden until you start.', help: 'The target is hidden until you start, then you only get its name. A Relay shows each stop once you reach the one before.' },
+  lead: { label: 'Top links only', blurb: 'Only the links at the top of each article work.', help: 'Only the links above an article’s first heading work: its opening text, infobox and the notes at the top. Routes get much longer.' },
+  distance: { label: 'Distance', blurb: 'Always shows how far your next stop is.', help: 'Always shows how many clicks your next stop is from your page, by the shortest route: the target, a checkpoint, the nearest find or the start on the way back. A click that gets you closer is cheered.' },
   checkpoint: { label: 'Relay' },
-  roundtrip: { label: 'Round trip', help: 'Then go back to the start, never through a page of the way there.' },
+  roundtrip: { label: 'Round trip', blurb: 'Then back to the start, by other pages.', help: 'Then go back to the start, never through a page of the way there.' },
   scavenger: { label: 'Scavenger hunt' },
-  limit: { label: 'Six clicks', help: `Finish in ${CLICK_LIMIT} clicks or fewer, or lose: checkpoints, finds and the way home included. Back counts.` },
+  limit: { label: 'Six clicks', blurb: `Finish in ${CLICK_LIMIT} clicks or fewer, or lose.`, help: `Finish in ${CLICK_LIMIT} clicks or fewer, or lose: checkpoints, finds and the way home included. Back counts.` },
   exact: { label: 'Exact clicks' },
 };
 // The game, one of the tiles: its rule (a Race has none), and what its tile and the strip under the tiles say, and with
@@ -1507,7 +1508,7 @@ function syncVia() {
   for (const k of Object.keys(OFF_WITH)) {
     const why = offWhy(k, chosenRules());
     $(`input.rule[value=${k}]`).disabled = !!why;
-    $(`#rules [data-desc=${k}]`).textContent = why ?? RULES[k].help;
+    $(`#rules [data-desc=${k}]`).textContent = why ?? RULES[k].blurb;
   }
   if (tripRelay()) {
     const [lo, hi] = backRange(keys.length);
@@ -6229,8 +6230,9 @@ $('#btnBrokenGiveUp').onclick = () => { if (game.active && !game.loading) { $('#
 // ---------------------------------------------------------------- Wiring
 $('#games').innerHTML = Object.entries(GAMES).map(([k, g]) => `<label><input type="radio" name="game" value="${k}"${k === 'race' ? ' checked' : ''}>
   <b>${esc(g.label)}</b><span class="diagram" aria-hidden="true">${esc(g.diagram)}</span><span class="note">${esc(g.blurb)}</span></label>`).join('');
-$('#rules').innerHTML = EXTRA_RULES.map(k => `<label><input type="checkbox" class="rule" value="${k}">
-  <span><b>${esc(RULES[k].label)}</b><span class="note" data-desc="${k}">${esc(RULES[k].help)}</span></span></label>`).join('');
+// Each extra rule's box says it in a line (blurb), so the boxes stay short; the whole of it is the box's tooltip (help).
+$('#rules').innerHTML = EXTRA_RULES.map(k => `<label title="${esc(RULES[k].help)}"><input type="checkbox" class="rule" value="${k}">
+  <span><b>${esc(RULES[k].label)}</b><span class="note" data-desc="${k}">${esc(RULES[k].blurb)}</span></span></label>`).join('');
 $('#viaCount').innerHTML = VIA_KEYS.map((w, i) => `<option>${i + 1}</option>`).join('');
 $('#huntMode').innerHTML = `<option value="kinds">${HUNT_SIZE} kinds</option><option value="articles">${HUNT_SIZE} articles</option>`;
 $('#exactExtra').innerHTML = EXACT_EXTRAS.map(n => `<option value="${n}">par + ${n}</option>`).join('')

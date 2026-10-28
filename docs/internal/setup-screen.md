@@ -33,7 +33,7 @@ The setup screen puts playing first.
   - 1 · Choose a game:
     - the tiles, `GAMES`, a radio group named `game`, read by `gameMode()`
     - the strip under them, `#gameHelp` plus the picked game's own options, `.game-opt`: the checkpoint count, What to find, and Exact clicks's clicks over par, `#exactExtra`, with its count beside it, `#exactInfo`, filled by `updateSetupPar`.
-  - 2 · Extra rules (`EXTRA_RULES`, boxes with a description each, in `#rules`, Round trip first).
+  - 2 · Extra rules (`EXTRA_RULES`, boxes in `#rules`, Round trip first), each saying its rule in a line (`RULES[k].blurb`, so the boxes stay short), the whole of it their tooltip (`help`).
   - 3 · Articles and difficulty (`#settings`, always shown): the pool, the difficulty, the target's topic and par, Content and Spin-offs.
 
 On a phone the cards lose their minimum height and show two lines of description, so Start game fits on the first screen.

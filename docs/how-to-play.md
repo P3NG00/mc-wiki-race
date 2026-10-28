@@ -38,7 +38,7 @@ Pick one of the tiles; Race is the default. The strip under them explains the ga
 
 ## Extra rules
 
-These are checkboxes that go with any game, and most combine.
+These are checkboxes that go with any game, and most combine. Each box says its rule in a line; point at it for the whole.
 
 | Rule | What it does |
 |---|---|

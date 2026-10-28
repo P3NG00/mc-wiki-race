@@ -167,7 +167,7 @@ Any change to the cards or rules makes it an ordinary game, and the game tells y
 
 The line under the daily shows your streak, your best, and the days won of those played ("🔥 3-day streak · Best 7 · Won 12 of 14 days"). The streak counts days in a row won on their own day, and holds until today's is due ("play today to keep it").
 
-**Past dailies** opens a calendar of every daily so far, each day marked **Won on the day**, **Won later** or **Not won**. You can catch up on a past day, but it doesn't mend a streak, and a day that hasn't come yet can't be played. The first win of a daily gets extra fireworks, a creeper among them.
+**Past dailies** opens a calendar of every daily so far, each day marked **Won on the day**, **Won later**, **Not won** or **Not played**. You can catch up on a past day, but it doesn't mend a streak, and a day that hasn't come yet can't be played. The first win of a daily gets extra fireworks, a creeper among them.
 
 ## Challenge links
 

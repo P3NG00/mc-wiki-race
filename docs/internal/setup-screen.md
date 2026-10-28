@@ -18,7 +18,7 @@ The setup screen puts playing first.
   - Past dailies beside the stats, `#btnPastDailies`, opens a calendar, `openCalendar`:
     - a month at a time from `DAILY_FIRST`'s to this one
     - the week starting on the locale's first day
-    - each day from `DAILY_FIRST` to today a button that loads its daily (`loadDaily`), named with its game and result in its tooltip, and marked won on its day, won later or not won.
+    - each day from `DAILY_FIRST` to today a button that loads its daily (`loadDaily`), named with its game and result in its tooltip, and marked won on its day, won later, not won or (plain) not played, with a key under the month naming all four.
 - Your game (`#gameSum`, filled by `updateGameSum`): the game with its option, the extra rules, the articles and the difficulty.
 - The cards.
   - A title typed into a card's box (`setCustom`) takes the card's roll (`setup.rolls`) as the lookup starts, so a reroll or the daily after it wins, and it wins over a roll going already.

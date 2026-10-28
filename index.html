@@ -130,7 +130,7 @@
   .daily-stats { display: block; margin-top: 2px; }
   .daily-stats button.link { font-size: 13px; }
   #dailyStats:not(:empty) { margin-right: 10px; }
-  /* Past dailies: a month of days, marked won on its day (in the streak), won later, or played and not won. */
+  /* Past dailies: a month of days, marked won on its day (in the streak), won later, played and not won, or not played. */
   .cal-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 4px 0 8px; }
   .cal { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; margin-bottom: 10px; }
   .cal .wd { text-align: center; font-size: 12px; color: var(--muted); }
@@ -138,6 +138,7 @@
   .cal .streak, .cal-key .streak { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
   .cal .won, .cal-key .won { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); }
   .cal .played, .cal-key .played { background: var(--warm-soft); border-color: var(--warm-soft); color: var(--warm); }
+  .cal-key .unplayed { background: var(--panel); border-color: var(--line); }   /* as a plain day's button */
   .cal .today { font-weight: 700; box-shadow: inset 0 0 0 2px var(--ink); }
   .cal-key { display: flex; flex-wrap: wrap; gap: 4px 14px; align-items: center; }
   .cal-key i { display: inline-block; width: 12px; height: 12px; margin-right: 5px; vertical-align: -1px; border: 1px solid; border-radius: 3px; }
@@ -1936,7 +1937,7 @@ function openCalendar(month = today().slice(0, 7)) {
       <b>${esc(new Date(y, m - 1, 1).toLocaleDateString(undefined, { month: 'long', year: 'numeric' }))}</b>
       <button id="calNext" aria-label="Next month"${shift(1) > now.slice(0, 7) ? ' disabled' : ''}>›</button></div>
     <div class="cal">${weekdays.map(w => `<span class="wd">${esc(w)}</span>`).join('')}${'<span></span>'.repeat(blanks)}${[...Array(new Date(y, m, 0).getDate())].map((_, i) => day(i + 1)).join('')}</div>
-    <p class="note cal-key"><span><i class="streak"></i>Won on the day</span><span><i class="won"></i>Won later</span><span><i class="played"></i>Not won</span></p>
+    <p class="note cal-key"><span><i class="streak"></i>Won on the day</span><span><i class="won"></i>Won later</span><span><i class="played"></i>Not won</span><span><i class="unplayed"></i>Not played</span></p>
     <div class="actions"><button id="calClose">Close</button></div>`);
   // The dialog is drawn again, so focus goes back to the arrow clicked, or the other one at the end of the months.
   const go = (n, id) => { openCalendar(shift(n)); ($(id).disabled ? $(id === '#calPrev' ? '#calNext' : '#calPrev') : $(id)).focus(); };

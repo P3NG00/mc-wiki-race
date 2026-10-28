@@ -480,7 +480,7 @@ The daily:
   - the daily box then saying it's done in how many clicks, and the streak
 - streaks of 7 and 30 earning Week Streak and Devoted
 - Past dailies:
-  - opening on this month with today marked and the days to come off
+  - opening on this month with today marked and the days to come off, its key naming won on the day, won later, not won and not played
   - going back to `DAILY_FIRST`'s month and no further
   - a day loading its daily in place of a challenge link's cards, and no longer a challenge's game, for Accepted
 - Clear history asking first, counting the games (the 1 recorded game for one), Cancel keeping them

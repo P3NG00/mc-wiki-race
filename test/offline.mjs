@@ -1358,8 +1358,9 @@ const calOk = `(() => { const c = document.querySelector('#modal .cal'), b = [..
   return !document.querySelector('#modalBg').classList.contains('hidden') && t?.dataset.day === today() && t.classList.contains('played')
     && b.every(x => x.disabled === (x.dataset.day > today() || x.dataset.day < DAILY_FIRST)) && b.length === new Date(+today().slice(0, 4), +today().slice(5, 7), 0).getDate()
     && (y => !y || y.classList.contains('streak') || y.dataset.day.slice(0, 7) !== today().slice(0, 7))(c.querySelector('[data-day="' + ${ago(1)} + '"]'))
-    && document.querySelector('#calNext').disabled && t.title.includes(dailyText(today())); })()`;
-check('Past dailies opens on this month, today marked, the days to come off', await ev(calOk), await ev("document.querySelector('#modal').textContent"));
+    && document.querySelector('#calNext').disabled && t.title.includes(dailyText(today()))
+    && document.querySelector('#modal .cal-key').textContent === 'Won on the dayWon laterNot wonNot played'; })()`;
+check('Past dailies opens on this month, today marked, the days to come off, its key naming all four marks', await ev(calOk), await ev("document.querySelector('#modal').textContent"));
 check('it goes back to the first daily\'s month and no further', await ev(`(() => {
   for (let i = 0; i < 240 && !document.querySelector('#calPrev').disabled; i++) document.querySelector('#calPrev').click();
   return [...document.querySelectorAll('#modal .cal button')].every(b => b.dataset.day.startsWith(DAILY_FIRST.slice(0, 7)) && b.disabled === (b.dataset.day < DAILY_FIRST || b.dataset.day > today()))

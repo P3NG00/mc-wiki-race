@@ -31,7 +31,7 @@ The setup screen puts playing first.
   - Sound, Timer, Theme and the background's settings stay as they are, but Roll by itself, which any change turns off.
 - Then, below a divider (`.game-settings`), the steps:
   - 1 · Choose a game:
-    - the tiles, `GAMES`, a radio group named `game`, read by `gameMode()`
+    - the tiles, `GAMES`, a radio group named `game`, read by `gameMode()`, each its name and diagram, its line (`blurb`, or with Round trip its `trip`'s) its tooltip, since the strip says the picked game
     - the strip under them, `#gameHelp` plus the picked game's own options, `.game-opt`: the checkpoint count, What to find, and Exact clicks's clicks over par, `#exactExtra`, with its count beside it, `#exactInfo`, filled by `updateSetupPar`.
   - 2 · Extra rules (`EXTRA_RULES`, boxes in `#rules`, Round trip first), each saying its rule in a line (`RULES[k].blurb`, so the boxes stay short), the whole of it their tooltip (`help`).
   - 3 · Articles and difficulty (`#settings`, always shown): the pool, the difficulty, the target's topic and par, Content and Spin-offs.

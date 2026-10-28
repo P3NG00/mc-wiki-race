@@ -482,6 +482,7 @@ await open('#start=Diamond&target=Zombie&rules=roundtrip');
 check('a round trip is a Race with the Round trip box, the start as the finish and ⇄', await until(ready) && await ev(`gameMode() === 'race' && rules().join() === 'roundtrip'
   && document.querySelector('input.rule[value=roundtrip]').checked && document.querySelector('#cardStart .tag').textContent === 'Start and finish'
   && document.querySelector('#pairArrow').textContent === '⇄' && document.querySelector('#games input[value=race]').parentElement.querySelector('.diagram').textContent === 'A ⇄ B'
+  && document.querySelector('#games input[value=race]').parentElement.title === GAMES.race.trip.blurb && !document.querySelector('#games .note')
   && openLink(new URL(challengeLink()).hash.slice(3)).endsWith('&rules=roundtrip') && document.querySelector('#gameSum').textContent.startsWith('Race · Round trip')`), await ev("document.querySelector('#gameSum').textContent"));
 const rtPar = await ev("cardsRoute(['Diamond', 'Zombie'], rules()).then(r => r.length - 1)");
 check('setup par is the round trip\'s', await until(`document.querySelector('#setupPar').textContent === 'Par ${rtPar}'`), `par ${rtPar}`);

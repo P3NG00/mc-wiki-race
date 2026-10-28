@@ -24,7 +24,7 @@ Under those come three steps: **1 · Choose a game**, **2 · Extra rules** and *
 
 ## The four games
 
-Pick one of the tiles; Race is the default. The strip under them explains the game and holds its one option.
+Pick one of the tiles; Race is the default. Each shows the game's name and its route as a diagram (point at it for a line about it), and the strip under them explains the picked game and holds its one option.
 
 | Game | Tile | What you do | Option |
 |---|---|---|---|

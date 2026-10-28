@@ -353,7 +353,7 @@ Blind target:
 A round trip:
 
 - a Race with the Round trip box
-- the setup screen marking it
+- the setup screen marking it, the Race tile's diagram A ⇄ B and its tooltip the trip's line, the tiles showing no line of their own
 - its par
 - the HUD naming the target and then the start
 - reaching the target clearing Back and showing the banner

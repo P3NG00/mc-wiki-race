@@ -1507,7 +1507,7 @@ function syncVia() {
   for (const [k, def] of Object.entries(GAMES)) {
     const says = { ...def, ...trip && def.trip }, tile = $(`#games input[value=${k}]`).parentElement;
     $('.diagram', tile).textContent = says.diagram;
-    $('.note', tile).textContent = says.blurb;
+    tile.title = says.blurb;
     if (k === g) $('#gameHelp').innerHTML = `<b>${esc(def.label)}:</b> ${esc(says.help)}`;
   }
   document.querySelectorAll('.game-opt').forEach(el => el.classList.toggle('hidden', el.dataset.game !== g));
@@ -6234,8 +6234,9 @@ $('#btnRebuild').onclick = rebuild;
 $('#btnBrokenGiveUp').onclick = () => { if (game.active && !game.loading) { $('#rebuildBar').classList.add('hidden'); finish(false); } };
 
 // ---------------------------------------------------------------- Wiring
-$('#games').innerHTML = Object.entries(GAMES).map(([k, g]) => `<label><input type="radio" name="game" value="${k}"${k === 'race' ? ' checked' : ''}>
-  <b>${esc(g.label)}</b><span class="diagram" aria-hidden="true">${esc(g.diagram)}</span><span class="note">${esc(g.blurb)}</span></label>`).join('');
+// A tile is the game's name and diagram, its line (blurb) the tooltip: the strip under the tiles says the picked one.
+$('#games').innerHTML = Object.entries(GAMES).map(([k, g]) => `<label title="${esc(g.blurb)}"><input type="radio" name="game" value="${k}"${k === 'race' ? ' checked' : ''}>
+  <b>${esc(g.label)}</b><span class="diagram" aria-hidden="true">${esc(g.diagram)}</span></label>`).join('');
 // Each extra rule's box says it in a line (blurb), so the boxes stay short; the whole of it is the box's tooltip (help).
 $('#rules').innerHTML = EXTRA_RULES.map(k => `<label title="${esc(RULES[k].help)}"><input type="checkbox" class="rule" value="${k}">
   <span><b>${esc(RULES[k].label)}</b><span class="note" data-desc="${k}">${esc(RULES[k].blurb)}</span></span></label>`).join('');

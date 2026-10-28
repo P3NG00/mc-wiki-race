@@ -577,7 +577,7 @@ The background:
   - held unticked by Reduce motion and as it was after
 - a moving picture caught to be stilled with motion reduced and put back after
 - XP on Minecraft's levels
-- a win listing its XP in the result and filling the bar
+- a win listing its XP in the result and filling the bar, its caption the XP to the next level, and the one beside Advancements saying XP level
 - a game given up listing only its new articles' XP
 - in the advancements' games: 2 × par for the win, 3 at par, 6 under par and not 3, 2 for each rule that makes it harder (Hard for No hubs) and none for Distance, an XP for each new article, each advancement its tier's, and the total their sum
 - stored XP only a whole number of none or more, and Reset advancements clearing it

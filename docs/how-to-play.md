@@ -316,7 +316,7 @@ Hot Streak doesn't need the clicks that reach a checkpoint or a find, or the las
 
 ## XP
 
-XP works as Minecraft's, toward levels on Minecraft's own curve, and is never taken away. The bar shows in the result, where the game's XP flies in as orbs, and beside the Advancements button.
+XP works as Minecraft's, toward levels on Minecraft's own curve, and is never taken away. The bar, with your level over it, shows in the result, where the game's XP flies in as orbs and the bar says how much more the next level takes, and beside the Advancements button.
 
 - A win: 2 × par, 3 more at par and 6 under par (not in Exact clicks), and 2 more for each of Round trip, No Back, Blind target, Top links only, Six clicks and Hard. The first win of the day's daily is 10 more.
 - Any game, won or not: 1 for each article you've never seen before.

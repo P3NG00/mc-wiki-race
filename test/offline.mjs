@@ -457,6 +457,9 @@ check('and each bursts into its sparks', await until("fx.parts.filter(p => p.lif
 check('XP levels are Minecraft\'s', await ev("xpLevel(6).L === 0 && xpLevel(7).L === 1 && xpLevel(7).into === 0 && xpLevel(352).L === 16 && xpLevel(353).into === 1"));
 check('a win lists its XP in the result, filling the bar', await until("!!document.querySelector('#mXp:not(.hidden) .xp')", 5000)
   && await ev(`$('#mXp').textContent.includes('Win (par ' + ${relayPar} + ')') && $('#mXp').textContent.includes('+' + 2 * ${relayPar}) && adv.xp > 0`), await ev("$('#mXp').textContent"));
+check('its bar saying the XP the next level takes, and the one beside Advancements that it is the XP level', await ev(`(({ L, into, need }) =>
+  $('#mXp .xp .cap').textContent === into + ' / ' + need + ' XP to level ' + (L + 1) && $('#xpSetup .cap').textContent === 'XP level')(xpLevel(Math.max(0, adv.xp - xpFlying)))`),
+  await ev("$('#mXp .xp .cap').textContent + ' | ' + $('#xpSetup .cap').textContent"));
 await ev("closeModal(); toSetup()");
 // Swap reverses the whole chain. A third checkpoint rolls a third card; back to one, Reroll all drops the other two.
 await ev("document.querySelector('#btnSwap').click()");

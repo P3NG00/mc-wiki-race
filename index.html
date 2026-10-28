@@ -408,7 +408,7 @@
   .adv-toast-icon { --size: 40px; flex: none; width: var(--size); height: var(--size); display: grid; place-items: center; }
   .adv-toast-icon img { width: 100%; height: 100%; }
   /* XP (see XP): Minecraft's own bar (advTextures; until it is in, a dark bar and a green fill), 182 by 5 at twice its
-     size, half beside the Advancements button, with the level in green over it. */
+     size, half beside the Advancements button, with the level in green over it and a caption under it saying what it is. */
   .xp { display: inline-grid; justify-items: center; vertical-align: middle; }
   .xp .lvl { position: relative; z-index: 1; margin-bottom: -3px; font-weight: 700; font-size: 16px; line-height: 1; color: #80ff20;
     text-shadow: 2px 0 #000, -2px 0 #000, 0 2px #000, 0 -2px #000, 2px 2px #000, -2px -2px #000, 2px -2px #000, -2px 2px #000; }
@@ -420,6 +420,8 @@
   :root.adv-textured .xp .fill { background: var(--adv-xp-fill) 0 0 / 364px 10px; }
   .xp.small .bar { width: 182px; height: 5px; } :root.adv-textured .xp.small .fill { background-size: 182px 5px; }
   .xp.small .lvl { font-size: 13px; }
+  .xp .cap { margin-top: 3px; font-size: 12px; line-height: 1.2; color: var(--muted); }
+  .xp.small .cap { font-size: 11px; }
   .result-xp { margin: 4px 0 16px; text-align: center; }
   .xp-gains { list-style: none; padding: 0; margin: 0 auto 8px; max-width: 360px; text-align: left; font-size: 14px; }
   .xp-gains li { display: flex; justify-content: space-between; gap: 16px; }
@@ -855,7 +857,7 @@ const THEMES = [...new Set(['auto', 'light', 'dark', ...Array.from(document.quer
 
   <div class="history hidden" id="history">
     <div class="history-head"><h2>Recent games</h2><button class="link" id="btnClearHistory">Clear history</button>
-      <span class="adv-side"><span class="xp small hidden" id="xpSetup"><span class="lvl"></span><span class="bar"><span class="fill"></span></span></span>
+      <span class="adv-side"><span class="xp small hidden" id="xpSetup"><span class="lvl"></span><span class="bar"><span class="fill"></span></span><span class="cap"></span></span>
       <button class="adv-btn" id="btnAdv">🏆 Advancements <span class="count mono" id="advCount"></span></button></span></div>
     <div class="history-wrap"><table><thead><tr><th>Game</th><th>Route</th><th>Result</th><th>Time</th><th>When</th></tr></thead><tbody></tbody></table></div>
   </div>
@@ -3072,13 +3074,15 @@ function xpFrames(v) {
   return xpTints.get(i);
 }
 let xpFlying = 0, xpShownLevel = null;
-const xpBar = cls => `<span class="xp ${cls}"><span class="lvl"></span><span class="bar"><span class="fill"></span></span></span>`;
-// Every bar on the page, at the XP not still flying to it; a new level plays Minecraft's level-up and bumps the number.
+const xpBar = cls => `<span class="xp ${cls}"><span class="lvl"></span><span class="bar"><span class="fill"></span></span><span class="cap"></span></span>`;
+// Every bar on the page, at the XP not still flying to it, its caption saying what it is (the result's, the XP to the
+// next level); a new level plays Minecraft's level-up and bumps the number.
 function drawXp() {
   const xp = Math.max(0, adv.xp - xpFlying), { L, into, need } = xpLevel(xp);
   for (const b of document.querySelectorAll('.xp')) {
     b.querySelector('.fill').style.width = into / need * 100 + '%';
     b.querySelector('.lvl').textContent = L;
+    b.querySelector('.cap').textContent = b.classList.contains('small') ? 'XP level' : `${into} / ${need} XP to level ${L + 1}`;
     b.title = `Level ${L} · ${into} / ${need} XP to level ${L + 1} · ${xp} XP in all`;
     if (xpShownLevel !== null && L > xpShownLevel) bump(b.querySelector('.lvl'));
   }

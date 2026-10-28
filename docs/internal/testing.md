@@ -658,6 +658,17 @@ Headless Firefox has no pointer device and matches `(hover: none)`, so `run-e2e.
 It runs as a single script; to focus on one behavior, edit or comment out checks in `e2e.mjs`.
 Code inside the article iframe is evaluated in the frame's own browsing context (`frameCtx()`).
 
+## The harness (`test/harness.mjs`)
+
+Both suites start with `connect(port, { wait, poll })`, which opens the BiDi session on the first tab and returns what they drive it with:
+
+- `ctx`, the tab, and `send`, one BiDi command
+- `ev`, an expression's value in the page or the article frame (`frameCtx`)
+- `until`, waiting for an expression to come true, for `wait` ms by default and looking every `poll` ms (the live suite 30 s and 300 ms, the offline one 15 s and 200 ms, its replies being instant); a wait that runs out is recorded by the line that waited
+- `listen`, which hands a function every other event the session subscribes to and returns one that stops it (the offline suite answers the wiki's requests through it, and a check can listen beside that)
+- `check`, which prints PASS or FAIL, and `sleep`
+- `end`, the last checks (no uncaught error, no wait timed out), the summary and the exit code
+
 ## Pre-commit hook
 
 The offline suite runs before every commit as a git pre-commit hook, unless the commit has only docs, pictures or `tools/`, `.githooks/pre-commit`, turned on once per clone with `git config core.hooksPath .githooks`.

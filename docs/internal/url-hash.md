@@ -64,7 +64,7 @@ With Scavenger in `rules`, the target and the `via=` titles are its three articl
 
 `rules=<key>,<key>`: rule keys (`RULES`; others are left out), the difficulty included (`setRules`: `nonav` is Normal, `nonav,nohubs` or `nohubs` alone Hard).
 
-- A challenge link always sets them, so one without `rules` is Relaxed, as every game was before difficulty.
+- A challenge link always sets them, so one without `rules` is Relaxed.
 - They are applied even if the pair fails to load.
 - On its own, `#rules=…` sets them for a rolled pair.
 

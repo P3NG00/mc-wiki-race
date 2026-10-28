@@ -4,6 +4,7 @@
 // real articles is left to e2e.mjs. Usage: test/run-e2e.sh --offline (starts Firefox), or
 //   node test/offline.mjs <bidi-port> <file-url>
 import fs from 'node:fs';
+import { connect } from './harness.mjs';
 
 const [port, fileUrl] = process.argv.slice(2);
 // Spin-off namespace numbers, from wiki-data.js, so a page in one gets the ns the live API would give it, and the hubs.
@@ -12,17 +13,8 @@ const { spinoffs: SPINOFFS, hubs } = JSON.parse(dataText.slice(dataText.indexOf(
 const HUBS = [...new Set(Object.values(hubs))];
 const nsOf = title => title.startsWith('Category:') ? 14 : SPINOFFS[Object.keys(SPINOFFS).find(n => title.startsWith(n + ':'))] ?? 0;
 
-const ws = new WebSocket(`ws://127.0.0.1:${port}/session`);
-let id = 0;
-const pending = new Map();
-const jsErrors = [], requests = new Map();   // requests: API request kinds ("action prop=…") and how many of each
-const send = (method, params) => new Promise(r => { const i = ++id; pending.set(i, r); ws.send(JSON.stringify({ id: i, method, params })); });
-const sleep = ms => new Promise(r => setTimeout(r, ms));
-let failures = 0;
-function check(name, ok, extra = '') {
-  console.log(`${ok ? 'PASS' : 'FAIL'}  ${name}${extra ? '  ' + extra : ''}`);
-  if (!ok) failures++;
-}
+const { send, listen, sleep, check, ctx, ev, frameCtx, until, end } = await connect(port, { wait: 15000, poll: 200 });
+const requests = new Map();   // API request kinds ("action prop=…") and how many of each
 
 // The wiki escapes a title in its HTML, so the made-up replies do too: the injection check below needs a page to be
 // what the wiki would send.
@@ -73,37 +65,10 @@ function answer(request, url) {
   return reply(request, JSON.stringify({ error: { code: 'offline', info: 'Not answered offline: ' + kind } }));
 }
 
-let onEvent = () => {};   // other events a check subscribes to
-ws.onmessage = m => {
-  const d = JSON.parse(m.data);
-  if (d.id && pending.has(d.id)) { pending.get(d.id)(d); pending.delete(d.id); }
-  else if (d.method === 'script.message') jsErrors.push(d.params.data.value);
-  else if (d.method === 'network.beforeRequestSent' && d.params.isBlocked) answer(d.params.request.request, d.params.request.url);
-  else if (d.method) onEvent(d);
-};
-await new Promise(r => ws.onopen = r);
-await send('session.new', { capabilities: {} });
-await send('session.subscribe', { events: ['script.message', 'network.beforeRequestSent'] });
-await send('script.addPreloadScript', { functionDeclaration: `report => {
-  addEventListener('error', e => report(String(e.message)));
-  addEventListener('unhandledrejection', e => report('Unhandled rejection: ' + (e.reason?.message ?? e.reason)));
-}`, arguments: [{ type: 'channel', value: { channel: 'mwr-errors' } }] });
+// Every request to minecraft.wiki is held and answered here.
+listen(d => d.method === 'network.beforeRequestSent' && d.params.isBlocked && answer(d.params.request.request, d.params.request.url));
+await send('session.subscribe', { events: ['network.beforeRequestSent'] });
 await send('network.addIntercept', { phases: ['beforeRequestSent'], urlPatterns: [{ type: 'pattern', hostname: 'minecraft.wiki' }] });
-const ctx = (await send('browsingContext.getTree', {})).result.contexts[0].context;
-const ev = async (expr, c = ctx) => {
-  const r = await send('script.evaluate', { target: { context: c }, expression: expr, awaitPromise: true });
-  return r.result?.result?.value ?? JSON.stringify(r.error || r.result?.exceptionDetails?.text);
-};
-// A wait that runs out is recorded by the line that waited, and fails the last check: one whose condition never comes
-// true costs its whole timeout even where the checks after it pass.
-const timedOut = [];
-const until = async (expr, ms = 15000) => {
-  const t = Date.now(), from = new Error();
-  while (Date.now() - t < ms) { if (await ev(expr) === true) return true; await sleep(200); }
-  timedOut.push(from.stack.match(/\w+\.mjs:\d+/g)?.[1]);
-  return false;
-};
-const frameCtx = async () => (await send('browsingContext.getTree', {})).result.contexts[0].children[0]?.context;
 const ready = "!document.querySelector('#btnPlay').disabled && setup.busy === 0";   // a pair on the cards, nothing rolling
 const status = "document.querySelector('#setupStatus').textContent";
 // A hash change alone wouldn't reload the page, so go through about:blank.
@@ -134,8 +99,7 @@ const playRoute = async (hash, route) => {
 };
 
 // Links by difficulty. A challenge link without rules is Relaxed: everything but other namespaces and the left-out pages
-// is live. No hubs alone (from an older link) is Hard: hubs and redirects to them are dead, the target hub stays live,
-// and so are navboxes' links.
+// is live. No hubs alone is Hard: hubs, redirects to them and navboxes' links are dead, and the target hub stays live.
 check('the data loads', await open('#start=Diamond&target=Crafting') && await ev("WIKI_DATA.snapshot.length === 10 && POOL.size === 5"));
 check('the footer names the offline copy\'s date as the page\'s other dates, with its year, and links where it comes from', await ev(`$('#wikiCopyDate').textContent === shortDate(localDay(WIKI_DATA.snapshot), true)
   && $('#wikiCopyDate').textContent.includes(WIKI_DATA.snapshot.slice(0, 4)) && $('#wikiCopy a').href === 'https://minecraft.wiki/w/Minecraft_Wiki:Offline_use'`), await ev("$('#wikiCopy').textContent"));
@@ -2479,7 +2443,7 @@ await ev('finish(false); closeModal(); toSetup()');
 // real click, so Start is pressed with one. BiDi accepts the "Leave page?" dialog and reports it as
 // browsingContext.userPromptOpened.
 let prompts = [];
-onEvent = d => { if (d.method === 'browsingContext.userPromptOpened') prompts.push(d.params.type); };
+const stopPrompts = listen(d => { if (d.method === 'browsingContext.userPromptOpened') prompts.push(d.params.type); });
 await send('session.subscribe', { events: ['browsingContext.userPromptOpened'] });
 const leaveAfter = async giveUp => {
   await open('#start=Diamond&target=Crafting');
@@ -2496,11 +2460,8 @@ const leftDuring = await leaveAfter(false), leftAfter = await leaveAfter(true);
 check('leaving the page during a game asks first', leftDuring === 'beforeunload', leftDuring);
 check('leaving after the game doesn’t ask', leftAfter === '', leftAfter);
 await send('session.unsubscribe', { events: ['browsingContext.userPromptOpened'] });
-onEvent = () => {};
+stopPrompts();
 
 check('only page info, the advancements\' and items\' pictures and articles are asked for', [...requests.keys()].every(k => ['query prop=pageprops|pageimages|extracts', 'query prop=pageimages', 'query prop=imageinfo', 'parse prop=text|displaytitle|categories|links'].includes(k)),
   JSON.stringify(Object.fromEntries(requests)));
-check('no uncaught errors', jsErrors.length === 0, jsErrors.slice(0, 3).join(' | '));
-check('no wait timed out', !timedOut.length, timedOut.join(', '));
-console.log(failures ? `${failures} check(s) failed` : 'All checks passed');
-process.exit(failures ? 1 : 0);
+await end();

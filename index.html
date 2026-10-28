@@ -1263,7 +1263,7 @@ const LEVELS = {
   hard: { label: 'Hard', rules: ['nonav', 'nohubs'], help: 'Hard: no navboxes, and links to big overview pages (Block, Item, Mob, Crafting, Java Edition…) are dead too.' },
 };
 const LEVEL_RULES = [...new Set(Object.values(LEVELS).flatMap(l => l.rules))];
-// The difficulty a set of rules makes. No hubs on its own, from a link made before difficulty, counts as Hard.
+// The difficulty a set of rules makes: No hubs is Hard, with No navboxes or without.
 const levelOf = keys => keys.includes('nohubs') ? 'hard' : keys.includes('nonav') ? 'normal' : 'relaxed';
 // Content families: articles the pool leaves out, which the Content checkboxes add back. Keys as in wiki-data.js.
 const FAMILIES = {

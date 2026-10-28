@@ -17,7 +17,7 @@ To run it, open `index.html` in a browser; [development.md](development.md) has 
 | `favicon.ico`, `apple-touch-icon.png`, `og-image.png` | The icon and the link-preview image. |
 | `tools/wikidata/` | The Python scripts that build the four data files from the ZIM, their `config.json`, and `RESEARCH.md` with the numbers behind the difficulties and pools. |
 | `tools/check-docs.mjs` | Checks the docs' links and that the names the internal docs mention are still in the code (see [the docs check](development.md#the-docs-check)); `check-docs.test.mjs` tests it. |
-| `test/` | `run-e2e.sh` runs `e2e.mjs` (real games on the live wiki) or `offline.mjs` (the game's logic, every request answered by the test) in headless Firefox. |
+| `test/` | `run-e2e.sh` runs `e2e.mjs` (real games on the live wiki) or `offline.mjs` (the game's logic, every request answered by the test) in headless Firefox, both driving it through `harness.mjs`. |
 | `.githooks/pre-commit` | Runs the docs check, then the offline suite unless the commit has only docs, pictures or `tools/`. |
 | `docs/` | These pages; `docs/internal/` is the detailed reference, one file per part of the game. |
 | `README.md`, `LICENSE`, `CLAUDE.md` | The introduction, the MIT licence, and instructions for AI coding agents. |

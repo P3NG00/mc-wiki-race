@@ -1585,6 +1585,9 @@ check('so is a left-out page', await until("document.querySelector('#setupStatus
 // start only under Blind target), with the line above the cards naming the game, and they don't all come out the same.
 const randomDone = `setup.busy === 0 && (isBlind() ? ['start'] : cardKeys()).every(w => setup[w]) && (huntMode() !== 'kinds' || isBlind() || setup.kinds?.length === 3)
   && document.querySelector('.pair').dataset.vias === String(viaKeys().length) && document.querySelector('#gameSum').textContent.startsWith(GAMES[gameMode()].label)`;
+// Its own shuffle, where the buttons that only roll cards have the die.
+check('Random game has the shuffle, the buttons that roll cards the die', await ev(`$('#btnRandom').textContent === '🔀 Random game' && $('#btnRerollAll').textContent.startsWith('🎲')
+  && [...document.querySelectorAll('[data-reroll]')].every(b => b.textContent.startsWith('🎲'))`));
 const randoms = [];
 for (let i = 0; i < 8; i++) {
   await ev("document.querySelector('#btnRandom').click()");

@@ -548,6 +548,7 @@ Par:
   - a refused copy, Share's or Copy challenge link's, showing its text under the buttons, selected, to copy by hand, and a copy that works putting it away
   - a daily's naming its day with the year, as the result names it without, and with its setup screen's challenge link linking its day
 - Random game:
+  - its 🔀, where the buttons that only roll cards have 🎲
   - eight clicks each filling the cards its settings use, the start alone under Blind target, with the line above the cards naming the game
   - not all coming out the same
 

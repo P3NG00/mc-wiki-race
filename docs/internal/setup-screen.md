@@ -27,7 +27,7 @@ The setup screen puts playing first.
 - Start game and par.
 - Reroll all.
 - Copy challenge link (`#btnCopy`): "Challenge link copied.", or when the browser refuses the copy, the link in the status line to copy by hand.
-- Random game (`#btnRandom`, `randomGame`):
+- Random game (`#btnRandom`, `randomGame`, 🔀, since the 🎲 buttons only roll cards):
   - every setting under the cards at random, each on its own, every box a coin flip and every choice as likely as the others, then `reroll('all')`
   - Sound, Timer, Theme and the background's settings stay as they are, but Roll by itself, which any change turns off.
 - Then, below a divider (`.game-settings`), the settings of the game, under headings without numbers, since none has to be set before Start:

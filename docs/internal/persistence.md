@@ -44,7 +44,7 @@ The result note shows the topic when it isn't Any and the Content as "Content: A
 
 ### Recent games
 
-Recent games (`renderHistory`) shows the newest 15 of the 50 records, in five columns:
+Recent games (`renderHistory`) always shows (with no records, "No games yet. Your last 15 show here.", `#historyNone`, in place of the table and Clear history), and shows the newest 15 of the 50 records, in five columns:
 - the game as labels like the header's (the game, its extra rules, and a daily's day as a green "Daily 20 Oct"),
 - the route (`routeText`) with the settings the labels don't say under it,
 - the result: a badge, green for a win, orange for a loss, grey for giving up, with the golf name and par, or "Par 2" at par, under it, and Best on each pair's personal best,

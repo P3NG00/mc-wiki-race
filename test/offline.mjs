@@ -1932,14 +1932,16 @@ check('stored advancements keep only what would be written', await ev(`(a => JSO
 check('and XP only as a whole number of none or more', await ev(`[-1, 2.5, 'x', 12].map(xp => (localStorage.setItem('mwr.advancements', JSON.stringify({ xp })), savedAdvancements().xp)).join() === '0,0,0,12'`));
 await ev('saveAdv()');   // back to the earned ones
 await ev("$('#btnClearHistory').click(); $('#hClear').click()");
-check('Clear history leaves them, the heading and the button still there with no table', await ev(`advEarned() === ${earnedN} && savedGames().length === 0
-  && !$('#history').classList.contains('hidden') && $('.history-wrap').classList.contains('hidden') && $('#btnClearHistory').classList.contains('hidden')`));
+check('Clear history leaves them, the heading and the button still there with no table, saying no games yet', await ev(`advEarned() === ${earnedN} && savedGames().length === 0
+  && !$('#history').classList.contains('hidden') && $('.history-wrap').classList.contains('hidden') && $('#btnClearHistory').classList.contains('hidden')
+  && $('#historyNone').textContent === 'No games yet. Your last 15 show here.' && !$('#historyNone').classList.contains('hidden')`));
 await ev("$('#btnAdv').click()");
 check('the panel\'s foot says Clear history keeps them and XP', await ev("document.querySelector('.adv-foot .note').textContent === 'Clear history keeps your advancements and XP. Only Reset advancements clears them.'"),
   await ev("document.querySelector('.adv-foot .note').textContent"));
 await ev("$('#aReset').click(); $('#aWipe').click()");
 check('Reset advancements forgets them and the counts', await ev(`advEarned() === 0 && adv.wins === 0 && adv.xp === 0 && adv.pages.size === 0 && JSON.stringify(store.get('mwr.advancements').got) === '{}'
-  && $('#advCount').textContent.startsWith('0 / ') && document.querySelectorAll('.adv-tile.got').length === 0 && $('#history').classList.contains('hidden')`));
+  && $('#advCount').textContent.startsWith('0 / ') && document.querySelectorAll('.adv-tile.got').length === 0`));
+check('and with no games either, as on a first visit, Recent games still shows the button', await ev("!$('#btnAdv').closest('.hidden') && !$('#historyNone').classList.contains('hidden') && $('#xpSetup').classList.contains('hidden')"));
 await ev('closeModal()');
 // What earns the rest, after Reset, so each game is its pair's first. Each count from one short of it, reached by the
 // next blast, win or arrival; the last of the five topics arriving. A Hard game with No Back, Blind target and Six

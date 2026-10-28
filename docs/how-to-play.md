@@ -154,7 +154,7 @@ Your personal best for a game is the fewest clicks, then the fastest time, among
 
 ## Recent games
 
-**Recent games** lists your last 15 games: the game, the route, the result, the time and when. A win's badge is green, a loss's orange and giving up grey, and **Best** marks each game's personal best, out of the last 50 games, which your browser keeps. **Clear history** deletes them all, personal bests, dailies and the daily streak included, after asking; your advancements and XP stay.
+**Recent games** lists your last 15 games (before your first, it says so): the game, the route, the result, the time and when. A win's badge is green, a loss's orange and giving up grey, and **Best** marks each game's personal best, out of the last 50 games, which your browser keeps. **Clear history** deletes them all, personal bests, dailies and the daily streak included, after asking; your advancements and XP stay.
 
 ## The daily
 

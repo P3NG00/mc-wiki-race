@@ -269,7 +269,7 @@ The advancements:
 - the panel's tiles, gold and ??? ones
 - a count's progress and a secret's detail saying nothing
 - stored advancements keeping only what would be written
-- Clear history leaving them, as the panel's foot says, and Reset forgetting them
+- Clear history leaving them, as the panel's foot says, with the heading and the button and a line saying no games yet, and Reset forgetting them, Recent games still showing the button with no games, as on a first visit
 - a toast headed by its tier (Advancement Made!, Goal Reached!, Challenge Complete!), those shown together playing the highest tier's sound
 - after Reset, what earns the rest, each game its pair's first:
   - the counts from one short of each, nothing earned until the next blast (Demolition Expert), arrivals (Tourist, Bookworm, Cartographer) or win (Regular, Veteran, Wiki Legend) reaches them, and Around the World on the last topic arriving

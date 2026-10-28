@@ -275,8 +275,9 @@
     background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow);
   }
   body.bg-view #bgFacts { position: fixed; left: 16px; right: 72px; bottom: 26px; margin: 0; text-align: center; }
-  /* Text straight on the background keeps a halo of the page's colour, so the picture never cuts into it. */
-  #setup :is(.setup-head, .sub, .your-game, .step, .setup-par, .status, .history-head, .bg-facts, .site-foot) {
+  /* Text straight on the background keeps a halo of the page's colour, so the picture never cuts into it (BG_TEXT, the
+     same list, keeps the background's names clear of it). */
+  #setup :is(.setup-head, .sub, .your-game, .step, .setup-par, .status, .history-head, #historyNone, .bg-facts, .site-foot) {
     text-shadow: 0 0 3px var(--bg), 0 0 6px var(--bg), 0 0 10px var(--bg);
   }
 
@@ -860,6 +861,7 @@ const THEMES = [...new Set(['auto', 'light', 'dark', ...Array.from(document.quer
       <span class="adv-side"><span class="xp small hidden" id="xpSetup"><span class="lvl"></span><span class="bar"><span class="fill"></span></span><span class="cap">XP level</span></span>
       <button class="adv-btn" id="btnAdv">🏆 Advancements <span class="count mono" id="advCount"></span></button></span></div>
     <div class="history-wrap"><table><thead><tr><th>Game</th><th>Route</th><th>Result</th><th>Time</th><th>When</th></tr></thead><tbody></tbody></table></div>
+    <p class="note hidden" id="historyNone">No games yet. Your last 15 show here.</p>
   </div>
 
   <p class="bg-facts" id="bgFacts" hidden></p>
@@ -2125,10 +2127,12 @@ function renderHistory() {
     const b = best.get(pair(r));
     if (r.won && (!b || beats(r, b))) best.set(pair(r), r);
   }
-  // With no games but advancements earned (after Clear history), only the heading and the Advancements button show.
-  $('#history').classList.toggle('hidden', rows.length === 0 && !advEarned() && !adv.xp);
+  // Always there, so the Advancements button is from the first visit (hidden in the markup only for a page without
+  // JavaScript); with no games, a line saying what will be in place of the table.
+  $('#history').classList.remove('hidden');
   drawXp();
   for (const el of ['.history-wrap', '#btnClearHistory']) $(el).classList.toggle('hidden', rows.length === 0);
+  $('#historyNone').classList.toggle('hidden', rows.length > 0);
   $('#advCount').textContent = `${advEarned()} / ${Object.keys(ADVANCEMENTS).length}`;
   $('#history tbody').innerHTML = rows.slice(0, 15).map(r => {
     const tags = [[GAMES[gameOf(r.rules)].label, 'game'], ...extraLabels(r.rules).map(t => [t]),
@@ -5927,7 +5931,7 @@ const bgLabelX = (x, w) => Math.min(bg.W - w / 2 - 6, Math.max(w / 2 + 6, x));
 // screen, measured at each paint (bgCovers), and painted again as the page scrolls while the background is still
 // (motion reduced).
 const BG_COVERS = '.daily-box, .card, .games label, .game-help, .extras label, .settings, .history table, .setup-actions button, .head-opts select, #bgOpts[open] .bg-panel, #setup .items-btn, .bg-view-btn';
-const BG_TEXT = '#setup :is(.setup-head, .sub, .your-game, .step, .setup-par, .status, .history-head, .bg-facts, .site-foot)';   // with a halo
+const BG_TEXT = '#setup :is(.setup-head, .sub, .your-game, .step, .setup-par, .status, .history-head, #historyNone, .bg-facts, .site-foot)';   // the CSS's with a halo
 function bgCovers() {
   const viewing = bgViewing(), covers = [...document.querySelectorAll(viewing ? '#bgOpts, #btnBgView' : BG_COVERS)].map(el => el.getBoundingClientRect());
   const range = document.createRange();

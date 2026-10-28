@@ -105,7 +105,7 @@ Until then, or if the request fails (it is asked again next time), the frame sho
 
 The 🏆 Advancements button at the right of the Recent games heading (`#btnAdv`, with the count earned of all, `#advCount`) opens it (`openAdvancements`).
 
-Recent games shows when there are games or advancements earned; with advancements but no games (after Clear history), only its heading and the button.
+Recent games always shows, so the button is there from the first visit; with no games (a first visit, or after Clear history) its heading, the button and a line saying no games yet (`#historyNone`) instead of the table.
 
 ### Head
 
@@ -157,7 +157,7 @@ A game collects its XP as it goes (`game.xp`, each `[what, xp, an advancement's]
 ### The bar
 
 - The bar is Minecraft's own (`Experience bar background` and `progress`, 182 × 5, at twice that, by `advTextures`; until they are in, a dark bar with a green fill), with the level in green over it, a caption under it saying what it is (beside the button "XP level", in the result the XP to the next level, "4 / 9 XP to level 2"), and a tooltip of the XP to the next level and in all.
-- It shows in the result and, half as big, beside the Advancements button (`#xpSetup`) once there is any XP; Recent games shows for XP alone too.
+- It shows in the result and, half as big, beside the Advancements button (`#xpSetup`) once there is any XP.
 
 ### Orbs
 

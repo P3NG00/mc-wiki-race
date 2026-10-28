@@ -779,6 +779,17 @@ for (const [i, t] of wander.entries()) {
 check('running out loses: Out of clicks, headed in orange as Recent games marks a loss, the clicks all of the count', await until('!game.active') && await ev(`store.get('mwr.history', [])[0].outOfClicks === true && document.querySelector('#modal h2').textContent === 'Out of clicks' && $('#mClicks').textContent === '${n} of ${n}'
   && (probe => (document.body.append(probe), probe.style.color = 'var(--warm)', (c => (probe.remove(), c))(getComputedStyle(probe).color)))(document.createElement('i')) === getComputedStyle(document.querySelector('#modal h2')).color`));
 await ev("closeModal(); toSetup()");
+// A long name in the route (Chaos rolls titles of 60 letters) ends in …, the whole of it the chip's tooltip, so the start
+// and the target both fit the row on a wide screen.
+const longest = JSON.parse(await ev("JSON.stringify(WIKI_DATA.articles.map(a => a[0]).filter(t => !/[:/]/.test(t)).sort((a, b) => b.length - a.length).slice(0, 2))"));
+await open(`#start=${encodeURIComponent(longest[0])}&target=${encodeURIComponent(longest[1])}`);
+await play();
+check('long names in the route end in …, the whole the chip\'s tooltip, and the start and the target fit the row', await ev(`(() => {
+  const chips = [...document.querySelectorAll('#hudRoute .chip')], row = $('#hudRoute').getBoundingClientRect();
+  return chips.length === 2 && chips.every(c => { const n = $('.n', c), r = c.getBoundingClientRect();
+    return n.scrollWidth > n.clientWidth && getComputedStyle(n).textOverflow === 'ellipsis' && c.title.endsWith(n.textContent) && r.left >= row.left - 1 && r.right <= row.right + 1; });
+})()`), await ev("JSON.stringify([...document.querySelectorAll('#hudRoute .chip')].map(c => [c.title, Math.round(c.getBoundingClientRect().left), Math.round(c.getBoundingClientRect().right)]))"));
+await ev("finish(false); closeModal(); toSetup()");
 // Six clicks: the target on the sixth click wins; running out says what was left: no target yet, something still to find
 // on a hunt, or the way back on a round trip. The detours are made-up pages, no target or find. Share says how a loss
 // ended: out of clicks with the time, too soon with Exact clicks's count, the clicks with the Timer off.

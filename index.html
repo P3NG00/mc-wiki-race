@@ -312,6 +312,9 @@
   .route-row { display: flex; gap: 8px; align-items: center; min-width: 0; }
   .route { position: relative; display: flex; gap: 6px; align-items: center; min-width: 0; overflow-x: auto; scrollbar-width: thin; padding: 2px; }
   .route .sep { flex: none; color: var(--muted); }
+  /* A long name (Chaos rolls titles of 60 letters) ends in … at a width the row can show beside its neighbours, the whole
+     of it the chip's tooltip. */
+  .chip .n { min-width: 0; max-width: min(18em, 40vw); overflow: hidden; text-overflow: ellipsis; }
   .chip { flex: none; display: inline-flex; gap: 6px; align-items: center; white-space: nowrap; border: 1px solid var(--line);
     border-radius: var(--radius); padding: 2px 9px; background: var(--panel); color: var(--ink); font: inherit; line-height: 1.4; }
   .chip .k { font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
@@ -2324,8 +2327,8 @@ function renderObjective() {
   if (game.rules.includes('blind') && !game.hunt) for (const s of stops) if (s.state === 'ahead' && !(s === goal && game.roundTrip)) s.name = '?';
   const short = stops.length > ROUTE_FULL, full = s => [s.k, s.name, s.sub].filter(Boolean).join(': ');
   $('#hudRoute').innerHTML = stops.map((s, i) => (i && (!game.hunt || s.goal) ? '<span class="sep" aria-hidden="true">→</span>' : '') + (s.state === 'now'
-    ? `<span class="chip now${s.goal ? ' target' : ''}"><img alt="" id="hudImg" class="hidden"><span class="k" id="hudLbl">${esc(s.k)}</span> <span class="n" id="hudGoal">${esc(s.name)}</span></span>`
-    : `<${s.state === 'done' ? `button class="chip done${short ? ' short' : ''}" title="${esc(full(s))}" aria-label="${esc('Done: ' + full(s))}"` : 'span class="chip ahead"'}>`
+    ? `<span class="chip now${s.goal ? ' target' : ''}" title="${esc(full(s))}"><img alt="" id="hudImg" class="hidden"><span class="k" id="hudLbl">${esc(s.k)}</span> <span class="n" id="hudGoal">${esc(s.name)}</span></span>`
+    : `<${s.state === 'done' ? `button class="chip done${short ? ' short' : ''}" title="${esc(full(s))}" aria-label="${esc('Done: ' + full(s))}"` : `span class="chip ahead"${s.name === '?' ? '' : ` title="${esc(full(s))}"`}`}>`
       + (s.k ? `<span class="k">${esc(s.k)}</span> ` : '') + `<span class="n">${esc(s.name)}</span>` + (s.sub ? ` <span class="sub">(${esc(s.sub)})</span>` : '')
       + `</${s.state === 'done' ? 'button' : 'span'}>`)).join('');
   const img = game.rules.includes('blind') ? '' : next?.img;

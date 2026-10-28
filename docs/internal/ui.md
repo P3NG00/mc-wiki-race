@@ -369,6 +369,7 @@ Under them is the route (`#hudRoute`): every stop as a chip, joined by arrows:
 For Scavenger the things to find, found ones ticked with what found them.
 
 A route of more than `ROUTE_FULL` (3) stops shrinks the done chips to their ✓ (their names stay in a tooltip), and a click on one opens them all (`.route.open`).
+A long name (Chaos rolls titles of 60 letters) ends in … at 18em or 40% of the window, whichever is less, so a start and a target fit the row on a wide screen; every chip's tooltip has the whole of it (`full`), but a Blind target's ?.
 The row scrolls sideways when it still doesn't fit, kept on the objective by `scrollRouteToNow` (also on resize).
 The ? button beside it is the peek: the objective's picture and description under its label and name ("Target: Zombie", or "Back to Diamond" on a round trip's way home), or Scavenger's list of what is left. Its button says "Back to the hunt" in Scavenger and "Back to the article" otherwise.
 

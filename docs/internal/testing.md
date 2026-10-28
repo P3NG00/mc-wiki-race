@@ -403,6 +403,7 @@ Exact clicks:
 - a pair with no route of exactly its count keeping Start off, the strip saying to reroll or pick another number of clicks
 - Random rolling par + 1 to 5 with each roll, and the line above the cards saying only "par + random"
 - running out losing, headed in orange, its Clicks tile all of the count
+- long names in the route ending in …, the whole of it the chip's tooltip, the start and the target fitting the row
 - Six clicks: the header counting down to the limit (on a phone, at 360 px, its numbers sharing a row with sound, Back and Give up, the items' and note block's buttons beside Hide, and back in the header on a wide screen), the target on the sixth click winning, and running out saying what was left (no target yet, something still to find on a hunt, the way back on a round trip), its Clicks tile 6 of 6
 - Share saying how a loss ended: out of clicks with the time, too soon with Exact clicks's count, the clicks with the Timer off
 - the settings under the cards headed without numbers

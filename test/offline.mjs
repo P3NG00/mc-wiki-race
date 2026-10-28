@@ -2188,7 +2188,8 @@ check('Auto is the redstone map at a phone\'s width', await until("bgStyle() ===
 await send('browsingContext.setViewport', { context: ctx, viewport: null });
 check('and the constellation again on a wide screen', await until("bgStyle() === 'constellation'"));
 // No name the background draws is under the setup screen's cards, tiles or panels, nor past the screen's edge, even in
-// part: over three seconds of the sky, its labels, pulses and markers. And with motion reduced a scroll paints it again,
+// part: over three seconds of the sky, its labels, pulses and markers, half at the top of the page and half at its foot,
+// where it is open enough that some are drawn. And with motion reduced a scroll paints it again,
 // as what covers it moved.
 await until('!!bg.sky');
 const underCards = JSON.parse(await ev(`new Promise(done => {
@@ -2202,7 +2203,8 @@ const underCards = JSON.parse(await ev(`new Promise(done => {
     if (l < 0 || l + w > bg.W || y - 10 < 0 || y > bg.H || boxes().some(r => l < r.right && r.left < l + w && y - 10 < r.bottom && r.top < y + 2)) hits.add(text);
     return real.apply(this, arguments);
   };
-  setTimeout(() => { bgCtx.fillText = real; done(JSON.stringify({ drawn, hits: [...hits] })); }, 3000);
+  setTimeout(() => scrollTo(0, document.documentElement.scrollHeight), 1500);
+  setTimeout(() => { bgCtx.fillText = real; scrollTo(0, 0); done(JSON.stringify({ drawn, hits: [...hits] })); }, 3000);
 })`));
 check('the background draws no name under the setup screen\'s cards and panels, nor past the screen\'s edge', underCards.drawn > 0 && !underCards.hits.length, JSON.stringify(underCards));
 check('and with motion reduced a scroll paints it again', await ev(`(async () => {

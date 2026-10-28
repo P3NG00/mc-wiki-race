@@ -555,7 +555,7 @@ The background:
 - the corner's buttons clear of the setup screen at 1400, 1280, 1024 and 820 px, in a row beside the title at a phone's width, and Background only's back in the corner, under the Background box
 - Auto the constellation on a wide screen and the redstone map at a phone's width
 - the sky laid out the same every time
-- no name drawn under the setup screen's cards and panels or past the screen's edge, over three seconds of the sky, and with motion reduced a scroll painting it again
+- no name drawn under the setup screen's cards and panels or past the screen's edge, over three seconds of the sky at the top of the page and at its foot, and with motion reduced a scroll painting it again
 - the facts line starting with the snapshot's pages and getting how far apart articles are on the difficulty
 - Roll by itself:
   - marking pairs of its own, in grey where the cards' markers are green and red

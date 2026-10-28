@@ -857,7 +857,7 @@ const THEMES = [...new Set(['auto', 'light', 'dark', ...Array.from(document.quer
 
   <div class="history hidden" id="history">
     <div class="history-head"><h2>Recent games</h2><button class="link" id="btnClearHistory">Clear history</button>
-      <span class="adv-side"><span class="xp small hidden" id="xpSetup"><span class="lvl"></span><span class="bar"><span class="fill"></span></span><span class="cap"></span></span>
+      <span class="adv-side"><span class="xp small hidden" id="xpSetup"><span class="lvl"></span><span class="bar"><span class="fill"></span></span><span class="cap">XP level</span></span>
       <button class="adv-btn" id="btnAdv">🏆 Advancements <span class="count mono" id="advCount"></span></button></span></div>
     <div class="history-wrap"><table><thead><tr><th>Game</th><th>Route</th><th>Result</th><th>Time</th><th>When</th></tr></thead><tbody></tbody></table></div>
   </div>
@@ -3075,14 +3075,14 @@ function xpFrames(v) {
 }
 let xpFlying = 0, xpShownLevel = null;
 const xpBar = cls => `<span class="xp ${cls}"><span class="lvl"></span><span class="bar"><span class="fill"></span></span><span class="cap"></span></span>`;
-// Every bar on the page, at the XP not still flying to it, its caption saying what it is (the result's, the XP to the
-// next level); a new level plays Minecraft's level-up and bumps the number.
+// Every bar on the page, at the XP not still flying to it, the result's captioned with the XP to the next level (the one
+// beside Advancements says XP level); a new level plays Minecraft's level-up and bumps the number.
 function drawXp() {
   const xp = Math.max(0, adv.xp - xpFlying), { L, into, need } = xpLevel(xp);
   for (const b of document.querySelectorAll('.xp')) {
     b.querySelector('.fill').style.width = into / need * 100 + '%';
     b.querySelector('.lvl').textContent = L;
-    b.querySelector('.cap').textContent = b.classList.contains('small') ? 'XP level' : `${into} / ${need} XP to level ${L + 1}`;
+    if (!b.matches('.small')) b.querySelector('.cap').textContent = `${into} / ${need} XP to level ${L + 1}`;
     b.title = `Level ${L} · ${into} / ${need} XP to level ${L + 1} · ${xp} XP in all`;
     if (xpShownLevel !== null && L > xpShownLevel) bump(b.querySelector('.lvl'));
   }

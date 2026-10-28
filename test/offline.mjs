@@ -786,6 +786,19 @@ await open('#start=Diamond&target=Zombie&rules=nonav,limit');
 await play();
 check('Six clicks counts down to the limit in the header', await ev("$('#hudClicks').textContent === '0' && $('#hudClicksK').textContent === 'of 6' && document.querySelectorAll('#hudMeter i').length === 6"),
   await ev("$('.hud .stat').textContent"));
+// On a phone held upright the header's last row holds clicks (Six clicks's dots too, at a two-digit count), par, time,
+// sound, Back and Give up on one line, the items' and note block's buttons in the path's line beside Hide; back to the
+// header on a wide screen.
+await send('browsingContext.setViewport', { context: ctx, viewport: { width: 360, height: 740 } }); await sleep(200);
+const phoneHud = await ev(`(() => {
+  $('#hudClicks').textContent = '10';
+  const top = s => $(s).getBoundingClientRect().top, row = Math.abs(top('#hudClicks') - top('#btnGiveUp')) < 30 && Math.abs(top('#hudClicks') - top('#btnSound')) < 30;
+  return JSON.stringify([row, !!$('.path #hudItems') && !!$('.path #hudNotes'), document.documentElement.scrollWidth <= innerWidth]);
+})()`);
+await send('browsingContext.setViewport', { context: ctx, viewport: null }); await sleep(200);
+check('on a phone the header\'s numbers and its buttons share a row, the items\' and note block\'s beside Hide, back in the header wide',
+  phoneHud === '[true,true,true]' && await ev("!!$('.hud .btns #hudItems') && !!$('.hud .btns #hudNotes') && $('.hud .btns').firstElementChild === $('#hudItems')"), phoneHud);
+await ev('renderHud()');
 await walk(['Diamond', ...detours.slice(0, 5), 'Zombie']);
 check('Six clicks: the target on the sixth click wins', await until('!game.active') && await ev("(r => r.won && r.clicks === 6 && !r.outOfClicks)(store.get('mwr.history', [])[0])"),
   await ev("JSON.stringify(store.get('mwr.history', [])[0])"));

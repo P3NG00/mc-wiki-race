@@ -688,21 +688,29 @@
   }
   /* The game on a phone held upright (a short screen on its side keeps the sidebar, below). */
   @media (max-width: 720px) and (min-height: 501px) {
-    /* The objective gets the header's first row; clicks, time and the buttons the second. */
-    .hud { gap: 6px 14px; padding: 8px 12px; }
+    /* The objective gets the header's first rows; clicks, par, time and the buttons share the last, a little smaller, the
+       items' and note block's in the path's line (placeHudToys). The labels wrap as one line with what's said after them
+       (the progress, Distance's hint), so those two share a line. */
+    .hud { gap: 6px 10px; padding: 8px 12px; }
     .hud .goal { flex-basis: 100%; }
-    .hud .btns { margin-left: auto; }
+    .hud-top { gap: 4px 6px; }
+    .hud-tags { display: contents; }
+    .hud .btns { margin-left: auto; gap: 6px; }
+    .hud .btns button { height: 36px; padding: 0 10px; }
     .hud .word { display: none; }   /* Back is its arrow */
     .stat .v { font-size: 17px; }
-    /* The path is one line of breadcrumbs that scrolls sideways, with Hide beside it and the credit under it. */
+    /* The path is one line of breadcrumbs that scrolls sideways, with the items', the note block's and Hide beside it and
+       the credit under it. */
     .main { grid-template-columns: 1fr; grid-template-rows: auto 1fr; }
     .path {
-      display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 4px 10px;
+      display: grid; grid-template-columns: 1fr auto auto auto; align-items: center; gap: 4px 8px;
       border-right: 0; border-bottom: 1px solid var(--line); padding: 6px 12px;
     }
     .path-head { display: contents; }
     .path h3 { display: none; }
-    .path-toggle { grid-column: 2; grid-row: 1; }
+    .path-toggle { grid-column: 4; grid-row: 1; }
+    .path .items-btn { grid-row: 1; width: 30px; height: 30px; }
+    .path .items-btn img { width: 22px; height: 22px; }
     .path-list { grid-column: 1; grid-row: 1; overflow: auto hidden; scrollbar-width: none; }
     .path-list.scrolled { mask-image: linear-gradient(to right, transparent, #000 24px); }   /* more path to the left */
     .path ol { display: flex; gap: 6px; padding: 0; list-style: none; white-space: nowrap; }
@@ -6308,6 +6316,12 @@ function setPathCollapsed(on) {
 }
 setPathCollapsed(store.get('mwr.pathCollapsed', false));
 $('#btnPath').onclick = () => setPathCollapsed(!pathCollapsed);
+// On a phone held upright the header's last row has room for clicks, par, time, sound, Back and Give up only, so the
+// items' and the note block's buttons sit in the path's line beside Hide instead (the query is the CSS's).
+const PHONE_UPRIGHT = matchMedia('(max-width: 720px) and (min-height: 501px)');
+const placeHudToys = () => PHONE_UPRIGHT.matches ? $('#btnPath').before($('#hudItems'), $('#hudNotes')) : $('.hud .btns').prepend($('#hudItems'), $('#hudNotes'));
+PHONE_UPRIGHT.addEventListener('change', placeHudToys);
+placeHudToys();
 $('.path-list').addEventListener('scroll', markPathScroll, { passive: true });
 addEventListener('resize', () => { scrollPathToEnd(); scrollRouteToNow(); });   // turning a phone switches layouts
 function setSound(on) {

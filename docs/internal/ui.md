@@ -101,7 +101,7 @@ With Distance on, a click that got closer also dings (`closer`), a step higher t
 The note block's buttons:
 
 - the round button above the items' in the setup screen's bottom-right corner (`#btnNotes`; it drops to the items' place when the background's button is hidden), or left of it in the row beside the title at 720 px and below
-- the one beside the items' in the game header (`#hudNotes`).
+- the one beside the items' in the game header (`#hudNotes`), or in the path's line on a phone held upright (`placeHudToys`).
 
 Each is the wiki's Note Block picture, or ♪ if it doesn't come.
 They open a window like a Minecraft container (`openNoteBox`, in the screen showing, `itemsRoot`), which picks what the game's clicks play, as Minecraft's note block does.
@@ -401,9 +401,9 @@ At 720 px and below:
 
 On a phone held upright (also taller than 500 px):
 
-- the game header puts the labels and the route on their own rows above clicks, time and the buttons
+- the game header puts the labels, with the progress and Distance's hint after them on one line, and the route on their own rows, above one row of clicks, par, time, sound, Back and Give up, a little smaller; the items' and the note block's buttons move into the path's line beside Hide (`placeHudToys`, by `PHONE_UPRIGHT`, and back when the screen turns), so that row fits a 360 px phone with Six clicks's dots and a two-digit count
 - Back shows only its arrow
-- the path sidebar becomes one line of breadcrumbs that scrolls sideways, kept at its newest entry by `scrollPathToEnd` (also on resize, as turning the phone switches layouts), with a faded left edge while there is more to the left (`markPathScroll`), Hide beside it and the credit under it.
+- the path sidebar becomes one line of breadcrumbs that scrolls sideways, kept at its newest entry by `scrollPathToEnd` (also on resize, as turning the phone switches layouts), with a faded left edge while there is more to the left (`markPathScroll`), the items' and note block's buttons and Hide beside it and the credit under it.
 
 Any screen 500 px tall or less, such as a phone on its side, keeps the sidebar at 160 px instead.
 

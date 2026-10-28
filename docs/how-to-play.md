@@ -106,7 +106,7 @@ The **Spin-offs** row does the same for Dungeons, Dungeons II, Legends, Earth, S
 
 The header shows the game and its rules as labels, with how far along you are ("1 of 2 checkpoints reached", "Found 1 of 3", "On the way there", "On the way back"), and under Exact clicks a reminder to land on the target with your last click, not before. Under them is your route: stops done (✓), the one you're heading for, and those ahead (dashed). The **?** button shows the description of what you're looking for, and reaching a checkpoint or a find shows a banner naming what comes next.
 
-On the right are your **Clicks** ("of 6" under Six clicks, "of exactly 7" under Exact clicks, with a dot a click), **Par**, **Time**, the items and note block buttons, sound, **← Back** and **Give up**. **Your path** runs down the side; **Hide** folds it away. On a phone held upright it becomes one line of breadcrumbs.
+On the right are your **Clicks** ("of 6" under Six clicks, "of exactly 7" under Exact clicks, with a dot a click), **Par**, **Time**, the items and note block buttons, sound, **← Back** and **Give up**. **Your path** runs down the side; **Hide** folds it away. On a phone held upright it becomes one line of breadcrumbs, with the items and note block buttons beside **Hide**, leaving the header's last row to the numbers, sound, Back and Give up.
 
 ## Links in the article
 

@@ -1777,7 +1777,8 @@ const red = (x, y) => `(d => d[0] > 200 && d[1] < 60)(fxCtx.getImageData(${x} * 
 await ev("fx.parts = [{ x: 100, y: 400, vx: 0, vy: 0, g: 0, size: 8, color: '#ff0000', born: performance.now(), life: 5000, ...fxOn({ on: 'page' }) }]; fx.last = performance.now(); fx.raf ||= requestAnimationFrame(fxFrame); scrollTo(0, 300)");
 await ev("new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)))");
 check('and a spark on it as well', await ev(`${red(100, 300)} && !${red(100, 400)}`));
-await ev("fx.parts = []; holdItem('bed'); $('.hold').onclick({ clientX: 400, clientY: 300 }); dropItem(); $('.thing.bed').click()");
+// The TNT above is taken away first: the bed's blast would light it, and it would go off just as Rebuild's second is up.
+await ev("for (const t of [...items.things]) removeThing(t); fx.parts = []; holdItem('bed'); $('.hold').onclick({ clientX: 400, clientY: 300 }); dropItem(); $('.thing.bed').click()");
 check('as a blast\'s are', await ev("fx.parts.length > 0 && fx.parts.every(p => p.on === 'page' && p.at.y === 300)"));
 await ev("$('#btnRebuild').click()");
 await until("!items.broken && !document.querySelector('#setup [data-broke-style]')", 4000);

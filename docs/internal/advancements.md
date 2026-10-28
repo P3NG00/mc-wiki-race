@@ -88,7 +88,7 @@ Adding one is an entry there and its check; it is earned from then on.
 
 ### When and where
 
-- While playing they sit under the game header, so Back and Give up stay clear, and wait while an article loads (`frameReady` pumps them once it shows).
+- While playing they sit under the game header, so Back and Give up stay clear, and under the game's banner while one shows (a checkpoint, a find, a page with no way on), which spans a phone's width, those already up moving down for one that comes after them, and wait while an article loads (`frameReady` pumps them once it shows).
 - A game's end shows its own `ADV_AFTER_RESULT` (1.2 s) after the result opens, once its fanfare has played, over the result.
 - They slide in from the right, and with Reduce motion fade in instead.
 - Above the effects' canvas and the result window, they take no clicks.

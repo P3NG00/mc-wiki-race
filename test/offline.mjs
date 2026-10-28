@@ -1876,6 +1876,14 @@ await play();
 await ev("navigate('Cake', null)");
 check('landing on Cake earns its secret, its toast once the article shows', await until("!game.loading && !!adv.got.cake && $('#advToasts').textContent.includes('The Cake Is Real')"),
   await ev("$('#advToasts').textContent"));
+check('in a game the toasts sit under the header, and under the game\'s banner while one shows, one already up moving down', await ev(`(() => {
+  advQueue.push('cake'); advPump();
+  const host = $('#advToasts'), plain = host.getBoundingClientRect().top > $('.hud').getBoundingClientRect().bottom;
+  showToast('A banner'); advPump();
+  const t = $('#toast'), under = host.getBoundingClientRect().top > $('.viewer').getBoundingClientRect().top + t.offsetTop + t.offsetHeight;
+  hideToast();
+  return plain && under;
+})()`));
 await ev("navigate('Diamond', null)");
 check('and clicking back to the start, without Back, Full Circle', await until('!game.loading && !!adv.got.fullCircle'));
 await ev('finish(false); closeModal(); toSetup()');

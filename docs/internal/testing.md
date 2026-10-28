@@ -263,6 +263,7 @@ The advancements:
 - the arrivals counted
 - no skill one for the same pair again or a par 1 pair
 - Cake and Full Circle on arrival with the toast once the article shows
+- in a game the toasts under the header, and under the game's banner while one shows, one already up moving down for it
 - a personal best: none noted on a pair's first win, a win in fewer clicks noted as a new best earning Self-Improvement with Recent games' Best tag moving to it, and a win in more saying the best, which keeps the tag
 - the button's count
 - the panel's tiles, gold and ??? ones

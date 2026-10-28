@@ -3159,8 +3159,8 @@ async function advFinish(rec, first, newBest, dailyFirst) {
 }
 
 // The toasts: up to ADV_SHOWN at once, each for ADV_MS, the rest waiting; one sound for those shown together, the
-// highest tier's. While playing they sit under the game header, clear of Back and Give up, and wait for an article
-// that is loading (frameReady shows them).
+// highest tier's. While playing they sit under the game header, clear of Back and Give up, and under the game's banner
+// while one shows (a phone's spans the width), and wait for an article that is loading (frameReady shows them).
 const ADV_SHOWN = 3, ADV_MS = 5000;
 function advPump() {
   if (game.active && game.loading) return;
@@ -3175,9 +3175,12 @@ function advPump() {
     if (a.tier === 'challenge') challenge = el;
     setTimeout(() => { el.classList.add('out'); setTimeout(() => { el.remove(); advPump(); }, 350); }, ADV_MS);
   }
+  // Placed again at every pump, new toasts or not, as frameReady's comes after a navigation's banner. The banner by where
+  // it settles, not where its sliding in has it now.
+  const playing = !$('#game').classList.contains('hidden') && $('#modalBg').classList.contains('hidden'), banner = $('#toast');
+  const bannerBottom = banner.classList.contains('hidden') ? 0 : $('.viewer').getBoundingClientRect().top + banner.offsetTop + banner.offsetHeight;
+  host.style.top = playing ? Math.max($('.hud').getBoundingClientRect().bottom, bannerBottom) + 12 + 'px' : '';
   if (!tiers.length) return;
-  const playing = !$('#game').classList.contains('hidden') && $('#modalBg').classList.contains('hidden');
-  host.style.top = playing ? $('.hud').getBoundingClientRect().bottom + 12 + 'px' : '';
   play(ADV_TIERS[['challenge', 'goal', 'task'].find(t => tiers.includes(t))].sound);
   if (challenge) effect('challenge', { x: middleOf(host).x, y: middleOf(challenge).y });   // where the toasts sit, as it slides in
   advPictures();

@@ -30,12 +30,12 @@ The setup screen puts playing first.
 - Random game (`#btnRandom`, `randomGame`):
   - every setting under the cards at random, each on its own, every box a coin flip and every choice as likely as the others, then `reroll('all')`
   - Sound, Timer, Theme and the background's settings stay as they are, but Roll by itself, which any change turns off.
-- Then, below a divider (`.game-settings`), the steps:
-  - 1 · Choose a game:
+- Then, below a divider (`.game-settings`), the settings of the game, under headings without numbers, since none has to be set before Start:
+  - Choose a game:
     - the tiles, `GAMES`, a radio group named `game`, read by `gameMode()`, each its name and diagram, its line (`blurb`, or with Round trip its `trip`'s) its tooltip, since the strip says the picked game
     - the strip under them, `#gameHelp` plus the picked game's own options, `.game-opt`: the checkpoint count, What to find, and Exact clicks's clicks over par, `#exactExtra`, with its count beside it, `#exactInfo`, filled by `updateSetupPar`.
-  - 2 · Extra rules (`EXTRA_RULES`, boxes in `#rules`, Round trip first), each saying its rule in a line (`RULES[k].blurb`, so the boxes stay short), the whole of it their tooltip (`help`).
-  - 3 · Articles and difficulty (`#settings`, always shown): the pool, the difficulty, the target's topic and par, Content and Spin-offs.
+  - Extra rules (`EXTRA_RULES`, boxes in `#rules`, Round trip first), each saying its rule in a line (`RULES[k].blurb`, so the boxes stay short), the whole of it their tooltip (`help`).
+  - Articles and difficulty (`#settings`, always shown): the pool, the difficulty, the target's topic and par, Content and Spin-offs.
 
 On a phone the cards lose their minimum height and show two lines of description, so Start game fits on the first screen.
 

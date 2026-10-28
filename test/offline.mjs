@@ -817,6 +817,9 @@ check('Share says how a loss ended: out of clicks with the time, too soon with E
   { outOfClicks: true, clicks: 6, ms: 83000 }, { tooSoon: true, exact: 5, clicks: 3, ms: 12000 }, { clicks: 4, ms: undefined }]
   .map(x => shareText({ ...r, won: false, par: undefined, outOfClicks: undefined, tooSoon: undefined, ...x }, '#').split('\\n').find(l => l.startsWith('❌'))).join('|'))(store.get('mwr.history', [])[0])`)
   === '❌ Out of clicks after 1:23|❌ Too soon after 3 of 5 clicks, 0:12|❌ Gave up after 4 clicks');
+// The settings under the cards are headed without numbers, since none has to be set before Start.
+check('the settings under the cards are headed without numbers', await ev("[...document.querySelectorAll('.game-settings .step')].map(h => h.textContent).join('|')")
+  === 'Choose a game|Extra rules (most combine)|Articles and difficulty');
 // Each extra rule's box says it in a line, the whole of it the box's tooltip, so the boxes stay short.
 check('the extra rules\' boxes say each in a line, the whole of it their tooltip', await ev(`EXTRA_RULES.every(k => (l => l.title === RULES[k].help
   && $('[data-desc=' + k + ']', l).textContent === (offWhy(k, chosenRules()) ?? RULES[k].blurb) && RULES[k].blurb.length <= 50)($('input.rule[value=' + k + ']').closest('label')))`));

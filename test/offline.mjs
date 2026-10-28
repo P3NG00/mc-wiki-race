@@ -109,14 +109,18 @@ const play = async () => {
   await ev("document.querySelector('#btnPlay').click()");
   return until('game.active && game.path.length === 1 && !game.loading');
 };
-// Opens a link and plays its route, each title after the start by a click, to the last arrival.
+// Plays a route, each title after the start by a click, to the last arrival or the game's end.
+const walk = async route => {
+  for (const t of route.slice(1)) {
+    await ev(`navigate(${JSON.stringify(t)}, null)`);
+    await until(`game.path.at(-1).title === ${JSON.stringify(t)} && !game.loading || !game.active`);
+  }
+};
+// Opens a link and plays its route.
 const playRoute = async (hash, route) => {
   await open(hash);
   await play();
-  for (const t of route.slice(1)) {
-    await ev(`navigate(${JSON.stringify(t)}, null)`);
-    await until(`game.path.at(-1).title === ${JSON.stringify(t)} && !game.loading`);
-  }
+  await walk(route);
 };
 
 // Links by difficulty. A challenge link without rules is Relaxed: everything but other namespaces and the left-out pages
@@ -1216,7 +1220,7 @@ check('another difficulty leaves the daily', await ev("setup.daily === null && d
 
 // The daily streak and stats, from mwr.dailies: only days won on their day make a streak, which lasts until today's is
 // due, and anything finish wouldn't write is left out.
-const ago = k => `(d => (d.setDate(d.getDate() - ${k}), dateKey(d)))(new Date())`;
+const ago = k => `(d => (d.setDate(d.getDate() - (${k})), dateKey(d)))(new Date())`;
 await ev(`(() => {
   const win = { won: true, onDay: true, clicks: 3, ms: 60000 }, all = {};
   for (const k of [1, 2, 3, 5, 6, 7, 8, 9]) all[${ago('k')}] = win;
@@ -1247,13 +1251,46 @@ check('a loss after a win keeps the win, and a missed day ends a streak', await 
   return dailyStreaks(savedDailies()).now === 4 && dailyStreaks(a).now === 0 && dailyStreaks(a).best === 1 && dailyStatsText(a) === 'Streak over · Best 1 · Won 1 of 1 day'
     && dailyStreaks(b).now === 0 && dailyStatsText({}) === '';
 })()`));
-// A daily played to the end is recorded for its day, a loss as played.
-await ev("localStorage.removeItem('mwr.dailies')");
+// A daily played to the end is recorded for its day, a loss as played, and earns Daily Bread.
+await ev("localStorage.removeItem('mwr.dailies'); for (const k of ['daily', 'habit', 'weekStreak', 'devoted']) delete adv.got[k]; saveAdv()");
 await open('#daily');
 await play();
 await ev("finish(false); closeModal(); toSetup()");
 check('giving up a daily keeps its day as played', await ev("JSON.stringify(savedDailies()) === JSON.stringify({ [today()]: { won: false, onDay: false } })"), await ev("JSON.stringify(savedDailies())"));
 check('the daily box counts it', await ev("document.querySelector('#dailyStats').textContent === 'Won 0 of 1 day'"), await ev("document.querySelector('#dailyStats').textContent"));
+check('and playing one earns Daily Bread', await until('!!adv.got.daily', 3000));
+// A daily won, whatever its rule, by its par route (Exact clicks's of its count). Yesterday's, won today, is kept as won
+// but not on its day, mending no streak, and Past dailies marks it won later. Today's, after a loss on it and with
+// yesterday and the day before won on theirs, joins the streak, earning Habit, and the daily box says it's done; its
+// first win gives 10 XP, and winning it again none. Streaks of 7 and 30 earn Week Streak and Devoted.
+const winDaily = async hash => {
+  await open(hash);
+  await play();
+  await walk(JSON.parse(await ev('(game.exact ? Promise.resolve(game.exact) : game.parReady).then(r => JSON.stringify(r))')));
+  return await until('!game.active') && await ev('savedGames()[0].won') && await until("!!document.querySelector('#mXp:not(.hidden) .total')", 5000);
+};
+const dailyXp = "$('#mXp').textContent.includes('The daily, won for the first time+10')", wonOnDay = '{ won: true, onDay: true, clicks: 2 }';
+const yesterday = await ev(ago(1));
+await ev(`store.set('mwr.dailies', { ...savedDailies(), [${ago(2)}]: ${wonOnDay} })`);
+check('yesterday\'s daily won today is kept as won, not on its day, mending no streak', await winDaily('#daily=' + yesterday)
+  && await ev(`(d => d.won && !d.onDay && dailyStreaks(savedDailies()).now === 0)(savedDailies()['${yesterday}'])`), await ev(`JSON.stringify(savedDailies()['${yesterday}'])`));
+await ev(`closeModal(); toSetup(); openCalendar('${yesterday}'.slice(0, 7))`);
+check('and Past dailies marks it won later', await ev(`(b => b.classList.contains('won') && b.title.endsWith(', won later'))(document.querySelector('#modal [data-day="${yesterday}"]'))`),
+  await ev(`document.querySelector('#modal [data-day="${yesterday}"]')?.outerHTML`));
+await ev(`closeModal(); store.set('mwr.dailies', { ...savedDailies(), '${yesterday}': ${wonOnDay} })`);
+check('today\'s daily won joins the streak, after a loss on it, its first win giving 10 XP', await winDaily('#daily')
+  && await ev(`(d => d.won && d.onDay && d.clicks === savedGames()[0].clicks && dailyStreaks(savedDailies()).now === 3)(savedDailies()[today()]) && ${dailyXp}`),
+  await ev("JSON.stringify(savedDailies()[today()]) + ' ' + $('#mXp').textContent"));
+check('three days in a row earn Habit', await until('!!adv.got.habit && !adv.got.weekStreak', 3000));
+await ev('closeModal(); toSetup()');
+check('the daily box says it\'s done, in how many clicks, and the streak', await ev(`$('#dailyDone').textContent === '· done in ' + wonText(savedDailies()[today()], true)
+  && $('#dailyStats').textContent === '🔥 3-day streak · Won 3 of 3 days'`), await ev("$('#dailyDone').textContent + ' ' + $('#dailyStats').textContent"));
+check('winning it again gives no daily XP', await winDaily('#daily') && await ev(`!${dailyXp}`), await ev("$('#mXp').textContent"));
+await ev('closeModal(); toSetup()');
+await ev(`store.set('mwr.dailies', { ...savedDailies(), ...Object.fromEntries([3, 4, 5, 6].map(k => [${ago('k')}, ${wonOnDay}])) }); advEarn({})`);
+check('seven days in a row earn Week Streak', await ev('!!adv.got.weekStreak && !adv.got.devoted'), await ev('dailyStreaks(savedDailies()).now'));
+await ev(`store.set('mwr.dailies', { ...savedDailies(), ...Object.fromEntries(Array.from({ length: 23 }, (_, i) => [${ago('i + 7')}, ${wonOnDay}])) }); advEarn({})`);
+check('and thirty Devoted', await ev('!!adv.got.devoted && dailyStreaks(savedDailies()).now === 30'), await ev('dailyStreaks(savedDailies()).now'));
 // Past dailies: this month, today marked, later days off, back to DAILY_FIRST's month and no further, a day loading its
 // daily in place of a challenge link's cards.
 await ev(`localStorage.setItem('mwr.dailies', JSON.stringify({ [${ago(1)}]: { won: true, onDay: true, clicks: 2 }, [today()]: { won: false, onDay: false } }))`);
@@ -1889,10 +1926,7 @@ await ev('closeModal(); toSetup()');
 await open('#start=Diamond&kind=Nether%20mobs&kind=Enchantments&kind=Potions&rules=scavenger');
 const kindsRoute = JSON.parse(await ev('cardsRoute([setup.start.title], rules(), setup.kinds).then(r => JSON.stringify(r))'));
 await play();
-for (const t of kindsRoute.slice(1)) {
-  await ev(`navigate(${JSON.stringify(t)}, null)`);
-  await until(`game.path.at(-1).title === ${JSON.stringify(t)} && !game.loading || !game.active`);
-}
+await walk(kindsRoute);
 check('a hunt of kinds earns Treasure Hunter and Kind Collector', await until(`!game.active && ${got(['treasure', 'kinds'])}`, 5000), `${kindsRoute.join(' → ')} ${await ev(earnedKeys)}`);
 await ev('closeModal(); toSetup()');
 const joke = await ev("[...ARTICLES].find(([, a]) => a.fams.includes('joke'))[0]");

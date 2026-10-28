@@ -196,7 +196,7 @@ Rolls in every pool:
 
 - An article that fails to load mid-game: Cancel keeping the page you were on with the clock going again and Give up on, and Retry, once the wiki answers, loading it
 - An article whose frame never says it's ready (the ready message dropped, the 15 s wait shortened) loading with the clock held and Give up off until then, then going on with both and no stuck banner
-- Give up asking first, saying the time is paused, which it is; Keep going going on with the clock running; Give up ending the game given up; and without the Timer saying nothing of time
+- Give up asking first, saying the time is paused, which it is; Keep going going on with the clock running; Give up ending the game given up, its Clicks tile the clicks it took; and without the Timer saying nothing of time
 - A link redirecting to the target winning, its title seen as the target's
 - A win headed You made it!, with the shortest route and its par
 - A live link pressed with the mouse being asked for at the press and its click taking that request (one pressed and let go elsewhere asked for once, its later click asking no more)
@@ -390,7 +390,7 @@ Exact clicks:
 - the header's count, shown only by the clicks, with the rule beside the labels and the target's chip saying just Target
 - Back gone
 - visited pages dead, titled as already visited
-- the target too soon losing as Too soon
+- the target too soon losing as Too soon, its Clicks tile the clicks of the count
 - the history giving a loss's clicks of the count, and par
 - on the count winning with no golf score and its path counted with no click marked as getting no closer
 - the history marking the win as the pair's best, played Today; a game from yesterday saying Yesterday, and one before that its day
@@ -401,8 +401,8 @@ Exact clicks:
 - par + 4 and par + 2 being two games for personal bests
 - a pair with no route of exactly its count keeping Start off, the strip saying to reroll or pick another number of clicks
 - Random rolling par + 1 to 5 with each roll, and the line above the cards saying only "par + random"
-- running out losing, headed in orange
-- Six clicks: the header counting down to the limit, the target on the sixth click winning, and running out saying what was left (no target yet, something still to find on a hunt, the way back on a round trip)
+- running out losing, headed in orange, its Clicks tile all of the count
+- Six clicks: the header counting down to the limit, the target on the sixth click winning, and running out saying what was left (no target yet, something still to find on a hunt, the way back on a round trip), its Clicks tile 6 of 6
 - Share saying how a loss ended: out of clicks with the time, too soon with Exact clicks's count, the clicks with the Timer off
 - Six clicks and Round trip greyed out with the reason and left out even if ticked, and back with another game
 - a link with several games' rules playing Exact clicks only

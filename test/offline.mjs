@@ -206,8 +206,8 @@ await ev("$('#gKeep').click()");
 await sleep(300);
 check('Keep going goes on, the clock running', await ev(`game.active && $('#modalBg').classList.contains('hidden') && now() > ${askedAt} + 200`));
 await ev("$('#btnGiveUp').click(); $('#gQuit').click()");
-check('and Give up ends the game given up', await ev("!game.active && (r => !r.won && !Object.keys(LOSSES).some(k => r[k]))(savedGames()[0]) && $('.result-head h2').textContent === 'You gave up'"),
-  await ev("$('.result-head h2').textContent"));
+check('and Give up ends the game given up, with the clicks it took', await ev("!game.active && (r => !r.won && !Object.keys(LOSSES).some(k => r[k]) && $('#mClicks').textContent === String(r.clicks))(savedGames()[0]) && $('.result-head h2').textContent === 'You gave up'"),
+  await ev("$('.result-head h2').textContent + ' ' + $('#mClicks').textContent"));
 await ev("closeModal(); toSetup(); $('#timerToggle').click()");
 await play();
 await ev("$('#btnGiveUp').click()");
@@ -698,7 +698,8 @@ check('visited pages are dead links, saying why', rtLinks['/w/Crafting'] === fal
   && await ev("document.querySelector('a[href=\"/w/Crafting\"]').title === 'Off limits: already visited (Exact clicks)'", await frameCtx()), JSON.stringify(rtLinks));
 await ev("navigate('Zombie', null)");
 check('reaching the target sooner loses: Too soon', await until('!game.active') && await ev(`(r => r.tooSoon && !r.won && r.exact === ${n})(store.get('mwr.history', [])[0])
-  && document.querySelector('#modal h2').textContent === 'Too soon' && document.querySelector('#modal').textContent.includes('it had to be exactly ${n}')`));
+  && document.querySelector('#modal h2').textContent === 'Too soon' && document.querySelector('#modal').textContent.includes('it had to be exactly ${n}')
+  && $('#mClicks').textContent === store.get('mwr.history', [])[0].clicks + ' of ${n}'`));
 await ev("closeModal(); toSetup()");
 check('the history says too soon, under the game\'s label', await ev("document.querySelector('#history tbody tr .res.lost').textContent === '✗ Too soon' && document.querySelector('#history tbody tr .tag.game').textContent === 'Exact clicks'"));
 check('with the clicks of its count and par', await ev("(r => document.querySelector('#history tbody tr .h-result .note').textContent === `${r.clicks} of exactly ${r.exact} · par ${r.par}`)(savedGames()[0])"),
@@ -765,7 +766,7 @@ for (const [i, t] of wander.entries()) {
   await ev(`navigate(${JSON.stringify(t)}, null)`);
   await until(`game.path.length === ${i + 2} && !game.loading || !game.active`);
 }
-check('running out loses: Out of clicks, headed in orange as Recent games marks a loss', await until('!game.active') && await ev(`store.get('mwr.history', [])[0].outOfClicks === true && document.querySelector('#modal h2').textContent === 'Out of clicks'
+check('running out loses: Out of clicks, headed in orange as Recent games marks a loss, the clicks all of the count', await until('!game.active') && await ev(`store.get('mwr.history', [])[0].outOfClicks === true && document.querySelector('#modal h2').textContent === 'Out of clicks' && $('#mClicks').textContent === '${n} of ${n}'
   && (probe => (document.body.append(probe), probe.style.color = 'var(--warm)', (c => (probe.remove(), c))(getComputedStyle(probe).color)))(document.createElement('i')) === getComputedStyle(document.querySelector('#modal h2')).color`));
 await ev("closeModal(); toSetup()");
 // Six clicks: the target on the sixth click wins; running out says what was left: no target yet, something still to find
@@ -784,11 +785,11 @@ const outReasons = [];
 for (const hash of ['#start=Diamond&target=Zombie&rules=nonav,limit', '#start=Diamond&kind=Hostile%20mobs&kind=Enchantments&kind=Potions&rules=nonav,scavenger,limit',
   '#start=Diamond&target=Zombie&rules=nonav,roundtrip,limit']) {
   await playRoute(hash, ['Diamond', ...detours]);
-  outReasons.push(await until('!game.active') && await ev("document.querySelector('#modal .reason')?.textContent"));
+  outReasons.push(await until('!game.active') && await ev("document.querySelector('#modal .reason')?.textContent + ' ' + $('#mClicks').textContent"));
   await ev('closeModal(); toSetup()');
 }
-check('running out says what was left: the target, something to find, or the way back', outReasons.join('|')
-  === 'All 6 clicks used, and no target yet.|All 6 clicks used, with something still to find.|All 6 clicks used, and not back at Diamond yet.', outReasons.join(' | '));
+check('running out says what was left: the target, something to find, or the way back, the clicks 6 of 6', outReasons.join('|')
+  === 'All 6 clicks used, and no target yet. 6 of 6|All 6 clicks used, with something still to find. 6 of 6|All 6 clicks used, and not back at Diamond yet. 6 of 6', outReasons.join(' | '));
 check('Share says how a loss ended: out of clicks with the time, too soon with Exact clicks\'s count, the clicks with the Timer off', await ev(`(r => [
   { outOfClicks: true, clicks: 6, ms: 83000 }, { tooSoon: true, exact: 5, clicks: 3, ms: 12000 }, { clicks: 4, ms: undefined }]
   .map(x => shareText({ ...r, won: false, par: undefined, outOfClicks: undefined, tooSoon: undefined, ...x }, '#').split('\\n').find(l => l.startsWith('❌'))).join('|'))(store.get('mwr.history', [])[0])`)

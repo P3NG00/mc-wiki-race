@@ -47,7 +47,7 @@ The result also shows one shortest route. `showPar` fills, once it knows, unless
 The result window (`finish`, `.result`) goes:
 1. the outcome as the heading (a loss orange, with its reason under it, and giving up grey, as Recent games marks them) and the golf score beside it;
 2. the game and its extra rules as labels, like the header's, with a daily's day (`shortDate`), the route and the settings the labels don't say;
-3. four tiles (clicks, or "2 of 4" for Exact clicks, par, time, time per click);
+3. four tiles (clicks, or for a loss under Six clicks or Exact clicks the clicks of the count, "6 of 6" or "2 of 4"; par, time, time per click);
 4. the personal best (a green bar when it is a new one);
 5. your path;
 6. the missed shortcut, with the shortest route beside it;

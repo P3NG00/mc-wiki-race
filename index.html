@@ -5413,7 +5413,7 @@ function finish(won, lost = null) {
     <div class="result-game">${tags.map((t, i) => `<span class="tag${i ? '' : ' game'}">${esc(t)}</span>`).join('')}
       <p class="note">${rec.daily ? `Daily ${esc(shortDate(localDay(rec.daily)))}: ` : ''}${esc(route)}${otherSettings ? ' · ' + esc(otherSettings) : ''}</p></div>
     <div class="tiles${game.timed ? '' : ' untimed'}">
-      <div class="tile"><div class="v mono">${won ? rec.clicks : game.exact ? `${rec.clicks} of ${game.limit}` : '—'}</div><div class="k">Clicks</div></div>
+      <div class="tile"><div class="v mono" id="mClicks">${won || !game.limit ? rec.clicks : `${rec.clicks} of ${game.limit}`}</div><div class="k">Clicks</div></div>
       <div class="tile"><div class="v mono" id="mPar">${rec.par ?? '…'}</div><div class="k">Par</div></div>
       ${game.timed ? `<div class="tile"><div class="v mono">${fmtTime(ms)}</div><div class="k">Time</div></div>
       <div class="tile"><div class="v mono">${rec.clicks ? fmtTime(ms / rec.clicks) : '–'}</div><div class="k">Per click</div></div>` : ''}

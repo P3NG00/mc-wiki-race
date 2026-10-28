@@ -359,7 +359,7 @@ A round trip:
 - reaching the target clearing Back and showing the banner
 - the way there dead, titled as part of the way there, with other links live
 - Back working again on the way back
-- the peek on the way back headed "Back to Diamond"
+- the peek on the way back headed "Back to Diamond", a click beside it or Escape closing it, the clock running
 - the win recorded by its cards
 - a target with no way back saying so
 - with a checkpoint still to come on the way back, no way on to it

@@ -503,7 +503,13 @@ check('Back works again on the way back', await ev("!document.querySelector('#bt
 await ev("document.querySelector('#btnPeek').click()");
 check('the peek on the way back is headed Back to the start, with no colon', await ev("document.querySelector('#modal h2').textContent === 'Back to Diamond'"),
   await ev("document.querySelector('#modal h2')?.textContent"));
-await ev('closeModal()');
+// A glance: a click beside it, or Escape, closes it as its button does, and the clock never stops for it.
+const peekedAt = await ev('now()');
+await ev("$('#modalBg').dispatchEvent(new MouseEvent('click', { bubbles: true }))");
+const besideCloses = await ev("$('#modalBg').classList.contains('hidden')");
+await ev("$('#btnPeek').click(); document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))");
+await sleep(200);
+check('a click beside the peek or Escape closes it, the clock running', besideCloses && await ev(`$('#modalBg').classList.contains('hidden') && now() > ${peekedAt} + 100`));
 await ev("navigate('Diamond', null)");
 check('back at the start wins, recorded by its cards', await until('!game.active') && await ev(`(r => r.won && r.goal === 'Zombie' && !r.vias && !r.back
   && r.rules.join() === 'roundtrip')(store.get('mwr.history', [])[0]) && document.querySelector('#modal').textContent.includes('Diamond → Zombie → Diamond')`));

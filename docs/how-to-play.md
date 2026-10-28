@@ -126,7 +126,7 @@ Back returns to the previous article and counts as a click. The clock pauses whi
 
 The result window opens with "🎉 You made it!" (or "🎉 You found them all!"), or "Out of clicks", "Too soon" or "You gave up". Under it are your game's labels, then tiles for **Clicks**, **Par**, **Time** and **Per click** (just the first two with the Timer off), your personal best, the XP the game earned, your path and the shortest route.
 
-Beside each page of your path is the fewest clicks from it to what was next; in red, a click that got no closer. For Exact clicks the route column shows one way in exactly your count instead. The buttons are **Share**, **Copy challenge link**, **Play again** and **New game**.
+Beside each page of your path is the fewest clicks from it to what was next; in red, a click that got no closer. For Exact clicks the route column shows one way in exactly your count instead. The buttons are **Share**, **Copy challenge link**, **Same cards again** (the same game from the start) and **New game** (back to the setup screen with new cards).
 
 ## Par and golf scores
 

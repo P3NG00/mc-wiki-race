@@ -556,7 +556,7 @@ The background:
 - the corner's buttons clear of the setup screen at 1400, 1280, 1024 and 820 px, in a row beside the title at a phone's width, and Background only's back in the corner, under the Background box
 - Auto the constellation on a wide screen and the redstone map at a phone's width
 - the sky laid out the same every time
-- no name drawn under the setup screen's cards and panels or past the screen's edge, over fifteen frames at the top of the page and fifteen at its foot, and with motion reduced a scroll painting it again
+- no name drawn under the setup screen's cards and panels or past the screen's edge, every 150 px down the page, and with motion reduced a scroll painting it again
 - the facts line starting with the snapshot's pages and getting how far apart articles are on the difficulty
 - Roll by itself:
   - marking pairs of its own, in grey where the cards' markers are green and red
@@ -622,6 +622,7 @@ The setup screen holding still:
 - The path sidebar collapsing (the credit stays, the article widens, remembered across a reload) and expanding
 - Back served from the parse cache, asking for nothing
 - Escape pressed in the article keeping the result open
+- the result's buttons Share, Copy challenge link, Same cards again and New game, the last two saying what they start
 - The No Back rule: in the challenge link, Back hidden and `goBack` doing nothing, in the result and the record, and kept out of the personal best of games without it
 - The request limit: ten pages asked for at once, with no more than `API_CONCURRENCY` in flight
 - The Rules row leaving the difficulty's rules to the Difficulty row, Normal by default

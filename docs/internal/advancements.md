@@ -40,8 +40,8 @@ Adding one is an entry there and its check; it is earned from then on.
 - *As a game ends* (`advFinish`, from `finish`, given whether the pair had a game in the history before (`recordKey`, any rules) and whether it is a new personal best):
   - a win counts (`wins`),
   - then `advFinish` waits for par (`game.parReady`, if the record doesn't have it yet) and every arrival's count (`measured`).
-  - What it needs of the game it reads before waiting, since Play again can start another game in the meantime.
-  - Skill ones need a win at par `ADV_PAR` (3) or more the first time that game is played, so a typed easy pair or Play again doesn't earn them, and speed ones the Timer too:
+  - What it needs of the game it reads before waiting, since Same cards again can start another game in the meantime.
+  - Skill ones need a win at par `ADV_PAR` (3) or more the first time that game is played, so a typed easy pair or Same cards again doesn't earn them, and speed ones the Timer too:
     - Par for the Course (at par),
     - Birdie (under par, which only a live edit making a route the offline copy lacks can do),
     - Hardcore (`nohubs`, so Hard),
@@ -150,7 +150,7 @@ XP is kept with the advancements (`adv.xp`), so Clear history leaves it and Rese
 
 ### A game's XP
 
-A game collects its XP as it goes (`game.xp`, each `[what, xp, an advancement's]`, captured by `advFinish` before it waits, so Play again can't take it).
+A game collects its XP as it goes (`game.xp`, each `[what, xp, an advancement's]`, captured by `advFinish` before it waits, so Same cards again can't take it).
 
 `advFinish` adds the game's own once par is in and shows it (`showXp`): in the result, under the tiles, what earned it (the game's first, then its advancements), its total and the bar. Outside a game an advancement's XP goes straight to the bar.
 

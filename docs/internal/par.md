@@ -14,7 +14,7 @@ Par is the fewest clicks for a pair, going by the snapshot.
 - The search can hold the page up for a moment, a round trip's or Scavenger's most, so `setupPar` first shows `Par …` with a spinner (`.working`) and waits for the page to be drawn (`painted`).
   - Of the runs started meanwhile (a change of rules renders every card) only the last one searches.
 - `startGame` works it out for the game (`game.parReady`, then `game.par`, for the header), taking the route the setup screen has just found.
-  - `cardsRoute` keeps its last search by everything it went by (`lastRoute`), so Start and Play again don't search again, and drops one that fails.
+  - `cardsRoute` keeps its last search by everything it went by (`lastRoute`), so Start and Same cards again don't search again, and drops one that fails.
 - Both show par in every game, so a player knows the score to aim for from the start; only Blind target holds it until the game starts.
 
 ### Golf scores
@@ -51,7 +51,7 @@ The result window (`finish`, `.result`) goes:
 4. the personal best (a green bar when it is a new one);
 5. your path;
 6. the missed shortcut, with the shortest route beside it;
-7. then Share, Copy challenge link, Play again and New game.
+7. then Share, Copy challenge link, Same cards again and New game.
 
 ### Your path
 
@@ -79,7 +79,7 @@ Then, folded away under "Show a shortcut you missed" (`#mShortcut`, a `<details>
 
 Beside it, the shortest route (for Exact clicks, a route of its count).
 
-Then Share, Copy challenge link, Play again and New game.
+Then Share, Copy challenge link, Same cards again and New game.
 
 ### Share and the challenge link
 

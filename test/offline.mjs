@@ -2192,8 +2192,8 @@ check('Auto is the redstone map at a phone\'s width', await until("bgStyle() ===
 await send('browsingContext.setViewport', { context: ctx, viewport: null });
 check('and the constellation again on a wide screen', await until("bgStyle() === 'constellation'"));
 // No name the background draws is under the setup screen's cards, tiles or panels, nor past the screen's edge, even in
-// part: its labels, pulses and markers over fifteen frames at the top of the page and fifteen at its foot, where it is
-// open enough that some are drawn. And with motion reduced a scroll paints it again, as what covers it moved.
+// part: its labels, pulses and markers every 150 px down the page, past the gaps between sections, where some are drawn.
+// And with motion reduced a scroll paints it again, as what covers it moved.
 await until('!!bg.sky');
 const underCards = JSON.parse(await ev(`(async () => {
   const boxes = () => [...document.querySelectorAll('.daily-box, .card, .games label, .game-help, .extras label, .settings')].map(el => el.getBoundingClientRect()).filter(r => r.width);
@@ -2205,10 +2205,11 @@ const underCards = JSON.parse(await ev(`(async () => {
     if (l < 0 || l + w > bg.W || y - 10 < 0 || y > bg.H || boxes().some(r => l < r.right && r.left < l + w && y - 10 < r.bottom && r.top < y + 2)) hits.add(text);
     return real.apply(this, arguments);
   };
-  // Painted here, a frame every 100 ms, so the check doesn't hang on the background's own frames coming.
-  for (const y of [0, document.documentElement.scrollHeight]) {
+  // Painted here, three frames every 150 px down the page, so the check doesn't hang on the background's own frames
+  // coming, and goes past the gaps between sections, where names have room.
+  for (let y = 0; y < document.documentElement.scrollHeight; y += 150) {
     scrollTo(0, y);
-    for (let i = 0; i < 15; i++) { bgPaint(bgNow()); await new Promise(r => setTimeout(r, 100)); }
+    for (let i = 0; i < 3; i++) { bgPaint(bgNow()); await new Promise(r => setTimeout(r, 60)); }
   }
   bgCtx.fillText = real; scrollTo(0, 0);
   return JSON.stringify({ drawn, hits: [...hits], style: bgStyle(), live: bgLive(), calm: calm(), covers: bg.covers.length, W: bg.W, H: bg.H });
@@ -2382,6 +2383,8 @@ await until("!game.active && !$('#modalBg').classList.contains('hidden')");
 await ev("document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))", await frameCtx());
 await sleep(300);
 check('Escape in the article keeps the result open', await ev("!$('#modalBg').classList.contains('hidden')"));
+check('its buttons say what the last two start: the same cards again, or new ones', await ev(`[...document.querySelectorAll('.result .actions button')].map(b => b.textContent).join('|') === 'Share|Copy challenge link|Same cards again|New game'
+  && $('#mSame').title === 'Play these cards again with the same rules, from the start' && $('#mNew').title === 'Back to the setup screen with new cards'`));
 // No Back: in the challenge link, no Back button and goBack() doing nothing, and in the record and the result. The
 // 3-click win above, without the rule, isn't this pair's best (this 2-click one would otherwise be a new best).
 await ev("$('#rules input[value=noback]').click()");

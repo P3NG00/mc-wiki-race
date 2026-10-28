@@ -75,7 +75,7 @@ flowchart LR
 Every request to the wiki's MediaWiki API goes through `api()`. It adds `origin=*`, keeps at most four requests in flight with the rest queued in order (MediaWiki asks clients not to send many at once), and times each out after 30 seconds. Most requests are `pageInfo`, for a card's description, picture and redirects, or `action=parse`, for an article's HTML. The rest look up the addresses of the wiki's pictures and sounds once each, when first needed.
 Nothing polls: every request comes from something the player did.
 
-The parse cache keeps up to 40 titles (an article is kept under both the requested and the resolved title) and at most 10 million characters, so Back and Play again don't fetch again. The API marks parse replies uncacheable, so the browser's own cache can't do this.
+The parse cache keeps up to 40 titles (an article is kept under both the requested and the resolved title) and at most 10 million characters, so Back and Same cards again don't fetch again. The API marks parse replies uncacheable, so the browser's own cache can't do this.
 When a link is pressed with a mouse or pen, the frame says so and the article is asked for at once, a little before the click arrives.
 
 Details: [internal/rendering.md](internal/rendering.md#api-access), [internal/rules.md](internal/rules.md#the-parse-cache)

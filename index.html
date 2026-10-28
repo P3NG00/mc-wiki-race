@@ -1454,8 +1454,8 @@ async function setupPar() {
 }
 
 // A shortest route for the cards' titles, in cardKeys order, and Scavenger's kinds if it has them, under rules, with
-// back of the checkpoints after the target. The last search is kept by all it went by (lastRoute), so Start and Play again
-// take the route the setup screen has just found rather than searching again; one that fails isn't kept.
+// back of the checkpoints after the target. The last search is kept by all it went by (lastRoute), so Start and Same
+// cards again take the route the setup screen has just found rather than searching again; one that fails isn't kept.
 let lastRoute = { key: null, route: null };
 function cardsRoute(titles, rules, kinds = null, back = 0) {
   const content = contentInPlay(titles), key = JSON.stringify([titles, rules, kinds, back, content]);
@@ -2351,7 +2351,7 @@ function startGame() {
   navigate(game.start.title, null);
 }
 
-// Parse results by requested and resolved title, so Back and Play again don't refetch.
+// Parse results by requested and resolved title, so Back and Same cards again don't refetch.
 // The API marks parse responses uncacheable, so the browser cache doesn't help here. Cleared on return to setup. At most
 // PARSE_CACHE_MAX titles, and PARSE_CACHE_TEXT characters of articles in all (a long one is over a million, so 40 could
 // hold tens of megabytes on a phone), the oldest going first, but never the page just cached.
@@ -2928,7 +2928,7 @@ function cheer(entry) {
 // wins, articles visited, the different articles visited (pages, by title, so a new snapshot keeps them), the topics
 // seen, the blasts that broke the page (see Items) and the note block's instruments heard (see Note block). They are checked as a page arrives (advArrive), as a game ends (advFinish) and as Distance cheers (cheer). Skill
 // and speed ones need par ADV_PAR or more and the pair's first game, none of it in the history before, so a typed easy
-// pair or Play again doesn't earn them; speed ones also need the Timer.
+// pair or Same cards again doesn't earn them; speed ones also need the Timer.
 const ADV_PAR = 3;
 const ADV_TIERS = {
   task: { label: 'Task', title: 'Advancement Made!', sound: 'checkpoint' },
@@ -3136,8 +3136,8 @@ function advArrive(title, back) {
   } catch { /* no advancement */ }
 }
 // A game's end, from finish, with whether it was the pair's first game and a new personal best. What it needs of the
-// game is read before the first await, since Play again may start another; par and the arrivals' counts are waited
-// for. Its toasts come once the result's fanfare has played (ADV_AFTER_RESULT).
+// game is read before the first await, since Same cards again may start another; par and the arrivals' counts are
+// waited for. Its toasts come once the result's fanfare has played (ADV_AFTER_RESULT).
 const ADV_AFTER_RESULT = 1200;
 async function advFinish(rec, first, newBest, dailyFirst) {
   const at = performance.now() + ADV_AFTER_RESULT, path = game.path, parReady = game.parReady, rules = game.rules, has = k => rules.includes(k);
@@ -5447,8 +5447,8 @@ function finish(won, lost = null) {
     <div class="actions">
       <button id="mShare" title="Copy your result and a link to play this game">Share</button>
       <button id="mLink" title="Copy a link that opens this exact game">Copy challenge link</button>
-      <button id="mSame">Play again</button>
-      <button class="primary" id="mNew">New game</button>
+      <button id="mSame" title="Play these cards again with the same rules, from the start">Same cards again</button>
+      <button class="primary" id="mNew" title="Back to the setup screen with new cards">New game</button>
     </div>
     <div class="copy-by-hand hidden" id="mCopyBox"><p class="note">Couldn’t copy, so copy it from here:</p><textarea readonly id="mCopyText" aria-label="Text to copy"></textarea></div></div>`, false);
   if (won) effect(newBest ? 'best' : 'win', { ...middleOf($('.result-head h2')), daily: dailyFirst });

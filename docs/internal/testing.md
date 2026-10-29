@@ -77,6 +77,7 @@ What it checks, by area:
 - On Beacon:
   - Beacon's layered blueprint (choosing a layer hides the ones above it)
   - calculator placeholders being hidden
+  - the wiki's calculator gadget running: the breaking-time options showing, their Haste label a live link, a time following the Haste slider, and the link going to Haste (after the speaker, since it leaves the page)
   - a speaker in its Sounds table playing and stopping (with a real click, since the browser only plays sound after one)
 - Folding boxes on Bastion Remnant:
   - its File structure and a table of block links starting folded with `[show]`
@@ -101,7 +102,7 @@ The test starts by asking the wiki itself for what its checks take from live pag
   - Blaze Rod to Blaze
 - Diamond's link counts, Tutorial links, navboxes and text links to hubs and the Crafting hub
 - Pickaxe's crafting output slot, a crafting slot linking Diamond and infobox tabs
-- Beacon's layered blueprint, calculator and sounds
+- Beacon's layered blueprint, calculators (both kinds) and sounds
 - Bastion Remnant's folded File structure, folded table of links, open `mw-collapsible` table and folded navbox groups
 - Icons.png's image map
 - Minecraft Dungeons' and Dungeons:Creeper's Dungeons links
@@ -137,6 +138,8 @@ It also fails, as its last check, on any wait that ran out, naming the lines tha
 - Stylesheets come back empty and images fail, and so do the articles a check names (`failParse`), as with no connection.
 - The articles a check names in `faultReplies` get its made-up error reply instead, as from a wiki in trouble.
 - A made-up redirect, Crafting recipe, leads to Crafting (`REDIRECTS`).
+- One made-up article, Breaking Table (`CALC_PAGE`), has a calculator: a field, a row of options hidden until the gadget runs with a link in its label, and what stands in for it without JavaScript.
+- jQuery and the calculator gadget come back as stand-ins (`CALC_SCRIPTS`) that do what the real ones would on it, unless a check makes them fail (`failCalc`).
 - Page info marks a title ending in "(disambiguation)" as a disambiguation page, as the wiki's does.
 
 It checks the game's own logic, by area:
@@ -647,6 +650,7 @@ The setup screen holding still:
 - A host-page theme (added by a BiDi preload script) listed and becoming the default
 - Challenge links carrying awkward titles (`&`, `+`, `?`, `%`, `/`, `:`, quotes, accents) intact through the sealed link, a load of it and the frame's link reading
 - The wiki failing, by made-up replies (`faultReplies`): Cancel on a start that didn't load going back to the setup screen, and an HTTP error, a MediaWiki error, a reply that isn't JSON and one with no article each offering Retry with the clock stopped, Retry loading the article
+- The wiki's calculator gadget on Breaking Table: jQuery and then the gadget loaded, the gadget given the page's content, title and namespace and Codex's styles once it asks; once it has run, the options showing with a live link that goes to its article and the stand-in for no JavaScript gone; a page without calculators loading neither; and with them failing, the options hidden and the stand-in showing
 - Leaving the page asking first during a game and not after it (Start pressed with a real click, since browsers only ask after one; BiDi accepts the dialog and reports it as `browsingContext.userPromptOpened`)
 
 ### Requests

@@ -73,7 +73,7 @@ If your server sends a Content-Security-Policy, it has to allow:
 | `font-src` | `https://minecraft.wiki` |
 | `media-src` | `https://minecraft.wiki` (sounds played in an article) |
 | `base-uri` | `https://minecraft.wiki` (the article frame sets its base there) |
-| `script-src` | inline scripts, and your own origin for the data files |
+| `script-src` | inline scripts, your own origin for the data files, and `https://minecraft.wiki/load.php` (the wiki's calculator script, run in articles with calculators: that address only, since anyone can put a script elsewhere on a wiki) |
 
 The article frame is filled from the page itself, so it inherits the page's policy.
 

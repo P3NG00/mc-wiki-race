@@ -42,6 +42,12 @@ NAVBOX = ('<table class="navbox hlist collapsible"><tr><td><a href="Creeper">Cre
 # An advancement's list of what it asks for, folded, with divs inside it, and a link after it that is the page's again.
 REQUIRED = ('<table class="wikitable"><tr><td>Kill one of these: <div class="collapsible collapsed"><div class="hlist searchaux">'
             '<ul><li><div class="nowrap"><a href="Creeper">Creeper</a></div></li></ul></div></div> <a href="Breaking">after it</a></td></tr></table>')
+# What a page hides and what it shows. The breaking-time calculator's options (a hidden row the wiki's calculator gadget
+# shows, which the game's frame runs) count, but not a cell inside them hidden on its own, nor what stands in for the
+# gadget without JavaScript, nor a block editors hid, nor a hidden image, which has no end tag, so the links after it count.
+HIDDEN = ('<table class="wikitable"><tr><td>0.1</td></tr><tr class="calculatorgadget-enabled" style="display:none"><th><a href="Haste">Haste</a></th>'
+          '<td style="display: none"><div><a href="Creeper">Creeper</a></div></td></tr></table><span class="calculatorgadget-fallback"><a href="Block">x</a></span>'
+          '<div style="display:none"><div><a href="Creeper">x</a></div></div><img style="display:none" src="x.png">')
 # A navbox both its pages carry, each showing itself as plain text, as mwoffliner does: build.py stores it once.
 family = lambda own: '<table class="navbox"><tr><td>' + ' '.join(
     f'<b>{t}</b>' if t == own else f'<a href="{t.replace(" ", "_")}">{t}</a>' for t in ('Charcoal', 'Iron Ingot')) + '</td></tr></table>'
@@ -50,8 +56,9 @@ PAGES = {
                    '<a href="Tutorial%3AMining">tutorial</a>, <a href="#Obtaining">same page</a>, '
                    '<a href="https://example.com/">external</a>, <a class="new" href="Nope">red link</a>, '
                    '<a href="Diamond">itself</a>, <a href="Village_%26_Pillage">encoded</a>, <a href="Village_&amp;_Pillage">escaped</a></p>'
-                   '<div class="mw-heading mw-heading2"><h2 id="Obtaining">Obtaining</h2></div>'
-                   '<map><area href="Breaking" shape="rect"></map>' + REQUIRED + NAVBOX, ['Items'], ['Pages with sound tables']),
+                   '<span style="display:none"><a href="Block">hidden above the heading</a></span>'
+                   '<div class="mw-heading mw-heading2"><h2 id="Obtaining">Obtaining</h2></div>' +
+                   HIDDEN + '<map><area href="Breaking" shape="rect"></map>' + REQUIRED + NAVBOX, ['Items'], ['Pages with sound tables']),
     'Diamond Pickaxe': (0, '<a href="Diamond">diamond</a> <a href="Block">block</a>', ['Items', 'Tools']),
     'Creeper': (0, '<a href="Diamond">diamond</a> <a href="Dungeons%3ACreeper">in Dungeons</a> <a href="1.0">a version</a>',
                 ['Hostile mobs', 'Entities']),
@@ -143,10 +150,10 @@ with tempfile.TemporaryDirectory() as tmp:
 
     snap = Snapshot(snap_path)
     d = snap.pages['Diamond']
-    check('links outside navboxes, image maps included, the page header left out',
-          d['body'] == ['Breaking', 'Diamond', 'Diamond Pickaxe', 'Iron ingot', 'Tutorial:Mining', 'Village & Pillage'], d['body'])
+    check('links outside navboxes, image maps and what the calculator gadget shows included, the page header and what the page hides left out',
+          d['body'] == ['Breaking', 'Diamond', 'Diamond Pickaxe', 'Haste', 'Iron ingot', 'Tutorial:Mining', 'Village & Pillage'], d['body'])
     check('links in navboxes, nested tables included, and in a requirement list up to its end', d['nav'] == ['Block', 'Creeper', 'Diamond Pickaxe'], d['nav'])
-    check('links above the first heading, outside navboxes, or the whole page with no heading',
+    check('links above the first heading, outside navboxes and not hidden, or the whole page with no heading',
           d['lead'] == ['Diamond', 'Diamond Pickaxe', 'Iron ingot', 'Tutorial:Mining', 'Village & Pillage']
           and snap.pages['Iron Ingot']['lead'] == ['Diamond'], (d['lead'], snap.pages['Iron Ingot']['lead']))
     check('visible categories only', d['cats'] == ['Items'], d['cats'])

@@ -257,6 +257,16 @@ const aboveHidden = await until(`/^vvh+$/.test(${layers})`, 3000, f);
 check('blueprint layers can be chosen', allShown && aboveHidden && await ev('game.path.length === 1'), `${layersBefore} -> ${await ev(layers, f)}`);
 // A calculator only says it is loading without the wiki's script, so it is hidden.
 check('calculator placeholders are hidden', await ev("(c => c.length > 0 && c.every(e => !e.offsetHeight))([...document.querySelectorAll('.mcw-calc')])", f));
+// The wiki's calculator gadget, its own script from the wiki: Beacon's breaking-time table gets its options, Efficiency
+// and Haste sliders whose labels are links the snapshot counts, and the times follow the sliders.
+const calcRan = await until("document.documentElement.classList.contains('mwr-calc')", 20000, f);
+const hasteLink = "[...document.querySelectorAll('.calculatorgadget-enabled a.mwr-live')].find(a => a.getAttribute('href') === '/w/Haste')";
+const breakTime = "document.querySelector('.breakingrow-breakingtime-value')?.textContent";
+const calcBefore = JSON.parse(await ev(`JSON.stringify((a => ({ link: !!a && a.checkVisibility(), sliders: a?.closest('tr').querySelectorAll('input[type=range]').length ?? 0, time: ${breakTime} }))(${hasteLink}))`, f));
+await ev(`(r => { r.value = 2; r.dispatchEvent(new Event('input', { bubbles: true })); r.dispatchEvent(new Event('change', { bubbles: true })); })(${hasteLink}.closest('tr').querySelector('input[type=range]'))`, f);
+const calcAfter = await until(`${breakTime} !== ${JSON.stringify(calcBefore.time)}`, 3000, f);
+check('the calculator gadget runs: the breaking-time options show, their labels live links, and the times follow the sliders',
+  calcRan && calcBefore.link && calcBefore.sliders === 1 && calcAfter, `${JSON.stringify(calcBefore)} -> ${await ev(breakTime, f)}`);
 // The sound gadget: a speaker plays its sound when clicked and stops it when clicked again, and that isn't a click. A real
 // click, since the browser only lets a page play sound after one.
 const sound = "document.querySelector('.sound')";
@@ -270,6 +280,8 @@ await ev(`${sound}.click()`, f);
 const stopped = await until(`!${sound}.classList.contains('sound-playing') && ${sound}.querySelector('audio').paused && ${sound}.title === 'Click to play'`, 5000, f);
 check('a speaker plays its sound and stops it', speaker === 'true,true,Click to play' && playing && stopped && await ev('game.path.length === 1'),
   `${speaker} playing=${playing} stopped=${stopped}`);
+await ev(`${hasteLink}.click()`, f);
+check('an option\'s link goes to its article', await until("game.path.length === 2 && game.path.at(-1).title === 'Haste' && !game.loading"), await ev("game.path.map(p => p.title).join(' > ')"));
 
 // The wiki's folding boxes fold as on the wiki: Bastion Remnant's File structure and the tables of its parts' blocks start
 // folded with a [show] toggle, its sortable tables start open with a [hide] button, and so do its navboxes, with groups

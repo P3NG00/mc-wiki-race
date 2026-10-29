@@ -1058,6 +1058,12 @@ const WIKI_STYLES = [
   // body.wgl-theme-dark, so it is always loaded and switching the article's theme is a body class change.
   'wgl.theme.dark',
 ].map(m => `${WIKI}/load.php?lang=en&modules=${encodeURIComponent(m)}&only=styles&skin=vector`);
+// The wiki's calculator gadget, which the article frame runs on a page with calculators: jQuery and then the gadget, each
+// as the wiki serves it, and the Codex styles the gadget asks for when it draws a field as a Codex one.
+const WIKI_CALC = {
+  scripts: ['jquery', 'ext.gadget.simplecalc'].map(m => `${WIKI}/load.php?lang=en&modules=${m}&only=scripts&raw=1`),
+  codex: `${WIKI}/load.php?lang=en&modules=codex-styles&only=styles&skin=vector`,
+};
 
 const $ = (sel, root = document) => root.querySelector(sel);
 const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -4795,6 +4801,32 @@ function renderArticle(page, fragment, token, { dead = [], hubs = [] } = {}, see
         sound.title = 'Click to play';
       });
     }
+    // The wiki's calculator gadget (MediaWiki:Gadget-simplecalc.js), the wiki's own script, on a page with calculators as
+    // its loader does: each .calculator-field becomes an input, or a figure its formula keeps up to date, and what only
+    // works with it shows, such as the options under a breaking-time table, whose Efficiency and Haste labels are links
+    // the snapshot counts. The frame stands in for what it uses of MediaWiki beside jQuery. Its styles apply once the
+    // wiki's scripts have run (.client-js), so here once it has run (.mwr-calc). If it can't load or fails, what needs it
+    // stays hidden, as on the wiki with JavaScript off.
+    if (document.querySelector('#mw-content-text .calculator-field')) {
+      const CALC = ${js(WIKI_CALC)}, onContent = [];
+      let codex = false;
+      window.mw = {
+        hook: name => ({ add: fn => { if (name === 'wikipage.content') onContent.push(fn); } }),
+        config: { get: k => ({ wgTitle: ${js(page.title)}, wgNamespaceNumber: 0, wgContentLanguage: 'en' })[k] ?? null },
+        track() {},
+        loader: { load(m) {
+          if (m !== '@wikimedia/codex' || codex) return;
+          codex = true;
+          document.head.append(Object.assign(document.createElement('link'), { rel: 'stylesheet', href: CALC.codex }));
+        } },
+      };
+      const load = src => new Promise((done, fail) => document.head.append(Object.assign(document.createElement('script'), { src, onload: done, onerror: fail })));
+      // An error in the gadget isn't caught, so the suites see it.
+      CALC.scripts.reduce((p, src) => p.then(() => load(src)), Promise.resolve()).then(() => {
+        for (const fn of onContent) fn($('#mw-content-text'));
+        if (onContent.length) document.documentElement.classList.add('mwr-calc');
+      }, () => {});
+    }
     // The wiki's Minecraft-style tooltips (MediaWiki:Common.js), in place of the browser's. Hovering a .minetip or an
     // inventory slot's item shows its data-minetip-title, or else its title, or else the title of the deepest element at
     // its start, in Minecraft's tooltip, with the game's formatting codes (&e yellow, &l bold, &#rrggbb…), and its
@@ -4967,6 +4999,10 @@ ${WIKI_STYLES.map(h => `<link rel="stylesheet" href="${esc(h)}">`).join('\n')}
   .sound-audio { display: none; }
   .sound-audio:has(.mw-broken-media) { display: inline; }
   .sound-title::after { content: ''; display: inline-block; width: 1.143em; height: 1.143em; margin-left: .286em; vertical-align: text-top; }
+  /* The calculator gadget's (ext.gadget.simplecalc), once it has run: what only works with it shows, and what stands in
+     for it without JavaScript goes. */
+  html.mwr-calc .calculatorgadget-enabled { display: revert !important; }
+  html.mwr-calc .calculatorgadget-fallback { display: none; }
   ${noNav ? '.navbox, .mw-heading:has(> #Navigation) { display: none !important; }' : ''}
 </style>
 </head><body class="mediawiki ltr sitedir-ltr ns-0 ns-subject skin-vector skin-vector-legacy action-view ${WGL_THEME_CLASSES[dark ? 'dark' : 'light'].join(' ')}">

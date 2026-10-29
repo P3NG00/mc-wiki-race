@@ -35,7 +35,7 @@ Links are split into:
   - the page's own title is added to each, since a navbox shows the page it is on as plain text, so every copy of a navbox has the same titles
   - `Snapshot` derives `nav`, their union, from them.
 
-Links are taken from the parser output only, and resolved against the page's own path as a browser would, since a subpage links to `../Diamond`.
+Links are taken from the parser output only, leaving out what the page hides (below), and resolved against the page's own path as a browser would, since a subpage links to `../Diamond`.
 
 Redirects include mwoffliner's forwarding pages for redirects to a section.
 
@@ -45,6 +45,16 @@ A requirement list ("Kill one of these 41 monsters", "Eat each of these foods", 
 
 - Before, it made 39% of mob pairs and 41% of world pairs one click apart on Normal, through a link nobody would think to unfold (17% and 14% after).
 - Only those lists: `searchaux` alone also marks hatnotes and message boxes, which are the article's.
+
+#### What a page hides
+
+`drop_hidden` leaves out what nobody sees in the game's article frame, so can't click, and all inside it:
+
+- An element with `style="display:none"`, such as the crafting tables of dye recipes hidden in a `div` on 11 pages (Wool, Bed, Bundle, a guide), hidden on the wiki too.
+- But not one the wiki's calculator gadget shows (`.calculatorgadget-enabled`), since the frame runs it (see [rendering.md](rendering.md#calculators)). Most are the options under a breaking-time table, on about 545 block pages of the 2026-08 snapshot: their Efficiency and Haste labels put Haste one click from those blocks (Coarse Dirt to Haste is par 1), and 545 of the 578 articles linking Haste link it only there.
+- And what the gadget hides (`.calculatorgadget-fallback`, on 2 pages, none holding a link).
+
+The frame and this rule go together: in v1.0.0 the frame ran no gadget, so Coarse Dirt to Haste was par 1 through a link nobody could see.
 
 ### build.py
 

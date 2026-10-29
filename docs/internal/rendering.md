@@ -150,7 +150,21 @@ The frame script also runs the wiki's Minecraft-style tooltips (from MediaWiki:C
 
 ### Calculators
 
-The wiki's calculators (`.mcw-calc`) are hidden: its script replaces each with an iframe, and without it they only say they are loading.
+The wiki has two kinds.
+
+Its calculator gadget (`ext.gadget.simplecalc`, MediaWiki:Gadget-simplecalc.js) runs in the frame: the wiki's own script, not a copy, the one script of the wiki's the frame loads.
+- On a page with a `.calculator-field` (839 articles of the 2026-08 snapshot: every breaking-time table, and mob damage, food, item stacks, the Calculators/ pages), the frame script loads `jquery` and then the gadget from `load.php` (`WIKI_CALC`, `only=scripts&raw=1`), as the wiki's own loader for it does.
+- The gadget turns each field into an input, or a figure its formula keeps up to date.
+- The frame stands in for what it uses of MediaWiki beside jQuery:
+  - `mw.hook('wikipage.content')`, fired with `#mw-content-text` as MediaWiki does
+  - `mw.config.get`: `wgTitle`, `wgNamespaceNumber`, `wgContentLanguage`
+  - `mw.track`, which does nothing
+  - `mw.loader.load('@wikimedia/codex')`, which adds the `codex-styles` stylesheet, once.
+- Its styles show `.calculatorgadget-enabled` and hide `.calculatorgadget-fallback` under `html.client-js`, which the frame can't set (it would change the folding boxes), so the frame's styles do the same under `html.mwr-calc`, set once the gadget has run. Until then, and for good if it can't load or fails, they stay as on the wiki with JavaScript off.
+- What it shows holds links: the options under a breaking-time table are labelled Efficiency and Haste, links the snapshot counts (see [wiki-data.md](wiki-data.md#what-a-page-hides)). Without the gadget, par would count links nobody can click.
+- It runs with the article, in the sandboxed frame, so it can't reach the game's storage, but like the frame script it could post the page messages. A host's Content-Security-Policy has to allow scripts from the wiki for it (see [hosting.md](../hosting.md#content-security-policy)).
+
+The tools calculators (`.mcw-calc`) are hidden: their loader replaces each with an iframe from tools.minecraft.wiki, and without it they only say they are loading. None holds a link.
 
 ### Light and dark theme
 

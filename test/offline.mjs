@@ -27,7 +27,14 @@ const escHtml = s => s.replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>'
 // Hubs Only, which isn't in the snapshot, links only two hubs (as Bee Our Guest does on the wiki), so on Hard nothing on
 // it works.
 const HUBS_ONLY = 'Hubs Only';
-const ARTICLE = title => title === HUBS_ONLY
+// A made-up article with a calculator, as the wiki's calculator gadget finds one: a field its formula fills, a row of
+// options hidden until the gadget runs (its label a link, drawn as a Codex one), and what stands in for it without
+// JavaScript.
+const CALC_PAGE = 'Breaking Table';
+const CALC_ARTICLE = `<div class="mw-parser-output"><p>A calculator.</p><table class="wikitable"><tr><td><span class="calculator-field" data-calculator-type="plain" data-calculator-formula="1+1">0</span></td></tr>
+  <tr class="calculatorgadget-enabled" style="display:none"><th><span class="calculator-field-label cdx-label__label"><a href="/w/Sharpness">Sharpness</a></span></th></tr></table>
+  <p class="calculatorgadget-fallback">Needs JavaScript.</p></div>`;
+const ARTICLE = title => title === CALC_PAGE ? CALC_ARTICLE : title === HUBS_ONLY
   ? `<div class="mw-parser-output"><p>${HUBS.slice(0, 2).map(h => `<a href="/w/${encodeURIComponent(h.replace(/ /g, '_'))}">${escHtml(h)}</a>`).join(' and ')}.</p></div>` : `<div class="mw-parser-output"><p>${escHtml(title)}: <a href="/w/Diamond_Pickaxe">pickaxe</a> <a href="/w/Block">Block</a>
   <a href="/w/Blocks">Blocks</a> <a href="/w/Crafting">Crafting</a> <a href="/w/Tutorial:Mining">tutorial</a> <a href="/w/Dungeons:Creeper">dungeons</a>
   <a href="/w/Java_Edition_version_history">versions</a> <a href="/w/Pocket_Edition_version_history">old versions</a>
@@ -43,11 +50,38 @@ const failParse = new Set();   // articles whose requests fail, as with no conne
 const faultReplies = new Map();   // articles answered with [status, body] in place of the article, as a wiki in trouble can
 const REDIRECTS = { 'Crafting recipe': 'Crafting' };   // titles a parse follows to another article, as the wiki's redirects do
 const LIVE_CATEGORIES = { 'Brand New Mob': ['Nether_mobs', 'Verify'], Chicken: ['Nether_mobs', 'Passive_mobs'] };
+// The calculator gadget and jQuery as the wiki would send them, here stand-ins: just enough jQuery for the gadget's
+// $content, and a gadget that does as the real one would on CALC_PAGE (fills the field, turns the label into a <label>
+// with its link inside, asks for Codex for it) and notes what MediaWiki's stand-in told it.
+const CALC_SCRIPTS = {
+  jquery: 'window.jQuery = window.$ = s => [...document.querySelectorAll(s)];',
+  'ext.gadget.simplecalc': `mw.hook('wikipage.content').add($content => {
+    const root = $content[0];
+    for (const f of root.querySelectorAll('.calculator-field')) f.textContent = '2';
+    for (const l of root.querySelectorAll('.calculator-field-label')) {
+      const label = document.createElement('label');
+      label.append(...l.childNodes);
+      l.replaceWith(label);
+      mw.loader.load('@wikimedia/codex');
+    }
+    window.calcSeen = [mw.config.get('wgTitle'), mw.config.get('wgNamespaceNumber'), root.id].join();
+  });`,
+};
+const calcLoads = [];   // the calculator's scripts and the Codex styles, in the order asked for
+let failCalc = false;   // whether they fail, as with no connection
 const reply = (request, body, type = 'application/json', statusCode = 200) => send('network.provideResponse', { request, statusCode, body: { type: 'string', value: body },
   headers: [['Access-Control-Allow-Origin', '*'], ['Content-Type', type]].map(([name, value]) => ({ name, value: { type: 'string', value } })) });
 function answer(request, url) {
   const u = new URL(url), p = u.searchParams;
-  if (u.pathname === '/load.php') return reply(request, '', 'text/css');
+  if (u.pathname === '/load.php' && p.get('only') === 'scripts') {
+    calcLoads.push(p.get('modules'));
+    if (failCalc) return send('network.failRequest', { request });
+    return reply(request, CALC_SCRIPTS[p.get('modules')] ?? '', 'text/javascript');
+  }
+  if (u.pathname === '/load.php') {
+    if (p.get('modules') === 'codex-styles') calcLoads.push('codex-styles');
+    return reply(request, '', 'text/css');
+  }
   if (u.pathname !== '/api.php') return send('network.failRequest', { request });   // images
   const kind = [p.get('action'), ...['list', 'generator', 'prop'].filter(k => p.has(k)).map(k => `${k}=${p.get(k)}`)].join(' ');
   requests.set(kind, (requests.get(kind) || 0) + 1);
@@ -122,7 +156,7 @@ const SNAPSHOT_FACTS = {
   'Blaze is a hostile and a flying mob, Sharpness an enchantment, Potion of Swiftness a potion': "KIND_MEMBERS.get('Hostile mobs')?.has('Blaze') && KIND_MEMBERS.get('Flying mobs')?.has('Blaze') && KIND_MEMBERS.get('Enchantments')?.has('Sharpness') && KIND_MEMBERS.get('Potions')?.has('Potion of Swiftness')",
   'Chicken is left out of Nether mobs': "KINDS['Nether mobs']?.exclude.includes('Chicken')",
   'Java Edition version history, Pocket Edition version history (a redirect to one) and Closed captions are left out': "['Java Edition version history', 'Pocket Edition version history', 'Closed captions'].every(t => LEFT_OUT.has(t) && !ARTICLES.has(t))",
-  'the made-up pages aren’t in it': `![${JSON.stringify(HUBS_ONLY)}, 'Brand New Mob'].some(t => ARTICLES.has(t))`,
+  'the made-up pages aren’t in it': `![${JSON.stringify(HUBS_ONLY)}, ${JSON.stringify(CALC_PAGE)}, 'Brand New Mob'].some(t => ARTICLES.has(t))`,
 };
 const factsOff = [];
 for (const [fact, expr] of Object.entries(SNAPSHOT_FACTS)) if (await ev(expr) !== true) factsOff.push(fact);
@@ -2685,6 +2719,39 @@ for (const [kind, fault, title, message] of [['HTTP 500', [500, 'oops'], 'Fault 
   check(`${kind} offers Retry with the clock stopped, and Retry loads the article`, offered && said.includes(message) && stopped
     && await until(`game.path.length === ${steps + 1} && game.path.at(-1).title === ${JSON.stringify(title)} && !game.loading`), said);
 }
+await ev('finish(false); closeModal(); toSetup()');
+
+// The wiki's calculator gadget runs in the article on a page with calculators: jQuery and then the gadget, as the wiki
+// sends them, with MediaWiki's hook, config and loader stood in for. Once it has run, the options it needs show, their
+// link live, and the stand-in for it without JavaScript goes. A page without calculators loads neither, and if they
+// can't load, what needs them stays hidden.
+await open('#start=Diamond&target=Crafting');
+await play();
+await ev(`navigate(${JSON.stringify(CALC_PAGE)}, null)`);
+await until(`game.path.at(-1).title === ${JSON.stringify(CALC_PAGE)} && !game.loading`);
+let f = await frameCtx();
+const calcRan = await until("document.documentElement.classList.contains('mwr-calc')", 5000, f);
+const calcState = `JSON.stringify((a => ({ field: document.querySelector('.calculator-field').textContent, row: document.querySelector('tr.calculatorgadget-enabled').checkVisibility(),
+  link: a.checkVisibility() && a.classList.contains('mwr-live') && a.parentElement.tagName === 'LABEL', fallback: document.querySelector('.calculatorgadget-fallback').checkVisibility(),
+  seen: window.calcSeen ?? null }))(document.querySelector('a[href="/w/Sharpness"]')))`;
+const calcShown = JSON.parse(await ev(calcState, f));
+check('a page with calculators runs the wiki\'s gadget: jQuery, then the gadget, which gets the page\'s content, title and namespace, and Codex\'s styles once it asks',
+  calcRan && JSON.stringify(calcLoads) === '["jquery","ext.gadget.simplecalc","codex-styles"]' && calcShown.seen === `${CALC_PAGE},0,mw-content-text` && calcShown.field === '2',
+  JSON.stringify({ calcLoads, ...calcShown }));
+check('once it has run, the options it needs show, their link live, and what stands in for it without JavaScript goes', calcShown.row && calcShown.link && !calcShown.fallback,
+  JSON.stringify(calcShown));
+await ev("document.querySelector('a[href=\"/w/Sharpness\"]').click()", f);
+check('the options\' link goes to its article', await until("game.path.at(-1).title === 'Sharpness' && !game.loading"), await ev("game.path.map(p => p.title).join(' > ')"));
+check('a page without calculators loads neither', calcLoads.length === 3 && !await ev("document.documentElement.classList.contains('mwr-calc')", await frameCtx()), JSON.stringify(calcLoads));
+failCalc = true;
+await ev(`navigate(${JSON.stringify(CALC_PAGE)}, null)`);
+await until(`game.path.at(-1).title === ${JSON.stringify(CALC_PAGE)} && !game.loading`);
+f = await frameCtx();
+await sleep(800);   // the failed requests' moment
+const calcFailed = JSON.parse(await ev(calcState, f));
+check('if they can\'t load, what needs them stays hidden, and what stands in for them shows', !calcFailed.row && !calcFailed.link && calcFailed.fallback
+  && !await ev("document.documentElement.classList.contains('mwr-calc')", f), JSON.stringify(calcFailed));
+failCalc = false;
 await ev('finish(false); closeModal(); toSetup()');
 
 // Leaving the page during a game asks first, and after the game it doesn't. Browsers only ask once the page has had a

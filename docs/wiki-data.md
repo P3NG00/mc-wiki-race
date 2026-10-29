@@ -58,7 +58,7 @@ Then run each one with `.venv/bin/python -I tools/wikidata/<script>`.
 
 | File | What it does |
 |---|---|
-| `extract.py <zim>` | Scans the ZIM (about a minute) into an extract, `tools/wikidata/cache/<name>.jsonl.gz`: each page's namespace, categories and links, split into the article's own, those above its first heading, and each navbox's. It also lists every redirect. The cache is ignored by git. |
+| `extract.py <zim>` | Scans the ZIM (about a minute) into an extract, `tools/wikidata/cache/<name>.jsonl.gz`: each page's namespace, categories and links (not those the page hides, which nobody can click, but those the wiki's calculator script shows, which the game runs), split into the article's own, those above its first heading, and each navbox's. It also lists every redirect. The cache is ignored by git. |
 | `build.py <extract>` | Writes the four generated files from the extract and `config.json`, to the repo root unless given `-o folder`. It stops with an error when the config no longer fits the wiki (see below). |
 | `report.py <extract>` | Writes a Markdown report (about 3 minutes): pool sizes, Content families and spin-offs, link counts, every Scavenger hunt kind with its members, dead ends, the pool designs compared, and hub candidates. |
 | `diff.py <old> <new>` | Compares two `wiki-data.js` files: pages added and removed, pool, family, spin-off and kind members that joined or left, link counts that moved, and hub, left-out page and namespace changes. |

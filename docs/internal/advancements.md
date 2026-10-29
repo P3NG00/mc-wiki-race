@@ -184,4 +184,11 @@ It is read once at load through `savedAdvancements`, which keeps only what `advE
 
 `adv` holds it, `pages` and `instruments` as Sets (`advTally` counts a Set by its size), and `saveAdv` writes it back.
 
+`saveAdv` writes to them as stored (`storedAs`), like the history (see [persistence.md](persistence.md#writing-it-back)), so a newer version's advancements outlast a tab or cached copy of this one:
+- keys it doesn't read stay, and so do the entries of `got`, `pages`, `topics` and `instruments` it leaves out (a later advancement, topic or instrument);
+- a list rather than an object, a newer format, is left alone;
+- a later format that would change what one of these keys holds names a new key instead, or this version would overwrite it.
+
+Reset advancements (`saveAdv(true)`) keeps nothing, since the player asked to forget everything. They carry no version marker: without one they are format 1.
+
 Clear history leaves it. It starts empty: nothing is worked out from games played before.

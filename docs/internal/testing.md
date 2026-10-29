@@ -641,6 +641,7 @@ The setup screen holding still:
 - The daily's own rule winning over a link's `rules=`, the daily marked in Recent games, left by New game without the notice, and by another rule, Swap or a card rerolled with it
 - Damaged history in storage (not a list, or entries that aren't records) left out without stopping the setup screen
 - History written back with what this version can't read: a newer version's record staying through a finished game and the par worked out after it, history that is an object left alone, and a string or non-object entries replaced
+- So are the dailies and advancements: days, keys and entries this version can't read staying, a day it can't read left as it is, a list left alone, Reset advancements keeping nothing, and a `__proto__` key in storage staying a plain key without adding to every object
 - A host-page theme (added by a BiDi preload script) listed and becoming the default
 - Challenge links carrying awkward titles (`&`, `+`, `?`, `%`, `/`, `:`, quotes, accents) intact through the sealed link, a load of it and the frame's link reading
 - The wiki failing, by made-up replies (`faultReplies`): Cancel on a start that didn't load going back to the setup screen, and an HTTP error, a MediaWiki error, a reply that isn't JSON and one with no article each offering Retry with the clock stopped, Retry loading the article
@@ -733,7 +734,7 @@ Before a release, run it, then check by hand what neither suite can:
   - the creeper and ghast facing their way
   - the textures and toasts
 - a game or two on a real phone, upright and on its side
-- the formats of the history and challenge links (see [persistence.md](persistence.md#writing-it-back) and [url-hash.md](url-hash.md#format-versions)):
-  - a record or link without a version is format 1, so the first release adds no marker
+- the formats of what's stored (history, dailies, advancements) and of challenge links (see [persistence.md](persistence.md#writing-it-back) and [url-hash.md](url-hash.md#format-versions)):
+  - stored data or a link without a version is format 1, so the first release adds no marker
   - a release that changes either so the one before would misread it adds a version (`g2=` for a link) and a converter from the version before; one that only adds to it, like a new rule at the end of `RULES`, doesn't
-  - the release before must never overwrite newer data: it keeps records it can't read, leaves history that isn't a list alone, and asks for a reload on a newer link (the offline suite checks the current release does)
+  - the release before must never overwrite newer data: it keeps what it can't read, leaves stored data of another shape (a list for an object, or the other way round) alone, and asks for a reload on a newer link (the offline suite checks the current release does)

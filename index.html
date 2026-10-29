@@ -1107,14 +1107,16 @@ const beats = (a, b) => a.clicks < b.clicks || (a.clicks === b.clicks && (a.ms ?
 const clicksText = n => `${n} click${n === 1 ? '' : 's'}`;
 // A won record's clicks and, if timed, its time: "4 clicks in 1:23", or for the daily "4 clicks (1:23)".
 const wonText = (r, daily) => clicksText(r.clicks) + (r.ms === undefined ? '' : daily ? ` (${fmtTime(r.ms)})` : ' in ' + fmtTime(r.ms));
-// The history as stored, to write back to. A newer version of the game may have written it, and a tab or cached copy
-// of this one can outlive its release, so nothing it can't read is lost: entries that are objects stay (records
-// isRecord doesn't take), and history that is an object rather than a list (a newer format) is left alone (null).
-// Anything else isn't a record of any version.
-function storedGames() {
-  const h = store.get('mwr.history', []);
-  return Array.isArray(h) ? h.filter(r => typeof r === 'object' && r !== null) : typeof h === 'object' && h !== null ? null : [];
+// A key as stored, to write back to. A newer version of the game may have written it, and a tab or cached copy of this
+// one can outlive its release, so nothing it can't read is lost: whoever writes it back keeps what it doesn't read, and
+// a list where this version writes an object, or an object where it writes a list (list), is a newer format, left alone
+// (null). Anything else, missing or not data of any version, starts empty.
+function storedAs(key, list) {
+  const v = store.get(key, null);
+  return typeof v !== 'object' || v === null ? (list ? [] : {}) : Array.isArray(v) === list ? v : null;
 }
+// The history as stored: entries that are objects stay, records isRecord doesn't take among them.
+const storedGames = () => storedAs('mwr.history', true)?.filter(r => typeof r === 'object' && r !== null);
 const savedGames = () => storedGames()?.filter(isRecord) ?? [];
 
 // ---------------------------------------------------------------- API helpers
@@ -1951,13 +1953,13 @@ function dailyHow(date) {
 // Read like the history: anything finish() wouldn't write is left out.
 const isDaily = (date, d) => realDate(date) && typeof d === 'object' && d !== null && typeof d.won === 'boolean' && typeof d.onDay === 'boolean' &&
   (d.won ? Number.isFinite(d.clicks) && optional(d.ms, Number.isFinite) : !d.onDay && d.clicks === undefined && d.ms === undefined);
-function savedDailies() {
-  const all = store.get('mwr.dailies', {});
-  return typeof all === 'object' && all !== null && !Array.isArray(all) ? Object.fromEntries(Object.entries(all).filter(([date, d]) => isDaily(date, d))) : {};
-}
-// rec: a daily's record from finish; onDay: whether the game started on its day.
+const savedDailies = () => Object.fromEntries(Object.entries(storedAs('mwr.dailies', false) ?? {}).filter(([date, d]) => isDaily(date, d)));
+// rec: a daily's record from finish; onDay: whether the game started on its day. Written to the dailies as stored
+// (storedAs), keeping the days and keys it can't read, and leaving its day alone if it can't read that.
 function saveDaily(rec, onDay) {
-  const all = savedDailies(), was = all[rec.daily], best = rec.won && (!was?.won || beats(rec, was)) ? rec : was?.won ? was : null;
+  const all = storedAs('mwr.dailies', false), was = all?.[rec.daily];
+  if (!all || was !== undefined && !isDaily(rec.daily, was)) return;
+  const best = rec.won && (!was?.won || beats(rec, was)) ? rec : was?.won ? was : null;
   all[rec.daily] = { won: !!best, onDay: !!was?.onDay || rec.won && onDay, ...(best && { clicks: best.clicks, ...(best.ms !== undefined && { ms: best.ms }) }) };
   store.set('mwr.dailies', all);
 }
@@ -3077,8 +3079,7 @@ const ADVANCEMENTS = Object.fromEntries([
 // Read through savedAdvancements, which keeps only what advancements would write: storage is open to the player.
 const advEmpty = () => ({ got: {}, wins: 0, visits: 0, blasts: 0, xp: 0, pages: new Set(), topics: [], instruments: new Set() });
 function savedAdvancements() {
-  const s = store.get('mwr.advancements', null), a = advEmpty();
-  if (!s || typeof s !== 'object') return a;
+  const s = storedAs('mwr.advancements', false) ?? {}, a = advEmpty();
   for (const [k, at] of Object.entries(s.got && typeof s.got === 'object' ? s.got : {})) if (isKey(ADVANCEMENTS, k) && Number.isFinite(at)) a.got[k] = at;
   for (const k of ['wins', 'visits', 'blasts', 'xp']) if (Number.isInteger(s[k]) && s[k] >= 0) a[k] = s[k];
   if (Array.isArray(s.pages)) a.pages = new Set(s.pages.filter(t => typeof t === 'string'));
@@ -3087,7 +3088,15 @@ function savedAdvancements() {
   return a;
 }
 let adv = savedAdvancements();
-const saveAdv = () => store.set('mwr.advancements', { ...adv, pages: [...adv.pages], instruments: [...adv.instruments] });
+// Written to the advancements as stored (storedAs), keeping what savedAdvancements doesn't read: other keys, and the
+// entries of got, pages, topics and instruments it leaves out. Reset advancements (wipe) keeps nothing.
+function saveAdv(wipe) {
+  const s = wipe ? {} : storedAs('mwr.advancements', false);
+  if (!s) return;
+  const kept = k => [...new Set([...Array.isArray(s[k]) ? s[k] : [], ...adv[k]])];
+  store.set('mwr.advancements', { ...s, ...adv, got: { ...s.got && typeof s.got === 'object' && !Array.isArray(s.got) && s.got, ...adv.got },
+    pages: kept('pages'), topics: kept('topics'), instruments: kept('instruments') });
+}
 const advTally = t => t === 'streak' ? dailyStreaks(savedDailies()).now : adv[t] instanceof Set ? adv[t].size : adv[t];
 const advEarned = () => Object.keys(adv.got).length;
 // A note block instrument heard (see Sounds), for Sound of Music.
@@ -3348,7 +3357,7 @@ function openAdvancements() {
       <div class="actions"><button id="aKeep">Cancel</button><button class="danger" id="aWipe">Reset advancements</button></div>`);
     $('#aKeep').onclick = openAdvancements;
     $('#aKeep').focus();
-    $('#aWipe').onclick = () => { adv = advEmpty(); saveAdv(); renderHistory(); openAdvancements(); };
+    $('#aWipe').onclick = () => { adv = advEmpty(); saveAdv(true); renderHistory(); openAdvancements(); };
   };
   advPictures();
 }

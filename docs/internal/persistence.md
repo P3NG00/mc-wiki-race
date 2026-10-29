@@ -17,7 +17,7 @@ Storage is shared with every page on the origin and open to the player, so it is
 
 ### Writing it back
 
-`finish` and `showPar` write to the history as stored (`storedGames`), not to what `savedGames` reads, since a newer version of the game may have written it and a tab or cached copy of this one can outlive its release:
+`finish` and `showPar` write to the history as stored (`storedGames`, through `storedAs`), not to what `savedGames` reads, since a newer version of the game may have written it and a tab or cached copy of this one can outlive its release (the dailies and advancements are written the same way, see [Dailies](#dailies-mwrdailies) and [advancements.md](advancements.md#storage)):
 - entries that are objects stay, records `isRecord` doesn't take among them (a later rule, topic or field), and count towards the 50;
 - history that is an object rather than a list, a newer format, is left alone, and the game isn't recorded;
 - anything else, never a record of any version, goes.
@@ -79,6 +79,14 @@ The 🏆 Advancements button at the heading's right opens the advancements (see 
 - and `onDay` once true staying so.
 
 It is read through `savedDailies()`, which leaves out a day that isn't a real date and an entry `saveDaily` wouldn't write (`isDaily`).
+
+`saveDaily` writes to the dailies as stored (`storedAs`), like the history:
+- the days and other keys it doesn't read stay;
+- its own day, stored as an entry it can't read, is left as it is and the game isn't saved there;
+- dailies that are a list rather than an object, a newer format, are left alone;
+- anything else starts empty.
+
+Like the history, they carry no version marker: without one they are format 1.
 
 The streak (`dailyStreaks`) is the days in a row won on their day, up to today, or up to yesterday while today's isn't won yet, so a past daily played from the calendar catches up without mending a streak.
 

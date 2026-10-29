@@ -132,7 +132,7 @@ Details: [internal/rules.md](internal/rules.md)
 ## What's kept in the browser
 
 Everything is kept in `localStorage`, through a `store` wrapper that swallows storage errors. Saved records are checked on the way back in (`isRecord`), since storage is shared with every page on the origin and open to the player.
-A finished game is written back beside the records the page can't read, and history that isn't a list is left alone, so a page left open from an older release doesn't wipe what a newer one saved. Neither the history nor a link has a version marker yet: without one, it's the first format.
+The history, dailies and advancements are written back beside what the page can't read, and one stored in a shape it doesn't write is left alone, so a page left open from an older release doesn't wipe what a newer one saved. Neither they nor a link have a version marker yet: without one, it's the first format.
 
 | Key | What it holds |
 | --- | --- |

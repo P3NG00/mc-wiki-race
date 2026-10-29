@@ -1355,7 +1355,7 @@ check('a loss after a win keeps the win, and a missed day ends a streak', await 
     && dailyStreaks(b).now === 0 && dailyStatsText({}) === '';
 })()`));
 // A daily played to the end is recorded for its day, a loss as played, and earns Daily Bread.
-await ev("localStorage.removeItem('mwr.dailies'); for (const k of ['daily', 'habit', 'weekStreak', 'devoted']) delete adv.got[k]; saveAdv()");
+await ev("localStorage.removeItem('mwr.dailies'); for (const k of ['daily', 'habit', 'weekStreak', 'devoted']) delete adv.got[k]; saveAdv(true)");
 await open('#daily');
 await play();
 await ev("finish(false); closeModal(); toSetup()");
@@ -2210,7 +2210,7 @@ check('a click\'s sparks are its note\'s colour, and with a mob head the game\'s
   noteBlock.head = 'zombie'; const none = noteColor(0); noteBlock.head = null; fx.parts = [];
   return one === '#0606FF' && none === null; })()`));
 const music = await ev(`(() => {
-  const was = sample, under = noteBlock.under; sample = () => {}; adv.instruments.clear(); delete adv.got.soundOfMusic;
+  const was = sample, under = noteBlock.under; sample = () => {}; adv.instruments.clear(); delete adv.got.soundOfMusic; saveAdv(true);
   const keys = Object.keys(NOTE_UNDER);
   for (const k of keys.slice(0, -1)) { soundBank.set(k, ['x']); noteBlock.under = k; note(0); note(0); }
   const before = !adv.got.soundOfMusic && advTally('instruments') === keys.length - 1;
@@ -2573,6 +2573,43 @@ await play();
 await ev('finish(false)');
 check('nor is anything but a list or object kept', await ev("store.get('mwr.history', []).length === 1"), await ev("localStorage.getItem('mwr.history')"));
 await ev("closeModal(); toSetup(); localStorage.removeItem('mwr.history')");
+// So are the dailies and advancements: days, keys and entries this version can't read stay, a day it can't read is left
+// as it is, and a list where it writes an object is left alone. A __proto__ key in storage stays a plain key, adding
+// nothing to every object.
+const dailyKept = JSON.parse(await ev(`(() => {
+  const day = '2026-01-05', later = { won: 'later', streak: 3 };
+  localStorage.setItem('mwr.dailies', JSON.stringify({ '2026-01-04': later, '2026-01-05x': later, format: 2 }).replace('{', '{"__proto__":{"polluted":1},'));
+  saveDaily({ daily: day, won: true, clicks: 3, ms: 1000 }, true);
+  const one = store.get('mwr.dailies');
+  localStorage.setItem('mwr.dailies', JSON.stringify({ [day]: later }));
+  saveDaily({ daily: day, won: true, clicks: 3 }, true);
+  const two = localStorage.getItem('mwr.dailies');
+  localStorage.setItem('mwr.dailies', '[1]');
+  saveDaily({ daily: day, won: true, clicks: 3 }, true);
+  const three = localStorage.getItem('mwr.dailies');
+  localStorage.setItem('mwr.dailies', '"junk"');
+  saveDaily({ daily: day, won: false }, false);
+  const four = Object.keys(store.get('mwr.dailies')).join();
+  localStorage.removeItem('mwr.dailies');
+  return JSON.stringify([one['2026-01-04'].streak, one['2026-01-05x'].streak, one.format, Object.hasOwn(one, '__proto__') && one['__proto__'].polluted,
+    one[day].clicks, two === JSON.stringify({ [day]: later }), three, four, ({}).polluted === undefined]);
+})()`));
+check('a daily is saved beside the days and keys a newer version wrote, leaving a day or dailies it can\'t read alone', JSON.stringify(dailyKept) === JSON.stringify([3, 3, 2, 1, 3, true, '[1]', '2026-01-05', true]), JSON.stringify(dailyKept));
+const advKept = JSON.parse(await ev(`(() => {
+  const was = localStorage.getItem('mwr.advancements'), held = adv;
+  localStorage.setItem('mwr.advancements', '{"__proto__":{"polluted":1},"got":{"__proto__":{"polluted":1},"hello":1,"later":2},"wins":4,"laterCount":5,"pages":["A",7],"topics":["laterTopic"],"instruments":["laterInstrument"]}');
+  adv = savedAdvancements(); adv.wins++; adv.pages.add('B'); saveAdv();
+  const s = store.get('mwr.advancements');
+  localStorage.setItem('mwr.advancements', '[1]'); saveAdv();
+  const list = localStorage.getItem('mwr.advancements');
+  saveAdv(true);
+  const wiped = Object.keys(store.get('mwr.advancements')).join();
+  adv = held; was === null ? localStorage.removeItem('mwr.advancements') : localStorage.setItem('mwr.advancements', was);
+  return JSON.stringify([s.got.hello, s.got.later, Object.hasOwn(s.got, '__proto__'), s.wins, s.laterCount, s.pages, s.topics, s.instruments, Object.hasOwn(s, '__proto__'),
+    list, wiped, ({}).polluted === undefined]);
+})()`));
+check('advancements are saved beside what a newer version wrote, a list left alone, Reset keeping nothing', JSON.stringify(advKept)
+  === JSON.stringify([1, 2, true, 5, 5, ['A', 7, 'B'], ['laterTopic'], ['laterInstrument'], true, '[1]', 'got,wins,visits,blasts,xp,pages,topics,instruments', true]), JSON.stringify(advKept));
 
 // A theme stylesheet added by the host page shows up in the picker and, marked data-mwr-default, wins over a saved theme
 // that no longer exists. A preload script stands in for the host page putting it in <head>.

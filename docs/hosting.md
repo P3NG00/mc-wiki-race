@@ -78,3 +78,10 @@ If your server sends a Content-Security-Policy, it has to allow:
 The article frame is filled from the page itself, so it inherits the page's policy.
 
 Details: [internal/rendering.md](internal/rendering.md#api-access), [internal/rendering.md](internal/rendering.md#rendering-articles), [internal/ui.md](internal/ui.md#fetching-the-sounds)
+
+## Checking your copy
+
+With a clone of the repo, Firefox and Node 22 or newer, `MWR_URL=https://your.host/path/ test/run-e2e.sh` plays real games on your copy against the live wiki and ends "All checks passed" or lists what failed.
+It fails on anything your Content-Security-Policy blocks too, naming the directive and the address, such as `media-src https://minecraft.wiki/images/…` for a policy without the wiki's sounds.
+
+Details: [internal/testing.md](internal/testing.md#live-suite-teste2emjs)

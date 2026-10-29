@@ -9,10 +9,14 @@ export async function connect(port, { wait, poll }) {
   // Uncaught errors and rejections in the page and the article frame, reported by a preload script (below) and checked at
   // the end. Its listeners are on the window, so failed images, fonts and requests, which Firefox also logs, don't count.
   const jsErrors = [];
+  // What a Content-Security-Policy blocked, in the page or the frame: nothing under file://, but a host's policy (MWR_URL)
+  // that blocks a picture or a sound breaks nothing the checks see, so it would pass without this.
+  const cspBlocked = new Set();
   ws.onmessage = m => {
     const d = JSON.parse(m.data);
     if (d.id && pending.has(d.id)) { pending.get(d.id)(d); pending.delete(d.id); }
     else if (d.method === 'script.message' && d.params.channel === 'mwr-errors') jsErrors.push(d.params.data.value);
+    else if (d.method === 'script.message' && d.params.channel === 'mwr-csp') cspBlocked.add(d.params.data.value);
     else if (d.method) for (const fn of listeners) fn(d);
   };
   const send = (method, params) => new Promise(r => { const i = ++id; pending.set(i, r); ws.send(JSON.stringify({ id: i, method, params })); });
@@ -29,10 +33,11 @@ export async function connect(port, { wait, poll }) {
   await new Promise(r => ws.onopen = r);
   await send('session.new', { capabilities: {} });
   await send('session.subscribe', { events: ['script.message'] });
-  await send('script.addPreloadScript', { functionDeclaration: `report => {
+  await send('script.addPreloadScript', { functionDeclaration: `(report, csp) => {
     addEventListener('error', e => report(String(e.message)));
     addEventListener('unhandledrejection', e => report('Unhandled rejection: ' + (e.reason?.message ?? e.reason)));
-  }`, arguments: [{ type: 'channel', value: { channel: 'mwr-errors' } }] });
+    addEventListener('securitypolicyviolation', e => csp(e.effectiveDirective + ' ' + e.blockedURI.replace(/\\?.*/, '')));
+  }`, arguments: [{ type: 'channel', value: { channel: 'mwr-errors' } }, { type: 'channel', value: { channel: 'mwr-csp' } }] });
   const ctx = (await send('browsingContext.getTree', {})).result.contexts[0].context;
 
   // An expression's value in the page, or in another browsing context (the article frame's, from frameCtx).
@@ -54,6 +59,7 @@ export async function connect(port, { wait, poll }) {
   // The last checks, then the summary, and the exit code says whether any check failed.
   const end = async () => {
     check('no uncaught errors', jsErrors.length === 0, jsErrors.slice(0, 5).join(' | '));
+    check('nothing blocked by a Content-Security-Policy', cspBlocked.size === 0, [...cspBlocked].slice(0, 5).join(' | '));
     check('no wait timed out', !timedOut.length, timedOut.join(', '));
     await send('session.end', {});
     console.log(failures ? `${failures} check(s) failed` : 'All checks passed');

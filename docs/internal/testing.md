@@ -5,7 +5,7 @@ For people: [development.md](../development.md).
 ## Live suite (`test/e2e.mjs`)
 
 `test/run-e2e.sh [--offline] [screenshot-dir]` starts headless Firefox with WebDriver BiDi and runs `test/e2e.mjs`.
-The test opens `index.html` from `file://` and plays a real game against the live wiki, saving screenshots to `screenshot-dir` if one is given (`shot`), made if it isn't there.
+The test opens `index.html` from `file://`, or the served copy `MWR_URL` names (a copy on a web server, say: `MWR_URL=http://localhost:8000/ test/run-e2e.sh`), and plays a real game against the live wiki, saving screenshots to `screenshot-dir` if one is given (`shot`), made if it isn't there.
 What it checks, by area:
 
 ### Loading, sounds and textures
@@ -113,6 +113,7 @@ An edit on the wiki that changes one fails there by name, so a check further dow
 ### Errors
 
 The test also fails on any uncaught error or rejection in the page or the article frame, reported by a BiDi preload script whose listeners are on the window, so failed images, fonts and requests, which Firefox also logs as errors, don't count.
+The same script reports what a Content-Security-Policy blocked (`securitypolicyviolation`), and the test fails on that too. Nothing is blocked under `file://`, but under a host's policy (`MWR_URL`) a blocked picture or sound breaks nothing the checks see: Beacon's speaker still toggles with its sound blocked by a policy that leaves the wiki out of media-src.
 
 It also fails, as its last check, on any wait that ran out, naming the lines that waited: a wait whose condition never comes true costs its whole timeout even when the checks after it pass, so it would otherwise go unseen. The offline suite does the same.
 
@@ -685,7 +686,7 @@ Both suites start with `connect(port, { wait, poll })`, which opens the BiDi ses
 - `until`, waiting for an expression to come true, for `wait` ms by default and looking every `poll` ms (the live suite 30 s and 300 ms, the offline one 15 s and 200 ms, its replies being instant); a wait that runs out is recorded by the line that waited
 - `listen`, which hands a function every other event the session subscribes to and returns one that stops it (the offline suite answers the wiki's requests through it, and a check can listen beside that)
 - `check`, which prints PASS or FAIL, and `sleep`
-- `end`, the last checks (no uncaught error, no wait timed out), the summary and the exit code
+- `end`, the last checks (no uncaught error, nothing blocked by a Content-Security-Policy, no wait timed out), the summary and the exit code
 
 ## Pre-commit hook
 

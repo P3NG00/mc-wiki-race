@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Starts headless Firefox with WebDriver BiDi and runs test/e2e.mjs against index.html, or with --offline test/offline.mjs,
 # which answers every request to the wiki itself. Needs firefox and node (>= 22, for the global WebSocket).
-# Optional arg: directory for screenshots (e2e.mjs only).
+# Optional arg: directory for screenshots (e2e.mjs only). MWR_URL runs it against a served copy (a host's container, say)
+# instead of this folder's index.html.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 TEST=e2e
@@ -15,4 +16,4 @@ printf 'user_pref("ui.primaryPointerCapabilities", 6);\nuser_pref("ui.allPointer
 firefox --headless --remote-debugging-port="$PORT" --profile "$PROFILE" --no-remote about:blank >/dev/null 2>&1 &
 FF=$!
 for _ in $(seq 50); do (exec 3<>/dev/tcp/127.0.0.1/"$PORT") 2>/dev/null && break; sleep 0.2; done
-node "test/$TEST.mjs" "$PORT" "file://$PWD/index.html" "${1:-}"
+node "test/$TEST.mjs" "$PORT" "${MWR_URL:-file://$PWD/index.html}" "${1:-}"

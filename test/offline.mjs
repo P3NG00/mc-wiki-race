@@ -1559,6 +1559,26 @@ const flipped = sealed[0].slice(0, -8) + (sealed[0].at(-8) === 'A' ? 'B' : 'A') 
 check('a damaged link rolls a random pair and says so', await open(new URL(flipped).hash) && await until(damaged),
   await ev("document.querySelector('#setupStatus').textContent"));
 check('an overlong blob is not opened', await open('#g=' + 'A'.repeat(9000)) && await until(damaged));
+// A link of a later format (g2=, g3=…) asks for a reload instead of being misread; g= and g1= aren't one.
+const newerSays = "document.querySelector('#setupStatus').textContent === 'The challenge link is from a newer version of the game, so new cards were rolled instead. Reload the page to play it.'";
+check('a link of a newer format rolls new cards and asks for a reload', await open('#g2=' + new URL(sealed[0]).hash.slice(3)) && await until(newerSays)
+  && await open('#g12=AAAAAAAA&start=Diamond&target=Crafting') && await until(newerSays)
+  && await ev("['g', 'g1', 'g01', 'gx', 'g2x'].every(k => !newerLink(k)) && ['g2', 'g9', 'g10'].every(newerLink)"), await ev(status));
+// Random keys of g, digits and other characters are taken for a newer link exactly when they are g and a whole number
+// above 1 written without leading zeros, and nothing else in such a hash is read: markup in it adds nothing, a daily or
+// rules beside it are left out.
+const newerFuzz = await ev(`(() => {
+  const chars = 'g0123456789x%=&G ١', bad = [];
+  for (let n = 0; n < 20000; n++) {
+    const k = (Math.random() < 0.8 ? 'g' : '') + Array.from({ length: Math.random() * 6 | 0 }, () => chars[Math.random() * chars.length | 0]).join('');
+    if (newerLink(k) !== (/^g[1-9][0-9]*$/.test(k) && BigInt(k.slice(1)) > 1n)) bad.push(k);
+  }
+  return JSON.stringify(bad.slice(0, 5));
+})()`);
+check('only g and a whole number above 1 is a newer link', newerFuzz === '[]', newerFuzz);
+await open('#g2=%3Cimg%20src%3Dx%20onerror%3D%22parent.pwned%3D1%22%3E&start=%3Cscript%3Eparent.pwned%3D1%3C%2Fscript%3E&target=Diamond&rules=hard,blind&daily');
+check('nothing else in a newer link is read, and its markup adds nothing', await until(newerSays) && await ev(`!window.pwned && !document.querySelector('img[src="x"], #setupStatus *')
+  && !rules().includes('blind') && !setup.daily && !game.daily`), await ev(`JSON.stringify([${status}, rules(), setup.daily])`));
 // The key is in the page, so a made-up blob can pass its hash. Whatever its bytes, it opens to nothing or to a
 // challenge's keys only, with known rules, numbers for back and extra, and a title back as sealed: titles that try to
 // add keys, every first byte, runaway and unknown rule bits, every tag byte, UTF-8 cut short and random bytes.
@@ -2534,7 +2554,25 @@ const rec = JSON.stringify({ start: 'Diamond', goal: 'Iron Ingot', rules: [], wo
 await ev(`store.set('mwr.history', [null, 5, { ...${rec}, clicks: '<b>2</b>' }, { ...${rec}, rules: ['nope'] }, { ...${rec}, topic: 'constructor' }, ${rec}]); renderHistory()`);
 check('only real records are shown', await ev("document.querySelectorAll('#history tbody tr').length === 1 && !$('#history tbody b')"),
   `rows=${await ev("document.querySelectorAll('#history tbody tr').length")}`);
-await ev("localStorage.removeItem('mwr.history')");
+// History is written back with what this version can't read, since a newer one may have written it: entries that are
+// objects stay through a finished game and a par worked out after it, and history that isn't a list, a newer format, is
+// left alone. Non-objects, never a record, go.
+const later = JSON.stringify({ ...JSON.parse(rec), rules: ['laterRule'], at: Date.now() - 1 });
+await ev(`store.set('mwr.history', [null, 5, ${later}])`);
+await play();
+await ev("game.parReady = new Promise(r => setTimeout(() => r(['A', 'B']), 300)); game.par = null; finish(false)");
+await until("store.get('mwr.history', [])[0].par !== undefined", 3000);
+check('a newer version\'s records stay through a game and its par', await ev(`(h => h.length === 2 && h[0].par === 1 && JSON.stringify(h[1]) === JSON.stringify(${later}))(store.get('mwr.history', []))`),
+  await ev("localStorage.getItem('mwr.history')"));
+await ev("closeModal(); toSetup(); localStorage.setItem('mwr.history', '{\"v\":9,\"games\":[]}')");
+await play();
+await ev('finish(false)');
+check('history that isn’t a list is left alone', await ev(`localStorage.getItem('mwr.history') === '{"v":9,"games":[]}'`), await ev("localStorage.getItem('mwr.history')"));
+await ev("closeModal(); toSetup(); localStorage.setItem('mwr.history', '\"junk\"')");
+await play();
+await ev('finish(false)');
+check('nor is anything but a list or object kept', await ev("store.get('mwr.history', []).length === 1"), await ev("localStorage.getItem('mwr.history')"));
+await ev("closeModal(); toSetup(); localStorage.removeItem('mwr.history')");
 
 // A theme stylesheet added by the host page shows up in the picker and, marked data-mwr-default, wins over a saved theme
 // that no longer exists. A preload script stands in for the host page putting it in <head>.

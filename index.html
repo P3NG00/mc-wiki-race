@@ -1107,7 +1107,15 @@ const beats = (a, b) => a.clicks < b.clicks || (a.clicks === b.clicks && (a.ms ?
 const clicksText = n => `${n} click${n === 1 ? '' : 's'}`;
 // A won record's clicks and, if timed, its time: "4 clicks in 1:23", or for the daily "4 clicks (1:23)".
 const wonText = (r, daily) => clicksText(r.clicks) + (r.ms === undefined ? '' : daily ? ` (${fmtTime(r.ms)})` : ' in ' + fmtTime(r.ms));
-const savedGames = () => { const h = store.get('mwr.history', []); return Array.isArray(h) ? h.filter(isRecord) : []; };
+// The history as stored, to write back to. A newer version of the game may have written it, and a tab or cached copy
+// of this one can outlive its release, so nothing it can't read is lost: entries that are objects stay (records
+// isRecord doesn't take), and history that is an object rather than a list (a newer format) is left alone (null).
+// Anything else isn't a record of any version.
+function storedGames() {
+  const h = store.get('mwr.history', []);
+  return Array.isArray(h) ? h.filter(r => typeof r === 'object' && r !== null) : typeof h === 'object' && h !== null ? null : [];
+}
+const savedGames = () => storedGames()?.filter(isRecord) ?? [];
 
 // ---------------------------------------------------------------- API helpers
 // MediaWiki asks clients not to send many requests at once, so at most API_CONCURRENCY are in flight and the rest
@@ -2117,7 +2125,10 @@ const linkReady = () => cardKeys().every(w => setup[w]) && (huntMode() !== 'kind
 // base64url. The nonce makes two links to one game look unrelated, and the hash finds a link a chat app cut short or
 // mangled. Titles go as text, never as numbers from wiki-data.js, so a link opens the same after a snapshot update.
 // LINK_MAX is the longest blob opened: five titles of MediaWiki's longest (255 bytes) fit.
+// This is the links' first format, and g= names it. A later version that changes the format so this code would misread
+// it seals its links under g2=, g3= and so on, for which this one asks for a reload (newerLink) rather than open them.
 const LINK_KEY = 0x6d777221, LINK_MAX = 2048, LINK_TITLES = ['start', 'target', 'via', 'kind'];
+const newerLink = key => /^g([2-9]|[1-9]\d+)$/.test(key);
 // A seeded random number generator (0 to 1), for the sealed links' keystream and the background.
 const mulberry32 = seed => () => {
   let t = seed = seed + 0x6d2b79f5 | 0;
@@ -5406,7 +5417,7 @@ async function showPar(rec, routeReady) {
   // The par, for a game finished before it was worked out, which drops the target par if the game is off it.
   const add = par !== null && rec.par === undefined, off = rec.reach && REACHES[rec.reach].fits?.(par) === false;
   if (add || off) {
-    const saved = savedGames(), mine = saved.find(r => r.at === rec.at && r.start === rec.start);
+    const saved = storedGames(), mine = saved?.find(r => isRecord(r) && r.at === rec.at && r.start === rec.start);
     for (const r of [rec, mine].filter(Boolean)) { if (add) r.par = par; if (off) delete r.reach; }
     if (mine) store.set('mwr.history', saved);
   }
@@ -5454,11 +5465,10 @@ function finish(won, lost = null) {
     ...(target?.topic && { topic: target.topic }),
     ...(target?.reach && (game.par === null || REACHES[target.reach].fits?.(game.par) !== false) && { reach: target.reach }),
     ...(game.content.length && { content: game.content }), ...(game.par !== null && { par: game.par }), ...(game.exact && { exact: game.limit }), rules: game.rules, won, ...(lost && { [lost]: true }), clicks: clicks(), ...(game.timed && { ms }), at: Date.now(), path: game.path.map(p => p.title) };
-  const hist = savedGames(), first = !hist.some(r => recordKey(r) === recordKey(rec));   // the pair's first game, for advancements
+  const saved = storedGames(), hist = saved?.filter(isRecord) ?? [], first = !hist.some(r => recordKey(r) === recordKey(rec));   // the pair's first game, for advancements
   const best = hist.filter(r => r.won && recordKey(r) === recordKey(rec) && sameRules(r, rec))
     .reduce((b, r) => !b || beats(r, b) ? r : b, null);
-  hist.unshift(rec);
-  store.set('mwr.history', hist.slice(0, 50));
+  if (saved) store.set('mwr.history', [rec, ...saved].slice(0, 50));
   const dailyFirst = won && game.daily && !savedDailies()[game.daily]?.won;   // the daily's first win, for more fireworks
   if (game.daily) saveDaily(rec, game.onDay);
   itemsReset();
@@ -6566,15 +6576,16 @@ $('#btnPeek').onclick = () => {
 const cardsLoaded = () => !!setup.start && !!(huntMode() === 'kinds' ? setup.kinds?.length : setup.goal);
 // Initial load: a challenge link (#g=, sealed, or a hand-made #start=…&target=…) plays that exact pair, #daily (or
 // #daily=YYYY-MM-DD, a past day) that day's pair and rule, otherwise roll a random one. A #g= hash is read on its own:
-// anything beside it is left out.
+// anything beside it is left out. A link of a later format (g2=, g3=…) rolls one too, asking for a reload.
 (async function init() {
   $('#wikiCopyDate').textContent = snapshotDay();
   updateModeHelp();
   updateLevelHelp();
   syncContentToMode();   // a reload may bring the Pool radio button back on Chaos
   renderHistory();
-  const blob = new URLSearchParams(location.hash.slice(1)).get('g');
-  const query = blob === null ? location.hash.slice(1) : openLink(blob), h = new URLSearchParams(query ?? '');
+  const hash = new URLSearchParams(location.hash.slice(1)), blob = hash.get('g');
+  const newer = blob === null && [...hash.keys()].some(newerLink);
+  const query = newer ? '' : blob === null ? location.hash.slice(1) : openLink(blob), h = new URLSearchParams(query ?? '');
   // A challenge link carries its whole rules, difficulty included: one with none is Relaxed, as every game was before
   // difficulty (navboxes on).
   // Scavenger's kinds go in as kind= in place of the target.
@@ -6624,6 +6635,7 @@ const cardsLoaded = () => !!setup.start && !!(huntMode() === 'kinds' ? setup.kin
   } else {
     await reroll('all');
     if (query === null && setup.start) setStatus('The challenge link is damaged, perhaps cut short, so new cards were rolled instead.', true);
+    if (newer && setup.start) setStatus('The challenge link is from a newer version of the game, so new cards were rolled instead. Reload the page to play it.', true);
   }
   syncVia();   // a challenge link may have turned Checkpoint on
 })();

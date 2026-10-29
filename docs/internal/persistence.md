@@ -15,6 +15,17 @@ Storage is shared with every page on the origin and open to the player, so it is
 - a rule, topic or Content key that doesn't exist,
 - or a daily that isn't a real day, though one after today is kept, so a clock or time zone change doesn't drop it.
 
+### Writing it back
+
+`finish` and `showPar` write to the history as stored (`storedGames`), not to what `savedGames` reads, since a newer version of the game may have written it and a tab or cached copy of this one can outlive its release:
+- entries that are objects stay, records `isRecord` doesn't take among them (a later rule, topic or field), and count towards the 50;
+- history that is an object rather than a list, a newer format, is left alone, and the game isn't recorded;
+- anything else, never a record of any version, goes.
+
+The history carries no version marker: a record or list without one is format 1, the format of the first release. A later change that this version would misread adds one (an object around the list, or a field on each record) and a converter from the format before.
+
+Clear history still writes an empty list, since that's what the player asked for.
+
 ### What a record holds
 
 - A Scavenger record has `finds` (its articles) or `kinds` (their categories) in place of `goal`.

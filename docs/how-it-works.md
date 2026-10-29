@@ -107,6 +107,7 @@ Details: [internal/picking.md](internal/picking.md)
 
 Copy challenge link puts the setup into the URL hash as `g=`: the cards and the rules, packed into bytes and scrambled so the cards aren't readable at a glance. The key is in the page, so this hides rather than protects; a made-up link can do nothing a plain one can't. Titles go in as text, so a link still opens the same game after a snapshot update.
 Plain `start=`, `target=`, `via=` and `rules=` keys work too, which is handy for testing a route.
+`g=` is the first format of these links. A later release whose links this one would misread puts them under `g2=` and so on, and this release, met with one in a page cached or left open, rolls new cards and asks for a reload rather than open it wrongly.
 
 Details: [internal/url-hash.md](internal/url-hash.md)
 
@@ -131,6 +132,7 @@ Details: [internal/rules.md](internal/rules.md)
 ## What's kept in the browser
 
 Everything is kept in `localStorage`, through a `store` wrapper that swallows storage errors. Saved records are checked on the way back in (`isRecord`), since storage is shared with every page on the origin and open to the player.
+A finished game is written back beside the records the page can't read, and history that isn't a list is left alone, so a page left open from an older release doesn't wipe what a newer one saved. Neither the history nor a link has a version marker yet: without one, it's the first format.
 
 | Key | What it holds |
 | --- | --- |

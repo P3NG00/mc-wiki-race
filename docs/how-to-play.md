@@ -173,7 +173,7 @@ The line under the daily shows your streak, your best, and the days won of those
 
 **Copy challenge link**, on the setup screen or in the result, copies a link that opens this exact game: its cards, game, rules, difficulty and count. If your browser won't let the page copy it, the link (or in the result, Share's text too) shows under the buttons to copy by hand.
 It looks like `https://mcwikirace.com/#g=…`, sealed so the cards aren't readable at a glance. The target topic, target par and Content aren't in it: whoever opens it plays with their own Content boxes, though a card's own spin-off always counts.
-Under Blind target it picks the hidden cards first, and they stay hidden for whoever opens the link. A link cut short rolls new cards instead, and says it's damaged.
+Under Blind target it picks the hidden cards first, and they stay hidden for whoever opens the link. A link cut short rolls new cards instead, and says it's damaged. A link from a newer version of the game, opened in a page that's out of date, also rolls new cards, and asks you to reload the page.
 
 ### Writing one by hand
 

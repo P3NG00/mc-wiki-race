@@ -31,6 +31,14 @@ A `#g=` hash is read on its own, leaving anything beside it out.
 
 A blob longer than `LINK_MAX` (room for five titles of MediaWiki's longest), not base64url, failing its hash (a link a chat app cut short) or not unpacking rolls new cards and says the link is damaged.
 
+### Format versions
+
+`g=` is the links' first format, and the link carries no version marker.
+- A later release that changes the format so this one would misread its links seals them under `g2=`, `g3=` and so on, and opens `g=` through a converter from this format.
+- This release spots such a key (`newerLink`: `g` and a whole number above 1, so not `g1` or `g01`), rolls new cards and says the link is from a newer version of the game and to reload the page.
+  A copy of the page cached or kept open past a release is the one that meets those links.
+- A change that old links still open correctly in, like a new rule at the end of `RULES`, keeps `g=`.
+
 ## `start=` and `target=`: a fixed pair
 
 - `start=<Title>` with `target=<Title>` (or `kind=`): a fixed pair, handy for testing a specific route.

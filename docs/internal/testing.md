@@ -480,12 +480,13 @@ The daily:
 - giving up a daily keeping its day as played
 - playing one earning Daily Bread
 - a daily won to the end, whatever the day's rule, by its par route (Exact clicks's of its count):
-  - yesterday's, won today, kept as won but not on its day, mending no streak, and marked won later in Past dailies
+  - yesterday's, won today, kept as won but not on its day, mending no streak
   - today's, after a loss on it, joining the streak of the two days before, earning Habit, with 10 XP for its first win and none for winning it again
   - the daily box then saying it's done in how many clicks, and the streak
 - streaks of 7 and 30 earning Week Streak and Devoted
-- Past dailies:
+- Past dailies, with the page's clock 40 days ahead (a BiDi preload script) so past days are in it even on the day `DAILY_FIRST` names:
   - opening on this month with today marked and the days to come off, its key naming won on the day, won later, not won and not played
+  - a day won later marked so
   - going back to `DAILY_FIRST`'s month and no further
   - a day loading its daily in place of a challenge link's cards, the status line naming it with its rule's plain words, and no longer a challenge's game, for Accepted
 - Clear history asking first, counting the games (the 1 recorded game for one), Cancel focused and keeping them, Clear history in a loss's colour

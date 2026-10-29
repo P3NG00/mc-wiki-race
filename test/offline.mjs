@@ -1363,7 +1363,7 @@ check('giving up a daily keeps its day as played', await ev("JSON.stringify(save
 check('the daily box counts it', await ev("document.querySelector('#dailyStats').textContent === 'Won 0 of 1 day'"), await ev("document.querySelector('#dailyStats').textContent"));
 check('and playing one earns Daily Bread', await until('!!adv.got.daily', 3000));
 // A daily won, whatever its rule, by its par route (Exact clicks's of its count). Yesterday's, won today, is kept as won
-// but not on its day, mending no streak, and Past dailies marks it won later. Today's, after a loss on it and with
+// but not on its day, mending no streak. Today's, after a loss on it and with
 // yesterday and the day before won on theirs, joins the streak, earning Habit, and the daily box says it's done; its
 // first win gives 10 XP, and winning it again none. Streaks of 7 and 30 earn Week Streak and Devoted.
 const winDaily = async hash => {
@@ -1377,10 +1377,7 @@ const yesterday = await ev(ago(1));
 await ev(`store.set('mwr.dailies', { ...savedDailies(), [${ago(2)}]: ${wonOnDay} })`);
 check('yesterday\'s daily won today is kept as won, not on its day, mending no streak', await winDaily('#daily=' + yesterday)
   && await ev(`(d => d.won && !d.onDay && dailyStreaks(savedDailies()).now === 0)(savedDailies()['${yesterday}'])`), await ev(`JSON.stringify(savedDailies()['${yesterday}'])`));
-await ev(`closeModal(); toSetup(); openCalendar('${yesterday}'.slice(0, 7))`);
-check('and Past dailies marks it won later', await ev(`(b => b.classList.contains('won') && b.title.endsWith(', won later'))(document.querySelector('#modal [data-day="${yesterday}"]'))`),
-  await ev(`document.querySelector('#modal [data-day="${yesterday}"]')?.outerHTML`));
-await ev(`closeModal(); store.set('mwr.dailies', { ...savedDailies(), '${yesterday}': ${wonOnDay} })`);
+await ev(`closeModal(); toSetup(); store.set('mwr.dailies', { ...savedDailies(), '${yesterday}': ${wonOnDay} })`);
 check('today\'s daily won joins the streak, after a loss on it, its first win giving 10 XP', await winDaily('#daily')
   && await ev(`(d => d.won && d.onDay && d.clicks === savedGames()[0].clicks && dailyStreaks(savedDailies()).now === 3)(savedDailies()[today()]) && ${dailyXp}`),
   await ev("JSON.stringify(savedDailies()[today()]) + ' ' + $('#mXp').textContent"));
@@ -1394,10 +1391,15 @@ await ev(`store.set('mwr.dailies', { ...savedDailies(), ...Object.fromEntries([3
 check('seven days in a row earn Week Streak', await ev('!!adv.got.weekStreak && !adv.got.devoted'), await ev('dailyStreaks(savedDailies()).now'));
 await ev(`store.set('mwr.dailies', { ...savedDailies(), ...Object.fromEntries(Array.from({ length: 23 }, (_, i) => [${ago('i + 7')}, ${wonOnDay}])) }); advEarn({})`);
 check('and thirty Devoted', await ev('!!adv.got.devoted && dailyStreaks(savedDailies()).now === 30'), await ev('dailyStreaks(savedDailies()).now'));
-// Past dailies: this month, today marked, later days off, back to DAILY_FIRST's month and no further, a day loading its
-// daily in place of a challenge link's cards.
-await ev(`localStorage.setItem('mwr.dailies', JSON.stringify({ [${ago(1)}]: { won: true, onDay: true, clicks: 2 }, [today()]: { won: false, onDay: false } }))`);
+// Past dailies: this month, today marked, later days off, a day won later marked so, back to DAILY_FIRST's month and no
+// further, a day loading its daily in place of a challenge link's cards. The page's clock runs 40 days ahead here (a
+// preload script), so past days are in the calendar even on the day DAILY_FIRST names.
+const clockAhead = (await send('script.addPreloadScript', { functionDeclaration: `() => {
+  const D = Date, ahead = 40 * 864e5;
+  globalThis.Date = class extends D { constructor(...a) { a.length ? super(...a) : super(D.now() + ahead); } static now() { return D.now() + ahead; } };
+}` })).result.script;
 await open('#start=Diamond&target=Diamond%20Pickaxe');
+await ev(`localStorage.setItem('mwr.dailies', JSON.stringify({ [${ago(2)}]: { won: true, onDay: false, clicks: 2 }, [${ago(1)}]: { won: true, onDay: true, clicks: 2 }, [today()]: { won: false, onDay: false } }))`);
 const wasChallenge = await ev('setup.challenge');
 await ev("document.querySelector('#btnPastDailies').click()");
 const calOk = `(() => { const c = document.querySelector('#modal .cal'), b = [...c.querySelectorAll('button')], t = c.querySelector('.today');
@@ -1407,6 +1409,10 @@ const calOk = `(() => { const c = document.querySelector('#modal .cal'), b = [..
     && document.querySelector('#calNext').disabled && t.title.includes(dailyText(today()))
     && document.querySelector('#modal .cal-key').textContent === 'Won on the dayWon laterNot wonNot played'; })()`;
 check('Past dailies opens on this month, today marked, the days to come off, its key naming all four marks', await ev(calOk), await ev("document.querySelector('#modal').textContent"));
+const wonLater = `(() => { const d = ${ago(2)}; openCalendar(d.slice(0, 7)); const b = document.querySelector('#modal [data-day="' + d + '"]');
+  return b.classList.contains('won') && !b.disabled && b.title.endsWith(', won later') || b.outerHTML; })()`;
+check('a day won later is marked so', await ev(wonLater) === true, await ev(wonLater));
+await ev('openCalendar()');
 check('it goes back to the first daily\'s month and no further', await ev(`(() => {
   for (let i = 0; i < 240 && !document.querySelector('#calPrev').disabled; i++) document.querySelector('#calPrev').click();
   return [...document.querySelectorAll('#modal .cal button')].every(b => b.dataset.day.startsWith(DAILY_FIRST.slice(0, 7)) && b.disabled === (b.dataset.day < DAILY_FIRST || b.dataset.day > today()))
@@ -1417,6 +1423,7 @@ check('a day loads its daily', await until("setup.daily !== null && setup.daily 
   && await ev("document.querySelector('#setupStatus').textContent.startsWith('Daily challenge for ' + shortDate(localDay(setup.daily)) + ': ' + dailyText(setup.daily) + '. ' + dailyHow(setup.daily) + ' ')"),
   await ev("setup.daily + ' ' + document.querySelector('#setupStatus').textContent"));
 check('and is no challenge link\'s game then, for Accepted', wasChallenge === true && await ev('setup.challenge === false'), await ev('setup.challenge'));
+await send('script.removePreloadScript', { script: clockAhead });
 // Clear history asks first, counting the games; Cancel keeps them.
 const clearAsks = "(() => { $('#btnClearHistory').click(); const p = $('#modal p').textContent + (document.activeElement === $('#hKeep') && $('#hClear.danger') ? '' : ' (Cancel not focused, or Clear history not in a loss\\'s colour)'); $('#hKeep').click(); return p; })()";
 const games = await ev('savedGames().length'), asksMany = await ev(clearAsks);

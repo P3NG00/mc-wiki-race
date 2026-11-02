@@ -130,7 +130,7 @@ Beside each page of your path is the fewest clicks from it to what was next; in 
 
 ## Par and golf scores
 
-Par is the fewest clicks a game can be done in, going by the wiki's offline copy ([how that's made](wiki-data.md)), shown beside **Start game** and in the header from the start (under Blind target, once the game starts). A win is named as in golf:
+Par is the fewest clicks a game can be done in, going by the wiki's offline copy ([how that's made](wiki-data.md)), shown beside **Start game** and in the header from the start (under Blind target, once the game starts). Links to pages a Content box leaves out still work, so par can go through one when nothing else is as short, such as Crafting; where another route is just as short, the route shown takes that. A win is named as in golf:
 
 | Score | Means |
 |---|---|

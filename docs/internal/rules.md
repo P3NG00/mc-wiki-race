@@ -116,7 +116,7 @@ Revisits are out because a page almost always links back to the one before, whic
 
 The count can always be done: `updateSetupPar` finds a route of exactly that many clicks (`exactRoute`, `setup.exact`) and Start waits for it.
 
-- That is NP-hard in general, so `exactRoute` searches depth first through pages the target can still be reached from in the clicks left (`distancesTo`, a breadth-first search back from the target over reverse edges made once per graph file), the farthest first, and gives up after `EXACT_BUDGET` pages.
+- That is NP-hard in general, so `exactRoute` searches depth first through pages the target can still be reached from in the clicks left (`distancesTo`, a breadth-first search back from the target over reverse edges made once per graph file), the farthest first, then those in the pool, and gives up after `EXACT_BUDGET` pages.
 - On this snapshot it found one for every pool pair tried in Normal, Relaxed and Hard, 150 each at par + 1 to 6 and 60 each at par + 8, 10, 15 and 20, in 18 ms at most, so the strip's choices could go much higher.
 - Past par + 5 the game becomes wandering rather than planning.
 - The result shows that route, and a win gets no golf score, since every win is par plus the number picked.

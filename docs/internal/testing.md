@@ -529,7 +529,8 @@ Par:
 - routes follow the graph files
 - Relaxed's are never longer than Normal's nor Normal's than Hard's
 - Hard's avoid hubs
-- Normal's go through content alone when a route that does is as short
+- Normal's go through the pool alone when a route that does is as short, and par is still the fewest clicks
+- a Race, a hunt of kinds and Exact clicks each taking the page in the pool on a made-up graph where it is as short as one outside it (a Race and a hunt through a navbox too), and the one outside when nothing else is
 - a spin-off page needs its spin-off on
 - a route goes through one checkpoint and through two in order
 - a round trip goes there and back with the way back off the way there, almost always at the lower bound

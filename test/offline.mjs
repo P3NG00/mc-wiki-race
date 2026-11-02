@@ -1532,25 +1532,28 @@ check('history entries with an unknown Content key are left out', await ev("(r =
 
 // Par: routes go by the graph files and keep to the game's settings. Each step must be a link in the graph it was found
 // in, Relaxed's are never longer than Normal's nor Normal's than Hard's, Hard's avoid hubs but the target, Normal's only
-// goes through a page that isn't content when no route through content alone is as short, a spin-off page is only
+// goes through a page outside the pool when no route through the pool alone is as short, a spin-off page is only
 // reachable with its spin-off on, and a checkpoint's route goes through it.
 const par = JSON.parse(await ev(`(async () => {
   const relaxed = await linkGraph([]), id = t => PAGE_IDS.get(t);
   const linked = (g, a, b) => g.links[id(a)].includes(id(b)) || (g.carries?.[id(a)] ?? []).some(x => g.boxes[x].includes(id(b)));
   const follows = (g, route) => route.every((t, i) => i === 0 || linked(g, route[i - 1], t));
-  const hubs = new Set(HUB_TITLES.values()), bad = [], offContent = [];
-  let throughContent = 0;
+  const hubs = new Set(HUB_TITLES.values()), bad = [], offPool = [], parMoved = [];
+  let throughPool = 0;
   for (let i = 0; i < 30; i++) {
     const start = pick(POOL_TITLES), goal = pick(POOL_TITLES);
     if (start === goal) continue;
     const [r, n, h] = await Promise.all([[], ['nonav'], ['nohubs', 'nonav']].map(rules => parRoute({ start, goal, rules })));
     if (!r || !n || !follows(relaxed, r) || !follows({ links: relaxed.links }, n) || r.length > n.length || (h && (h.length < n.length
       || h.slice(1).some(t => hubs.has(t) && t !== goal)))) bad.push(start + ' -> ' + goal);
-    const pure = n && shortestRoute({ links: relaxed.links }, start, goal, v => CONTENT_PAGES[v]);
+    const pure = n && shortestRoute({ links: relaxed.links }, start, goal, v => POOL_PAGES[v]);
     if (pure?.length === n.length) {
-      throughContent++;
-      if (n.some(t => !CONTENT_PAGES[id(t)])) offContent.push(n.join(' → '));
+      throughPool++;
+      if (n.some(t => !POOL_PAGES[id(t)])) offPool.push(n.join(' → '));
     }
+    // The preference only picks among the shortest: par is still the distance a search with none finds.
+    const usable = routeUsable({ keep: [start, goal], rules: ['nonav'], content: [] });
+    if (n && distancesFrom({ links: relaxed.links }, start, usable)[id(goal)] !== n.length - 1) parMoved.push(n.join(' → '));
   }
   const off = await parRoute({ start: 'Minecraft Dungeons', goal: 'Dungeons:Creeper', rules: ['nonav'] });
   const on = await parRoute({ start: 'Minecraft Dungeons', goal: 'Dungeons:Creeper', rules: ['nonav'], content: ['Dungeons'] });
@@ -1574,15 +1577,34 @@ const par = JSON.parse(await ev(`(async () => {
   const loop = await parRoute({ start: 'Diamond', vias: ['Creeper', 'Zombie'], goal: 'Bamboo', back: 1, rules: ['nonav', 'roundtrip'] });
   const kinds = ['Nether mobs', 'Enchantments', 'Potions'];
   const [hunt, huntHome] = await Promise.all([[], ['roundtrip']].map(r => parRoute({ start: 'Diamond', kinds, rules: ['nonav', 'scavenger', ...r] })));
-  return JSON.stringify({ bad, offContent, throughContent, roundTrips, atBound, spinoff: off === null && on?.at(-1) === 'Dungeons:Creeper', via: via?.includes('Creeper') && via.at(-1) === 'Bamboo',
+  return JSON.stringify({ bad, offPool, throughPool, parMoved, roundTrips, atBound, spinoff: off === null && on?.at(-1) === 'Dungeons:Creeper', via: via?.includes('Creeper') && via.at(-1) === 'Bamboo',
     relay: relay?.indexOf('Creeper') > 0 && relay.indexOf('Zombie') > relay.indexOf('Creeper') && relay.at(-1) === 'Bamboo',
     loop: loop?.indexOf('Creeper') > 0 && loop.indexOf('Bamboo') > loop.indexOf('Creeper') && loop.lastIndexOf('Zombie') > loop.indexOf('Bamboo') && loop.at(-1) === 'Diamond'
       && follows({ links: relaxed.links }, loop) && offWay(loop, loop.indexOf('Bamboo'), ['Zombie', 'Diamond']),
     kinds: !!hunt && huntHome?.at(-1) === 'Diamond' && huntHome.length > hunt.length && follows({ links: relaxed.links }, huntHome) });
 })()`));
 check('par routes follow the graph, Relaxed ≤ Normal ≤ Hard, Hard without hubs', par.bad.length === 0, par.bad.slice(0, 3).join(', '));
-check('par shows a route through content alone when one is as short', par.offContent.length === 0 && par.throughContent >= 10,
-  `${par.throughContent} of 30 had one; ${par.offContent.slice(0, 3).join(', ')}`);
+check('par shows a route through the pool alone when one is as short', par.offPool.length === 0 && par.throughPool >= 10,
+  `${par.throughPool} of 30 had one; ${par.offPool.slice(0, 3).join(', ')}`);
+check('and par is still the fewest clicks, as a search with no preference finds', par.parMoved.length === 0, par.parMoved.slice(0, 3).join(', '));
+// Every search prefers the pool, on a made-up graph where Crafting (outside it, and first by page number) is as short as
+// Diamond: a Race's, Scavenger's kinds' and Exact clicks', and both breadth-first searches reaching them through a navbox.
+// With only Crafting, the route still goes through it.
+const poolFirst = JSON.parse(await ev(`(async () => {
+  const id = t => PAGE_IDS.get(t), links = WIKI_DATA.articles.map(() => []);
+  links[id('Stone')] = [id('Crafting'), id('Diamond')];
+  links[id('Crafting')] = links[id('Diamond')] = [id('Zombie')];
+  const g = { links }, only = { links: links.map((l, i) => i === id('Stone') ? [id('Crafting')] : l) }, real = linkGraph, any = () => true;
+  const boxed = { links: links.map((l, i) => i === id('Stone') ? [] : l), boxes: [[id('Crafting'), id('Diamond')]], carries: links.map((l, i) => i === id('Stone') ? [0] : []) };
+  const exactOn = async graph => { linkGraph = async () => graph; try { return await exactRoute(['Stone', 'Zombie'], ['nonav'], 2, []); } finally { linkGraph = real; } };
+  return JSON.stringify({ bites: id('Crafting') < id('Diamond') && !POOL_PAGES[id('Crafting')] && POOL_PAGES[id('Diamond')],
+    exact: await exactOn(g), exactOnly: await exactOn(only),
+    race: shortestRoute(g, 'Stone', 'Zombie', any), kinds: kindsRoute(g, 'Stone', ['Hostile mobs'], any), raceOnly: shortestRoute(only, 'Stone', 'Zombie', any), kindsOnly: kindsRoute(only, 'Stone', ['Hostile mobs'], any),
+    raceBoxed: shortestRoute(boxed, 'Stone', 'Zombie', any), kindsBoxed: kindsRoute(boxed, 'Stone', ['Hostile mobs'], any) });
+})()`));
+check('a Race, a hunt of kinds and Exact clicks each take the page in the pool when one is as short', poolFirst.bites && [poolFirst.race, poolFirst.kinds, poolFirst.exact].every(r => r?.join() === 'Stone,Diamond,Zombie'), JSON.stringify(poolFirst));
+check('and through a navbox too', [poolFirst.raceBoxed, poolFirst.kindsBoxed].every(r => r?.join() === 'Stone,Diamond,Zombie'), JSON.stringify(poolFirst));
+check('and go through a page outside it when nothing else is as short', [poolFirst.raceOnly, poolFirst.kindsOnly, poolFirst.exactOnly].every(r => r?.join() === 'Stone,Crafting,Zombie'), JSON.stringify(poolFirst));
 check('par reaches a spin-off page only with its spin-off on', par.spinoff);
 check('par goes through the checkpoint, and through two in order', par.via && par.relay);
 check('round trip par goes there and back, the way back off the way there', par.roundTrips.length === 0 && par.atBound >= 15, `${par.atBound} at the bound; ${par.roundTrips.join(', ')}`);

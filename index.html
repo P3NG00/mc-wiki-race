@@ -5080,18 +5080,18 @@ async function linkGraph(rules) {
   return { links: links.decoded, ...boxes.decoded };
 }
 
-// Whether a page is game content (it has a topic or a family), by page number. Pages that aren't, such as Minecraft
-// Dungeons, Particles or Minecraft.net, are on a shortest route for many pairs, though one through content alone is often
-// as short.
-const CONTENT_PAGES = WIKI_DATA.articles.map(([, , , topic, families]) => !!topic || families.length > 0);
+// Whether a page is in the pool (it has a topic), by page number. Pages that aren't are on a shortest route for many
+// pairs, though one through the pool alone is often as short: those a Content checkbox adds (Crafting, on 45% of the routes
+// a search with no preference showed in Normal), and others, such as Minecraft Dungeons, Particles or Minecraft.net.
+const POOL_PAGES = WIKI_DATA.articles.map(([, , , topic]) => !!topic);
 // One route with the fewest clicks from one page to another (or to the nearest of a list), as titles, or null if there
 // is none. usable(page): whether the route may go through a page. Of the routes with the fewest clicks it takes one
-// through the fewest pages that aren't content, then the first by page number: each level of the search goes in that
-// order, so the first page to reach another (or to open a navbox) is the best one to come from.
+// through the fewest pages outside the pool, then the first by page number: each level of the search goes in that order,
+// so the first page to reach another (or to open a navbox) is the best one to come from.
 function shortestRoute(graph, from, to, usable) {
   const start = PAGE_IDS.get(from), goals = new Set([to].flat().map(t => PAGE_IDS.get(t)).filter(v => v !== undefined));
   if (start === undefined || !goals.size) return null;
-  const prev = new Map([[start, -1]]), off = new Map([[start, 0]]), opened = new Set();   // off: pages that aren't content so far
+  const prev = new Map([[start, -1]]), off = new Map([[start, 0]]), opened = new Set();   // off: pages outside the pool so far
   for (let level = [start]; level.length;) {
     const found = level.filter(u => goals.has(u));
     if (found.length) {
@@ -5099,7 +5099,7 @@ function shortestRoute(graph, from, to, usable) {
       for (let v = found.reduce((a, b) => off.get(b) < off.get(a) ? b : a); v !== -1; v = prev.get(v)) route.unshift(WIKI_DATA.articles[v][0]);
       return route;
     }
-    const next = [], through = u => off.get(u) + !CONTENT_PAGES[u];
+    const next = [], through = u => off.get(u) + !POOL_PAGES[u];
     for (const u of level.sort((a, b) => through(a) - through(b))) {
       const reach = v => { if (!prev.has(v) && usable(v)) { prev.set(v, u); off.set(v, through(u)); next.push(v); } };
       graph.links[u].forEach(reach);
@@ -5247,8 +5247,9 @@ async function searchStartPars(topic) {
 // Exact clicks: a route of exactly n clicks from the first card to the last that is on no page twice, as titles, or null.
 // Whether there is one is NP-hard in general (it can be a longest-route question), so this searches depth first, only
 // through pages the target can still be reached from in the clicks left, the farthest first, since the detour has to
-// be somewhere, and gives up after EXACT_BUDGET pages. On the 2026-08 snapshot it found one for every pool pair tried in
-// Normal, Relaxed and Hard, 150 each at par + 1 to 6 and 60 each at par + 8, 10, 15 and 20, in 18 ms at most.
+// be somewhere, then those in the pool, and gives up after EXACT_BUDGET pages. On the 2026-08 snapshot it found one for
+// every pool pair tried in Normal, Relaxed and Hard, 150 each at par + 1 to 6 and 60 each at par + 8, 10, 15 and 20, in
+// 18 ms at most.
 const EXACT_BUDGET = 20000;
 async function exactRoute(titles, rules, n, content = contentInPlay(titles)) {
   const [start, goal] = [titles[0], titles.at(-1)].map(t => PAGE_IDS.get(t));
@@ -5262,7 +5263,7 @@ async function exactRoute(titles, rules, n, content = contentInPlay(titles)) {
     if (left === 0) return u === goal;
     if (--budget < 0) return false;
     const next = [...out(u)].filter(v => !on.has(v) && dist[v] >= 0 && dist[v] < left && (v === goal) === (left === 1))
-      .sort((a, b) => dist[b] - dist[a]);
+      .sort((a, b) => dist[b] - dist[a] || POOL_PAGES[b] - POOL_PAGES[a]);
     for (const v of next) {
       path.push(v); on.add(v);
       if (go(v, left - 1)) return true;
@@ -5294,37 +5295,44 @@ function huntRoute(graph, start, finds, usable, home = false) {
   return best;
 }
 // Scavenger's kinds: a shortest route through a page of each, found exactly by a breadth-first search over (page, the
-// kinds found so far). A page of several kinds finds them all, and the start finds none. home: a round trip, which goes
-// back to the start from the last find, never through a page of the hunt: the hunts are taken nearest first, each with
-// the shortest way back around it unless the shortest way back at all (toStart) can't beat the best, until a hunt can't
-// (the way back is a click at least) or after ROUND_TRIP_TRIES, so this is no longer exact.
+// kinds found so far), through the fewest pages outside the pool as shortestRoute's is. A page of several kinds finds
+// them all, and the start finds none. home: a round trip, which goes back to the start from the last find, never through
+// a page of the hunt: the hunts are taken nearest first, each with the shortest way back around it unless the shortest
+// way back at all (toStart) can't beat the best, until a hunt can't (the way back is a click at least) or after
+// ROUND_TRIP_TRIES, so this is no longer exact.
 function kindsRoute(graph, start, kinds, usable, home = false) {
   const from = PAGE_IDS.get(start), bits = kinds.length, all = (1 << bits) - 1;
   if (from === undefined) return null;
   const finds = new Uint8Array(graph.links.length);
   kinds.forEach((k, i) => { for (const t of KINDS[k].members) if (PAGE_IDS.has(t)) finds[PAGE_IDS.get(t)] |= 1 << i; });
-  // A state is page << bits | found; prev holds the state before it (-1 for the start, -2 for one not reached yet).
-  const prev = new Int32Array(graph.links.length << bits).fill(-2), queue = [from << bits], opened = new Set();
-  prev[queue[0]] = -1;
+  // A state is page << bits | found; prev holds the state before it (-1 for the start, -2 for one not reached yet), and
+  // off the pages outside the pool so far.
+  const prev = new Int32Array(graph.links.length << bits).fill(-2), off = new Uint16Array(prev.length), opened = new Set();
+  prev[from << bits] = -1;
   const toStart = home && distancesTo(graph, from, usable);
+  const through = s => off[s] + !POOL_PAGES[s >> bits];
   let best = null, tries = 0;
-  for (let i = 0; i < queue.length; i++) {
-    const s = queue[i], found = s & all;
-    if (found === all) {
-      const route = [], pages = new Set();
-      for (let t = s; t !== -1; t = prev[t]) { route.unshift(WIKI_DATA.articles[t >> bits][0]); pages.add(t >> bits); }
-      if (!home) return route;
-      if (best && route.length + 1 >= best.length) break;
-      if (toStart[s >> bits] < 0 || (best && route.length + toStart[s >> bits] >= best.length)) continue;
-      const way = shortestRoute(graph, route.at(-1), start, v => usable(v) && (v === from || !pages.has(v)));
-      if (way && (!best || route.length + way.length - 1 < best.length)) best = route.concat(way.slice(1));
-      if (++tries === ROUND_TRIP_TRIES) break;
-      continue;
+  search: for (let level = [from << bits]; level.length;) {
+    const next = [];
+    for (const s of level.sort((a, b) => through(a) - through(b))) {
+      const found = s & all;
+      if (found === all) {
+        const route = [], pages = new Set();
+        for (let t = s; t !== -1; t = prev[t]) { route.unshift(WIKI_DATA.articles[t >> bits][0]); pages.add(t >> bits); }
+        if (!home) return route;
+        if (best && route.length + 1 >= best.length) break search;
+        if (toStart[s >> bits] < 0 || (best && route.length + toStart[s >> bits] >= best.length)) continue;
+        const way = shortestRoute(graph, route.at(-1), start, v => usable(v) && (v === from || !pages.has(v)));
+        if (way && (!best || route.length + way.length - 1 < best.length)) best = route.concat(way.slice(1));
+        if (++tries === ROUND_TRIP_TRIES) break search;
+        continue;
+      }
+      const reach = v => { const t = v << bits | found | finds[v]; if (prev[t] === -2 && usable(v)) { prev[t] = s; off[t] = through(s); next.push(t); } };
+      graph.links[s >> bits].forEach(reach);
+      // A navbox is opened once for each set of kinds found, the first, nearest time.
+      for (const b of graph.carries?.[s >> bits] ?? []) if (!opened.has(b << bits | found)) { opened.add(b << bits | found); graph.boxes[b].forEach(reach); }
     }
-    const reach = v => { const t = v << bits | found | finds[v]; if (prev[t] === -2 && usable(v)) { prev[t] = s; queue.push(t); } };
-    graph.links[s >> bits].forEach(reach);
-    // A navbox is opened once for each set of kinds found, the first, nearest time.
-    for (const b of graph.carries?.[s >> bits] ?? []) if (!opened.has(b << bits | found)) { opened.add(b << bits | found); graph.boxes[b].forEach(reach); }
+    level = next;
   }
   return best;
 }

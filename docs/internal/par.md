@@ -108,10 +108,13 @@ Then Share, Copy challenge link, Same cards again and New game.
   - or `wiki-lead.js` alone for Top links only,
   - each the first time it is needed, refused if its sha256 isn't `WIKI_DATA`'s.
 - `parRoute` searches it breadth-first (`shortestRoute`), opening each navbox once, the first and nearest time it is reached.
-- Of the routes with the fewest clicks it takes one through the fewest pages that aren't content (`CONTENT_PAGES`: no topic and no family), then the first by page number, by taking each level of the search in that order.
-  - Pages that aren't content, such as Minecraft Dungeons, Particles or Minecraft.net, link to much of the wiki, and by page number alone nearly 1 in 5 routes shown on this snapshot went through one.
-  - Now 1 in 30 do, the rest having no route through content alone as short.
-  - Par is the same either way.
+- Of the routes with the fewest clicks it takes one through the fewest pages outside the pool (`POOL_PAGES`: no topic), then the first by page number, by taking each level of the search in that order.
+  - Pages outside the pool link to much of the wiki: those a Content checkbox adds (Crafting, Renewable resource, Advancement) and others (Minecraft Dungeons, Particles, Minecraft.net).
+  - It goes by the pool whatever Content is on, so nothing about it depends on the game's settings: a route avoids a page the player turned on too, which costs nothing.
+  - In Normal on this snapshot, 52% of Race routes shown went through a page outside the pool when only the others counted, and 14% do now, the rest having no route through the pool alone as short. About 12% go through a Mechanics page, most of them hubs that Hard kills, and under 4% through a page with no topic or family, and April Fools, Removed, Education and Books pages are all but gone. In Hard it is 31% to 11%, in Relaxed 24% to 1%.
+  - `kindsRoute` does the same by the level of its search over (page, kinds found), taking a Scavenger route from 44% to 2% in Normal, and `exactRoute` takes the pool first among pages equally far from the target, though its detours keep it from a guarantee (100% to 59%).
+  - Par is the same either way for the exact searches: 1,918 games of every kind, on all three difficulties, compared with the old search when this went in, none differed.
+  - The exception is a round trip's hunt of kinds, where the order decides which finished hunts `ROUND_TRIP_TRIES` gets to try: 1 in 3,000 came out a click shorter than before, none longer.
 
 ### Following the game's settings
 

@@ -71,14 +71,18 @@ The frame and this rule go together: in v1.0.0 the frame ran no gadget, so Coars
 - the version categories
 - the list pages
 - the hubs and the core namespaces the ZIM doesn't hold
-- Scavenger's kinds (`kinds`: hand-picked categories, approved 2026-10-21, each with the name the game shows and the members it leaves out).
+- Scavenger's kinds (`kinds`: each with the name the game shows, its fixed list of `members`, and for some `also`, pages that count without par going by them).
 
-A kind's members are the pool articles in its category linked well enough to be a target, less its exclusions.
-The build stops if an excluded title has left its category or a kind has fewer than `MIN_KIND` (5) members, so a new snapshot gets the list looked at again.
+A kind's members are written out by hand, first picked from the wiki's categories (approved 2026-10-21) and then filled in where a category misses pages, and neither the build nor the game asks the wiki what is in a kind.
+A kind's key is the category it started from, which links and history records hold, and the only thing still reading that category is `report.py`, which lists what it holds that the list doesn't, for a new snapshot.
+Members needn't have a topic (the potions mostly don't), and a kind's topic is the commonest among those that do.
+`also` holds the few pages a Content checkbox hides that are still fair finds (Illusioner, Sprinting), kept apart so that par never ends a route on one.
+The build stops if a member or `also` page is no longer an article, a page is on both, a member is in a Content family or an `also` page in none, or a kind has fewer than `MIN_KIND` (5) members, so a new snapshot gets the lists looked at again.
+`report.py` says so if no page is in a kind's category any more, since it can then show nothing the list misses.
 
 The build also stops:
 
-- if a category the config names (a topic's, a family's, a kind, or a not-content or disambiguation category) is on no page, such as one renamed on the wiki, which would otherwise move its articles without a word
+- if a category the config names (a topic's, a family's, or a not-content or disambiguation category) is on no page, such as one renamed on the wiki, which would otherwise move its articles without a word
 - if a not-content title is no longer an article (gone, or a redirect left by a rename, which would let the page under its new title into the pool).
 
 #### Left-out pages

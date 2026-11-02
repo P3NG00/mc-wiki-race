@@ -43,13 +43,10 @@ const ARTICLE = title => title === CALC_PAGE ? CALC_ARTICLE : title === HUBS_ONL
   <p><a href="/w/Gold_Ingot">gold</a></p>
   <div class="mw-heading mw-heading2"><h2 id="Uses">Uses</h2></div><p><a href="/w/Iron_Ingot">iron</a></p>
   <table class="navbox"><tr><td><a href="/w/Creeper">Creeper</a></td></tr></table></div>`;
-// The live categories a parse reply gives, as the API writes them: Brand New Mob is only in the live wiki's Nether mobs,
-// and Chicken is in it too but excluded from the kind.
 const REACH_LABEL = { p1: 'Par 1', p2: 'Par 2', p3: 'Par 3', p4: 'Par 4', p5: 'Par 5+' };
 const failParse = new Set();   // articles whose requests fail, as with no connection
 const faultReplies = new Map();   // articles answered with [status, body] in place of the article, as a wiki in trouble can
 const REDIRECTS = { 'Crafting recipe': 'Crafting' };   // titles a parse follows to another article, as the wiki's redirects do
-const LIVE_CATEGORIES = { 'Brand New Mob': ['Nether_mobs', 'Verify'], Chicken: ['Nether_mobs', 'Passive_mobs'] };
 // The calculator gadget and jQuery as the wiki would send them, here stand-ins: just enough jQuery for the gadget's
 // $content, and a gadget that does as the real one would on CALC_PAGE (fills the field, turns the label into a <label>
 // with its link inside, asks for Codex for it) and notes what MediaWiki's stand-in told it.
@@ -91,7 +88,7 @@ function answer(request, url) {
     const fault = faultReplies.get(t);
     if (fault) return reply(request, fault[1], 'application/json', fault[0]);
     return reply(request, JSON.stringify({ parse: { title: t, displaytitle: escHtml(t), text: ARTICLE(t),
-      categories: (LIVE_CATEGORIES[t] ?? []).map(category => ({ sortkey: '', category })), links: [{ ns: 0, title: 'No such page', exists: false }, { ns: 0, title: 'Diamond Pickaxe', exists: true }] } }));
+      links: [{ ns: 0, title: 'No such page', exists: false }, { ns: 0, title: 'Diamond Pickaxe', exists: true }] } }));
   }
   if (p.get('action') === 'query' && p.has('titles')) {
     return reply(request, JSON.stringify({ query: { pages: p.get('titles').split('|').map(t => t.startsWith('No such ') ? { title: t, missing: true } : { title: t, ns: nsOf(t), pageprops: t.endsWith(' (disambiguation)') ? { disambiguation: '' } : {}, extract: `About ${t}.` }) } }));
@@ -154,7 +151,9 @@ const SNAPSHOT_FACTS = {
   'the pages used are articles in it, not hubs': "['Diamond', 'Diamond Pickaxe', 'Zombie', 'Creeper', 'Bamboo', 'Ghast', 'Sharpness'].every(t => ARTICLES.has(t) && !spinoffOf(t) && !HUB_TITLES.has(t))",
   'Minecraft Dungeons is an article, Dungeons:Creeper a Dungeons page': "ARTICLES.has('Minecraft Dungeons') && !spinoffOf('Minecraft Dungeons') && spinoffOf('Dungeons:Creeper') === 'Dungeons' && ARTICLES.has('Dungeons:Creeper')",
   'Blaze is a hostile and a flying mob, Sharpness an enchantment, Potion of Swiftness a potion': "KIND_MEMBERS.get('Hostile mobs')?.has('Blaze') && KIND_MEMBERS.get('Flying mobs')?.has('Blaze') && KIND_MEMBERS.get('Enchantments')?.has('Sharpness') && KIND_MEMBERS.get('Potions')?.has('Potion of Swiftness')",
-  'Chicken is left out of Nether mobs': "KINDS['Nether mobs']?.exclude.includes('Chicken')",
+  'Chicken is not on Nether mobs\' list, and Blaze is': "!KIND_MEMBERS.get('Nether mobs').has('Chicken') && KIND_MEMBERS.get('Nether mobs').has('Blaze')",
+  'Diamond Helmet, which its wiki category misses, is on Armor\'s list': "KIND_MEMBERS.get('Armor').has('Diamond Helmet')",
+  'Hostile mobs also counts Illusioner, and Transport more than one page': "KINDS['Hostile mobs'].also.includes('Illusioner') && !KIND_MEMBERS.get('Hostile mobs').has('Illusioner') && KINDS.Transport.also.length > 1",
   'Java Edition version history, Pocket Edition version history (a redirect to one) and Closed captions are left out': "['Java Edition version history', 'Pocket Edition version history', 'Closed captions'].every(t => LEFT_OUT.has(t) && !ARTICLES.has(t))",
   'the made-up pages aren’t in it': `![${JSON.stringify(HUBS_ONLY)}, ${JSON.stringify(CALC_PAGE)}, 'Brand New Mob'].some(t => ARTICLES.has(t))`,
 };
@@ -925,8 +924,7 @@ check('a roll with it has a route', await until(ready) && await until("/^Par \\d
   await ev("document.querySelector('#setupPar').textContent"));
 
 // Scavenger, kinds: a link's kinds go on the hunt card, par is a route through a member of each, and a find ticks its
-// kind: a snapshot member, or a page the live wiki puts in the category less the kind's exclusions (Chicken). Finding
-// one of each wins, and the record keeps the kinds.
+// kind: a page on its list, and no other (Chicken isn't on Nether mobs'). Finding one of each wins, and the record keeps the kinds.
 await open('#start=Diamond&kind=Nether%20mobs&kind=Enchantments&kind=Potions&rules=scavenger');
 check('Scavenger: a kinds link puts its kinds on the hunt card in place of the target', await until(ready) && await ev(`huntMode() === 'kinds'
   && setup.kinds.join() === 'Nether mobs,Enchantments,Potions' && !document.querySelector('#cardHunt').classList.contains('hidden')
@@ -942,11 +940,11 @@ const hunt = "[...document.querySelectorAll('#hudRoute .chip')].map(c => (c.clas
 check('the header lists the kinds to find', await ev(hunt) === 'a mob found in the Nether, an enchantment, a potion' && await ev("document.querySelector('#hudTags').textContent.includes('Found 0 of 3')"), await ev(hunt));
 await ev("navigate('Chicken', null)");
 await until('game.path.length === 2 && !game.loading');
-check('an excluded page in the live category isn\'t a find', await ev('!game.path[1].found && game.hunt.every(h => !h.found)'));
-await ev("navigate('Brand New Mob', null)");
+check('a page not on a kind\'s list isn\'t a find', await ev('!game.path[1].found && game.hunt.every(h => !h.found)'));
+await ev("navigate('Blaze', null)");
 await until('game.path.length === 3 && !game.loading');
-check('a page only the live wiki puts in the category is a find', await ev(`game.path[2].found?.join() === 'a mob found in the Nether'
-  && ${toast} === '✓ Found a mob found in the Nether: Brand New Mob (1 of 3)'`) && await ev(hunt) === '✓ a mob found in the Nether (Brand New Mob), an enchantment, a potion', await ev(hunt));
+check('a page on a kind\'s list is a find', await ev(`game.path[2].found?.join() === 'a mob found in the Nether'
+  && ${toast} === '✓ Found a mob found in the Nether: Blaze (1 of 3)'`) && await ev(hunt) === '✓ a mob found in the Nether (Blaze), an enchantment, a potion', await ev(hunt));
 await ev("navigate('Sharpness', null)");
 await until('game.path.length === 4 && !game.loading');
 await ev("navigate('Potion of Swiftness', null)");
@@ -961,22 +959,44 @@ await ev("navigate('Blaze', null)");
 check('a page of two kinds finds both', await until("game.path.length === 2 && !game.loading") &&
   await ev(`game.path[1].found.join() === 'a hostile mob,a flying mob' && ${toast} === '✓ Found a hostile mob and a flying mob: Blaze (2 of 3)'`), await ev(toast));
 await ev("finish(false); closeModal(); toSetup()");
-// The start is no find, coming back to it either, though the live wiki puts it in a kind's category.
-await open('#start=Brand%20New%20Mob&kind=Nether%20mobs&kind=Enchantments&kind=Potions&rules=scavenger');
+// A page its wiki category misses counts, from the list alone.
+await open('#start=Diamond&kind=Armor&kind=Enchantments&kind=Overworld%20biomes&rules=scavenger');
 await until(ready);
+await play();
+await ev("navigate('Diamond Helmet', null)");
+check('a page on a kind\'s list is a find with no word from the wiki on what it is', await until('game.path.length === 2 && !game.loading') && await ev("game.path[1].found?.join() === 'a piece of armor'"),
+  await ev('JSON.stringify(game.path.at(-1))'));
+await ev("finish(false); closeModal(); toSetup()");
+// A page a kind also counts is a find, and par never aims for one, even one click away with the members further.
+await open('#start=Diamond&kind=Hostile%20mobs&kind=Enchantments&kind=Overworld%20biomes&rules=scavenger');
+await until(ready);
+await play();
+await ev("navigate('Illusioner', null)");
+check('a page a kind also counts is a find', await until('game.path.length === 2 && !game.loading') && await ev("game.path[1].found?.join() === 'a hostile mob'"),
+  await ev('JSON.stringify(game.path.at(-1))'));
+await ev("finish(false); closeModal(); toSetup()");
+const alsoPar = JSON.parse(await ev(`linkGraph(['nonav']).then(g => {
+  const also = new Set(KINDS.Transport.also.map(t => PAGE_IDS.get(t))), member = v => KIND_MEMBERS.get('Transport').has(WIKI_DATA.articles[v][0]);
+  const start = POOL_TITLES.find(t => !KIND_FINDS.get('Transport').has(t) && g.links[PAGE_IDS.get(t)].some(v => also.has(v)) && !g.links[PAGE_IDS.get(t)].some(member));
+  return parRoute({ start, kinds: ['Transport'], rules: ['nonav', 'scavenger'] }).then(route => JSON.stringify({ route, also: KINDS.Transport.also }));
+})`));
+check('par never aims for such a page, though one is a click away', alsoPar.route?.length >= 3 && !alsoPar.also.includes(alsoPar.route.at(-1)), JSON.stringify(alsoPar));
+// The start is no find, coming back to it either, though a challenge link's kind holds it, whose kinds aren't rolled again.
+await open('#start=Blaze&kind=Nether%20mobs&kind=Enchantments&kind=Potions&rules=scavenger');
+check('a challenge link keeps its kinds, though its start is in one', await until(ready) && await ev("setup.kinds.join() === 'Nether mobs,Enchantments,Potions'"), await ev('setup.kinds?.join()'));
 await play();
 await ev("navigate('Diamond', null)");
 await until('game.path.length === 2 && !game.loading');
-await ev("navigate('Brand New Mob', null)");
-check('the start is no find, coming back to it either', await until('game.path.length === 3 && !game.loading') && await ev('game.hunt.every(h => !h.found) && !game.path[2].found'),
+await ev("navigate('Blaze', null)");
+check('the start is no find, coming back to it either, though a kind holds it', await until('game.path.length === 3 && !game.loading') && await ev("game.hunt.every(h => !h.found) && !game.path[2].found"),
   await ev('JSON.stringify(game.path.map(e => e.found ?? null))'));
 await ev("finish(false); closeModal(); toSetup()");
 const rolled = JSON.parse(await ev(`(() => {
   setup.start = { title: 'Blaze' };
   // Forty random rolls, and one in an order putting kinds that share pages first (Boat is a vehicle and a way to get around).
   const rolls = [...Array.from({ length: 40 }, rollKinds), firstKinds(['Transport', 'Vehicles', 'Storage', 'Effects', 'Food', 'Climbable blocks', ...Object.keys(KINDS)], 'Blaze')];
-  return JSON.stringify(rolls.filter(ks => ks.length !== 3 || new Set(ks.map(k => KINDS[k].topic)).size !== 3 || ks.some(k => KIND_MEMBERS.get(k).has('Blaze'))
-    || ks.some(a => ks.some(b => a !== b && KINDS[a].members.some(t => KIND_MEMBERS.get(b).has(t))))));
+  return JSON.stringify(rolls.filter(ks => ks.length !== 3 || new Set(ks.map(k => KINDS[k].topic)).size !== 3 || ks.some(k => KIND_FINDS.get(k).has('Blaze'))
+    || ks.some(a => ks.some(b => a !== b && [...KIND_FINDS.get(a)].some(t => KIND_FINDS.get(b).has(t))))));
 })()`));
 check('rolled kinds are three from three topics sharing no page, none holding the start', rolled.length === 0, JSON.stringify(rolled.slice(0, 2)));
 await open('#start=Diamond&kind=Hostile%20mobs&kind=Enchantments&kind=Potions&rules=scavenger');
@@ -984,6 +1004,11 @@ await until(ready);
 await ev("setCustom('start', 'Blaze')");
 check('a start in one of the kinds rolls them again', await ev("KIND_MEMBERS.get('Hostile mobs').has('Blaze')") && await until("setup.start?.title === 'Blaze' && setup.busy === 0") &&
   await ev("setup.kinds.length === 3 && !setup.kinds.some(k => KIND_MEMBERS.get(k).has('Blaze'))"), await ev('setup.kinds.join()'));
+await open('#start=Diamond&kind=Hostile%20mobs&kind=Enchantments&kind=Potions&rules=scavenger');
+await until(ready);
+await ev("setCustom('start', 'Illusioner')");
+check('and so does a start a kind also counts', await until("setup.start?.title === 'Illusioner' && setup.busy === 0") &&
+  await ev("setup.kinds.length === 3 && !setup.kinds.some(k => KIND_FINDS.get(k).has('Illusioner'))"), await ev('setup.kinds.join()'));
 
 // Scavenger, articles: three Find cards joined by +, par the best order, any order wins, Distance counts to the nearest.
 await open('#start=Diamond&target=Bamboo&via=Ghast&via=Sharpness&rules=scavenger,distance');
@@ -2454,7 +2479,7 @@ const framePoint = async href => JSON.parse(await ev(`(() => { const r = documen
   return JSON.stringify({ x: Math.round(r.left + r.width / 2), y: Math.round(r.top + r.height / 2) }); })()`, await frameCtx()));
 const pointer = actions => send('input.performActions', { context: ctx, actions: [{ type: 'pointer', id: 'mouse', parameters: { pointerType: 'mouse' }, actions }] });
 const frameAt = JSON.parse(await ev("(r => JSON.stringify({ x: Math.round(r.left), y: Math.round(r.top) }))($('#frame').getBoundingClientRect())"));
-const parses = () => requests.get('parse prop=text|displaytitle|categories|links') ?? 0;
+const parses = () => requests.get('parse prop=text|displaytitle|links') ?? 0;
 let before = parses(), at = await framePoint('/w/Diamond_Pickaxe');
 await pointer([{ type: 'pointerMove', x: frameAt.x + at.x, y: frameAt.y + at.y }, { type: 'pointerDown', button: 0 }, { type: 'pause', duration: 120 }, { type: 'pointerUp', button: 0 }]);
 check('a link pressed and clicked is asked for once, at the press, and arrives', await until("game.path.length === 2 && !game.loading") && parses() - before === 1,
@@ -2777,6 +2802,6 @@ check('leaving after the game doesn’t ask', leftAfter === '', leftAfter);
 await send('session.unsubscribe', { events: ['browsingContext.userPromptOpened'] });
 stopPrompts();
 
-check('only page info, the advancements\' and items\' pictures and articles are asked for', [...requests.keys()].every(k => ['query prop=pageprops|pageimages|extracts', 'query prop=pageimages', 'query prop=imageinfo', 'parse prop=text|displaytitle|categories|links'].includes(k)),
+check('only page info, the advancements\' and items\' pictures and articles are asked for', [...requests.keys()].every(k => ['query prop=pageprops|pageimages|extracts', 'query prop=pageimages', 'query prop=imageinfo', 'parse prop=text|displaytitle|links'].includes(k)),
   JSON.stringify(Object.fromEntries(requests)));
 await end();

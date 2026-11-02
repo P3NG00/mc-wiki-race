@@ -37,7 +37,7 @@ def diff(old, new, moved=0.5, min_links=20):
             if was - now:
                 w(f'  left: {listing(was - now)}')
     for cat in dict.fromkeys([*old['kinds'], *new['kinds']]):
-        was, now = (set(d['kinds'].get(cat, {}).get('members', [])) for d in (old, new))
+        was, now = (set(d['kinds'].get(cat, {}).get('members', []) + d['kinds'].get(cat, {}).get('also', [])) for d in (old, new))
         if was != now:
             w(f'Kind {cat}: {len(was)} → {len(now)}')
             if now - was:

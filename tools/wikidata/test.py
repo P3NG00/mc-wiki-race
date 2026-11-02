@@ -136,8 +136,8 @@ CONFIG = {**load_config(), 'topics': {'items': ['Items', 'Tools'], 'mobs': ['Hos
                        'fiction': ['Fictional mods'], 'variants': ['Slabs'], 'mechanics': ['Gameplay']},
           'not_content_categories': ['Minecraft 4k'], 'not_content_titles': ['Village & Pillage'], 'disambiguation_categories': ['Disambiguation pages'],
           'version_categories': ['Versions'], 'list_titles': ['Creative inventory'],
-          'kinds': {'Items': {'label': 'an item', 'exclude': ['Iron Ingot']}}}
-build_module.MIN_KIND = 1   # the fixture's only item linked well enough to be a target is Diamond
+          'kinds': {'Items': {'label': 'an item', 'members': ['Diamond', 'Charcoal'], 'also': ['Ankle Monitor']}}}
+build_module.MIN_KIND = 1   # the fixture's kind lists only two pages
 
 with tempfile.TemporaryDirectory() as tmp:
     zim = os.path.join(tmp, 'test.zim')
@@ -218,17 +218,33 @@ with tempfile.TemporaryDirectory() as tmp:
           data['hubs'] == {'Block': 'Block', 'Blocks': 'Block', 'Breaking': 'Breaking', 'Breaking/Mining': 'Breaking', 'Mining': 'Breaking'},
           data['hubs'])
 
-    # Items: Diamond is in it and linked well enough; Iron Ingot is excluded; Charcoal isn't linked well enough.
-    check('Scavenger kinds: pool members linked well enough, less the exclusions',
-          data['kinds'] == {'Items': {'label': 'an item', 'topic': 'items', 'members': ['Diamond'], 'exclude': ['Iron Ingot']}}, data['kinds'])
+    # The fixed lists as they stand, sorted, Charcoal in it however little it is linked, and Diamond Pickaxe, in the category, not.
+    check('Scavenger kinds: exactly the config\'s lists, whatever the categories say',
+          data['kinds'] == {'Items': {'label': 'an item', 'topic': 'items', 'members': ['Charcoal', 'Diamond'], 'also': ['Ankle Monitor']}}, data['kinds'])
+    no_also = build(snap, {**CONFIG, 'kinds': {'Items': {'label': 'an item', 'members': ['Diamond']}}})[0]['kinds']
+    check('a kind with no also pages has no also in the data', 'also' not in no_also['Items'], no_also)
     stops = lambda kinds: build(snap, {**CONFIG, 'kinds': kinds})
     try:
-        stops({'Items': {'label': 'an item', 'exclude': ['Creeper']}})
-        check('a kind whose excluded title left its category stops the build', False)
+        stops({'Items': {'label': 'an item', 'members': ['Nope', 'Iron ingot', 'Mining', 'Creative inventory', 'Diamond'], 'also': ['Nada']}})
+        check('a kind with a member that is no longer an article stops the build', False)
     except SystemExit as e:
-        check('a kind whose excluded title left its category stops the build', 'Creeper' in str(e), e)
+        check('a kind with a member that is no longer an article stops the build', all(m in str(e) for m in (
+            'Items: member that is no longer an article: Nope', 'Items: member that is no longer an article: Iron ingot (now a redirect to Iron Ingot)',
+            'Items: member that is no longer an article: Creative inventory (now left out)',
+            'Items: also page that is no longer an article: Nada')), e)
     try:
-        stops({'Hostile mobs': {'label': 'a hostile mob', 'exclude': []}})
+        stops({'Items': {'label': 'an item', 'members': ['Diamond', 'Ankle Monitor'], 'also': ['Charcoal']}})
+        check('a member in a Content family and an also page in none stop the build', False)
+    except SystemExit as e:
+        check('a member in a Content family and an also page in none stop the build', all(m in str(e) for m in (
+            'Items: member in a Content family: Ankle Monitor', 'Items: also page in no Content family: Charcoal')), e)
+    try:
+        stops({'Items': {'label': 'an item', 'members': ['Ankle Monitor'], 'also': ['Ankle Monitor']}})
+        check('a page on both a kind\'s members and its also stops the build', False)
+    except SystemExit as e:
+        check('a page on both a kind\'s members and its also stops the build', 'Items: on both members and also: Ankle Monitor' in str(e), e)
+    try:
+        stops({'Hostile mobs': {'label': 'a hostile mob', 'members': []}})
         check('a kind with too few members stops the build', False)
     except SystemExit as e:
         check('a kind with too few members stops the build', 'Hostile mobs: 0 members' in str(e), e)
@@ -245,8 +261,11 @@ with tempfile.TemporaryDirectory() as tmp:
 
     text = report(snap, CONFIG, 20)
     check('the report runs, with its topics, kinds, pool definitions and designs',
-          all(h in text for h in ('## Topics', '## Scavenger kinds', '- **Items:** Diamond', '## Pool definitions', '## Pool designs',
+          all(h in text for h in ('## Topics', '## Scavenger kinds', '- **Items:** Charcoal, Diamond', 'Also counts, though par doesn\'t go by them: Ankle Monitor', 'In the category, not listed: Diamond Pickaxe, Dirt (Minecraft 4k), Iron Ingot', '## Pool definitions', '## Pool designs',
                                   '| Everyday, any pair |', 'Dead ends')), text[:400])
+
+    gone = report(snap, {**CONFIG, 'kinds': {'Renamed': {'label': 'an item', 'members': ['Diamond']}}}, 20)
+    check('the report says when no page is in a kind\'s category any more', 'No page is in a category of this name any more' in gone, gone[:400])
 
     out = os.path.join(tmp, 'wiki-data.js')
     with open(out, 'w', encoding='utf-8') as f:
@@ -274,11 +293,11 @@ with tempfile.TemporaryDirectory() as tmp:
     newer['articles'][[r[0] for r in newer['articles']].index('Diamond')][2] = 30
     newer['hubs'].pop('Mining')
     newer['left_out'].remove('1.0')
-    newer['kinds']['Items']['members'] = ['Charcoal']
+    newer['kinds']['Items'].update(members=['Diamond', 'Diamond Pickaxe'], also=['Ankle Monitor'])
     report = diff(data, newer, min_links=5)
     check('diff lists added and removed articles, category and kind moves, link changes, hubs and left-out pages',
           all(s in report for s in ('2026-08-21', '2026-11-21', 'added (1): Copper Golem', 'removed (1): Creeper',
-                                    'mobs: 1 → 1', 'Kind Items: 1 → 1\n  joined: Charcoal\n  left: Diamond', 'Diamond: 8 → 30', 'Hubs: +none; −Mining', 'Left out: +none; −1.0')), report)
+                                    'mobs: 1 → 1', 'Kind Items: 3 → 3\n  joined: Diamond Pickaxe\n  left: Charcoal', 'Diamond: 8 → 30', 'Hubs: +none; −Mining', 'Left out: +none; −1.0')), report)
 
 # The game labels every topic and family the data names; a key without a label stops the page from loading.
 game = open(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..', 'index.html'), encoding='utf-8').read()

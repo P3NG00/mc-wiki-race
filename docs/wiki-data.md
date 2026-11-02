@@ -60,7 +60,7 @@ Then run each one with `.venv/bin/python -I tools/wikidata/<script>`.
 |---|---|
 | `extract.py <zim>` | Scans the ZIM (about a minute) into an extract, `tools/wikidata/cache/<name>.jsonl.gz`: each page's namespace, categories and links (not those the page hides, which nobody can click, but those the wiki's calculator script shows, which the game runs), split into the article's own, those above its first heading, and each navbox's. It also lists every redirect. The cache is ignored by git. |
 | `build.py <extract>` | Writes the four generated files from the extract and `config.json`, to the repo root unless given `-o folder`. It stops with an error when the config no longer fits the wiki (see below). |
-| `report.py <extract>` | Writes a Markdown report (about 3 minutes): pool sizes, Content families and spin-offs, link counts, every Scavenger hunt kind with its members, dead ends, the pool designs compared, and hub candidates. |
+| `report.py <extract>` | Writes a Markdown report (about 3 minutes): pool sizes, Content families and spin-offs, link counts, every Scavenger hunt kind with its members and what its wiki category holds that its list doesn't, dead ends, the pool designs compared, and hub candidates. |
 | `diff.py <old> <new>` | Compares two `wiki-data.js` files: pages added and removed, pool, family, spin-off and kind members that joined or left, link counts that moved, and hub, left-out page and namespace changes. |
 | `test.py` | Writes a small ZIM shaped like the real one and checks the other scripts against it, in a few seconds. |
 | `common.py` | Loads an extract and the link graph built from it, and reads a `wiki-data.js` back, for the other scripts. |
@@ -82,14 +82,14 @@ Everything in `wiki-data.js` comes from the ZIM except what `config.json` picks 
 | `popular_share`, `deep_cuts_share` | How much of the pool is Popular (0.3) and of each topic Deep cuts (0.33) |
 | `families` | The Content families, by category; their articles leave the pool unless turned on |
 | `spinoffs` | The spin-off games' namespaces, each a Spin-offs checkbox |
-| `kinds` | The Scavenger hunt's kinds: a category, the name the game shows ("a hostile mob") and the members it leaves out |
+| `kinds` | The Scavenger hunt's kinds: the name the game shows ("a hostile mob"), the fixed list of pages that count, and for some kinds `also`, pages that count without par going by them |
 | `disambiguation_categories` | Disambiguation pages, which only **Chaos** rolls |
 | `version_categories`, `list_titles` | Version pages and list pages, left out of the data altogether |
 | `hubs` | The big overview pages whose links are dead in **Hard** |
 | `core_namespaces` | The wiki's namespaces the ZIM doesn't hold, so the game knows to disable links into them |
 | `research` | Only `report.py` reads it: the other shares its pool designs compare, and the sweet spot's range |
 
-The build stops rather than quietly moving articles when the wiki has changed under the config: a category it names is on no page, a left-out or not-content title is no longer an article, an excluded title has left its kind, a kind has fewer than 5 members, a hub is no longer an article, a spin-off's namespace is gone, or a topic, family, spin-off or tier ends up empty.
+The build stops rather than quietly moving articles when the wiki has changed under the config: a category it names is on no page, a left-out or not-content title is no longer an article, a kind's member or `also` page is no longer an article, a page is on both, a member is in a Content family or an `also` page in none, a kind has fewer than 5 members, a hub is no longer an article, a spin-off's namespace is gone, or a topic, family, spin-off or tier ends up empty.
 
 Details: [internal/wiki-data.md](internal/wiki-data.md#buildpy)
 
@@ -123,7 +123,7 @@ When Kiwix publishes a newer ZIM:
 4. Build: `.venv/bin/python -I tools/wikidata/build.py tools/wikidata/cache/minecraft.wiki_en_all_<date>.jsonl.gz`. If it stops, fix `config.json` as its message says and build again.
 5. See what changed: `.venv/bin/python -I tools/wikidata/diff.py <(git show HEAD:wiki-data.js) wiki-data.js`.
 6. Run the scripts' own tests: `.venv/bin/python -I tools/wikidata/test.py`.
-7. Write the report and read its Scavenger hunt kinds through, member by member: `.venv/bin/python -I tools/wikidata/report.py tools/wikidata/cache/minecraft.wiki_en_all_<date>.jsonl.gz -o /tmp/report.md` (about 3 minutes).
+7. Write the report and read its Scavenger hunt kinds through, member by member, adding to `config.json` any new page that belongs on a list, since nothing else adds one: `.venv/bin/python -I tools/wikidata/report.py tools/wikidata/cache/minecraft.wiki_en_all_<date>.jsonl.gz -o /tmp/report.md` (about 3 minutes).
 8. Run both game suites, `test/run-e2e.sh --offline` and then `test/run-e2e.sh`. Their checks lean on the snapshot (named pages, par routes, the kinds and the dailies). If the offline suite's first checks say a named fact changed, pick another page that has it.
 9. Play a few games.
 10. Update the docs that name the ZIM or its counts: the ZIM's name, date and topic counts on this page, the ZIM's name in [internal/wiki-data.md](internal/wiki-data.md), and the par shares in [internal/picking.md](internal/picking.md) and in the comment above `REACHES` in `index.html`.

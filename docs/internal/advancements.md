@@ -43,7 +43,7 @@ Adding one is an entry there and its check; it is earned from then on.
   - What it needs of the game it reads before waiting, since Same cards again can start another game in the meantime.
   - Skill ones need a win at par `ADV_PAR` (3) or more the first time that game is played, so a typed easy pair or Same cards again doesn't earn them, and speed ones the Timer too:
     - Par for the Course (at par),
-    - Birdie (under par, which only a live edit making a route the offline copy lacks can do),
+    - Birdie (under par, which only a live edit making a route the offline copy lacks can do, or a hunt's find among a kind's `also` pages),
     - Hardcore (`nohubs`, so Hard),
     - No Take-Backs, Blindfolded, Six Shooter, Top Notch (each its rule),
     - Long Way Round (Exact clicks at par + 5 or more),

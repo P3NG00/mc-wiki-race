@@ -33,7 +33,7 @@ Pick one of the tiles; Race is the default. Each shows the game's name and its r
 | **Scavenger hunt** | A → ✓ ✓ ✓ | Instead of one target, find 3 things in any order: one of each of 3 kinds, or 3 articles. | **Find**: 3 kinds or 3 articles (kinds by default) |
 | **Exact clicks** | A → → → → B | Reach the target in exactly par + the clicks you pick, never on a page twice. | **Clicks**: par + 1 to par + 5, or Random (par + 2 by default) |
 
-- A kind is a wiki category, such as Hostile mobs, shown with a few of its best-known members as examples. Rolled kinds come from different topics and share no page, so a page usually finds just one (kinds you write into a link yourself may share), and the start never counts.
+- A kind is a fixed list of articles, such as Hostile mobs, shown with a few of its best-known members as examples. A few pages count even with their Content box off, such as Illusioner as a hostile mob and Sprinting as a way to get around, though par doesn't go by them. Rolled kinds come from different topics and share no page, so a page usually finds just one (kinds you write into a link yourself may share), and the start never counts.
 - In Exact clicks there's no Back, every page you've visited goes dead, and landing on the target too soon loses, as does running out of clicks. There's always a route of the count: the result shows one.
 
 ## Extra rules
@@ -140,7 +140,7 @@ Par is the fewest clicks a game can be done in, going by the wiki's offline copy
 | Birdie, Eagle, Albatross | 1, 2 or 3 under par |
 | N over par, N under par | anything further |
 
-You can only beat par where the live wiki has a link the offline copy doesn't. Exact clicks gets no golf score, since every win is par plus the count you picked. The result names the offline copy par went by, or says a page you played isn't in it, so par is unknown.
+You can only beat par where the live wiki has a link the offline copy doesn't, or on a hunt by finding one of those few pages par doesn't go by. Exact clicks gets no golf score, since every win is par plus the count you picked. The result names the offline copy par went by, or says a page you played isn't in it, so par is unknown.
 
 ## The missed shortcut
 
@@ -183,7 +183,7 @@ You can also write a link's keys after the `#` yourself, joined with `&`, for ex
 |---|---|
 | `start=` and `target=` | The pair, by article title. |
 | `via=` | A checkpoint, in order, up to three. With `scavenger` in `rules`, the target and these are the 3 articles to find. |
-| `kind=` | One of Scavenger's kinds instead of a target, by its category's name (`kind=Hostile%20mobs`), up to three. |
+| `kind=` | One of Scavenger's kinds instead of a target, by its name (`kind=Hostile%20mobs`), up to three. |
 | `rules=` | Rule keys, comma-separated: `noback`, `blind`, `lead` (Top links only), `distance`, `checkpoint` (Relay), `roundtrip`, `scavenger`, `limit` (Six clicks), `exact`, and `nonav` for Normal or `nonav,nohubs` for Hard. |
 | `back=` | With Round trip, how many checkpoints come after the target. |
 | `extra=` | With Exact clicks, the clicks over par, 1 to 5. |
@@ -267,7 +267,7 @@ Skill advancements need par 3 or more, the first time you play that game, so pla
 | Getting started | There and Back Again | Task | Win a Round trip. | |
 | Getting started | Accepted | Task | Win a game opened from a challenge link. | |
 | Skill | Par for the Course | Goal | Win at par. | |
-| Skill | Birdie | Challenge | Beat par: the live wiki had a shortcut the offline copy didn't. | Yes |
+| Skill | Birdie | Challenge | Beat par: the live wiki had a shortcut the offline copy didn't, or a hunt's find was one par doesn't go by. | Yes |
 | Skill | Hardcore | Goal | Win on Hard. | |
 | Skill | No Take-Backs | Task | Win with No Back. | |
 | Skill | Blindfolded | Goal | Win with Blind target. | |

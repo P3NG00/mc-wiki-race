@@ -52,7 +52,7 @@ What it checks, by area:
   - the HUD and the picture behind the path switching objective
   - reaching it being celebrated
   - the checkpoint in the link, the record and the personal-best key
-- Scavenger: a real article coming with its live categories, and a member of a kind being a find
+- Scavenger: a member of a kind being a find on a real article
 - Top links only on a real article:
   - the bar over the first section heading, outside the live wiki's table of contents, which the ZIM lacks
   - the rest folded away
@@ -106,7 +106,6 @@ The test starts by asking the wiki itself for what its checks take from live pag
 - Bastion Remnant's folded File structure, folded table of links, open `mw-collapsible` table and folded navbox groups
 - Icons.png's image map
 - Minecraft Dungeons' and Dungeons:Creeper's Dungeons links
-- Blaze in Nether mobs
 - Zombified Piglin's intro
 
 An edit on the wiki that changes one fails there by name, so a check further down failing with it means picking another page that has it, not a bug in the game.
@@ -152,7 +151,9 @@ The snapshot still holding what the checks take from it by name:
 - the pages used being articles and not hubs
 - Minecraft Dungeons an article, Dungeons:Creeper a Dungeons page
 - Blaze, Sharpness and Potion of Swiftness in their kinds
-- Chicken left out of Nether mobs
+- Chicken not on Nether mobs' list, and Blaze on it
+- Diamond Helmet, which its wiki category misses, on Armor's list
+- Illusioner counted by Hostile mobs' `also` and not a member, and more than one page in Transport's
 - Java Edition version history, Pocket Edition version history (a redirect to one) and Closed captions left out
 - the made-up pages absent
 
@@ -436,13 +437,15 @@ Scavenger with kinds:
 - a link's kinds on the hunt card, with no Swap
 - par through a member of each
 - the HUD listing them
-- an excluded page in the live category not counting
-- a page only the live wiki puts in the category counting
+- a page not on a kind's list not counting
+- a page on a kind's list counting
+- a page its wiki category misses counting, from the list alone
+- a page a kind also counts being a find, and par not aiming for one a click away
 - a page of two kinds finding both
-- the start no find, coming back to it either, though the live wiki puts it in a kind's category
+- the start no find, coming back to it either, though a challenge link's kind holds it, whose kinds stay as written
 - the win recorded by its kinds and named in the history
 - rolled kinds from three topics sharing no page, with none holding the start, also in an order putting kinds that share pages first
-- a new start in one of them rolling them again
+- a new start in one of them rolling them again, a page a kind also counts too
 
 And with articles:
 

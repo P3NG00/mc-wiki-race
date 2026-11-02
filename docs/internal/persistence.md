@@ -28,7 +28,7 @@ Clear history still writes an empty list, since that's what the player asked for
 
 ### What a record holds
 
-- A Scavenger record has `finds` (its articles) or `kinds` (their categories) in place of `goal`.
+- A Scavenger record has `finds` (its articles) or `kinds` (their keys) in place of `goal`.
   - `isRecord` takes exactly one of the three, and `targetText` and `routeText` say them.
   - `recordKey` keys its personal best with its finds in any order.
 - A lost record has the flag of its `LOSSES` key, `outOfClicks: true` (Six clicks or Exact clicks) or `tooSoon: true` (Exact clicks).

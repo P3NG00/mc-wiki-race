@@ -25,10 +25,10 @@ const liveOff = JSON.parse(await ev(`(async () => {
     'Dungeons:Creeper', 'Blaze Rod', 'Blaze', 'Zombified Piglin', 'Iron Ingot', 'Oxygène', 'Bastion Remnant'];
   // A request that fails leaves its pages null, which fails the facts about them.
   const info = await api({ action: 'query', prop: 'info', titles: [...titles, 'de:Diamant'].join('|') }).then(d => d.query, () => null);
-  const doc = t => api({ action: 'parse', page: t, prop: 'text|categories', redirects: '1' }).then(({ parse: p }) =>
-    Object.assign(new DOMParser().parseFromString(p.text, 'text/html'), { cats: p.categories.map(c => c.category) }), () => null);
-  const [diamond, pickaxe, diamondPickaxe, ironIngot, beacon, icons, dungeons, creeper, blazeRod, blaze, bastion] = await Promise.all(
-    ['Diamond', 'Pickaxe', 'Diamond Pickaxe', 'Iron Ingot', 'Beacon', 'Icons.png', 'Minecraft Dungeons', 'Dungeons:Creeper', 'Blaze Rod', 'Blaze',
+  const doc = t => api({ action: 'parse', page: t, prop: 'text', redirects: '1' }).then(({ parse: p }) =>
+    new DOMParser().parseFromString(p.text, 'text/html'), () => null);
+  const [diamond, pickaxe, diamondPickaxe, ironIngot, beacon, icons, dungeons, creeper, blazeRod, bastion] = await Promise.all(
+    ['Diamond', 'Pickaxe', 'Diamond Pickaxe', 'Iron Ingot', 'Beacon', 'Icons.png', 'Minecraft Dungeons', 'Dungeons:Creeper', 'Blaze Rod',
       'Bastion Remnant'].map(doc));
   const zpDesc = await pageInfo('Zombified Piglin').then(i => i?.desc, () => null);
   const hrefs = (d, sel = 'a[href^="/w/"]') => [...d.querySelectorAll(sel)].map(a => a.getAttribute('href'));
@@ -58,7 +58,7 @@ const liveOff = JSON.parse(await ev(`(async () => {
       !!bastion.querySelector('table.mw-collapsible:not(.mw-collapsed)') && !!bastion.querySelector('.navbox .collapsible.collapsed'),
     'Icons.png has image-map links': () => hrefs(icons, 'area[href^="/w/"]').length > 0,
     'Minecraft Dungeons and Dungeons:Creeper link Dungeons: pages': () => [dungeons, creeper].every(d => hrefs(d).some(h => h.startsWith('/w/Dungeons:'))),
-    'Blaze Rod links Blaze (plain), which the live wiki puts in Nether mobs': () => hrefs(blazeRod).includes('/w/Blaze') && blaze.cats.includes('Nether_mobs'),
+    'Blaze Rod links Blaze (plain)': () => hrefs(blazeRod).includes('/w/Blaze'),
     'Zombified Piglin’s intro starts “Zombified piglins are”': () => zpDesc.startsWith('Zombified piglins are'),
   };
   return JSON.stringify(Object.keys(facts).filter(f => { try { return facts[f]() !== true; } catch { return true; } }));
@@ -438,7 +438,7 @@ const viaModal = await ev("document.querySelector('#modal').textContent");
 check('checkpoint is recorded and kept out of other bests', await ev("store.get('mwr.history', [])[0].vias.join() === 'Pickaxe'") &&
   viaModal.includes('Diamond → Pickaxe → Diamond Pickaxe') && !/personal best|Your best/.test(viaModal));
 
-// Scavenger: the live wiki sends each article's categories with it, and a link from the start to a member of a kind finds it.
+// Scavenger: a link from the start to a member of a kind finds it.
 await send('browsingContext.navigate', { context: ctx, url: 'about:blank', wait: 'complete' });
 await send('browsingContext.navigate', { context: ctx, url: fileUrl + '#start=Blaze%20Rod&kind=Nether%20mobs&kind=Enchantments&kind=Potions&rules=scavenger', wait: 'complete' });
 await until("!document.querySelector('#btnPlay').disabled", 60000);
@@ -446,8 +446,8 @@ await ev("document.querySelector('#btnPlay').click()");
 await until("game.active && game.path.length === 1 && !game.loading", 60000);
 f = await frameCtx();
 await ev("[...document.querySelectorAll('a.mwr-live')].find(a => a.getAttribute('href') === '/w/Blaze').click()", f);
-check('Scavenger: the article comes with its live categories, and a member of a kind is a find', await until("game.path.length === 2 && !game.loading", 60000) &&
-  await ev("parseCache.get('Blaze')?.categories.some(c => c.category === 'Nether_mobs') && game.path[1].found?.join() === 'a mob found in the Nether'"),
+check('Scavenger: a member of a kind is a find', await until("game.path.length === 2 && !game.loading", 60000) &&
+  await ev("game.path[1].found?.join() === 'a mob found in the Nether'"),
   await ev("JSON.stringify(game.path.at(-1))"));
 await ev("finish(false); closeModal()");
 

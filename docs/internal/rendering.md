@@ -19,7 +19,7 @@ Calls used:
   - thumbnail,
   - redirect resolution,
   - and the description: the first paragraph of the TextExtracts plain-text intro, since `pageprops.description` is often an infobox caption and keeps HTML entities.
-- `action=parse` (article HTML, plus its live categories for Scavenger and its links with whether each page exists).
+- `action=parse` (article HTML, plus its links with whether each page exists).
 
 Nothing polls; every request comes from a player action. A roll looks up each card it draws (`pageInfo`), drawing again only when the page is missing or another card took it meanwhile: at most 12 lookups a card (`rollOne`), and 20 for each of the daily's cards (`dailyPair`).
 

@@ -1045,9 +1045,12 @@ const HUB_TITLES = new Map(Object.entries(WIKI_DATA.hubs));
 // The heart of the wiki's web of links, which every card must have a route to or from (see joinsWeb): the pool article
 // linked from the most articles outside navboxes that isn't a hub, so it is live in every difficulty (Lava).
 const WEB_HEART = POOL_TITLES.filter(t => !HUB_TITLES.has(t)).reduce((a, b) => ARTICLES.get(b).body > ARTICLES.get(a).body ? b : a);
-// Scavenger's kinds (wiki categories), from wiki-data.js: the name the game shows, topic, members and exclusions.
+// Scavenger's kinds, from wiki-data.js: the name the game shows, topic and the fixed lists of pages that count.
 const KINDS = WIKI_DATA.kinds;
 const KIND_MEMBERS = new Map(Object.entries(KINDS).map(([k, kind]) => [k, new Set(kind.members)]));
+// What reaching counts as a find: the members, which par, Distance and the examples go by, and a kind's also, the few
+// pages a Content checkbox hides that are still fair finds, so no route ends on a page the box hides.
+const KIND_FINDS = new Map(Object.entries(KINDS).map(([k, kind]) => [k, new Set([...kind.members, ...kind.also ?? []])]));
 // A kind's best-known members, to show what it means.
 const kindExamples = k => KINDS[k].members.toSorted((a, b) => ARTICLES.get(b).links - ARTICLES.get(a).links).slice(0, 3);
 const WIKI_STYLES = [
@@ -1416,8 +1419,8 @@ function renderCard(which) {
   setImg($('img.icon', card), blind ? '' : info?.img);
   setImg($('img.art', card), blind ? '' : info?.img);
   cardFacts(which, card, blind ? null : info);
-  // A start in one of Scavenger's kinds would be a find before the first click, so the kinds are rolled again.
-  if (which === 'start' && huntMode() === 'kinds' && setup.kinds?.some(k => KIND_MEMBERS.get(k).has(info?.title))) setKinds(rollKinds());
+  // The start never counts, so a start in one of Scavenger's rolled kinds rolls them again. A challenge link's stay as written.
+  if (which === 'start' && huntMode() === 'kinds' && !setup.challenge && setup.kinds?.some(k => KIND_FINDS.get(k).has(info?.title))) setKinds(rollKinds());
   updateSetupPar();   // first, so Start waits for an Exact clicks route
   updatePlay();
 }
@@ -1459,11 +1462,11 @@ function renderKinds() {
 // The first kinds in an order that come from different topics and share no page, none holding the start, so each find
 // counts once (a vehicle and a way to get around both hold Boat). Rolled in a random order, and the daily's in the day's
 // ranking.
-const kindsShare = (a, b) => KINDS[a].members.some(t => KIND_MEMBERS.get(b).has(t));
+const kindsShare = (a, b) => [...KIND_FINDS.get(a)].some(t => KIND_FINDS.get(b).has(t));
 function firstKinds(order, start) {
   const picked = [];
   for (const k of order) {
-    if (picked.length < HUNT_SIZE && !picked.some(p => KINDS[p].topic === KINDS[k].topic || kindsShare(p, k)) && !KIND_MEMBERS.get(k).has(start)) picked.push(k);
+    if (picked.length < HUNT_SIZE && !picked.some(p => KINDS[p].topic === KINDS[k].topic || kindsShare(p, k)) && !KIND_FINDS.get(k).has(start)) picked.push(k);
   }
   return picked;
 }
@@ -2444,7 +2447,7 @@ function cacheParse(keys, page) {
 // An article from the wiki. A reply without one fails here, so it fails inside navigate's try.
 // links: every link with whether its page exists, since a template can write a link to a missing page without the red
 // link's class (see classify).
-const askParse = title => api({ action: 'parse', page: title, prop: 'text|displaytitle|categories|links', redirects: '1', disableeditsection: '1', disablelimitreport: '1' })
+const askParse = title => api({ action: 'parse', page: title, prop: 'text|displaytitle|links', redirects: '1', disableeditsection: '1', disablelimitreport: '1' })
   .then(d => d.parse || Promise.reject(Object.assign(new Error('no article in its reply'), { wiki: true, reached: true })));
 // A live link pressed with a mouse or pen (the frame posts {mwr:'press'}): its article is asked for at once, the request
 // its click would make, sent the 50 to 150 ms sooner that a click comes after the press. The next navigation takes it if
@@ -2495,7 +2498,7 @@ async function navigate(title, fragment, { back = false, from = null } = {}) {
   cacheParse([title, page.title], page);
   if (back) game.stack.pop(); else game.stack.push(page.title);
   const via = page.title === game.vias[game.viaNext]?.title ? ++game.viaNext : 0;   // the checkpoint's number, from 1
-  // The start never counts, coming back to it either: the live wiki may have put it in a kind's category since.
+  // The start never counts, coming back to it either: a challenge link's kinds may hold it.
   const finds = hunting() && game.path.length && page.title !== game.start.title ? huntFinds(page) : [];
   game.path.push({ title: page.title, back, ...(via && { via }), ...(finds.length && { found: finds.map(h => h.label) }) });
   for (const h of finds) h.found = page.title;
@@ -3035,7 +3038,7 @@ const ADVANCEMENTS = Object.fromEntries([
   ['thereBack', 'start', 'There and Back Again', 'Win a Round trip.', 'task', 'Compass', '🧭'],
   ['accepted', 'start', 'Accepted', 'Win a game opened from a challenge link.', 'task', 'Bell', '🔔'],
   ['par', 'skill', 'Par for the Course', 'Win at par.', 'goal', 'Target', '🎯'],
-  ['birdie', 'skill', 'Birdie', 'Beat par: the live wiki had a shortcut the offline copy didn’t.', 'challenge', 'Parrot', '🐦', { secret: true }],
+  ['birdie', 'skill', 'Birdie', 'Beat par: the live wiki had a shortcut the offline copy didn’t, or a hunt’s find was one par doesn’t go by.', 'challenge', 'Parrot', '🐦', { secret: true }],
   ['hardcore', 'skill', 'Hardcore', 'Win on Hard.', 'goal', 'Totem of Undying', '❤️'],
   ['noTakeBacks', 'skill', 'No Take-Backs', 'Win with No Back.', 'task', 'Bow', '🏹'],
   ['blindfolded', 'skill', 'Blindfolded', 'Win with Blind target.', 'goal', 'Blindness', '🙈'],
@@ -5421,13 +5424,8 @@ function turnBack(entry) {
   }, () => {});
 }
 
-// Scavenger: what an arrival finds of what is left. A kind counts a page among its members (the snapshot's) or one the
-// live wiki puts in its category (page.categories, from the parse), less its exclusions.
-function huntFinds(page) {
-  const live = new Set((page.categories ?? []).map(c => c.category.replace(/_/g, ' ')));
-  return huntLeft().filter(h => h.info ? h.info.title === page.title
-    : KIND_MEMBERS.get(h.kind).has(page.title) || (live.has(h.kind) && !KINDS[h.kind].exclude.includes(page.title)));
-}
+// Scavenger: what an arrival finds of what is left: an article by its title, a kind by its fixed lists.
+const huntFinds = page => huntLeft().filter(h => h.info ? h.info.title === page.title : KIND_FINDS.get(h.kind).has(page.title));
 
 // The stuck banner: no link on the article works. Rolls never give such a page (joinsWeb), but a custom article, a
 // challenge link or a live edit since the snapshot can, and No hubs, Exact clicks or a round trip's way back can leave
@@ -5436,7 +5434,7 @@ const stuckText = () => game.stack.length > 1 && canGoBack() ? '⛔ No live link
   : '⛔ No live links on this page, and no going Back: only giving up is left.';
 
 // Golf: a win's clicks against par, as its golf name and what that means, for anyone who doesn't play golf. Below par is
-// only possible where the live wiki has a link the snapshot hasn't.
+// only possible where the live wiki has a link the snapshot hasn't, or a hunt's find is one par doesn't go by (a kind's also).
 function golfScore(clicks, par) {
   const over = clicks - par, plain = over ? `${Math.abs(over)} ${over > 0 ? 'over' : 'under'} par` : 'even with par';
   if (clicks === 1 && par === 1) return { name: 'Hole in one!', note: 'par 1 in one click', over };
@@ -6663,8 +6661,8 @@ const cardsLoaded = () => !!setup.start && !!(huntMode() === 'kinds' ? setup.kin
         if (rules().includes('scavenger')) $('#huntMode').value = 'articles';
       }
       syncVia();
+      setup.challenge = true;   // first, for the start's card to keep a link's kinds
       cardKeys().forEach(renderCard);
-      setup.challenge = true;
       const r = rulesText(rules());
       setStatus(`Challenge loaded${r ? ' with ' + r : ''}. Start the game when you’re ready.`);
     });

@@ -13,10 +13,9 @@ The output defines WIKI_DATA, which index.html loads with a script tag (a JSON f
                           from outside navboxes, topic, families, tiers]
   hubs                    for the No hubs rule, every hub and every redirect to one, mapped to the hub
   left_out                the left-out pages and the redirects to them that pages link to, whose links the game kills
-  kinds                   for Scavenger, each of the config's kinds (a category): the name the game shows, its members'
-                          commonest topic, its members (pool articles in the category linked well enough to be a
-                          target, less the config's exclusions) and the exclusions, which the game also applies to a
-                          page's live categories
+  kinds                   for Scavenger, each of the config's kinds: the name the game shows, its members' commonest
+                          topic, its members (the config's fixed list of the pages that count, which par goes by) and
+                          any also (pages that count too, which par doesn't go by)
 The left-out pages are the version pages, the config's list pages (even those in a family) and the subpages of either.
 Version pages are the articles and spin-off pages in a category ending in " versions" or in the config's version
 categories, but those with a topic or a family. Both link to much of the pool and many articles link to them, so a route
@@ -99,10 +98,10 @@ def left_out(snap, config, spinoff_ns, prefixes):
 
 def check_config(snap, config):
     """Stops if the config names a category no page is in, or a not-content or list title that is no longer an article:
-    a rename on the wiki would otherwise move articles out of their topic, family or kind, or let a list page under its
+    a rename on the wiki would otherwise move articles out of their topic or family, or let a list page under its
     new title into the pool or the game, without a word."""
     named = dict.fromkeys([*(c for topic in config['topics'].values() for c in topic), *(c for family in config['families'].values() for c in family),
-                           *config['not_content_categories'], *config['disambiguation_categories'], *config['version_categories'], *config['kinds']])
+                           *config['not_content_categories'], *config['disambiguation_categories'], *config['version_categories']])
     seen = {c for p in (*snap.pages.values(), *snap.left_out.values()) for c in p['cats']}   # the left-out pages from a build before
     problems = [f'category no page is in: {c}' for c in named if c not in seen]
     problems += [f'{what} title that is no longer an article: {t}' + (f' (now a redirect to {snap.resolve(t)})' if t in snap.redirects else '')
@@ -113,20 +112,25 @@ def check_config(snap, config):
 
 
 def kinds(snap, config, rows):
-    """Scavenger kinds, by category (see the docstring). Stops if an excluded title has left its category or a kind has
-    too few members, so a new snapshot gets the hand-picked list looked at again."""
-    aims = {r[0]: r[3] for r in rows if r[3] and r[2] >= MIN_BACKLINKS}
+    """Scavenger kinds, from the config's fixed lists (see the docstring). Stops if a member or also page is no longer an
+    article, as the game would never find it, a page is on both, a member is in a Content family (a route could end on a
+    page its box hides) or an also page in none (par should go by it), or a kind has too few members, so a new snapshot
+    gets the lists looked at again."""
+    topics, families = {r[0]: r[3] for r in rows}, {r[0]: r[4] for r in rows}
     out, problems = {}, []
-    for cat, kind in config['kinds'].items():
-        in_cat = {t for t, p in snap.pages.items() if p['ns'] == 0 and cat in p['cats']}
-        members = sorted(t for t in aims if t in in_cat and t not in kind['exclude'])
-        gone = [t for t in kind['exclude'] if t not in in_cat]
-        if gone:
-            problems.append(f'{cat}: excluded, but no longer in it: {", ".join(gone)}')
+    for name, kind in config['kinds'].items():
+        members, also = sorted(kind['members']), sorted(kind.get('also', []))
+        problems += [f'{name}: on both members and also: {t}' for t in members if t in also]
+        for what, titles in (('member', members), ('also page', also)):
+            for t in titles:
+                if snap.pages.get(t, {}).get('ns') != 0:
+                    problems.append(f'{name}: {what} that is no longer an article: {t}' + (f' (now a redirect to {snap.resolve(t)})' if t in snap.redirects else ' (now left out)' if t in snap.left_out else ''))
+        problems += [f'{name}: member in a Content family: {t}' for t in members if families.get(t)]
+        problems += [f'{name}: also page in no Content family: {t}' for t in also if t in families and not families[t]]
         if len(members) < MIN_KIND:
-            problems.append(f'{cat}: {len(members)} members')
-        topic = collections.Counter(aims[t] for t in members).most_common(1)[0][0] if members else ''
-        out[cat] = {'label': kind['label'], 'topic': topic, 'members': members, 'exclude': sorted(kind['exclude'])}
+            problems.append(f'{name}: {len(members)} members')
+        found = [topics[t] for t in members if topics.get(t)]
+        out[name] = {'label': kind['label'], 'topic': collections.Counter(found).most_common(1)[0][0] if found else '', 'members': members, **({'also': also} if also else {})}
     if problems:
         sys.exit('Scavenger kinds to look at in config.json:\n  ' + '\n  '.join(problems))
     return out

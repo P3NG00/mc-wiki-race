@@ -75,6 +75,7 @@ With Scavenger in `rules`, the target and the `via=` titles are its three articl
 - A challenge link always sets them, so one without `rules` is Relaxed.
 - They are applied even if the pair fails to load.
 - On its own, `#rules=…` sets them for a rolled pair.
+- The update notice's Reload writes it, or `daily=` or a sealed link if one is still on the cards unchanged (`reloadForUpdate`, see [setup-screen.md](setup-screen.md#the-update-notice)).
 
 ## `daily`: the daily
 

@@ -1,15 +1,17 @@
 // Offline test: drives headless Firefox over WebDriver BiDi against index.html opened from file://, with every request to
 // minecraft.wiki answered here (made-up page info and one made-up article), so it runs without the wiki. It checks the
 // game's own logic: what rolls pick, the daily, Content and Spin-offs, difficulty, and which links are live. Rendering
-// real articles is left to e2e.mjs. Usage: test/run-e2e.sh --offline (starts Firefox), or
+// real articles is left to e2e.mjs. A release going out under an open tab is played out from a local server, near the end.
+// Usage: test/run-e2e.sh --offline (starts Firefox), or
 //   node test/offline.mjs <bidi-port> <file-url>
 import fs from 'node:fs';
+import http from 'node:http';
 import { connect } from './harness.mjs';
 
 const [port, fileUrl] = process.argv.slice(2);
 // Spin-off namespace numbers, from wiki-data.js, so a page in one gets the ns the live API would give it, and the hubs.
 const dataText = fs.readFileSync(new URL('../wiki-data.js', import.meta.url), 'utf8'), marker = 'const WIKI_DATA = ';
-const { spinoffs: SPINOFFS, hubs } = JSON.parse(dataText.slice(dataText.indexOf(marker) + marker.length, dataText.lastIndexOf(';')));
+const { spinoffs: SPINOFFS, hubs, sha256: DATA_SHA } = JSON.parse(dataText.slice(dataText.indexOf(marker) + marker.length, dataText.lastIndexOf(';')));
 const HUBS = [...new Set(Object.values(hubs))];
 const nsOf = title => title.startsWith('Category:') ? 14 : SPINOFFS[Object.keys(SPINOFFS).find(n => title.startsWith(n + ':'))] ?? 0;
 
@@ -1601,10 +1603,20 @@ check('par routes follow the graph, Relaxed ≤ Normal ≤ Hard, Hard without hu
 check('par shows a route through the pool alone when one is as short', par.offPool.length === 0 && par.throughPool >= 10,
   `${par.throughPool} of 30 had one; ${par.offPool.slice(0, 3).join(', ')}`);
 check('and par is still the fewest clicks, as a search with no preference finds', par.parMoved.length === 0, par.parMoved.slice(0, 3).join(', '));
-// A graph file numbers pages by their place in wiki-data.js, so one from another build is refused.
-const graphCheck = JSON.parse(await ev(`Promise.all([['data:text/javascript,0', { sha256: 'another build' }], ['data:text/javascript,1', { sha256: WIKI_DATA.sha256, ok: true }]].map(([file, read]) =>
-  loadGraphFile(file, () => read).then(d => d.ok ?? false, e => e.message.includes('doesn’t match wiki-data.js')).finally(() => graphFiles.delete(file)))).then(JSON.stringify)`));
-check('a graph file with another sha256 is refused, and one with wiki-data.js’s taken', graphCheck[0] === true && graphCheck[1] === true, JSON.stringify(graphCheck));
+// A graph file numbers pages by their place in wiki-data.js, so one from another build is refused, as is one without the
+// data this page reads, which a read that throws stands in for here. Each one that isn't taken shows the notice, hidden
+// again for the checks after this. A release going out under an open tab is played out near the end of this file.
+const graphCheck = JSON.parse(await ev(`(async () => {
+  const load = (file, read) => loadGraphFile(file, read).then(d => d.ok ?? false, e => !!e.outdated && e.message.includes('doesn’t match wiki-data.js')).finally(() => graphFiles.delete(file));
+  const hiddenBefore = $('#updateNotice').classList.contains('hidden');
+  const taken = await load('data:text/javascript,1', () => ({ sha256: WIKI_DATA.sha256, ok: true })), stillHidden = $('#updateNotice').classList.contains('hidden');
+  const other = await load('data:text/javascript,0', () => ({ sha256: 'another build' })), shown = !$('#updateNotice').classList.contains('hidden');
+  const undeclared = await load('data:text/javascript,2', () => { throw new ReferenceError('WIKI_RENAMED is not defined'); });
+  $('#updateNotice').classList.add('hidden');
+  return JSON.stringify({ hiddenBefore, taken, stillHidden, other, shown, undeclared });
+})()`));
+check('a graph file with another sha256 is refused and shows the notice, and one with wiki-data.js’s is taken without it', graphCheck.taken === true && graphCheck.hiddenBefore && graphCheck.stillHidden && graphCheck.other === true && graphCheck.shown, JSON.stringify(graphCheck));
+check('and one that doesn’t declare what the page reads is refused too, rather than never answering', graphCheck.undeclared === true, JSON.stringify(graphCheck));
 // Every search prefers the pool, on a made-up graph where Crafting (outside it, and first by page number) is as short as
 // Diamond: a Race's, Scavenger's kinds' and Exact clicks', and both breadth-first searches reaching them through a navbox.
 // With only Crafting, the route still goes through it.
@@ -2841,6 +2853,238 @@ check('leaving the page during a game asks first', leftDuring === 'beforeunload'
 check('leaving after the game doesn’t ask', leftAfter === '', leftAfter);
 await send('session.unsubscribe', { events: ['browsingContext.userPromptOpened'] });
 stopPrompts();
+
+// A release going out under a tab already open: this folder served as a host serves it, with fixed names and no-cache.
+// release() changes the checksum in all four data files, as a release that changes it does, so a page opened before keeps
+// its old wiki-data.js and wiki-links.js and gets the new navboxes and lead, while one opened or reloaded after gets
+// all new ones. staleData has every file released but wiki-data.js, as a long-cached one would be. missingFile answers a file with a 404, and holdFile keeps a file's answer back until letGo().
+let released = false, staleData = false, missingFile = null, holdFile = null, letGo = () => {};
+const SERVED = new URL('../', import.meta.url), release = () => { released = true; };
+const server = http.createServer(async (req, res) => {
+  const name = new URL(req.url, 'http://host').pathname.slice(1) || 'index.html';
+  if (name === holdFile) await new Promise(r => { letGo = r; });
+  if (name === missingFile || !/^[\w-]+\.(html|js)$/.test(name)) { res.writeHead(404, { 'Cache-Control': 'no-cache' }); res.end(); return; }
+  const text = fs.readFileSync(new URL(name, SERVED), 'utf8');
+  res.writeHead(200, { 'Content-Type': name.endsWith('.js') ? 'text/javascript' : 'text/html', 'Cache-Control': 'no-cache' });
+  res.end(name.endsWith('.js') && (released || staleData && name !== 'wiki-data.js') ? text.replaceAll(DATA_SHA, 'another release') : text);
+});
+await new Promise(r => server.listen(0, '127.0.0.1', r));
+const servedUrl = `http://127.0.0.1:${server.address().port}/`;
+const openServed = async (hash = '') => {
+  await send('browsingContext.navigate', { context: ctx, url: 'about:blank', wait: 'complete' });
+  // A file held back can keep the page from finishing loading, since the background asks for its graph as it opens.
+  await send('browsingContext.navigate', { context: ctx, url: servedUrl + hash, wait: holdFile ? 'interactive' : 'complete' });
+  await until(ready);
+  await ev('window.sameTab = true');   // gone if the page reloads
+};
+const UPDATED = 'The game has been updated since you opened this page, so its link data no longer matches. Reload the page.';
+const FAILED = 'The game’s link data didn’t load (wiki-lead.js). Reload the page.';
+const noticeShown = "!$('#updateNotice').classList.contains('hidden')", parDone = `${ready} && !$('#setupPar').classList.contains('working')`;
+const clickIt = sel => ev(`$(${JSON.stringify(sel)}).click()`);
+const graphSays = rulesList => ev(`withBusy(() => linkGraph(${JSON.stringify(rulesList)})).then(() => $('#setupStatus').textContent)`);
+
+await openServed();
+check('a page just opened has only wiki-links.js among the graph files, and no notice', await ev(`!graphFiles.has('wiki-navboxes.js') && !graphFiles.has('wiki-lead.js') && !${noticeShown}`));
+// A failed load keeps what it does: its own message, no notice, and the next try loads the file again.
+missingFile = 'wiki-lead.js';
+await clickIt('input.rule[value=lead]');
+await until(parDone);
+const failedSays = await graphSays(['lead']);
+check('a graph file that fails to load says so, with no notice and blank par', failedSays === FAILED && await ev(`!${noticeShown} && $('#setupPar').textContent === ''`), failedSays);
+check('and is tried again the next time', await ev("!graphFiles.has('wiki-lead.js')"));
+// The same file again, from the new release: told apart from that failure, and no retry.
+missingFile = null;
+release();
+await ev('updateSetupPar()');
+check('a graph file from a newer release shows the notice with a Reload button, and par blank', await until(noticeShown) && await until(parDone)
+  && await ev("$('#setupPar').textContent === '' && $('#updateNotice').textContent.includes('updated since you opened this page') && $('#updateNotice button').textContent === 'Reload'"), await ev("$('#updateNotice').textContent"));
+const outdatedSays = await graphSays(['lead']);
+check('and says the game was updated, not that it failed to load', outdatedSays === UPDATED, outdatedSays);
+check('its refusal is kept, since only a reload helps', await ev("graphFiles.has('wiki-lead.js')"));
+check('and nothing reloaded by itself', await ev('window.sameTab === true'));
+await clickIt('input.rule[value=lead]');
+check('settings that need only what this page has still get par, the notice staying', await until(`${parDone} && /^Par \\d+/.test($('#setupPar').textContent)`) && await ev(noticeShown), await ev("$('#setupPar').textContent"));
+await clickIt('input[name=level][value=relaxed]');
+await until(parDone);
+check('wiki-navboxes.js from the newer release is refused too: Relaxed has blank par', await ev("$('#setupPar').textContent === '' && level() === 'relaxed'"), await ev("$('#setupPar').textContent"));
+const navboxSays = await graphSays([]);
+check('and says the game was updated', navboxSays === UPDATED, navboxSays);
+const setReach = v => ev(`$('#reach').value = '${v}'; $('#reach').dispatchEvent(new Event('change', { bubbles: true }))`);
+await setReach('p2');
+await until('setup.busy === 0');
+check('a roll at a target par says the game was updated', await ev(`${status} === ${JSON.stringify(UPDATED)}`), await ev(status));
+// As with a file that fails to load, that roll emptied the cards, and Any par rolls only the target, so Reroll all fills them.
+await setReach('any');
+await until('setup.busy === 0');
+await clickIt('#btnRerollAll');
+check('and at any par Reroll all gives cards again', await until(ready), await ev(status));
+await clickIt('input[name=game][value=exact]');
+check('Exact clicks says the game was updated, with Start off', await until(`setup.busy === 0 && $('#exactInfo').textContent === ${JSON.stringify(UPDATED)}`) && await until(parDone.replace(ready, 'setup.busy === 0')) && await ev("$('#btnPlay').disabled"), await ev("$('#exactInfo').textContent"));
+await clickIt('input.rule[value=blind]');
+await until('setup.busy === 0');
+const blindExact = await ev("pickHidden().then(ok => ok + ' ' + $('#setupStatus').textContent)");
+check('and so does Start under Blind target, without trying other targets', blindExact === 'false ' + UPDATED, blindExact);
+await clickIt('input.rule[value=blind]');
+await clickIt('input[name=game][value=race]');
+await until(ready);
+
+// A game on the file refused plays on, its header saying what it lacks, and the result has the way to reload.
+await clickIt('input.rule[value=distance]');
+await until(ready);
+await ev("setup.goal.reach = 'p2'");
+await play();
+check('a game on those settings plays on, saying what it lacks, with no overlay', await until("$('#hudHint').textContent === 'Game updated: no par or Distance. Reload after this game.'")
+  && await ev("!$('#hudHint').classList.contains('hidden') && $('#overlay').classList.contains('hidden') && $('#hudPar').textContent === '–' && game.active && !$('#hudHint button')"), await ev("$('#hudHint').textContent"));
+await ev("navigate('Diamond Pickaxe', null)");
+check('and clicks still go through', await until("game.path.length === 2 && !game.loading") && await ev("$('#overlay').classList.contains('hidden') && $('#hudHint').textContent.startsWith('Game updated')"));
+await ev("$('#btnGiveUp').click(); $('#gQuit').click()");
+check('its result says the game was updated, with a Reload button, in place of the error', await until(`$('#par').textContent.startsWith(${JSON.stringify(UPDATED)})`) && await ev("$('#par button').textContent === 'Reload' && $('#mPar').textContent === '–' && $('#hudHint').classList.contains('hidden')"), await ev("$('#par').textContent"));
+check('and nothing reloaded during it', await ev('window.sameTab === true'));
+check('par being unknown doesn’t take the target par off its record', await ev("store.get('mwr.history', [])[0].reach === 'p2'"), await ev("JSON.stringify(store.get('mwr.history', [])[0].reach)"));
+await ev('closeModal(); toSetup()');
+check('the notice is there back on the setup screen', await ev(`${noticeShown} && !!$('#updateNotice').offsetParent`));
+// A card the snapshot lacks has its own line where par goes, but the header has told this game to reload.
+await ev("setCustom('goal', 'Brand New Mob')");
+await until(`${ready} && setup.goal.title === 'Brand New Mob'`);
+await play();
+await until("$('#hudHint').textContent.startsWith('Game updated')");
+await ev("$('#btnGiveUp').click(); $('#gQuit').click()");
+check('and a game with a card the snapshot lacks says the game was updated too, with its Reload', await until(`$('#par').textContent.startsWith(${JSON.stringify(UPDATED)})`) && await ev("!!$('#par button')"), await ev("$('#par').textContent"));
+await ev('closeModal(); toSetup()');
+await clickIt('#btnRerollAll');
+await until(ready);
+// The game after it, on what the page has: nothing about it is off.
+await clickIt('input[name=level][value=normal]');
+await clickIt('input.rule[value=distance]');
+await until(parDone);
+await play();
+check('a game on settings the page has what they need for has par and says nothing', await until("/^\\d+$/.test($('#hudPar').textContent)") && await ev("$('#hudHint').classList.contains('hidden') && !game.outdated"), await ev("$('#hudPar').textContent"));
+await ev("$('#btnGiveUp').click(); $('#gQuit').click()");
+await until("$('#par').textContent.startsWith('Going by')");
+await ev('closeModal(); toSetup()');
+// Reload from a result: the new release's files all match, the notice is gone, and the rules are the setup's.
+await clickIt('input[name=level][value=relaxed]');
+await until(ready);
+await play();
+await ev("$('#btnGiveUp').click(); $('#gQuit').click()");
+await until("!!$('#par button')");
+await clickIt('#par button');
+check('Reload in the result reloads, keeping the rules, and the new release’s files are taken', await until('window.sameTab === undefined') && await until(`${parDone} && /^Par \\d+/.test($('#setupPar').textContent)`)
+  && await ev(`!${noticeShown} && level() === 'relaxed' && graphFiles.has('wiki-navboxes.js')`), await ev("$('#setupPar').textContent + ' ' + level()"));
+
+// Reload on the setup screen. A link the player has changed isn't what's on the cards any more, so its hash goes, and
+// the rules stay, those ticked but off too (Six clicks under Top links only).
+const reloaded = () => until('window.sameTab === undefined').then(() => until('setup.busy === 0'));
+released = false;
+await openServed('#start=Diamond&target=Crafting&rules=nonav');
+release();
+await clickIt('input.rule[value=limit]');
+await clickIt('input.rule[value=lead]');
+await until(noticeShown);
+await clickIt('#btnReload');
+check('Reload after changing a challenge link drops the link and keeps the rules, those ticked but off too', await reloaded() && await until(parDone)
+  && await ev(`location.hash === '#rules=nonav,lead,limit' && !setup.challenge && $('input.rule[value=lead]').checked && $('input.rule[value=limit]').checked && !rules().includes('limit') && !${noticeShown}`), await ev('location.hash'));
+// So does a daily changed: its rule goes with it, or the day would come back in place of the player's rules.
+released = false;
+await openServed('#daily');
+release();
+await clickIt('input[name=level][value=relaxed]');
+await until(noticeShown);
+await clickIt('#btnReload');
+check('and after changing the daily it’s an ordinary game on those rules', await reloaded()
+  && await ev(`!setup.daily && level() === 'relaxed' && location.hash.startsWith('#rules=') && !${noticeShown}`), await ev('location.hash'));
+// A daily played from its button is what's on the cards, whatever the hash said: a challenge link's here, which mustn't come back.
+released = false;
+await openServed('#start=Diamond&target=Crafting&rules=nonav,distance');
+release();
+await clickIt('input[name=level][value=relaxed]');
+await until(noticeShown);
+await clickIt('#btnDaily');
+await until('!!setup.daily && setup.busy === 0');
+await clickIt('#btnReload');
+check('Reload opens the daily played from its button, not the hash that was there', await reloaded() && await until('setup.daily === today()')
+  && await ev(`location.hash === '#daily=' + today() && !setup.challenge && !${noticeShown}`), await ev('location.hash'));
+// A link still on the cards opens again, sealed as Copy challenge link makes it: here the file comes while it opens.
+released = false;
+await openServed();
+const sealedHash = '#g=' + await ev("sealLink('start=Diamond&target=Crafting&rules=nonav,lead')");
+holdFile = 'wiki-lead.js';
+await openServed(sealedHash);
+release();
+holdFile = null;
+letGo();
+await until(noticeShown);
+check('the link is still the game on the cards', await ev("setup.challenge && setup.start.title === 'Diamond'"));
+await clickIt('#btnReload');
+check('and Reload opens a challenge link not changed again, with its pair and rules', await reloaded() && await until(`setup.start?.title === 'Diamond' && setup.goal?.title === 'Crafting'`)
+  && await ev(`location.hash.startsWith('#g=') && setup.challenge && rules().includes('lead') && !${noticeShown}`), await ev('location.hash'));
+// Starting a game clears the hash, so the result's Reload has to bring the link back itself.
+released = false;
+holdFile = 'wiki-navboxes.js';
+await openServed('#start=Diamond&target=Crafting&rules=distance');
+release();
+holdFile = null;
+letGo();
+await until(noticeShown);
+await play();
+await ev("$('#btnGiveUp').click(); $('#gQuit').click()");
+await until("!!$('#par button')");
+await clickIt('#par button');
+check('Reload from a challenge link’s result opens the link again', await reloaded() && await until(`setup.start?.title === 'Diamond' && setup.goal?.title === 'Crafting'`)
+  && await ev(`setup.challenge && level() === 'relaxed' && rules().includes('distance') && !${noticeShown}`), await ev('location.hash'));
+// A link this page couldn't open stays: a later format's, which it has just said to reload for.
+released = false;
+await openServed('#g2=abc');
+release();
+await clickIt('input[name=level][value=relaxed]');
+await until(noticeShown);
+await clickIt('#btnReload');
+check('Reload keeps a link of a newer format', await reloaded() && await ev("location.hash === '#g2=abc'"), await ev('location.hash'));
+// And a daily that failed, here with wiki-links.js refused beside a cached wiki-data.js, which every setting needs.
+released = false;
+staleData = true;
+await openServed('#daily');
+check('wiki-links.js refused as a daily opens shows the notice, without saying it’s only some settings', await until(noticeShown) && await ev("!setup.daily && setup.dailyFailed && !$('#updateNotice').textContent.includes('some settings')"), await ev("$('#updateNotice').textContent"));
+const dailySays = await graphSays(['nonav']);
+check('and says the game was updated', dailySays === UPDATED, dailySays);
+staleData = false;
+released = false;
+await clickIt('#btnReload');
+check('and Reload opens that daily', await reloaded() && await until('setup.daily === today()') && await ev(`location.hash === '#daily' && !${noticeShown}`), await ev('location.hash'));
+
+// A file that fails to load for par and is refused when Distance tries it again: said all the same.
+released = false;
+await openServed();
+missingFile = 'wiki-lead.js';
+await clickIt('input.rule[value=distance]');
+await clickIt('input.rule[value=lead]');
+await until(parDone);
+await play();
+check('a game whose file failed to load says nothing about an update', await ev("$('#hudHint').classList.contains('hidden') && !game.outdated"));
+missingFile = null;
+release();
+await ev("navigate('Diamond Pickaxe', null)");
+check('and when it is refused on the next try, the header says so', await until("$('#hudHint').textContent === 'Game updated: no par or Distance. Reload after this game.'"), await ev("$('#hudHint').textContent"));
+await until('!game.loading');
+await ev("$('#btnGiveUp').click(); $('#gQuit').click()");
+check('and so does the result, with its Reload', await until(`$('#par').textContent.startsWith(${JSON.stringify(UPDATED)})`) && await ev("!!$('#par button')"), await ev("$('#par').textContent"));
+await ev('closeModal(); toSetup()');
+
+// The file only arriving during the game: Start doesn't wait for par, so this is the one way a game meets it first.
+released = false;
+await openServed();
+release();
+holdFile = 'wiki-lead.js';
+await clickIt('input.rule[value=lead]');
+await until(ready);
+await play();
+check('a game started with the file still on its way shows nothing yet', await ev("$('#hudHint').classList.contains('hidden') && !game.outdated"));
+holdFile = null;
+letGo();
+check('and when it comes, says so in the header, and only there', await until("$('#hudHint').textContent === 'Game updated: no par. Reload after this game.'")
+  && await ev(`game.active && !game.loading && $('#overlay').classList.contains('hidden') && window.sameTab === true`), await ev("$('#hudHint').textContent"));
+await ev('finish(false); closeModal(); toSetup()');
+server.close();
 
 check('only page info, the advancements\' and items\' pictures and articles are asked for', [...requests.keys()].every(k => ['query prop=pageprops|pageimages|extracts', 'query prop=pageimages', 'query prop=imageinfo', 'parse prop=text|displaytitle|links'].includes(k)),
   JSON.stringify(Object.fromEntries(requests)));

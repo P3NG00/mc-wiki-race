@@ -216,6 +216,7 @@
   .setup-par { font-weight: 600; }
   .setup-par:empty { display: none; }
   .status.err { color: var(--target); }
+  .update-notice { flex-basis: 100%; }
   /* Busy: a roll or lookup (#setup.busy), and par being worked out. A spinner turns by the status line, on each card
      being rolled and by par, and an emptied card's title pulses over a line saying so. Spinning and pulsing animate
      transform and opacity, which keep going while a search holds the page up. */
@@ -330,7 +331,7 @@
   .route:not(.open) .chip.done.short > span { display: none; }
   .hud .peek { flex: none; width: 28px; height: 28px; padding: 0; border-radius: var(--radius-pill); font-weight: 700; color: var(--accent); }
   /* Distance's count for the latest arrival, beside the game's labels. */
-  .hint { flex: none; font-size: 13px; font-weight: 700; border-radius: var(--radius-pill); padding: 4px 10px; background: var(--bg); color: var(--muted); }
+  .hint { flex: none; max-width: 100%; font-size: 13px; font-weight: 700; border-radius: var(--radius-pill); padding: 4px 10px; background: var(--bg); color: var(--muted); }
   /* Six clicks' and Exact clicks's count, a dot a click. */
   .meter { display: flex; gap: 3px; justify-content: flex-end; margin: 2px 0 1px; }
   .meter i { width: 8px; height: 8px; box-sizing: border-box; border-radius: 50%; border: 1.5px solid var(--muted); }
@@ -856,6 +857,7 @@ const THEMES = [...new Set(['auto', 'light', 'dark', ...Array.from(document.quer
     <button id="btnSwap" title="Swap the start and the target">⇄ Swap</button>
     <button id="btnCopy" title="Copy a link that opens this exact game">Copy challenge link</button>
     <span class="status" id="setupStatus"></span>
+    <div class="status err update-notice hidden" id="updateNotice" role="status">The game has been updated since you opened this page, so par, Distance and Target par may not work until you reload. Reloading may roll new cards. <button id="btnReload">Reload</button></div>
   </div>
 
   <div class="game-settings">
@@ -1228,7 +1230,7 @@ const VIA_KEYS = ['via0', 'via1', 'via2'];
 // with Round trip, how many of the checkpoints come after the target, on the way back (see syncVia). blind: whether
 // Blind target was on when the rules were last set, so turning it off drops the cards it held unseen (see hiddenKeys).
 // route: the cards' par route, for the background (none under Blind target).
-const setup = { start: null, via0: null, via1: null, via2: null, goal: null, daily: null, challenge: false, busy: 0, exact: null, extra: null, kinds: null, back: null, blind: false, route: null,
+const setup = { start: null, via0: null, via1: null, via2: null, goal: null, daily: null, challenge: false, busy: 0, exact: null, outdated: false, dailyFailed: false, extra: null, kinds: null, back: null, blind: false, route: null,
   rolls: { start: 0, via0: 0, via1: 0, via2: 0, goal: 0 } };
 const viaCount = () => +$('#viaCount').value;
 // Scavenger's mode while it is on: 'articles' (the checkpoint cards and the target card hold them) or 'kinds'.
@@ -1492,8 +1494,9 @@ async function setupPar() {
   // Under Blind target par and the count would say something about the hidden cards, so they wait for the game.
   const blind = r.includes('blind');
   setup.exact = null;
+  setup.outdated = false;
   $('#exactInfo').textContent = blind ? 'Blind target: the count shows when you start.' : 'Working out the count…';
-  let text = '', route = null;
+  let text = '', route = null, outdated = false;
   if (titles.every(Boolean) && (kinds?.length ?? true)) {
     // The search can hold the page up for a moment (a round trip's or Scavenger's most), so the page is drawn first,
     // saying par is being worked out, and of the runs started meanwhile (a change of rules renders every card) only the
@@ -1502,7 +1505,7 @@ async function setupPar() {
     $('#setupPar').classList.toggle('working', !blind);
     await painted();
     if (token !== setupParToken) return;
-    route = await cardsRoute(titles, r, kinds, back).catch(() => undefined);   // undefined: the link graph didn't load
+    route = await cardsRoute(titles, r, kinds, back).catch(e => { outdated = !!e.outdated; });   // undefined: the link graph didn't load
     // No route between pages the offline copy has: Start stays, since a live edit may have made one. A page newer than
     // the copy, or no graph, leaves par blank.
     text = route ? `Par ${route.length - 1}` : route === null && titles.every(t => PAGE_IDS.has(t)) ? 'No route with these rules' : '';
@@ -1511,11 +1514,12 @@ async function setupPar() {
       if (token !== setupParToken) return;
       setup.exact = exact;
       text = !route ? 'No par to count exact clicks from' : exact ? `${text} · exactly ${n}` : `${text} · no way in exactly ${n}`;
-      if (!blind) $('#exactInfo').textContent = !route ? 'This pair has no par to count from.' : exact ? `This pair: par ${n - extra} + ${extra}, so exactly ${n} clicks.`
+      if (!blind) $('#exactInfo').textContent = outdated ? GAME_UPDATED : !route ? 'This pair has no par to count from.' : exact ? `This pair: par ${n - extra} + ${extra}, so exactly ${n} clicks.`
         : `This pair can’t be done in exactly ${n} clicks: reroll, or pick another number of clicks.`;
     }
   }
   if (token === setupParToken) {
+    setup.outdated = outdated;
     $('#setupPar').textContent = blind ? 'Par shows when you start' : text;
     $('#setupPar').classList.remove('working');
     updatePlay();
@@ -1620,11 +1624,12 @@ function leaveDaily() {
   return was;
 }
 
-// What a roll, lookup or load that failed says: the wiki not answering or answering with an error (api), the link graph
-// not loading (loadGraphFile), or else the game's own message.
+// What a roll, lookup or load that failed says: the wiki not answering or answering with an error (api), a link graph
+// file from a newer release or not loading (loadGraphFile), or else the game's own message.
+const GAME_UPDATED = 'The game has been updated since you opened this page, so its link data no longer matches. Reload the page.';
 const failText = (e, why = e.message.replace(/\.$/, '')) => e.wiki ? (e.reached ? `minecraft.wiki sent back an error (${why}). Try again in a moment.`
   : `Couldn’t reach minecraft.wiki (${why}). Check your connection and try again.`)
-  : e.graph ? `The game’s link data didn’t load (${e.graph}). Reload the page.` : e.message;
+  : e.outdated ? GAME_UPDATED : e.graph ? `The game’s link data didn’t load (${e.graph}). Reload the page.` : e.message;
 // #setup.busy shows it: a spinner by the status line and on the cards being rolled.
 async function withBusy(fn) {
   setup.busy++;
@@ -1871,6 +1876,7 @@ async function pickHidden() {
     // The latest par run, which renderCard started, decides setup.exact.
     for (let run; run !== setup.parRun;) await (run = setup.parRun);
     if (setup.exact) return true;
+    if (setup.outdated) { setStatus(GAME_UPDATED, true); return false; }
     setup.goal = null;
   }
   setStatus('No target came up that can be reached in exactly its count. Try again, or reroll the start.', true);
@@ -2280,6 +2286,7 @@ const game = {
   timer: 0,
   par: null,         // the fewest clicks, once parReady has worked it out
   parReady: null,    // a promise of one shortest route (parRoute)
+  outdated: false,   // its link graph file is from a newer release (loadGraphFile): no par or Distance this game
 };
 
 function fmtTime(ms) {
@@ -2297,10 +2304,12 @@ function renderHud() {
   // A limit (Six clicks, or Exact clicks's count) shows as its own dots, a click each, and under the count.
   $('#hudClicksK').textContent = !game.limit ? 'Clicks' : game.exact ? `of exactly ${game.limit}` : `of ${game.limit}`;
   $('#hudMeter').innerHTML = game.limit ? Array.from({ length: game.limit }, (_, i) => `<i${i < clicks() ? ' class="on"' : ''}></i>`).join('') : '';
-  // Distance: the latest arrival's count once it is measured, until the next, and each page's on the path.
+  // Distance: the latest arrival's count once it is measured, until the next, and each page's on the path. A game whose
+  // link graph file is from a newer release has neither par nor counts, and says so here instead.
   const distance = game.rules.includes('distance'), latest = game.path.at(-1), shown = distance && game.active && latest && 'togo' in latest;
-  $('#hudHint').classList.toggle('hidden', !shown);
-  $('#hudHint').textContent = !shown ? '' : latest.togo === undefined ? 'Distance unknown: not in the wiki’s offline copy'
+  const outdated = game.outdated && game.active;
+  $('#hudHint').classList.toggle('hidden', !shown && !outdated);
+  $('#hudHint').textContent = outdated ? `Game updated: no par${distance ? ' or Distance' : ''}. Reload after this game.` : !shown ? '' : latest.togo === undefined ? 'Distance unknown: not in the wiki’s offline copy'
     : latest.togo === null ? 'No route from here' : `${clicksText(latest.togo)} to go`;
   $('#hudPar').textContent = game.par ?? '–';
   $('#hudTime').textContent = fmtTime(now());
@@ -2418,10 +2427,11 @@ function startGame() {
   const exact = r.includes('exact') ? setup.exact : null, limit = exact ? exact.length - 1 : r.includes('limit') ? CLICK_LIMIT : 0;
   Object.assign(game, { active: true, link: gameLink(), start: setup.start, goal, vias, viaNext: 0, roundTrip, turn: roundTrip && !hunt ? out + 1 : 0, hunt,
     dead: new Set(), exact, limit, celebrate: false, stuck: false, rebuilt: false, cheerRun: 0, challenge: setup.challenge, daily: setup.daily, onDay: setup.daily === today(), rules: r, content: contentInPlay(cards.map(c => c.title)), timed: $('#timerToggle').checked, path: [],
-    seen: new Map(), stack: [], elapsed: 0, runningSince: 0, loading: false, par: null, xp: [], fresh: 0 });
+    seen: new Map(), stack: [], elapsed: 0, runningSince: 0, loading: false, par: null, outdated: false, xp: [], fresh: 0 });
   // Par shows in the header once it is known: at once when the setup screen has loaded the link graph.
   const parReady = game.parReady = cardsRoute(cards.map(c => c.title), r, kinds, back);
-  parReady.then(route => { if (game.parReady === parReady) { game.par = route ? route.length - 1 : null; renderHud(); } }, () => {});
+  parReady.then(route => { if (game.parReady === parReady) { game.par = route ? route.length - 1 : null; renderHud(); } },
+    e => { if (game.parReady === parReady && e.outdated) { game.outdated = true; renderHud(); } });
   itemsReset();
   $('#btnBack').classList.toggle('hidden', !canGoBack());
   $('#btnPeek').classList.toggle('hidden', game.rules.includes('blind'));
@@ -2523,7 +2533,7 @@ async function navigate(title, fragment, { back = false, from = null } = {}) {
   entry.measured = clicksToGo(entry.title).then(({ togo, route }) => {
     Object.assign(entry, { togo }, route?.length > 1 && { next: route[1], aim: route.at(-1) });
     if (game.path.at(-1) === entry && game.active) renderHud();
-  }, () => {});
+  }, e => { if (e.outdated && game.path.includes(entry)) { game.outdated = true; renderHud(); } });   // a file that failed for par, refused when tried again
   $('#credit').innerHTML = `<a href="${esc(wikiUrl(page.title))}" target="_blank" rel="noopener">View on minecraft.wiki</a> · ` +
     `<a href="${LICENSE_URL}" target="_blank" rel="noopener">CC BY-NC-SA 3.0</a>`;
   // The target and checkpoints stay reachable even if they are hubs.
@@ -5065,17 +5075,35 @@ function goBack() {
 // the others the first time the rules need them (a roll's checks, par on the setup screen or in a game), and each is
 // refused if its sha256 isn't wiki-data.js's, since a mismatch would give wrong routes. Each entry lists page numbers
 // as the gaps between them in base 36.
+// A file that came but isn't this page's (a tab open across a release, or one not declaring what read looks for) shows the
+// notice on the setup screen, whichever caller asked, since most of them carry on without par and say nothing. Its
+// rejection stays cached: only a reload can help, and loading a second copy would throw on its const.
 const PAGE_IDS = new Map(WIKI_DATA.articles.map(([title], i) => [title, i]));
 const decodeIds = s => { let n = -1; return s ? s.split(',').map(gap => n += parseInt(gap, 36)) : []; };
 const graphFiles = new Map();
 function loadGraphFile(file, read) {
   if (!graphFiles.has(file)) graphFiles.set(file, new Promise((resolve, reject) => {
     const script = Object.assign(document.createElement('script'), { src: file });
-    script.onload = () => { const d = read(); d.sha256 === WIKI_DATA.sha256 ? resolve(d) : reject(Object.assign(new Error(`${file} doesn’t match wiki-data.js`), { graph: file })); };
+    script.onload = () => {
+      let d = null;
+      try { d = read(); } catch { /* it doesn't declare what this page reads */ }
+      if (d?.sha256 === WIKI_DATA.sha256) return resolve(d);
+      $('#updateNotice').classList.remove('hidden');
+      reject(Object.assign(new Error(`${file} doesn’t match wiki-data.js`), { outdated: true }));
+    };
     script.onerror = () => { graphFiles.delete(file); script.remove(); reject(Object.assign(new Error(`couldn’t load ${file}`), { graph: file })); };
     document.head.append(script);
   }));
   return graphFiles.get(file);
+}
+// Reload from the notices. A link this page couldn't open (a later format, or a daily that failed) stays, to open after
+// it. Otherwise the hash says what is on the cards, whatever it said before: the daily or challenge link still there
+// unchanged, or else, as the setup isn't saved, the rules (those ticked but off too), and new cards.
+function reloadForUpdate() {
+  const hash = new URLSearchParams(location.hash.slice(1));
+  if (![...hash.keys()].some(newerLink) && !(setup.dailyFailed && hash.has('daily'))) history.replaceState(null, '', setup.daily ? `#daily=${setup.daily}`
+    : setup.challenge ? '#g=' + sealLink(challengeQuery()) : '#rules=' + [...LEVELS[level()].rules, ...chosenRules()].filter(Boolean).join());
+  location.reload();
 }
 // The graph a game is played on under its rules: the links above each page's first heading for Top links only, or else
 // the links outside navboxes, and the navboxes too when they are on (Relaxed).
@@ -5466,24 +5494,26 @@ const golfText = g => g.name + (g.note ? ` (${g.note})` : '');
 // own route in that column (see finish) and gets no golf score.
 async function showPar(rec, routeReady) {
   const el = $('#par'), missing = chain(rec).find(t => !PAGE_IDS.has(t)), copy = `the wiki’s offline copy from ${snapshotDay()}`;
-  let text, par = null, route = null;
+  let text, par = null, route, outdated = game.outdated;   // route: stays undefined if it couldn't be worked out
   try {
     route = missing ? null : await routeReady;
     if (route) par = route.length - 1;
     text = missing ? `“${missing}” isn’t in ${copy}, so the fewest clicks are unknown.`
       : !route ? `No route in ${copy} with these settings.` : `Going by ${copy}.`;
   } catch (e) {
+    outdated ||= !!e.outdated;
     text = `Couldn’t work out the fewest clicks: ${e.message}.`;
   }
   // The par, for a game finished before it was worked out, which drops the target par if the game is off it.
-  const add = par !== null && rec.par === undefined, off = rec.reach && REACHES[rec.reach].fits?.(par) === false;
+  const add = par !== null && rec.par === undefined, off = rec.reach && route !== undefined && REACHES[rec.reach].fits?.(par) === false;
   if (add || off) {
     const saved = storedGames(), mine = saved?.find(r => isRecord(r) && r.at === rec.at && r.start === rec.start);
     for (const r of [rec, mine].filter(Boolean)) { if (add) r.par = par; if (off) delete r.reach; }
     if (mine) store.set('mwr.history', saved);
   }
   if (!el.isConnected) return;
-  el.textContent = text;
+  el.textContent = outdated ? GAME_UPDATED : text;
+  if (outdated) el.append(' ', Object.assign(document.createElement('button'), { textContent: 'Reload', onclick: reloadForUpdate }));
   $('#mPar').textContent = par ?? '–';
   if (!rec.exact) {
     $('#mBestTitle').textContent = `${rec.finds || rec.kinds ? 'Shortest hunt' : 'Shortest route'}${route ? ` · par ${par}` : ''}`;
@@ -6575,6 +6605,7 @@ $('#btnSwap').onclick = () => {
   keys.forEach(renderCard);
 };
 $('#btnDaily').onclick = () => loadDaily();
+$('#btnReload').onclick = reloadForUpdate;
 $('#btnPastDailies').onclick = () => openCalendar();
 $('#btnPlay').onclick = async () => { if (!isBlind() || await pickHidden()) startGame(); };
 // A link has to carry the hidden cards, so under Blind target they are picked now and held unseen.
@@ -6692,7 +6723,8 @@ const cardsLoaded = () => !!setup.start && !!(huntMode() === 'kinds' ? setup.kin
     }
   } else if (h.has('daily')) {
     await loadDaily(dailyDate(h.get('daily')));
-    if (!cardsLoaded()) await reroll('all');
+    setup.dailyFailed = !cardsLoaded();
+    if (setup.dailyFailed) await reroll('all');
   } else {
     await reroll('all');
     if (query === null && setup.start) setStatus('The challenge link is damaged, perhaps cut short, so new cards were rolled instead.', true);

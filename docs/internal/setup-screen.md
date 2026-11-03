@@ -66,12 +66,30 @@ If it fails, the status line says whose failure it was (`failText`):
 - the wiki's, any `api` error (and `askParse`'s reply with no article), by whether it answered at all (`reached`):
   - none: "Couldn’t reach minecraft.wiki (Failed to fetch). Check your connection and try again."
   - an error: "minecraft.wiki sent back an error (HTTP 503). Try again in a moment."
-- the link graph files', from `loadGraphFile`: "The game’s link data didn’t load (wiki-links.js). Reload the page."
+- a link graph file that didn't load, from `loadGraphFile`: "The game’s link data didn’t load (wiki-links.js). Reload the page."
+- a link graph file that isn't this page's (`GAME_UPDATED`, see [The update notice](#the-update-notice)): "The game has been updated since you opened this page, so its link data no longer matches. Reload the page."
 - otherwise the game's own message: a card none of whose draws fit (`rollOne`: "Couldn’t find an article that fits. Try Reroll again.") or a daily with no pair (`DAILY_FAILED`: "Couldn’t make this day’s daily challenge. Pick another day from Past dailies, or play your own game.", since such a day would fail the same way every time; none does on the snapshot).
 
 Par has its own spinner while it is worked out (see [par.md](par.md)).
 
 The spinners are transform animations, so they keep turning while a search runs, and turn slowly with reduced motion.
+
+## The update notice
+
+A tab left open across a release gets a link graph file that doesn't match its `wiki-data.js` the first time it needs one (`loadGraphFile`). Most callers carry on without par and say nothing, so `loadGraphFile` shows the notice itself, whichever of them asked: `#updateNotice`, at the end of the row under the cards.
+
+- It says the game has been updated and has a Reload button (`#btnReload`), and it stays until the page reloads, on any settings, since the page is out of date whatever is ticked.
+- Nothing reloads by itself.
+- Reload is `reloadForUpdate`:
+  - A link the page couldn't open stays in the hash, to open after it: a later format's (`newerLink`), or a daily that failed (`setup.dailyFailed`).
+  - Otherwise it writes the hash from what is on the cards, whatever the hash said, since starting a game clears it and Play the daily doesn't touch it: `daily=` for a daily still there (`setup.daily`), a sealed link for a challenge link's game unchanged (`setup.challenge`).
+  - Failing those the setup isn't saved, and the player usually reached the notice by changing the rules, so it writes `rules=` (see [url-hash.md](url-hash.md#rules-the-rules)), with rules ticked but off too (`chosenRules`), and the cards roll again. A link the player has changed goes with it: its pair would come back, and its game would count as Accepted.
+  - The other settings under the cards, such as Exact clicks's number, come back only if the browser restores them.
+- With Exact clicks the count's line says `GAME_UPDATED` in place of there being no par to count from, and Start stays off, as there is no count. Under Blind target, Start says it in the status line (`setup.outdated`, from `setupPar`), rather than `pickHidden` trying other targets.
+- A roll at a target par fails with `GAME_UPDATED`, and leaves the cards it emptied empty, as a file that doesn't load does: Reroll all fills them.
+- A long-cached file can bring the notice back after a reload: see [hosting.md](../hosting.md#caching).
+
+During a game the header says it instead, and the result has its own Reload: see [rules.md](rules.md#a-game-on-a-file-from-a-newer-release).
 
 ## Letting go
 

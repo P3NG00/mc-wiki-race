@@ -113,7 +113,7 @@ Details: [internal/url-hash.md](internal/url-hash.md)
 
 ## Par and route searches
 
-Par is the fewest clicks for a pair, worked out in the page by a breadth-first search over the link graph. `linkGraph` loads `wiki-links.js` as the page opens, adds `wiki-navboxes.js` in Relaxed or uses `wiki-lead.js` alone under Top links only, and refuses any file whose checksum doesn't match `wiki-data.js`.
+Par is the fewest clicks for a pair, worked out in the page by a breadth-first search over the link graph. `linkGraph` loads `wiki-links.js` as the page opens, adds `wiki-navboxes.js` in Relaxed or uses `wiki-lead.js` alone under Top links only, and refuses any file whose checksum doesn't match `wiki-data.js`. A tab left open across a release meets such a file the first time it needs one, so a refusal puts a notice with a Reload button on the setup screen. The game never reloads by itself, and a game already going plays on without par or Distance: [hosting.md](hosting.md#caching) has more.
 The search follows the game's settings: hubs are dead in Hard, spin-off pages count only when on, and checkpoints split the route into legs. Round trips, Scavenger and Exact clicks each have a search of their own on the same graph. Where several routes are as short, the route shown goes through the fewest pages outside the pool. That choice doesn't change par, but for the rare round trip of a hunt of kinds, whose search isn't exact and can come out a click shorter.
 
 The same searches drive Distance (how many clicks you are from what is next, measured at every arrival) and the result's missed shortcut. Live edits since the snapshot can make the real fewest clicks differ, so the result names the snapshot's date.

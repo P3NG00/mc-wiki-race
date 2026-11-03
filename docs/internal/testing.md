@@ -535,7 +535,7 @@ Par:
 - Normal's go through the pool alone when a route that does is as short, and par is still the fewest clicks
 - a Race, a hunt of kinds and Exact clicks each taking the page in the pool on a made-up graph where it is as short as one outside it (a Race and a hunt through a navbox too), and the one outside when nothing else is
 - a spin-off page needs its spin-off on
-- a graph file with another sha256 refused, and one with `wiki-data.js`'s taken
+- a graph file with another sha256 refused with the notice, one with `wiki-data.js`'s taken without it, and one that doesn't declare what the page reads refused rather than never answering
 - a route goes through one checkpoint and through two in order
 - a round trip goes there and back with the way back off the way there, almost always at the lower bound
 - a Relay round trip goes round its loop in order
@@ -661,6 +661,25 @@ The setup screen holding still:
 - The wiki's calculator gadget on Breaking Table: jQuery and then the gadget loaded, the gadget given the page's content, title and namespace and Codex's styles once it asks; once it has run, the options showing with a live link that goes to its article and the stand-in for no JavaScript gone; a page without calculators loading neither; and with them failing, the options hidden and the stand-in showing
 - Leaving the page asking first during a game and not after it (Start pressed with a real click, since browsers only ask after one; BiDi accepts the dialog and reports it as `browsingContext.userPromptOpened`)
 
+### A release under an open tab
+
+The suite serves this folder from a small local server (`openServed`), with fixed names and no-cache as a host does, and `release()` changes the checksum in all four data files, so a page opened before keeps its old `wiki-data.js` and `wiki-links.js` and gets the new `wiki-navboxes.js` and `wiki-lead.js`:
+- A file that fails to load (a 404): its own message, no notice, blank par, and tried again the next time
+- The same file from the new release: the notice with its Reload button, blank par, the status line saying the game was updated, the refusal kept, and no reload by itself
+- Settings the page has the files for still getting par with the notice up, and `wiki-navboxes.js` refused on Relaxed as `wiki-lead.js` is under Top links only
+- A roll at a target par saying the game was updated, and Reroll all giving cards again at any par
+- Exact clicks saying so with Start off, and Start under Blind target saying so without trying other targets
+- A game on the refused file playing on with no overlay, the header saying what it lacks, clicks going through; its result saying so with a Reload button; and no reload during it
+- A later game on what the page has showing par and saying nothing
+- A par that couldn't be worked out leaving the record's target par alone, and a game with a card the snapshot lacks saying the game was updated too
+- Reload from a result keeping the rules, with the new release's files taken and the notice gone
+- Reload on the setup screen after changing a challenge link dropping the link and keeping the rules, those ticked but off too, and after changing the daily giving an ordinary game on those rules
+- Reload opening the daily played from its button, not the hash that was there, and a sealed challenge link not changed, with its pair and rules
+- Reload from a challenge link's result opening the link again, though starting the game cleared the hash
+- Reload keeping a link of a newer format, and a daily that failed with `wiki-links.js` refused beside a cached `wiki-data.js`
+- A file that fails to load for par and is refused when Distance tries it again: nothing said until then, then the header and the result
+- A file held back until the game has started: nothing shown until it comes, then the header alone, the game going on
+
 ### Requests
 
 The suite checks that only page info, the advancements' pictures and articles are asked for.
@@ -686,6 +705,7 @@ The seed is printed with the result, and `MWR_SEED=<seed> test/run-e2e.sh` repla
 
 The live suite needs `firefox` and Node ≥ 22 (for the global `WebSocket`), plus network access.
 Headless Firefox has no pointer device and matches `(hover: none)`, so `run-e2e.sh` sets `ui.primaryPointerCapabilities` to report a mouse, as a desktop browser does.
+`run-e2e.sh` waits up to 10 seconds for its port to be free before starting Firefox, since the Firefox of a run just ended can still be shutting down on it, and stops with a message if it isn't (`PORT` chooses another).
 It runs as a single script; to focus on one behavior, edit or comment out checks in `e2e.mjs`.
 Code inside the article iframe is evaluated in the frame's own browsing context (`frameCtx()`).
 

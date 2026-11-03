@@ -142,6 +142,8 @@ Par is the fewest clicks a game can be done in, going by the wiki's offline copy
 
 You can only beat par where the live wiki has a link the offline copy doesn't, on Relaxed through a version page, or on a hunt by finding one of those few pages par doesn't go by. Exact clicks gets no golf score, since every win is par plus the count you picked. The result names the offline copy par went by, or says a page you played isn't in it, so par is unknown.
 
+If the game is updated while your tab is open, Relaxed and Top links only may stop working out par. The setup screen then says so, with a **Reload** button. Reloading keeps your rules but rolls new cards, unless the cards are a challenge link or daily you opened and haven't changed, and the game never does it for you. A game you're already playing carries on, without par or Distance, and its result has a Reload button too. Par being unknown, it can't earn the advancements that need par, and it still counts as your first game on those cards, so reload before you start one on those settings.
+
 ## The missed shortcut
 
 Under your path, **Show a shortcut you missed** opens the shortcut from your costliest detour: a page you were on, and the click from it that would have saved you two or more. For example: "From Dirt, Bone Meal was 1 click from Crafting: 3 clicks quicker." It never points at the start or a checkpoint (the shortest route already shows those), and Exact clicks and Share leave it out.

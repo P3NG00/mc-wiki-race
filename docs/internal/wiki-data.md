@@ -181,6 +181,20 @@ The link graph numbers pages by their place in `wiki-data.js`'s `articles` and g
 Each entry is page numbers as the gaps between them in base 36, one entry per line.
 Every graph file carries `wiki-data.js`'s `sha256`, of the ZIM's sha256 and every page's title in order, which the game checks: the files number pages by their place, so a config change that moves them, from the same ZIM, has to tell them apart as a new ZIM does.
 
+### A file that doesn't match
+
+`loadGraphFile` tells two failures apart:
+- A file that doesn't load (`onerror`) rejects with `graph` naming the file and is forgotten, so the next caller tries again.
+- A file that loads but isn't this page's rejects with `outdated`: its sha256 is another's, or reading it throws, since a release can rename what it declares and a half-written file declares nothing. So does a host's error page sent with status 200, which can't be told from those. It shows the notice (see [setup-screen.md](setup-screen.md#the-update-notice)), and the rejection stays cached: only a reload can help, and a second copy would throw on its `const`.
+
+The checksum changes with any release that changes the pages, on the same ZIM too, so a tab left open across such a release meets this for `wiki-navboxes.js` and `wiki-lead.js`, which it hasn't loaded yet. Normal and Hard games without Top links only, and the daily, go by `wiki-links.js` alone, which the tab already has. Versioned names wouldn't help, since the server only ships the latest release, and loading every file up front would undo the split.
+
+The sha256 doesn't cover the shape of the files. A release that changes a graph file's fields on the same pages would pass the check, and a tab left open would then throw a raw error with no notice, so that change also has to change what `tools/wikidata/build.py` hashes.
+
+Which callers it reaches:
+- those that show it: a roll at a target par and the daily (`withBusy`, through `failText`), `showPar`, `setupPar` for Exact clicks, `pickHidden`;
+- those that carry on and leave it to the notice: `setupPar`'s par, `joinsWeb` (every page passes), `startGame`'s par, `clicksToGo` (no Distance), `turnBack` (a stranded player isn't told), `advFinish` (par unknown, so no skill advancements and less XP, and the game still counts as the pair's first), a record with no `par`, and the background's `bgPair`, `bgRoll`, `bgSample` and `bgPairFacts`.
+
 ## Updating the snapshot
 
 To update:

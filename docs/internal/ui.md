@@ -356,7 +356,7 @@ Text straight on the background on the setup screen has a halo of `--bg`, so the
 
 ### Labels
 
-The game header (`renderObjective`, redrawn when the objective changes) has the game and its extra rules as labels (`#hudTags`) with how far along it is ("1 of 2 checkpoints reached", "Found 1 of 3", "On the way back", Exact clicks's "Land on the target with your last click, not before"), and with Distance on the latest arrival's count beside them (`#hudHint`, from `renderHud`).
+The game header (`renderObjective`, redrawn when the objective changes) has the game and its extra rules as labels (`#hudTags`) with how far along it is ("1 of 2 checkpoints reached", "Found 1 of 3", "On the way back", Exact clicks's "Land on the target with your last click, not before"), and with Distance on the latest arrival's count beside them (`#hudHint`, from `renderHud`), which also says when the game has no par because it was updated (`game.outdated`, see [rules.md](rules.md#a-game-on-a-file-from-a-newer-release)).
 
 ### The route
 

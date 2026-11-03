@@ -86,6 +86,16 @@ Showing the measure:
 - A click that got closer is cheered once its article shows, with a ding, sparks and the count lit, and one that didn't gets nothing (`cheer`, see [ui.md](ui.md)).
 - Distance isn't a daily rule, since it makes a game easier.
 
+### A game on a file from a newer release
+
+A game whose link graph file was refused (see [wiki-data.md](wiki-data.md#a-file-that-doesnt-match)) plays on: no overlay and no reload, since a game isn't saved and a reload would lose it.
+
+- `startGame` sets `game.outdated` if `game.parReady` rejects with `outdated`, whether the file was refused before Start or arrives during the game. An arrival's count does too (`navigate`), for a file that failed to load for par and is refused when tried again.
+- The header says so in `#hudHint` (`renderHud`): "Game updated: no par or Distance. Reload after this game.", without "or Distance" when that rule is off. It has no button.
+- The header's par stays "–", and Distance's counts never come.
+- The result says `GAME_UPDATED` where par goes, with a Reload button (`showPar`), in place of the line about a card the snapshot lacks too. By then the game is saved and the page no longer asks before leaving.
+- `game.outdated` only goes by this game's rules: a Normal game in the same tab has par and says nothing.
+
 ### Six clicks
 
 - *Six clicks* shows the count as "of 6" under the clicks, with a dot a click (`#hudClicksK`, `#hudMeter`, from `game.limit`).

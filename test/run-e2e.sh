@@ -8,6 +8,11 @@ cd "$(dirname "$0")/.."
 TEST=e2e
 if [ "${1:-}" = --offline ]; then TEST=offline; shift; fi
 PORT=${PORT:-9333}
+port_in_use() { (exec 3<>/dev/tcp/127.0.0.1/"$PORT") 2>/dev/null; }
+# The Firefox of a run that has just ended can still be shutting down on the port. The test would connect to that one and
+# stop as it goes, with no checks run and exit code 13, so wait for it to go.
+for _ in $(seq 50); do port_in_use || break; sleep 0.2; done
+if port_in_use; then echo "Port $PORT is in use: stop what's on it, or choose another with PORT=." >&2; exit 1; fi
 PROFILE=$(mktemp -d)
 trap 'kill "$FF" 2>/dev/null || true; rm -rf "$PROFILE"' EXIT
 # Headless Firefox has no pointer device, so it matches (hover: none). Report a mouse (fine pointer that hovers, 2 | 4),
@@ -15,5 +20,5 @@ trap 'kill "$FF" 2>/dev/null || true; rm -rf "$PROFILE"' EXIT
 printf 'user_pref("ui.primaryPointerCapabilities", 6);\nuser_pref("ui.allPointerCapabilities", 6);\n' > "$PROFILE/user.js"
 firefox --headless --remote-debugging-port="$PORT" --profile "$PROFILE" --no-remote about:blank >/dev/null 2>&1 &
 FF=$!
-for _ in $(seq 50); do (exec 3<>/dev/tcp/127.0.0.1/"$PORT") 2>/dev/null && break; sleep 0.2; done
+for _ in $(seq 50); do port_in_use && break; sleep 0.2; done
 node "test/$TEST.mjs" "$PORT" "${MWR_URL:-file://$PWD/index.html}" "${1:-}"

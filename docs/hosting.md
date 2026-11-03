@@ -25,7 +25,12 @@ Details: [internal/wiki-data.md](internal/wiki-data.md#the-link-graph-files)
 
 The four data files change together with each new snapshot of the wiki, and when the pages the game leaves out change, so serve them without long caching.
 Each link graph file carries a checksum of the snapshot and its pages, and the game refuses one that doesn't match `wiki-data.js`'s, since it would give wrong routes.
-A graph file cached from an older build beside a newer `wiki-data.js` would turn off par, Distance, Target par and the daily until the cache runs out.
+
+A refused file shows a notice with a Reload button, saying the game has been updated. It comes up in two ways:
+- **A tab left open across a release.** This is expected, even with no caching at all. The tab already has the old `wiki-data.js` and `wiki-links.js`, and fetches `wiki-navboxes.js` or `wiki-lead.js` from the new release the first time Relaxed or Top links only needs it. A reload fixes it. The game never reloads by itself, and a game in progress carries on without par or Distance. Other games in that tab, and the daily, aren't affected.
+- **A graph file cached from an older build beside a newer `wiki-data.js`.** Here a reload doesn't help, so the notice keeps coming back, and par, Distance, Target par and the daily stay off on the settings that need the file, until the cache runs out. This is why the files shouldn't be cached for long.
+
+A file that doesn't load at all gets a different message, that the game's link data didn't load. Send a real error status for that: an error page sent as 200 counts as a refused file.
 
 Details: [internal/wiki-data.md](internal/wiki-data.md#the-link-graph-files)
 

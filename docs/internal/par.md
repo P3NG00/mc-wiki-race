@@ -13,7 +13,7 @@ Par is the fewest clicks for a pair, going by the snapshot.
 - The setup screen works it out beside Start (`updateSetupPar`, run from every `renderCard`, so the first card rendered starts loading the graph and it is ready by the time a game starts).
 - The search can hold the page up for a moment, a round trip's or Scavenger's most, so `setupPar` first shows `Par …` with a spinner (`.working`) and waits for the page to be drawn (`painted`).
   - Of the runs started meanwhile (a change of rules renders every card) only the last one searches.
-- `startGame` works it out for the game (`game.parReady`, then `game.par`, for the header), taking the route the setup screen has just found.
+- `startGame` works it out for the game (`game.parReady`, then `game.par`, for the header), taking the route the setup screen has just found. If the file is refused, `game.outdated` is set (see [rules.md](rules.md#a-game-on-a-file-from-a-newer-release)).
   - `cardsRoute` keeps its last search by everything it went by (`lastRoute`), so Start and Same cards again don't search again, and drops one that fails.
 - Both show par in every game, so a player knows the score to aim for from the start; only Blind target holds it until the game starts.
 
@@ -97,7 +97,7 @@ Then Share, Copy challenge link, Same cards again and New game.
 ### Narrow screens and the record
 
 - On a narrow screen the tiles go two across and New game takes the full width above the others.
-- The record keeps `par`, added afterwards to a record saved before it was known, and the history and Share show it.
+- The record keeps `par`, added afterwards to a record saved before it was known, and the history and Share show it. A par that couldn't be worked out leaves the record's target par alone (`showPar`).
 
 ## Route searches
 
@@ -106,7 +106,7 @@ Then Share, Copy challenge link, Same cards again and New game.
 - `parRoute` loads the graph the game was played on (`linkGraph`):
   - `wiki-links.js`, and `wiki-navboxes.js` for Relaxed,
   - or `wiki-lead.js` alone for Top links only,
-  - each the first time it is needed, refused if its sha256 isn't `WIKI_DATA`'s.
+  - each the first time it is needed, refused if its sha256 isn't `WIKI_DATA`'s, or if it doesn't declare what the page reads (a rejection marked `outdated`, see [wiki-data.md](wiki-data.md#a-file-that-doesnt-match)).
 - `parRoute` searches it breadth-first (`shortestRoute`), opening each navbox once, the first and nearest time it is reached.
 - Of the routes with the fewest clicks it takes one through the fewest pages outside the pool (`POOL_PAGES`: no topic), then the first by page number, by taking each level of the search in that order.
   - Pages outside the pool link to much of the wiki: those a Content checkbox adds (Crafting, Renewable resource, Advancement) and others (Minecraft Dungeons, Particles, Minecraft.net).

@@ -46,7 +46,7 @@ function anchorsOf(file) {
     const seen = new Map(), set = new Set();
     const headings = /^ {0,3}#{1,6}[ \t]+(.+?)[ \t]*#*$|^ {0,3}([^\s#|>*+-].*?)[ \t]*\n {0,3}(?:=+|-+)[ \t]*$/gm;
     for (const [, atx, setext] of prose(read(file)).matchAll(headings)) {
-      const base = (atx ?? setext).replace(/!?\[([^\]]*)\]\([^)]*\)/g, '$1').replace(/<[^>]+>|`/g, '').toLowerCase()
+      const base = (atx ?? setext).replace(/!?\[([^\]]*)\]\([^)]*\)/g, '$1').replace(/[<>`]/g, '').toLowerCase()
         .replace(/[^\p{L}\p{N}\s_-]/gu, '').replace(/\s/g, '-');
       const n = seen.get(base) ?? 0;
       seen.set(base, n + 1);

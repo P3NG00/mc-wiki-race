@@ -23,9 +23,9 @@ Details: [internal/wiki-data.md](internal/wiki-data.md#the-link-graph-files)
 
 ## Caching
 
-The four data files change together with each new snapshot of the wiki, so serve them without long caching.
-Each link graph file carries the snapshot's checksum, and the game refuses one that doesn't match `wiki-data.js`'s, since it would give wrong routes.
-A graph file cached from an older snapshot beside a newer `wiki-data.js` would turn off par, Distance, Target par and the daily until the cache runs out.
+The four data files change together with each new snapshot of the wiki, and when the pages the game leaves out change, so serve them without long caching.
+Each link graph file carries a checksum of the snapshot and its pages, and the game refuses one that doesn't match `wiki-data.js`'s, since it would give wrong routes.
+A graph file cached from an older build beside a newer `wiki-data.js` would turn off par, Distance, Target par and the daily until the cache runs out.
 
 Details: [internal/wiki-data.md](internal/wiki-data.md#the-link-graph-files)
 

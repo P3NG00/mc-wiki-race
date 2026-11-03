@@ -312,8 +312,8 @@ check('their toggles open and fold them, and the links inside work', foldsAfter 
 await send('browsingContext.navigate', { context: ctx, url: 'about:blank', wait: 'complete' });
 await send('browsingContext.navigate', { context: ctx, url: fileUrl + '#start=Minecraft%20Dungeons&target=Diamond', wait: 'complete' });
 await until("!document.querySelector('#btnPlay').disabled");
-// Links to Dungeons pages, but its version pages, which are left out.
-const dungeonsLinks = async () => JSON.parse(await ev("JSON.stringify([...document.querySelectorAll('a[href^=\"/w/Dungeons:\"]')].filter(a => a.title !== 'Off limits: a version or list page').map(a => a.classList.contains('mwr-live')))", await frameCtx()));
+// Links to Dungeons pages. A challenge link without rules is Relaxed, where its version pages are live too.
+const dungeonsLinks = async () => JSON.parse(await ev("JSON.stringify([...document.querySelectorAll('a[href^=\"/w/Dungeons:\"]')].map(a => a.classList.contains('mwr-live')))", await frameCtx()));
 await ev("document.querySelector('#btnPlay').click()");
 await until("game.active && game.path.length === 1 && !game.loading");
 const offLinks = await dungeonsLinks();
@@ -327,6 +327,15 @@ await ev("document.querySelector('#btnPlay').click()");
 await until("game.active && game.path.length === 1 && !game.loading");
 check('a card in a spin-off turns its links on without the checkbox', await ev("JSON.stringify(game.content) === '[\"Dungeons\"]'") &&
   (links => links.length > 0 && links.every(l => l))(await dungeonsLinks()), await ev("JSON.stringify(game.content)"));
+await ev("finish(false); closeModal(); toSetup()");
+// On Normal a spin-off that is on keeps its version pages dead.
+await send('browsingContext.navigate', { context: ctx, url: 'about:blank', wait: 'complete' });
+await send('browsingContext.navigate', { context: ctx, url: fileUrl + '#start=Minecraft%20Dungeons&target=Dungeons:Creeper&rules=nonav', wait: 'complete' });
+await until("!document.querySelector('#btnPlay').disabled");
+await ev("document.querySelector('#btnPlay').click()");
+await until("game.active && game.path.length === 1 && !game.loading");
+const spinOffVersions = await ev(`[...document.querySelectorAll('a[href^="/w/Dungeons:"]')].filter(a => a.title === 'Off limits: a version or list page').length`, await frameCtx());
+check('a spin-off that is on keeps its version pages dead on Normal', spinOffVersions > 0, `${spinOffVersions} links`);
 await ev("finish(false); closeModal(); toSetup()");
 
 // No hubs: links to hubs and their redirects are dead, except a hub that is the target. The left-out pages are dead too.
@@ -347,7 +356,7 @@ const liveness = keep => textLinks.filter(([title]) => keep(title)).map(([, live
 const toHubs = liveness(t => hubMap[t] && hubMap[t] !== 'Crafting'), toTarget = liveness(t => hubMap[t] === 'Crafting'), toPickaxe = liveness(t => t === 'Pickaxe');
 check('No hubs disables hub links', toHubs.length > 0 && toHubs.every(live => !live), `${toHubs.length} hub links, ${toHubs.filter(Boolean).length} live`);
 check('No hubs keeps the target and other links live', toTarget.length > 0 && toTarget.every(Boolean) && toPickaxe.length > 0 && toPickaxe.every(Boolean));
-const leftOut = new Set(JSON.parse(await ev('JSON.stringify(WIKI_DATA.left_out)'))), toLeftOut = liveness(t => leftOut.has(t));
+const leftOut = new Set(JSON.parse(await ev('JSON.stringify(WIKI_DATA.left_out)'))), versionTitle = new RegExp(await ev('WIKI_DATA.version_title')), toLeftOut = liveness(t => leftOut.has(t) || versionTitle.test(t));
 check('links to left-out pages are dead', toLeftOut.length > 0 && toLeftOut.every(live => !live), `${toLeftOut.length} left-out links, ${toLeftOut.filter(Boolean).length} live`);
 
 // No navboxes: the navbox tables (and their Navigation heading) are hidden and their links dead; links in the text still work.

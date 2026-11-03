@@ -980,10 +980,18 @@ const NAMESPACES = WIKI_DATA.namespaces;
 // The left-out pages: version pages (releases, snapshots, version histories), list pages (data values, Closed captions,
 // Creative inventory…), their subpages and the redirects to them. Many articles link to them and they link to much of
 // the pool, so a route through one is a cheat: almost every article links to some version page from its history. They
-// are left out like the namespaces: links to them are dead in every difficulty, no card can be one, and the data and the
-// link graph don't have them. Written once for the article frame, which gets the list every time.
+// are left out like the namespaces: no card can be one, and the data and the link graph don't have them. Links to them
+// are dead but for version pages in Relaxed (versionsLive in renderArticle). Written once for the article frame, which
+// gets the list every time.
 const LEFT_OUT = new Set(WIKI_DATA.left_out);
 const LEFT_OUT_JSON = JSON.stringify(WIKI_DATA.left_out).replace(/</g, '\\u003c');
+// Those whose links are dead even in Relaxed, where version links live: navboxes already make its pairs par 1 or 2.
+const LIST_PAGES_JSON = JSON.stringify(WIKI_DATA.list_pages).replace(/</g, '\\u003c');
+// The titles releases get: a version newer than the snapshot is on no list, but is left out as those on it are.
+const VERSION_TITLE = new RegExp(WIKI_DATA.version_title);
+// A subpage goes with its page, one newer than the snapshot too, but those the link graph goes through.
+const SUBPAGES_KEPT = new Set(WIKI_DATA.subpages_kept);
+const isLeftOut = t => LEFT_OUT.has(t) || (LEFT_OUT.has(t.split('/')[0]) && !SUBPAGES_KEPT.has(t)) || VERSION_TITLE.test(t);
 // Spin-off games' namespaces, name to number. Their pages are in ARTICLES too, titled "Dungeons:…".
 const SPINOFFS = WIKI_DATA.spinoffs;
 const spinoffOf = title => Object.keys(SPINOFFS).find(n => title.startsWith(n + ':'));
@@ -1168,7 +1176,7 @@ const firstParagraph = text => (text || '').trim().split('\n')[0].trim();
 // a spin-off's (Tutorial:, Category:…).
 function toInfo(p) {
   if (!p || p.missing || p.invalid) return null;
-  if ((p.ns !== 0 && !Object.values(SPINOFFS).includes(p.ns)) || LEFT_OUT.has(p.title)) return false;
+  if ((p.ns !== 0 && !Object.values(SPINOFFS).includes(p.ns)) || isLeftOut(p.title)) return false;
   return {
     title: p.title,
     desc: firstParagraph(p.extract),
@@ -1330,7 +1338,7 @@ const gameOf = keys => ['exact', 'scavenger', 'relay'].find(g => keys.includes(G
 // Difficulty, as the rules it turns on. Navboxes decide how hard a game is far more than the pool does: with them almost any
 // sensible click gets closer (see tools/wikidata/RESEARCH.md), so Normal, the default, plays without them.
 const LEVELS = {
-  relaxed: { label: 'Relaxed', rules: [], help: 'Relaxed: the link tables at the bottom of articles (navboxes) are there, so almost any sensible click gets you closer.' },
+  relaxed: { label: 'Relaxed', rules: [], help: 'Relaxed: the link tables at the bottom of articles (navboxes) are there, so almost any sensible click gets you closer. Links to version pages work too, though par doesn’t count them.' },
   normal: { label: 'Normal', rules: ['nonav'], help: 'Normal: the link tables at the bottom of articles (navboxes) are hidden, so you find your way through the article itself.' },
   hard: { label: 'Hard', rules: ['nonav', 'nohubs'], help: 'Hard: no navboxes, and links to big overview pages (Block, Item, Mob, Crafting, Java Edition…) are dead too.' },
 };
@@ -3038,7 +3046,7 @@ const ADVANCEMENTS = Object.fromEntries([
   ['thereBack', 'start', 'There and Back Again', 'Win a Round trip.', 'task', 'Compass', '🧭'],
   ['accepted', 'start', 'Accepted', 'Win a game opened from a challenge link.', 'task', 'Bell', '🔔'],
   ['par', 'skill', 'Par for the Course', 'Win at par.', 'goal', 'Target', '🎯'],
-  ['birdie', 'skill', 'Birdie', 'Beat par: the live wiki had a shortcut the offline copy didn’t, or a hunt’s find was one par doesn’t go by.', 'challenge', 'Parrot', '🐦', { secret: true }],
+  ['birdie', 'skill', 'Birdie', 'Beat par, by a way it doesn’t count: a shortcut the offline copy lacks, a version page on Relaxed or one of a hunt’s extra finds.', 'challenge', 'Parrot', '🐦', { secret: true }],
   ['hardcore', 'skill', 'Hardcore', 'Win on Hard.', 'goal', 'Totem of Undying', '❤️'],
   ['noTakeBacks', 'skill', 'No Take-Backs', 'Win with No Back.', 'task', 'Bow', '🏹'],
   ['blindfolded', 'skill', 'Blindfolded', 'Win with Blind target.', 'goal', 'Blindness', '🙈'],
@@ -4399,7 +4407,7 @@ function syncFrameTheme() { $('#frame').contentWindow?.postMessage({ mwr: 'theme
 // there), and hubs (No hubs). seen: titles visited this game, whose links are marked.
 function renderArticle(page, fragment, token, { dead = [], hubs = [] } = {}, seen = []) {
   const dark = themeIsDark();
-  const noNav = game.rules.includes('nonav'), lead = game.rules.includes('lead');
+  const noNav = game.rules.includes('nonav'), lead = game.rules.includes('lead'), versionsLive = levelOf(game.rules) === 'relaxed';
   // The article renders in a sandboxed iframe (opaque origin): the wiki's own CSS applies untouched,
   // <base> resolves its relative image/CSS URLs, and the inline script reports clicks via postMessage.
   // Values go into the script as JSON with < escaped: a link fragment that opens an HTML comment and then a script tag
@@ -4412,7 +4420,8 @@ function renderArticle(page, fragment, token, { dead = [], hubs = [] } = {}, see
     const WGL = ${js(WGL_THEME_CLASSES)};
     const DEAD = new Set(${js(dead)}), DEAD_WHY = ${js(game.exact ? 'already visited (Exact clicks)' : 'part of your way there (Round trip)')};
     const HUBS = new Set(${js(hubs)});
-    const LEFT_OUT = new Set(${LEFT_OUT_JSON});
+    const OFF_TITLES = new Set(${versionsLive ? LIST_PAGES_JSON : LEFT_OUT_JSON}), OFF_NOTE = ${js(versionsLive ? 'Off limits: a big list page' : 'Off limits: a version or list page')};
+    const VERSION_TITLE = ${versionsLive ? 'null' : `new RegExp(${js(WIKI_DATA.version_title)})`}, SUBPAGES_KEPT = new Set(${js(WIKI_DATA.subpages_kept)});
     const MISSING = new Set(${js((page.links ?? []).filter(l => !l.exists).map(l => l.title))});
     const SEEN = new Set(${js(seen)});
     const NO_NAV = ${noNav};
@@ -4445,7 +4454,7 @@ function renderArticle(page, fragment, token, { dead = [], hubs = [] } = {}, see
       t = t.charAt(0).toUpperCase() + t.slice(1);   // as MediaWiki does, so titles match the dead, hub and seen lists
       // A dead link's note says why it is dead.
       if (MISSING.has(t)) return { kind: 'blocked', note: 'Off limits: this page doesn’t exist' };
-      if (LEFT_OUT.has(t)) return { kind: 'blocked', note: 'Off limits: a version or list page' };
+      if (OFF_TITLES.has(t) || (OFF_TITLES.has(t.split('/')[0]) && !SUBPAGES_KEPT.has(t)) || VERSION_TITLE?.test(t)) return { kind: 'blocked', note: OFF_NOTE };
       if (DEAD.has(t)) return { kind: 'blocked', note: 'Off limits: ' + DEAD_WHY };
       if (HUBS.has(t)) return { kind: 'blocked', note: 'Off limits on Hard: a big overview page' };
       if (belowTop(a)) return { kind: 'blocked', note: 'Off limits: Top links only' };
@@ -5436,13 +5445,14 @@ function turnBack(entry) {
 const huntFinds = page => huntLeft().filter(h => h.info ? h.info.title === page.title : KIND_FINDS.get(h.kind).has(page.title));
 
 // The stuck banner: no link on the article works. Rolls never give such a page (joinsWeb), but a custom article, a
-// challenge link or a live edit since the snapshot can, and No hubs, Exact clicks or a round trip's way back can leave
+// challenge link, a live edit since the snapshot or a version page in Relaxed can, and No hubs, Exact clicks or a round trip's way back can leave
 // every link on a page dead.
 const stuckText = () => game.stack.length > 1 && canGoBack() ? '⛔ No live links on this page. Go Back, or give up.'
   : '⛔ No live links on this page, and no going Back: only giving up is left.';
 
 // Golf: a win's clicks against par, as its golf name and what that means, for anyone who doesn't play golf. Below par is
-// only possible where the live wiki has a link the snapshot hasn't, or a hunt's find is one par doesn't go by (a kind's also).
+// only possible where the live wiki has a link the snapshot hasn't, Relaxed goes through a version page, or a hunt's find
+// is one par doesn't go by (a kind's also).
 function golfScore(clicks, par) {
   const over = clicks - par, plain = over ? `${Math.abs(over)} ${over > 0 ? 'over' : 'under'} par` : 'even with par';
   if (clicks === 1 && par === 1) return { name: 'Hole in one!', note: 'par 1 in one click', over };

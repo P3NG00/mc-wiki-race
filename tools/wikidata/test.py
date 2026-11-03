@@ -3,6 +3,7 @@ in a few seconds without the real ZIM:
 
     .venv/bin/python -I tools/wikidata/test.py
 """
+from types import SimpleNamespace
 import copy, filecmp, os, re, sys, tempfile
 from libzim.writer import Creator, Hint, Item, StringProvider
 
@@ -96,7 +97,7 @@ PAGES = {
     'Category:Items': (14, '<a href="Diamond">diamond</a>', []),
 }
 # A redirect to a version page that a page links to, and one nothing links to.
-REDIRECTS = {'Blocks': 'Block', 'Iron ingot': 'Iron Ingot', '1.0': 'Java Edition 1.0', 'JE 1.0': 'Java Edition 1.0'}
+REDIRECTS = {'Blocks': 'Block', 'Iron ingot': 'Iron Ingot', '1.0': 'Java Edition 1.0', 'JE 1.0': 'Java Edition 1.0', 'Creative menu': 'Creative inventory'}
 # mwoffliner writes a redirect to a section as a forwarding page, with a link relative to its own path.
 SECTION_REDIRECTS = {'Mining': './Breaking#Speed', 'Breaking/Mining': '../Breaking#Speed'}
 
@@ -175,7 +176,7 @@ with tempfile.TemporaryDirectory() as tmp:
             'Creative inventory/Old']
     check('every article and spin-off page is listed but the left-out pages, and nothing else',
           sorted(rows) == sorted(t for t, (ns, *_) in PAGES.items() if ns in (0, 10000) and t not in left), sorted(rows))
-    check('version and list pages, their subpages and the redirects to them that pages link to', data['left_out'] == sorted([*left, '1.0']),
+    check('version and list pages, their subpages and the redirects to them that pages link to', data['left_out'] == sorted([*left, '1.0', 'Creative menu']),
           data['left_out'])
     # Minecraft Dungeons versions holds only a left-out page, which the config's check has to find all the same.
     dungeons_versions = {**CONFIG, 'version_categories': ['Versions', 'Minecraft Dungeons versions']}
@@ -243,6 +244,20 @@ with tempfile.TemporaryDirectory() as tmp:
         check('a page on both a kind\'s members and its also stops the build', False)
     except SystemExit as e:
         check('a page on both a kind\'s members and its also stops the build', 'Items: on both members and also: Ankle Monitor' in str(e), e)
+    check('the list pages alone, with their subpages and every redirect, linked or not', data['list_pages'] == ['Creative inventory', 'Creative inventory/Old', 'Creative menu'], data['list_pages'])
+    pages_changed = build(Snapshot(again), {**CONFIG, 'list_titles': ['Creative inventory', 'Diamond Pickaxe']})[0]   # a build leaves pages out of its snapshot
+    check('the data\'s sha256 goes by the ZIM and the pages, so a page list from the same ZIM changing changes it',
+          len(data['sha256']) == 64 and data['sha256'] != meta['sha256'] and pages_changed['sha256'] != data['sha256'] and build(Snapshot(again), CONFIG)[0]['sha256'] == data['sha256'], pages_changed['sha256'])
+    check('the pattern for version titles reaches the data', data['version_title'] == CONFIG['version_title'], data.get('version_title'))
+    for pattern, says in (('^Diamond$', 'page in the data: Diamond'), ('^Iron ingot$', 'redirect to Iron Ingot that a page links to: Iron ingot')):
+        try:
+            build(snap, {**CONFIG, 'version_title': pattern})
+            check(f'a pattern for version titles that takes a {says.split(":")[0]} stops the build', False)
+        except SystemExit as e:
+            check(f'a pattern for version titles that takes a {says.split(":")[0]} stops the build', says in str(e), e)
+    kept = SimpleNamespace(pages={'JE 1.0/Old': {'body': ['Then/Linked'], 'nav': []}, 'Other': {'body': [], 'nav': []}}, redirects={'Then/Linked': 'Other', 'Then/Unlinked': 'Other'}, resolve=lambda t: 'Other')
+    check('a page, and a redirect to one that a page links to, under a left-out title are kept', build_module.kept_titles(kept, CONFIG, ['JE 1.0', 'Then']) == ['JE 1.0/Old', 'Then/Linked'],
+          build_module.kept_titles(kept, CONFIG, ['JE 1.0', 'Then']))
     try:
         stops({'Hostile mobs': {'label': 'a hostile mob', 'members': []}})
         check('a kind with too few members stops the build', False)
@@ -293,11 +308,13 @@ with tempfile.TemporaryDirectory() as tmp:
     newer['articles'][[r[0] for r in newer['articles']].index('Diamond')][2] = 30
     newer['hubs'].pop('Mining')
     newer['left_out'].remove('1.0')
+    newer['list_pages'] = [*newer['list_pages'], 'Brand new list']
+    newer['version_title'] = '^Newer'
     newer['kinds']['Items'].update(members=['Diamond', 'Diamond Pickaxe'], also=['Ankle Monitor'])
     report = diff(data, newer, min_links=5)
     check('diff lists added and removed articles, category and kind moves, link changes, hubs and left-out pages',
           all(s in report for s in ('2026-08-21', '2026-11-21', 'added (1): Copper Golem', 'removed (1): Creeper',
-                                    'mobs: 1 → 1', 'Kind Items: 3 → 3\n  joined: Diamond Pickaxe\n  left: Charcoal', 'Diamond: 8 → 30', 'Hubs: +none; −Mining', 'Left out: +none; −1.0')), report)
+                                    'mobs: 1 → 1', 'Kind Items: 3 → 3\n  joined: Diamond Pickaxe\n  left: Charcoal', 'Diamond: 8 → 30', 'List pages: +Brand new list; −none', '→ ^Newer', 'Hubs: +none; −Mining', 'Left out: +none; −1.0')), report)
 
 # The game labels every topic and family the data names; a key without a label stops the page from loading.
 game = open(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..', 'index.html'), encoding='utf-8').read()

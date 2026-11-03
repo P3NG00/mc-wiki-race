@@ -93,11 +93,20 @@ Every article and every spin-off page is listed but the left-out pages, which ar
 - the list pages
 - the subpages of either.
 
-Version pages are the articles and spin-off pages in a category ending in " versions" or in `version_categories` (Versions, Development version lists), but those with a topic or a family (the removed and unused features lists).
+Version pages are the articles and spin-off pages in a category ending in " versions" or in `version_categories` (Versions, Development version lists, Version disambiguation pages), but those with a topic or a family (the removed and unused features lists).
+
 Almost every article links to some version pages from its history, and they link to most of the pool, so with them nearly any pair was two clicks through one.
 
 List pages are the hand-picked `list_titles` (Closed captions, the data values pages, Block sound type, Creative inventory, Instant mining…), tables of game data that many articles link to and that link to much of the pool, left out even from a family.
 The build stops if a list page is no longer an article.
+
+Version disambiguation pages (1.18, linked from 53 articles) go with them: nearly dead ends, whose links are nearly all to version pages.
+
+A version newer than the snapshot can't be on a list, so `version_title`, a pattern for the titles releases get, kills those links in the game too (`VERSION_TITLE`).
+The game also kills a subpage of any left-out title, which catches new ones the list can't name.
+Since par would still go through a link the game killed, the build stops if the pattern takes a page in the data, or a redirect to one that a page links to, and lists those under a left-out title in `subpages_kept` for the game to spare (`Java Edition data values/Classic`, which leads to a page that isn't left out).
+
+Relaxed keeps only the list pages dead (`list_pages`): measured on 500 pairs, version pages move Relaxed's average par from 1.66 to 1.66 and 1 pair in 500 from par 3 to par 2, since navboxes already make nearly every pair par 1 or 2, while Normal's par 3 pairs would fall from 14% to 5%. Par still doesn't know them, as adding them would double the links in `wiki-links.js`, so Distance shows `?` on one and a route through one can beat par.
 
 The left-out pages' links don't count and the graph doesn't go through them.
 `left_out` lists their titles with the redirects to them that a page links to, for the game to kill links to them.
@@ -154,7 +163,7 @@ Each design is measured on random pairs (`--pairs`, 200 by default, seeded by it
 - pages added and removed
 - pool, family, spin-off and kind members that joined or left
 - link counts that moved
-- hub, left-out page and namespace changes.
+- hub, left-out page, list page, kept subpage, version title pattern and namespace changes.
 
 ### test.py
 
@@ -170,7 +179,7 @@ The link graph numbers pages by their place in `wiki-data.js`'s `articles` and g
 - `wiki-lead.js` (`WIKI_LEAD`) lists each page's links above its first heading, for Top links only: about 65,000, 0.30 MB, 95 KB gzipped, loaded only when that rule is on.
 
 Each entry is page numbers as the gaps between them in base 36, one entry per line.
-Every graph file carries the ZIM's sha256, which the game checks against `wiki-data.js`'s.
+Every graph file carries `wiki-data.js`'s `sha256`, of the ZIM's sha256 and every page's title in order, which the game checks: the files number pages by their place, so a config change that moves them, from the same ZIM, has to tell them apart as a new ZIM does.
 
 ## Updating the snapshot
 

@@ -4,7 +4,8 @@ extract.py and config.json.
     .venv/bin/python -I tools/wikidata/build.py tools/wikidata/cache/minecraft.wiki_en_all_2026-08.jsonl.gz [-o folder]
 
 The output defines WIKI_DATA, which index.html loads with a script tag (a JSON file couldn't be fetched from file://):
-  snapshot, file, sha256  where it came from
+  snapshot, file          where it came from
+  sha256                  of the ZIM's sha256 and every page's title in order, which the graph files carry
   namespaces              names of the wiki's non-article namespaces, whose links the game disables
   topics                  the pool's topics, in config order
   families                the Content families' keys, in config order
@@ -13,6 +14,12 @@ The output defines WIKI_DATA, which index.html loads with a script tag (a JSON f
                           from outside navboxes, topic, families, tiers]
   hubs                    for the No hubs rule, every hub and every redirect to one, mapped to the hub
   left_out                the left-out pages and the redirects to them that pages link to, whose links the game kills
+  list_pages              those of left_out that are list pages or any redirect to one, whose links are dead even in
+                          Relaxed
+  subpages_kept           titles under a left-out title that par goes through, so the game doesn't kill them as its
+                          subpages, as it does any other, for those newer than the snapshot
+  version_title           the config's pattern for version titles, whose links the game kills too, for versions newer
+                          than the snapshot, but in Relaxed
   kinds                   for Scavenger, each of the config's kinds: the name the game shows, its members' commonest
                           topic, its members (the config's fixed list of the pages that count, which par goes by) and
                           any also (pages that count too, which par doesn't go by)
@@ -32,13 +39,14 @@ The link graph, for par, numbers pages by their place in articles and goes throu
                           differ by which page shows as plain text, which extract.py adds back), and for every page the
                           navboxes it carries. Stored once each, they are a ninth of the size of every page's own list.
   wiki-lead.js            WIKI_LEAD: for every page, the pages it links to above its first heading, for Top links only
-All have the sha256 of wiki-data.js's ZIM, and the game only uses them with a wiki-data.js that has the same.
+All have wiki-data.js's sha256, and the game only uses them with a wiki-data.js that has the same: since they number
+pages by their place in it, a change to the pages from the same ZIM has to tell them apart as a new ZIM does.
 Links are counted per linking page, through redirects. An article's count only has links from articles. A spin-off
 page's count also has links from its own namespace, since those links are live when its spin-off is on. The same
 snapshot always gives the same bytes, one entry per line, so a new snapshot reads as a normal git diff (diff.py
 summarises it).
 """
-import argparse, collections, json, os, sys
+import argparse, collections, hashlib, json, os, re, sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))   # for common.py under python -I
 from common import CONFIG, HERE, MIN_BACKLINKS, Snapshot, load_config, spinoff_backlinks
@@ -80,11 +88,13 @@ def tiers(rows, config, popular_share, deep_share):
 
 def left_out(snap, config, spinoff_ns, prefixes):
     """Leaves the left-out pages out of snap (see the docstring), if they aren't already, and returns their titles with
-    the redirects to them that another article or spin-off page links to, sorted. Redirects nothing links to are left
-    out, like pages newer than the snapshot: the list goes into every article the game shows."""
+    the redirects to them that another article or spin-off page links to, sorted, and the list pages with every redirect
+    to them, which version pages, live in Relaxed, may link to. Other redirects nothing links to are left out, like pages
+    newer than the snapshot: the list goes into every article the game shows."""
     extra, families = set(config['version_categories']), [set(f) for f in config['families'].values()]
     played = {t: p for t, p in (*snap.pages.items(), *snap.left_out.items()) if p['ns'] == 0 or p['ns'] in spinoff_ns}
     pages = set(config['list_titles'])
+    lists = {t for t in played if t.split('/')[0] in pages}
     for title, p in played.items():
         cats = set(p['cats'])
         if any(c.endswith(' versions') or c in extra for c in cats) and not (
@@ -93,7 +103,22 @@ def left_out(snap, config, spinoff_ns, prefixes):
     pages |= {t for t in played if any('/'.join(t.split('/')[:i]) in pages for i in range(1, t.count('/') + 1))}   # subpages
     linked = {t for title, p in played.items() if title not in pages for t in (*p['body'], *p['nav'])}
     snap.leave_out(pages - snap.left_out.keys())
-    return sorted(pages | {t for t in snap.redirects if t in linked and snap.resolve(t) in pages and not t.startswith(prefixes)})
+    list_titles = lists | {t for t in snap.redirects if snap.resolve(t) in lists and not t.startswith(prefixes)}
+    return sorted(pages | list_titles | {t for t in snap.redirects if t in linked and snap.resolve(t) in pages and not t.startswith(prefixes)}), sorted(list_titles)
+
+
+def kept_titles(snap, config, titles):
+    """What the game has to keep live, as par goes through it: the pages in the data, and the redirects to them that a page
+    links to. Stops if the pattern for version titles matches any. Returns those that are subpages of a left-out title,
+    which the game would otherwise kill as subpages of one."""
+    pattern, left_out_titles = re.compile(config['version_title']), set(titles)
+    linked = {t for p in snap.pages.values() for t in (*p['body'], *p['nav'])}
+    kept = {t: f'page in the data: {t}' for t in snap.pages}
+    kept |= {t: f'redirect to {snap.resolve(t)} that a page links to: {t}' for t in snap.redirects if t in linked and snap.resolve(t) in snap.pages}
+    problems = [why for t, why in kept.items() if pattern.search(t)]
+    if problems:
+        sys.exit('version_title in config.json matches what the game has to keep:\n  ' + '\n  '.join(sorted(problems)))
+    return sorted(t for t in kept if t.split('/')[0] in left_out_titles)
 
 
 def check_config(snap, config):
@@ -146,7 +171,8 @@ def build(snap, config):
     spinoffs = {n: by_name[n] for n in config['spinoffs']}
     name_of = {ns: n for n, ns in spinoffs.items()}
     ns_names = namespaces(snap, config)
-    left_out_titles = left_out(snap, config, set(name_of), tuple(n + ':' for n in ns_names if n not in spinoffs))
+    left_out_titles, list_titles = left_out(snap, config, set(name_of), tuple(n + ':' for n in ns_names if n not in spinoffs))
+    subpages_kept = kept_titles(snap, config, left_out_titles)
     families = config['families']
     full, outside = snap.backlinks()
     rows = []
@@ -183,9 +209,10 @@ def build(snap, config):
             hubs.setdefault(title, to)
 
     return {
-        'snapshot': snap.meta['date'], 'file': snap.meta['file'], 'sha256': snap.meta['sha256'],
+        'snapshot': snap.meta['date'], 'file': snap.meta['file'],
+        'sha256': hashlib.sha256('\n'.join([snap.meta['sha256'], *(r[0] for r in rows)]).encode()).hexdigest(),
         'namespaces': ns_names, 'topics': list(config['topics']), 'families': list(families), 'spinoffs': spinoffs, 'articles': rows,
-        'hubs': dict(sorted(hubs.items())), 'left_out': left_out_titles, 'kinds': kinds(snap, config, rows),
+        'hubs': dict(sorted(hubs.items())), 'left_out': left_out_titles, 'list_pages': list_titles, 'subpages_kept': subpages_kept, 'version_title': config['version_title'], 'kinds': kinds(snap, config, rows),
     }, sizes
 
 
@@ -239,6 +266,9 @@ def render(data):
     fields.append(field('articles', block(map(j, data['articles']), '[', ']')))
     fields.append(field('hubs', block((f'{j(k)}: {j(v)}' for k, v in data['hubs'].items()), '{', '}')))
     fields.append(field('left_out', block(map(j, data['left_out']), '[', ']')))
+    fields.append(field('list_pages', block(map(j, data['list_pages']), '[', ']')))
+    fields.append(field('subpages_kept', block(map(j, data['subpages_kept']), '[', ']')))
+    fields.append(field('version_title', j(data['version_title'])))
     fields.append(field('kinds', block((f'{j(k)}: {j(v)}' for k, v in data['kinds'].items()), '{', '}')))
     return js_file(data, 'minecraft.wiki', 'titles, categories and link counts', 'WIKI_DATA', fields)
 

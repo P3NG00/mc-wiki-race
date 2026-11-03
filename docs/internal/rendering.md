@@ -60,7 +60,7 @@ Everything else gets the `mwr-dead` class (dimmed) and does nothing:
 
 So are links to pages that don't exist, by the parse reply's `links` (`MISSING`), titled "Off limits: this page doesn’t exist": a template can write one without the red link's class (on Minecraft (Dark Horse Comics), a link to Pips).
 
-So are links to the left-out version and list pages and the redirects to them, in every difficulty (`LEFT_OUT`; see [wiki-data.md](wiki-data.md)), titled "Off limits: a version or list page": the frame gets them as a list written once at load (`LEFT_OUT_JSON`, about 160 KB).
+So are links to the left-out version and list pages and the redirects to them, in Normal and Hard (`LEFT_OUT`, and `VERSION_TITLE` for versions newer than the snapshot; see [wiki-data.md](wiki-data.md)), titled "Off limits: a version or list page": the frame gets them as a list written once at load (`LEFT_OUT_JSON`, about 160 KB). A subpage goes with its page, even one newer than the snapshot, but those the link graph goes through (`subpages_kept` in the data). In Relaxed (`versionsLive`) only the list pages are dead, titled "Off limits: a big list page" (`LIST_PAGES_JSON`, `list_pages` in the data, with every redirect to one, since version pages can link to any), and version links are live.
 
 So are the titles passed in `dead`, the pages visits have made dead, titled under Exact clicks "Off limits: already visited (Exact clicks)" and on a round trip's way back "Off limits: part of your way there (Round trip)" (`DEAD_WHY`), and in `hubs` (No hubs), titled "Off limits on Hard: a big overview page".
 

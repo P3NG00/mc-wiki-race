@@ -8,7 +8,7 @@ Never edit those files by hand; rebuild them.
 ## What comes from the snapshot, and what is live
 
 Everything you read in a game is fetched live from the minecraft.wiki API while you play: the articles, their pictures and the cards' descriptions.
-Everything the game has to know about the whole wiki at once comes from the snapshot instead: which articles a roll can pick, their topics and link counts, the hubs and the pages left out, the wiki's namespaces, the Scavenger hunt's kinds, and the links between all 13,177 pages that par is worked out on.
+Everything the game has to know about the whole wiki at once comes from the snapshot instead: which articles a roll can pick, their topics and link counts, the hubs and the pages left out, the wiki's namespaces, the Scavenger hunt's kinds, and the links between all 12,926 pages that par is worked out on.
 The snapshot's date shows in the setup screen's footer ("Rolls and par go by the wiki’s offline copy from …") and in the result's par line ("Going by the wiki’s offline copy from …").
 Between snapshots the live wiki moves on, so a page newer than the snapshot can't be rolled, and par can be off where an article has changed.
 
@@ -26,7 +26,7 @@ The current one is `minecraft.wiki_en_all_2026-08.zim`, dated 2026-08-21.
 - It is about 1.9 GB, downloaded by hand from `https://download.kiwix.org/zim/other/` into the repo root.
 - `.gitignore` keeps it out of git; only its checksum, `minecraft.wiki_en_all_2026-08.zim.sha256`, is committed.
 - To check a downloaded copy: `sha256sum -c minecraft.wiki_en_all_2026-08.zim.sha256`.
-- Every generated file names the ZIM it came from in its header, and the game checks that the graph files carry the same ZIM sha256 as `wiki-data.js`.
+- Every generated file names the ZIM it came from in its header.
 
 Details: [internal/wiki-data.md](internal/wiki-data.md#the-zim)
 
@@ -41,7 +41,7 @@ All four are made by `tools/wikidata/build.py` and sit in the repo root beside `
 | `wiki-navboxes.js` | `WIKI_NAVBOXES` | Each distinct navbox once (about 1,100), and which navboxes each page carries | 0.6 MB (37 KB) | Only on **Relaxed**, where navboxes are on |
 | `wiki-lead.js` | `WIKI_LEAD` | Each page's links above its first heading, about 65,000 | 0.3 MB (95 KB) | Only with **Top links only** |
 
-The three graph files number pages by their place in `wiki-data.js`, and the game refuses one whose sha256 doesn't match, since that would give wrong routes.
+The three graph files number pages by their place in `wiki-data.js`, and the game refuses one whose sha256 doesn't match, since that would give wrong routes. The sha256 goes by the ZIM and every page's title in order, so it changes with a new ZIM and with a change to the pages from the same one.
 All four are JavaScript rather than JSON so that `index.html` can load them from `file://`.
 
 Details: [internal/wiki-data.md](internal/wiki-data.md#the-link-graph-files)
@@ -61,7 +61,7 @@ Then run each one with `.venv/bin/python -I tools/wikidata/<script>`.
 | `extract.py <zim>` | Scans the ZIM (about a minute) into an extract, `tools/wikidata/cache/<name>.jsonl.gz`: each page's namespace, categories and links (not those the page hides, which nobody can click, but those the wiki's calculator script shows, which the game runs), split into the article's own, those above its first heading, and each navbox's. It also lists every redirect. The cache is ignored by git. |
 | `build.py <extract>` | Writes the four generated files from the extract and `config.json`, to the repo root unless given `-o folder`. It stops with an error when the config no longer fits the wiki (see below). |
 | `report.py <extract>` | Writes a Markdown report (about 3 minutes): pool sizes, Content families and spin-offs, link counts, every Scavenger hunt kind with its members and what its wiki category holds that its list doesn't, dead ends, the pool designs compared, and hub candidates. |
-| `diff.py <old> <new>` | Compares two `wiki-data.js` files: pages added and removed, pool, family, spin-off and kind members that joined or left, link counts that moved, and hub, left-out page and namespace changes. |
+| `diff.py <old> <new>` | Compares two `wiki-data.js` files: pages added and removed, pool, family, spin-off and kind members that joined or left, link counts that moved, and hub, left-out page, list page, kept subpage, version title pattern and namespace changes. |
 | `test.py` | Writes a small ZIM shaped like the real one and checks the other scripts against it, in a few seconds. |
 | `common.py` | Loads an extract and the link graph built from it, and reads a `wiki-data.js` back, for the other scripts. |
 | `config.json` | The hand-picked inputs to the build (next section). |
@@ -85,11 +85,12 @@ Everything in `wiki-data.js` comes from the ZIM except what `config.json` picks 
 | `kinds` | The Scavenger hunt's kinds: the name the game shows ("a hostile mob"), the fixed list of pages that count, and for some kinds `also`, pages that count without par going by them |
 | `disambiguation_categories` | Disambiguation pages, which only **Chaos** rolls |
 | `version_categories`, `list_titles` | Version pages and list pages, left out of the data altogether |
+| `version_title` | A pattern for the titles releases get, so links to versions newer than the snapshot are dead too |
 | `hubs` | The big overview pages whose links are dead in **Hard** |
 | `core_namespaces` | The wiki's namespaces the ZIM doesn't hold, so the game knows to disable links into them |
 | `research` | Only `report.py` reads it: the other shares its pool designs compare, and the sweet spot's range |
 
-The build stops rather than quietly moving articles when the wiki has changed under the config: a category it names is on no page, a left-out or not-content title is no longer an article, a kind's member or `also` page is no longer an article, a page is on both, a member is in a Content family or an `also` page in none, a kind has fewer than 5 members, a hub is no longer an article, a spin-off's namespace is gone, or a topic, family, spin-off or tier ends up empty.
+The build stops rather than quietly moving articles when the wiki has changed under the config: a category it names is on no page, a left-out or not-content title is no longer an article, the version title pattern matches a page in the data, a kind's member or `also` page is no longer an article, a page is on both, a member is in a Content family or an `also` page in none, a kind has fewer than 5 members, a hub is no longer an article, a spin-off's namespace is gone, or a topic, family, spin-off or tier ends up empty.
 
 Details: [internal/wiki-data.md](internal/wiki-data.md#buildpy)
 

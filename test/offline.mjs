@@ -42,7 +42,7 @@ const ARTICLE = title => title === CALC_PAGE ? CALC_ARTICLE : title === HUBS_ONL
   <div id="toc" class="toc"><div class="toctitle"><h2 id="mw-toc-heading">Contents</h2></div><ul><li><a href="#Uses">Uses</a></li></ul></div>
   <p><a href="/w/Gold_Ingot">gold</a></p>
   <div class="mw-heading mw-heading2"><h2 id="Uses">Uses</h2></div><p><a href="/w/Iron_Ingot">iron</a></p>
-  <table class="navbox"><tr><td><a href="/w/Creeper">Creeper</a></td></tr></table></div>`;
+  <a href="/w/Java_Edition_26.4_Snapshot_6">snap6</a><a href="/w/Entity_format/Brand_new">new list subpage</a><a href="/w/Java_Edition_version_history/2027">new version subpage</a><a href="/w/Java_Edition_data_values/Classic">a redirect par goes through</a><table class="navbox"><tr><td><a href="/w/Creeper">Creeper</a></td></tr></table></div>`;
 const REACH_LABEL = { p1: 'Par 1', p2: 'Par 2', p3: 'Par 3', p4: 'Par 4', p5: 'Par 5+' };
 const failParse = new Set();   // articles whose requests fail, as with no connection
 const faultReplies = new Map();   // articles answered with [status, body] in place of the article, as a wiki in trouble can
@@ -129,8 +129,8 @@ const playRoute = async (hash, route) => {
   await walk(route);
 };
 
-// Links by difficulty. A challenge link without rules is Relaxed: everything but other namespaces and the left-out pages
-// is live. No hubs alone is Hard: hubs, redirects to them and navboxes' links are dead, and the target hub stays live.
+// Links by difficulty. A challenge link without rules is Relaxed: everything but other namespaces and the list pages
+// is live, version pages too. No hubs alone is Hard: hubs, redirects to them and navboxes' links are dead, and the target hub stays live.
 check('the data loads', await open('#start=Diamond&target=Crafting') && await ev("WIKI_DATA.snapshot.length === 10 && POOL.size === 5"));
 check('the footer names the offline copy\'s date as the page\'s other dates, with its year, and links where it comes from', await ev(`$('#wikiCopyDate').textContent === shortDate(localDay(WIKI_DATA.snapshot), true)
   && $('#wikiCopyDate').textContent.includes(WIKI_DATA.snapshot.slice(0, 4)) && $('#wikiCopy a').href === 'https://minecraft.wiki/w/Minecraft_Wiki:Offline_use'`), await ev("$('#wikiCopy').textContent"));
@@ -154,6 +154,7 @@ const SNAPSHOT_FACTS = {
   'Chicken is not on Nether mobs\' list, and Blaze is': "!KIND_MEMBERS.get('Nether mobs').has('Chicken') && KIND_MEMBERS.get('Nether mobs').has('Blaze')",
   'Diamond Helmet, which its wiki category misses, is on Armor\'s list': "KIND_MEMBERS.get('Armor').has('Diamond Helmet')",
   'Hostile mobs also counts Illusioner, and Transport more than one page': "KINDS['Hostile mobs'].also.includes('Illusioner') && !KIND_MEMBERS.get('Hostile mobs').has('Illusioner') && KINDS.Transport.also.length > 1",
+  'the version disambiguation page 1.18 is left out': "LEFT_OUT.has('1.18') && !ARTICLES.has('1.18')",
   'Java Edition version history, Pocket Edition version history (a redirect to one) and Closed captions are left out': "['Java Edition version history', 'Pocket Edition version history', 'Closed captions'].every(t => LEFT_OUT.has(t) && !ARTICLES.has(t))",
   'the made-up pages aren’t in it': `![${JSON.stringify(HUBS_ONLY)}, ${JSON.stringify(CALC_PAGE)}, 'Brand New Mob'].some(t => ARTICLES.has(t))`,
 };
@@ -161,7 +162,12 @@ const factsOff = [];
 for (const [fact, expr] of Object.entries(SNAPSHOT_FACTS)) if (await ev(expr) !== true) factsOff.push(fact);
 check('the snapshot still has what the checks lean on', !factsOff.length, factsOff.length ? 'changed: ' + factsOff.join('; ') : '');
 check('a challenge link without rules is Relaxed', await ev("level() === 'relaxed' && rules().length === 0"));
-check('the data has no left-out page', await ev("WIKI_DATA.articles.every(([t]) => !LEFT_OUT.has(t))"));
+check('the data has no left-out page', await ev("WIKI_DATA.articles.every(([t]) => !LEFT_OUT.has(t) && !VERSION_TITLE.test(t))"));
+const versionTitles = ['Java Edition 26.4', 'Java Edition 26.4 Snapshot 6', 'Java Edition 26.4-pre1', 'Java Edition 27w14a', '27w14a', 'Java Edition 26.4/Development versions', 'Bedrock Edition 26.70',
+  'Bedrock Edition Preview 26.70.21', 'Bedrock Edition beta 26.70.21', 'Bedrock Dedicated Server 26.70', 'Bedrock Editor 1.26.70', 'Minecraft Education 26.40', 'Minecraft Education Preview 26.40.1', 'Launcher 3.30.1', 'Preview 26.70.21', '26.4', '26.4 Snapshot 6', '26.4-pre1'];
+const notVersionTitles = ['Java Edition', 'Bedrock Edition', 'Java Edition data values', 'Minecraft Education', 'Launcher', 'Diamond', 'Update 1.8.8', 'Minecraft 1.8 trailer', 'Chaos Cubed'];
+check('the pattern for version titles takes those of versions newer than the snapshot, and no others', await ev(`${JSON.stringify(versionTitles)}.every(t => VERSION_TITLE.test(t) && !LEFT_OUT.has(t)) && !${JSON.stringify(notVersionTitles)}.some(t => VERSION_TITLE.test(t))`));
+check('and the game won’t take one for a card, nor a new subpage of a left-out page, though it will one par goes through', await ev("['Java Edition 26.4', 'Entity format/Brand new', 'Java Edition version history/2027'].every(title => toInfo({ title, ns: 0 }) === false) && !isLeftOut('Pocket Edition data values/Pre-v0.2.0 alpha')"));
 await ev("setCustom('start', 'Java Edition version history')");
 check('a left-out page typed in isn’t taken, saying the game leaves it out', await until("setup.busy === 0 && document.querySelector('#setupStatus').textContent === '“Java Edition version history” is on minecraft.wiki, but the game leaves it out (a version, list or non-article page).'")
   && await ev("setup.start.title === 'Diamond'"), await ev("document.querySelector('#setupStatus').textContent"));
@@ -256,12 +262,20 @@ check('a win is headed You made it!, with the shortest route and its par', await
 await ev("closeModal(); toSetup(); $('#timerToggle').click()");
 await play();
 let links = await linkStates();
-const leftOut = "['Java_Edition_version_history', 'Pocket_Edition_version_history', 'Closed_captions'].every(t => document.querySelector(`a[href='/w/${t}']`).title === 'Off limits: a version or list page')";
-check('Relaxed: hubs and navboxes live, other namespaces, version and list pages and redirects to them dead', links.Block === 'live' && links.Creeper === 'live'
-  && links['Tutorial:Mining'] === 'dead' && links['Dungeons:Creeper'] === 'dead' && links.Java_Edition_version_history === 'dead'
-  && links.Pocket_Edition_version_history === 'dead' && links.Closed_captions === 'dead' && await ev(leftOut, await frameCtx()), JSON.stringify(links));
+const listLinkNote = t => `document.querySelector("a[href='/w/${t}']").title`;
+check('Relaxed: hubs, navboxes and version pages live, those newer than the snapshot and new subpages too, other namespaces and list pages dead, a new subpage too', links['Java_Edition_26.4_Snapshot_6'] === 'live' && links['Java_Edition_version_history/2027'] === 'live' && links['Entity_format/Brand_new'] === 'dead' && links['Java_Edition_data_values/Classic'] === 'live' && links.Block === 'live' && links.Creeper === 'live'
+  && links['Tutorial:Mining'] === 'dead' && links['Dungeons:Creeper'] === 'dead' && links.Java_Edition_version_history === 'live'
+  && links.Pocket_Edition_version_history === 'live' && links.Closed_captions === 'dead' && await ev(listLinkNote('Closed_captions'), await frameCtx()) === 'Off limits: a big list page', JSON.stringify(links));
 check('a link to a page that doesn’t exist, though without the red link’s class, is dead, saying so', links.No_such_page === 'dead' && links.Diamond_Pickaxe === 'live'
   && await ev("document.querySelector('a[href=\"/w/No_such_page\"]').title === 'Off limits: this page doesn’t exist'", await frameCtx()), JSON.stringify(links));
+await ev("navigate('Java Edition 26.4 Snapshot 6', null)");
+check('Relaxed: a version page can be played through, though par doesn’t know it', await until('game.path.length === 2 && !game.loading') && await ev("game.active && game.path[1].title === 'Java Edition 26.4 Snapshot 6' && !PAGE_IDS.has(game.path[1].title)"),
+  await ev('JSON.stringify(game.path.at(-1))'));
+await open('#start=Diamond&target=Crafting&rules=nonav');
+await play();
+links = await linkStates();
+check('Normal: version pages dead, those newer than the snapshot and new subpages too, saying so, but a subpage par goes through', links['Java_Edition_data_values/Classic'] === 'live' && links['Java_Edition_version_history/2027'] === 'dead' && links['Entity_format/Brand_new'] === 'dead' && links.Java_Edition_version_history === 'dead' && links.Pocket_Edition_version_history === 'dead' && links['Java_Edition_26.4_Snapshot_6'] === 'dead' && links.Closed_captions === 'dead'
+  && await ev("['Java_Edition_version_history', 'Java_Edition_26.4_Snapshot_6', 'Closed_captions'].every(t => document.querySelector(`a[href='/w/${t}']`).title === 'Off limits: a version or list page')", await frameCtx()), JSON.stringify(links));
 await open('#start=Diamond&target=Crafting&rules=nohubs');
 check('No hubs alone is Hard', await ev("level() === 'hard' && rules().join() === 'nohubs,nonav'"));
 // Golf: par shows beside Start once the link graph has loaded, and in the header while playing.
@@ -273,7 +287,7 @@ check('the header shows par', await until("/^\\d+$/.test(document.querySelector(
   await ev("document.querySelector('#hudPar').textContent"));
 links = await linkStates();
 check('Hard: hubs, redirects to them, navboxes and left-out pages dead; the target hub and other links live',
-  links.Block === 'dead' && links.Blocks === 'dead' && links.Creeper === 'dead' && links.Java_Edition_version_history === 'dead' && links.Closed_captions === 'dead'
+  links.Block === 'dead' && links.Blocks === 'dead' && links.Creeper === 'dead' && links.Java_Edition_version_history === 'dead' && links['Java_Edition_26.4_Snapshot_6'] === 'dead' && links.Closed_captions === 'dead'
   && links.Crafting === 'live' && links.Diamond_Pickaxe === 'live' && await ev("document.querySelector('a[href=\"/w/Block\"]').title === 'Off limits on Hard: a big overview page'", await frameCtx())
   && await ev("HUB_TITLES.get('Crafting') === 'Crafting'"), JSON.stringify(links));   // else Crafting live would test nothing
 // A navbox's links, and a requirement list's (div.hlist.searchaux, which stays in sight), say why they are dead.
@@ -1587,6 +1601,10 @@ check('par routes follow the graph, Relaxed ≤ Normal ≤ Hard, Hard without hu
 check('par shows a route through the pool alone when one is as short', par.offPool.length === 0 && par.throughPool >= 10,
   `${par.throughPool} of 30 had one; ${par.offPool.slice(0, 3).join(', ')}`);
 check('and par is still the fewest clicks, as a search with no preference finds', par.parMoved.length === 0, par.parMoved.slice(0, 3).join(', '));
+// A graph file numbers pages by their place in wiki-data.js, so one from another build is refused.
+const graphCheck = JSON.parse(await ev(`Promise.all([['data:text/javascript,0', { sha256: 'another build' }], ['data:text/javascript,1', { sha256: WIKI_DATA.sha256, ok: true }]].map(([file, read]) =>
+  loadGraphFile(file, () => read).then(d => d.ok ?? false, e => e.message.includes('doesn’t match wiki-data.js')).finally(() => graphFiles.delete(file)))).then(JSON.stringify)`));
+check('a graph file with another sha256 is refused, and one with wiki-data.js’s taken', graphCheck[0] === true && graphCheck[1] === true, JSON.stringify(graphCheck));
 // Every search prefers the pool, on a made-up graph where Crafting (outside it, and first by page number) is as short as
 // Diamond: a Race's, Scavenger's kinds' and Exact clicks', and both breadth-first searches reaching them through a navbox.
 // With only Crafting, the route still goes through it.

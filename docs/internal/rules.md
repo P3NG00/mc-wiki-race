@@ -9,7 +9,7 @@ Part of the architecture, which is all in `index.html`. The state is the `game` 
 - `game.content` is the Content in play: what is on at `startGame`, plus the spin-off of any card's page (`spinoffOf`), whose links have to work to reach it, so a challenge link starting on `Dungeons:Creeper` needs no checkbox.
 - `renderArticle` leaves its spin-offs out of the frame's dead namespaces.
 - `toInfo` accepts a page in a spin-off's namespace by its number, taken from the ZIM's `ns-<N>` body classes, which match the live API's `ns`.
-- It refuses a page that doesn't exist (null) and one the game leaves out (false): a left-out page (`LEFT_OUT`) or one in any other namespace (Tutorial:, Category:…), so a typed-in title can say which (see [setup-screen.md](setup-screen.md#top-to-bottom)).
+- It refuses a page that doesn't exist (null) and one the game leaves out (false): a left-out page (`LEFT_OUT`, `VERSION_TITLE`) or one in any other namespace (Tutorial:, Category:…), so a typed-in title can say which (see [setup-screen.md](setup-screen.md#top-to-bottom)).
 
 ## Difficulty
 
@@ -18,6 +18,7 @@ Part of the architecture, which is all in `index.html`. The state is the `game` 
 The research behind it: with navboxes almost any sensible click gets closer ([RESEARCH.md](../../tools/wikidata/RESEARCH.md)).
 
 - The two rules stay rule keys, so `game.rules`, the frame, the personal-best key and challenge links treat them like any other rule, but the extra rules don't list them.
+- Relaxed (`levelOf`) also keeps version links live, where the other two kill them (see [rendering.md](rendering.md)). The link graph doesn't have version pages, so Distance has no number on one (`togo` undefined), and "No route from here", or a round trip's "no way back" and giving up, can show on a page where a live version link does offer a way on. Navboxes make that rare, and adding the pages to the graph isn't worth doubling its links (see [wiki-data.md](wiki-data.md)).
 - `rules()` adds the difficulty's to the ticked ones.
 - `setRules` sets the difficulty from them (`levelOf`).
 - `rulesText` names the difficulty unless it is Normal, so the Settings column shows "Hard" or "Relaxed".

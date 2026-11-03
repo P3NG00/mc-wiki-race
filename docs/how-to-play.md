@@ -75,7 +75,7 @@ The **Difficulty** row decides which links work. Normal is the default.
 
 | Difficulty | What changes |
 |---|---|
-| **Relaxed** | The link tables at the bottom of articles (navboxes) are there, so almost any sensible click gets you closer. |
+| **Relaxed** | The link tables at the bottom of articles (navboxes) are there, so almost any sensible click gets you closer. Links to version pages work too, though par doesn't count them. |
 | **Normal** | The link tables at the bottom of articles (navboxes) are hidden, so you find your way through the article itself. |
 | **Hard** | No navboxes, and links to big overview pages (hubs: Block, Item, Mob, Crafting, Java Edition…) are dead too. |
 
@@ -111,7 +111,7 @@ On the right are your **Clicks** ("of 6" under Six clicks, "of exactly 7" under 
 ## Links in the article
 
 - Live links light up on hover. Links to a page already on your path are purple and dotted, and say "Already on your path".
-- Dead links are dimmed and do nothing but a villager's "hrmm": files, categories, tutorials and other non-article pages, red links, other links to pages that don't exist ("Off limits: this page doesn't exist"), links off the wiki, version pages, and the few big list pages of game data that link to nearly everything ("Off limits: a version or list page"). The rules' dead links say why too: Hard's overview pages ("Off limits on Hard: a big overview page"), the lists of what an advancement asks for on Normal and Hard, since they count as navboxes ("Off limits on Normal and Hard: this list counts as a navbox"), everything below the top under Top links only, the pages you've visited under Exact clicks, and your way there once a Round trip turns back.
+- Dead links are dimmed and do nothing but a villager's "hrmm": files, categories, tutorials and other non-article pages, red links, other links to pages that don't exist ("Off limits: this page doesn't exist"), links off the wiki, the few big list pages of game data that link to nearly everything ("Off limits: a big list page"), and, except on Relaxed, version pages, including versions newer than the game's offline copy ("Off limits: a version or list page"). The rules' dead links say why too: Hard's overview pages ("Off limits on Hard: a big overview page"), the lists of what an advancement asks for on Normal and Hard, since they count as navboxes ("Off limits on Normal and Hard: this list counts as a navbox"), everything below the top under Top links only, the pages you've visited under Exact clicks, and your way there once a Round trip turns back.
 - A redirect to the target counts as reaching it.
 - A page with no live links says so in a banner: go Back, or give up.
 - The wiki's own features work: crafting grids cycle through their recipes, tabs switch, folding boxes fold, and the speakers in a Sounds table play.
@@ -140,7 +140,7 @@ Par is the fewest clicks a game can be done in, going by the wiki's offline copy
 | Birdie, Eagle, Albatross | 1, 2 or 3 under par |
 | N over par, N under par | anything further |
 
-You can only beat par where the live wiki has a link the offline copy doesn't, or on a hunt by finding one of those few pages par doesn't go by. Exact clicks gets no golf score, since every win is par plus the count you picked. The result names the offline copy par went by, or says a page you played isn't in it, so par is unknown.
+You can only beat par where the live wiki has a link the offline copy doesn't, on Relaxed through a version page, or on a hunt by finding one of those few pages par doesn't go by. Exact clicks gets no golf score, since every win is par plus the count you picked. The result names the offline copy par went by, or says a page you played isn't in it, so par is unknown.
 
 ## The missed shortcut
 
@@ -267,7 +267,7 @@ Skill advancements need par 3 or more, the first time you play that game, so pla
 | Getting started | There and Back Again | Task | Win a Round trip. | |
 | Getting started | Accepted | Task | Win a game opened from a challenge link. | |
 | Skill | Par for the Course | Goal | Win at par. | |
-| Skill | Birdie | Challenge | Beat par: the live wiki had a shortcut the offline copy didn't, or a hunt's find was one par doesn't go by. | Yes |
+| Skill | Birdie | Challenge | Beat par, by a way it doesn't count: a shortcut the offline copy lacks, a version page on Relaxed or one of a hunt's extra finds. | Yes |
 | Skill | Hardcore | Goal | Win on Hard. | |
 | Skill | No Take-Backs | Task | Win with No Back. | |
 | Skill | Blindfolded | Goal | Win with Blind target. | |

@@ -42,7 +42,7 @@ What it checks, by area:
 - The No hubs rule:
   - every hub link and redirect in the article text dead
   - a hub target live
-- Links to left-out pages dead
+- Links to left-out pages dead on Hard, those whose titles look like versions too
 - The Blind target rule: the target named in the HUD with no picture there or behind the path, and no peek
 - The No navboxes rule
 - The Checkpoint rule with one checkpoint:
@@ -65,7 +65,7 @@ What it checks, by area:
 
 ### Spin-offs
 
-- Links into a spin-off dead in a game without it, and live, its version pages aside, when a card's page is in it
+- Links into a spin-off dead in a game without it, and live when a card's page is in it, with its version pages dead on Normal
 - A challenge link starting on a spin-off page
 
 ### Images and article markup
@@ -167,6 +167,9 @@ So a new snapshot that changes one fails there by name rather than leaving a che
   - hubs and redirects to them dead in Hard, titled as Hard's overview pages, the target's hub live
   - a navbox's and a requirement list's links dead in Hard, titled as counting as a navbox
   - no left-out page in the data
+  - Relaxed's version links live, those newer than the snapshot and new subpages too, with a list page and a new subpage of one dead, and a version page played through
+  - Normal's and Hard's version links dead, new subpages too, saying so
+  - the pattern for version titles taking newer versions' titles and no others, and a card refusing one
 - A reroll, or the daily, while a typed-in title is looked up winning
 - A left-out page typed in or named in a challenge link not taken, a typed-in one saying the game leaves it out, as it does a page that isn't an article, and one that doesn't exist saying there's no article by that name
 - A disambiguation page typed in taken, with a heads-up
@@ -532,6 +535,7 @@ Par:
 - Normal's go through the pool alone when a route that does is as short, and par is still the fewest clicks
 - a Race, a hunt of kinds and Exact clicks each taking the page in the pool on a made-up graph where it is as short as one outside it (a Race and a hunt through a navbox too), and the one outside when nothing else is
 - a spin-off page needs its spin-off on
+- a graph file with another sha256 refused, and one with `wiki-data.js`'s taken
 - a route goes through one checkpoint and through two in order
 - a round trip goes there and back with the way back off the way there, almost always at the lower bound
 - a Relay round trip goes round its loop in order

@@ -28,7 +28,7 @@ The result scores a win against par as golf does, each name with what it means f
 - Double bogey,
 - Triple bogey,
 - then just "N over par";
-- under par, possible only where par isn't the live fewest clicks (see below), or on a hunt finding one of a kind's `also` pages, which par doesn't go by:
+- under par, possible only where par isn't the live fewest clicks (see below), in Relaxed through a version page, or on a hunt finding one of a kind's `also` pages, which par doesn't go by:
   - Birdie (1 under par),
   - Eagle,
   - Albatross,

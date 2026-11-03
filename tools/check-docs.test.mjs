@@ -16,6 +16,9 @@ function check(name, ok, extra = '') {
 
 // What the check should report on the made-up repo, on what is staged; the working tree also has an unstaged draft.
 const want = [
+  'docs/anchors.md:9: link to #a-g-key, which has no heading for #a-g-key',
+  'docs/anchors.md:9: link to #a--d, which has no heading for #a--d',
+  'docs/anchors.md:9: link to #press-kbdesckbd-to-quit, which has no heading for #press-kbdesckbd-to-quit',
   "README.md:1: link to docs/internal/b.md, which doesn't exist",
   "README.md:1: link to /nope.html, which doesn't exist",
   "README.md:1: link to odds-50%.md, which doesn't exist",
@@ -51,6 +54,9 @@ function renderThing() { el.dataset.mwrNote = SOUNDS.explode; load('Advancement-
   // Its own names don't count as the game's: goneThing is in this file, and in a copy of it in the made-up tools/.
   put('tools/check-docs.test.mjs', 'goneThing();\n');
   put('docs/café.md', '# Café\n');
+  // A code span keeps what it holds, an HTML tag goes, and a bare < or > isn't a tag. The anchors as GitHub makes them.
+  put('docs/anchors.md', '# A `g=<blob>` key\n\n## a < b and c > d\n\n## Press <kbd>Esc</kbd> to quit\n\n## <!-- a comment -->Noted\n\n'
+    + '[code](#a-gblob-key), [bare](#a--b-and-c--d), [tag](#press-esc-to-quit), [comment](#noted), [code as a tag](#a-g-key), [bare as a tag](#a--d), [tag kept](#press-kbdesckbd-to-quit).\n');
   put('docs/notes_(old).md', 'Underlined <em>heading</em>\n===\n\n[^1]: A footnote, not a link.\n');
   put('README.md', 'See [the rules](docs/internal/a.md#the-rules), [b](docs/internal/b.md), [root](/index.html), [top](/), [no](/nope.html), [café](docs/caf%C3%A9.md#café), [old](docs/notes_(old).md#underlined-heading), [odd](odds-50%.md) and [web](https://example.com).\n');
   put('docs/internal/a.md', `# A

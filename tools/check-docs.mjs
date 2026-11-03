@@ -37,8 +37,9 @@ const prose = text => text.replace(/^[ \t]*(```|~~~)[\s\S]*?^[ \t]*\1/gm, m => m
 const lineOf = (text, i) => text.slice(0, i).split('\n').length;
 const decode = s => { try { return decodeURIComponent(s); } catch { return s; } };
 
-// GitHub's heading anchors: the heading's text (a link's words, not its address, and no HTML tags), lower case,
-// punctuation dropped, spaces to hyphens, repeats numbered. Headings are # lines, or a line underlined with = or -.
+// GitHub's heading anchors: the heading's text (a link's words, not its address, a code span's text whatever it holds,
+// and no HTML tags, which a bare < or > isn't), lower case, punctuation dropped, spaces to hyphens, repeats numbered.
+// Headings are # lines, or a line underlined with = or -.
 // A stray % that isn't an escape is taken as it is.
 const anchors = new Map();
 function anchorsOf(file) {
@@ -46,7 +47,8 @@ function anchorsOf(file) {
     const seen = new Map(), set = new Set();
     const headings = /^ {0,3}#{1,6}[ \t]+(.+?)[ \t]*#*$|^ {0,3}([^\s#|>*+-].*?)[ \t]*\n {0,3}(?:=+|-+)[ \t]*$/gm;
     for (const [, atx, setext] of prose(read(file)).matchAll(headings)) {
-      const base = (atx ?? setext).replace(/!?\[([^\]]*)\]\([^)]*\)/g, '$1').replace(/<[^>]+>|`/g, '').toLowerCase()
+      const text = (atx ?? setext).replace(/!?\[([^\]]*)\]\([^)]*\)/g, '$1').split(/(`[^`]*`)/);
+      const base = text.map((part, i) => i % 2 ? part.slice(1, -1) : part.replace(/<[a-zA-Z/!][^>]*>/g, '')).join('').toLowerCase()
         .replace(/[^\p{L}\p{N}\s_-]/gu, '').replace(/\s/g, '-');
       const n = seen.get(base) ?? 0;
       seen.set(base, n + 1);

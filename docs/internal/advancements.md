@@ -18,7 +18,8 @@ Each is in `ADVANCEMENTS`, by key:
   - and its frame;
 - the article whose picture is its icon,
 - an emoji for when that picture hasn't loaded,
-- and for a count its goal (`of`), what it counts (`tally`) and the unit.
+- for a count its goal (`of`), what it counts (`tally`) and the unit,
+- and for a skill or speed one, if not its group's, its own `gate` and lowest par (`minPar`).
 
 A secret one (`secret`) shows as ??? in the panel until earned: the Secret group, Birdie among the skill ones and Light Reading among the item ones.
 
@@ -37,20 +38,27 @@ Adding one is an entry there and its check; it is earned from then on.
     - April Fools! (a page in the joke family),
     - Around the World (every topic seen)
     - and Full Circle (clicking back onto the start, not with Back, outside a Round trip).
-- *As a game ends* (`advFinish`, from `finish`, given whether the pair had a game in the history before (`recordKey`, any rules) and whether it is a new personal best):
+- *As a game ends* (`advFinish`, from `finish`, given whether the pair has no game in the history, and no win (`recordKey`, any rules, so a Round trip or another Exact clicks count is a different pair), and whether it is a new personal best):
   - a win counts (`wins`),
   - then `advFinish` waits for par (`game.parReady`, if the record doesn't have it yet) and every arrival's count (`measured`).
   - What it needs of the game it reads before waiting, since Same cards again can start another game in the meantime.
-  - Skill ones need a win at par `ADV_PAR` (3) or more the first time that game is played, so a typed easy pair or Same cards again doesn't earn them, and speed ones the Timer too:
+  - Skill and speed ones are held to a gate (`ADV_GATES`, by `advGate`, in `gated`), which the panel says as each is picked (`advNeeds`):
+    - `rule`, where playing by a rule is the feat: par `ADV_RULE_PAR` (2) or more, so a typed one-click pair earns nothing while nearly every roll, most being par 2, can, and the pair's first win, so Same cards again after a loss or giving up still can.
+    - `feat`, where the clicks or the time are the feat: par `ADV_PAR` (3) or more, as par 2 makes it too easy, and the pair's first game, as any game's end shows the shortest route.
+    - The history they go by is the last 50 games, and Clear history empties it.
+    - Speed ones have no time (`rec.ms`) without the Timer.
+  - At `feat`:
     - Par for the Course (at par),
     - Birdie (under par, which only a live edit making a route the offline copy lacks can do, a version page in Relaxed, or a hunt's find among a kind's `also` pages),
+    - Quick Thinker and Speedrunner (under 60 s and 30 s),
+    - and at par 4, Sprinter (under 45 s).
+  - At `rule`:
     - Hardcore (`nohubs`, so Hard),
     - No Take-Backs, Blindfolded, Six Shooter, Top Notch (each its rule),
     - Long Way Round (Exact clicks at par + 5 or more),
     - Grand Tour (a Round trip with three checkpoints),
     - Kind Collector (a Scavenger hunt of kinds),
-    - Full Kit (Hard, No Back and Blind target together),
-    - Quick Thinker, Speedrunner and Sprinter (under 60 s, 30 s, and 45 s at par 4+).
+    - Full Kit (Hard, No Back and Blind target together).
   - The rest:
     - Hello, Wiki (a win),
     - Daily Bread (any daily finished),
@@ -59,9 +67,9 @@ Adding one is an entry there and its check; it is earned from then on.
     - Self-Improvement (a new personal best),
     - Hot Streak (a win at par 4+ with Distance on, every click but those reaching a checkpoint or find, and the last, getting closer: `gotCloser`),
     - Rags to Riches (a Race from Dirt to Diamond),
-    - So Close (out of Six clicks with the last page one click away)
+    - So Close (out of Six clicks one click from winning: the last page's count is 1 and `lastStop` holds, so nothing comes after that stop, neither another checkpoint or find nor the way home)
     - and Scenic Route (a win in 15 clicks or more).
-- *As Distance cheers* (`cheer`): `game.cheerRun` counts the cheers in a row, set back by an arrival that didn't get closer, and three earn On a Roll.
+- *As Distance cheers* (`cheer`): `game.cheerRun` counts the cheers in a row, set back by an arrival that didn't get closer, but for one reaching a checkpoint or find, as for Hot Streak, and three earn On a Roll.
 - *Items* (see [items.md](items.md)): earned as the items are used, and Picking Up the Pieces at a game's end (a win with `game.rebuilt`).
 - *As the note block plays* (`note`, see [ui.md](ui.md#note-block)): each of its instruments heard for the first time, from its window or a game's clicks and Back, joins `instruments` (`advHeard`), not a mob head's sound nor the synthesized harp played while one isn't in, and the 20th earns Sound of Music.
 - *Counts* are checked with every earning (`advEarn`):
@@ -114,12 +122,13 @@ The panel's head stays at the top while the rest scrolls:
 - then the one picked (`advPicked`, `advDetail`):
   - its frame, name and tier,
   - how to get it,
+  - for a skill or speed one what it asks of the game (`advNeeds`),
   - and when it was earned, or a count's progress ("7 of 50 wins");
   - an unearned secret says only "A secret. Keep playing.".
 
 ### Groups
 
-Then each group's grid with its count and, for Skill and Speed, their rules: each advancement a tile with its frame and name, gold once earned, greyed out otherwise, with a small bar for a count.
+Then each group's grid with its count and, for Skill and Speed, what they all ask: each advancement a tile with its frame and name, gold once earned, greyed out otherwise, with a small bar for a count.
 
 ### Frames
 

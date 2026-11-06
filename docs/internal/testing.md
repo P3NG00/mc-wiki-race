@@ -269,13 +269,14 @@ The advancements:
 - a par 3+ pair's first game won at par from a challenge link earning the firsts, Accepted, Par for the Course and the speed ones
 - their toasts three at a time
 - the arrivals counted
-- no skill one for the same pair again or a par 1 pair
+- no skill one for the same pair won again or a par 1 pair
 - Cake and Full Circle on arrival with the toast once the article shows
 - in a game the toasts under the header, and under the game's banner while one shows, one already up moving down for it
 - a personal best: none noted on a pair's first win, a win in fewer clicks noted as a new best earning Self-Improvement with Recent games' Best tag moving to it, and a win in more saying the best, which keeps the tag
 - the button's count
 - the panel's tiles, gold and ??? ones
 - a count's progress and a secret's detail saying nothing
+- a skill or speed one's detail saying the par, the Timer and the first win or game it needs
 - stored advancements keeping only what would be written
 - Reset asking first, Cancel focused and Reset in a loss's colour
 - Clear history leaving them, as the panel's foot says, with the heading and the button and a line saying no games yet, and Reset forgetting them, Recent games still showing the button with no games, as on a first visit
@@ -284,12 +285,16 @@ The advancements:
   - the counts from one short of each, nothing earned until the next blast (Demolition Expert), arrivals (Tourist, Bookworm, Cartographer) or win (Regular, Veteran, Wiki Legend) reaches them, and Around the World on the last topic arriving
   - a Hard game with No Back, Blind target and Six clicks won at par: Hardcore, No Take-Backs, Blindfolded, Full Kit, Six Shooter
   - Top links only won by a click straight to the target, under the snapshot's par: Top Notch, Birdie
-  - Distance's cheers: not On a Roll after two in a row, On a Roll after three, and Hot Streak for a par 4 win cheered every click
+  - Distance's cheers: not On a Roll after two in a row, On a Roll after three, and Hot Streak for a par 4 win cheered every click; a click reaching a checkpoint or find keeps the run and one getting no closer ends it
   - Exact clicks at par + 5: Measure Twice, Long Way Round
   - a Round trip Relay of three checkpoints: Relay Racer, There and Back Again, Grand Tour
   - a hunt of kinds: Treasure Hunter, Kind Collector
   - Dirt to Diamond in 15 clicks by Herobrine, an April Fools page and a spin-off: Rags to Riches, Scenic Route, He Is Watching, April Fools!, Spin Doctor
-  - out of Six clicks one click from the target: So Close
+  - out of Six clicks one click from the target: So Close; also from a Relay's target with its checkpoints done and a hunt's last find, but not from a checkpoint with the target to go, a find with more to find, a round trip's target or a Scavenger round trip's last find
+  - a par 2 Six clicks game won at par: Six Shooter, but not Par for the Course or the speed ones
+  - a par 3 game won at par: Par for the Course and the speed ones but Sprinter; a par 4 game: Sprinter too
+  - without the Timer: Par for the Course but no speed one
+  - No Back after giving up on the same pair: No Take-Backs, but neither Par for the Course nor a speed one
 
 ### Effects
 

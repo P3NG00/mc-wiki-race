@@ -465,7 +465,7 @@
   .adv-head .close { margin-left: auto; padding: 2px 10px; }
   .adv-panel .bar { height: 8px; border-radius: var(--radius-pill); background: var(--bg); border: 1px solid var(--line); overflow: hidden; margin: 8px 0 0; max-width: 100%; }
   .adv-panel .bar i, .adv-tile .mini i { display: block; height: 100%; background: var(--accent); border-radius: inherit; }
-  .adv-panel .detail { display: flex; gap: 14px; align-items: center; margin-top: 12px; min-height: 64px; padding: 10px 12px; border-radius: var(--radius); background: var(--bg); }
+  .adv-panel .detail { display: flex; gap: 14px; align-items: center; margin-top: 12px; min-height: 104px; padding: 10px 12px; border-radius: var(--radius); background: var(--bg); }
   .adv-panel .detail .adv-frame { --size: 56px; }
   .adv-panel .detail .name { font-weight: 700; font-size: 16px; }
   .adv-panel .detail .tier { font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); margin-left: 6px; }
@@ -2331,6 +2331,8 @@ const hunting = () => !!game.hunt && huntLeft().length > 0;
 // What the player is heading for: the next checkpoint until all are reached, then the target (the start on a round
 // trip). Scavenger has none while hunting: see huntLeft.
 const objective = () => hunting() ? null : game.vias[game.viaNext] ?? game.goal;
+// Whether reaching what is next would win: nothing comes after it, neither another stop nor Scavenger's way home.
+const lastStop = () => hunting() ? huntLeft().length === 1 && !game.roundTrip : objective() === game.goal;
 // How many checkpoints there are, a round trip's target aside, and a checkpoint's number among them by its number among
 // the vias (from 1).
 const checkpoints = () => game.vias.length - (game.turn ? 1 : 0);
@@ -3014,7 +3016,8 @@ function cheer(entry) {
   const i = game.path.indexOf(entry);
   Promise.all([game.path[i - 1]?.measured, entry.measured]).then(() => {
     if (game.path.at(-1) !== entry || !game.active || game.loading) return;
-    if (!gotCloser(game.path, i, !!game.exact)) { game.cheerRun = 0; return; }   // cheerRun: cheers in a row, for On a Roll
+    // cheerRun: cheers in a row, for On a Roll. A click reaching a checkpoint or find has no closer to get, so it doesn't break them.
+    if (!gotCloser(game.path, i, !!game.exact)) { if (!entry.via && !entry.found) game.cheerRun = 0; return; }
     play('closer', entry.togo);
     bump($('#hudHint'), 'closer');
     effect('sparkle', middleOf($('#hudHint')));
@@ -3027,9 +3030,16 @@ function cheer(entry) {
 // its tier's heading and sound. mwr.advancements keeps what is earned (got: key to when) and what some count toward:
 // wins, articles visited, the different articles visited (pages, by title, so a new snapshot keeps them), the topics
 // seen, the blasts that broke the page (see Items) and the note block's instruments heard (see Note block). They are checked as a page arrives (advArrive), as a game ends (advFinish) and as Distance cheers (cheer). Skill
-// and speed ones need par ADV_PAR or more and the pair's first game, none of it in the history before, so a typed easy
-// pair or Same cards again doesn't earn them; speed ones also need the Timer.
-const ADV_PAR = 3;
+// and speed ones are gated (ADV_GATES) by the game's par, so a typed one-click pair doesn't earn them, and by the history,
+// so a game already beaten doesn't. Speed ones have no time to go by without the Timer.
+const ADV_RULE_PAR = 2, ADV_PAR = 3;
+// rule: playing by a rule is the feat. It only takes a real game, which nearly every roll is (most are par 2), and a retry
+// after a loss still counts. feat: the clicks or the time are the feat. Par 2 makes that too easy, and it means nothing
+// on a retry, since any game's end shows the shortest route, so it takes the first game of the pair.
+const ADV_GATES = {
+  rule: { minPar: ADV_RULE_PAR, only: 'your first win of that game' },
+  feat: { minPar: ADV_PAR, only: 'the first time you play that game' },
+};
 const ADV_TIERS = {
   task: { label: 'Task', title: 'Advancement Made!', sound: 'checkpoint' },
   goal: { label: 'Goal', title: 'Goal Reached!', sound: 'toast' },
@@ -3037,15 +3047,15 @@ const ADV_TIERS = {
 };
 const ADV_GROUPS = {
   start: { label: 'Getting started' },
-  skill: { label: 'Skill', note: `Par ${ADV_PAR} or more, the first time you play that game.` },
-  speed: { label: 'Speed', note: `Timer on, par ${ADV_PAR} or more, the first time you play that game.` },
+  skill: { label: 'Skill', gate: 'rule', note: `Par ${ADV_RULE_PAR}+, and only your first win of a game, unless it says otherwise.` },
+  speed: { label: 'Speed', gate: 'feat', note: `Timer on, par ${ADV_PAR}+, and only the first time you play a game.` },
   keep: { label: 'Keeping at it' },
   explore: { label: 'Exploring' },
   items: { label: 'Items' },
   secret: { label: 'Secret', note: 'Hidden until you find them.' },
 };
 // icon: the article whose picture it shows (the emoji until that loads, or if it doesn't). A count is of tally
-// (advTally), in unit.
+// (advTally), in unit. gate and minPar: its own, in place of its group's gate's.
 const ADVANCEMENTS = Object.fromEntries([
   ['firstClick', 'start', 'First Click', 'Click a link in a game.', 'task', 'Wooden Pickaxe', '⛏️'],
   ['hello', 'start', 'Hello, Wiki', 'Win a game.', 'task', 'Book and Quill', '📖'],
@@ -3055,8 +3065,8 @@ const ADVANCEMENTS = Object.fromEntries([
   ['measure', 'start', 'Measure Twice', 'Win an Exact clicks game.', 'task', 'Spyglass', '📏'],
   ['thereBack', 'start', 'There and Back Again', 'Win a Round trip.', 'task', 'Compass', '🧭'],
   ['accepted', 'start', 'Accepted', 'Win a game opened from a challenge link.', 'task', 'Bell', '🔔'],
-  ['par', 'skill', 'Par for the Course', 'Win at par.', 'goal', 'Target', '🎯'],
-  ['birdie', 'skill', 'Birdie', 'Beat par, by a way it doesn’t count: a shortcut the offline copy lacks, a version page on Relaxed or one of a hunt’s extra finds.', 'challenge', 'Parrot', '🐦', { secret: true }],
+  ['par', 'skill', 'Par for the Course', 'Win at par.', 'goal', 'Target', '🎯', { gate: 'feat' }],
+  ['birdie', 'skill', 'Birdie', 'Beat par, by a way it doesn’t count: a shortcut the offline copy lacks, a version page on Relaxed or one of a hunt’s extra finds.', 'challenge', 'Parrot', '🐦', { secret: true, gate: 'feat' }],
   ['hardcore', 'skill', 'Hardcore', 'Win on Hard.', 'goal', 'Totem of Undying', '❤️'],
   ['noTakeBacks', 'skill', 'No Take-Backs', 'Win with No Back.', 'task', 'Bow', '🏹'],
   ['blindfolded', 'skill', 'Blindfolded', 'Win with Blind target.', 'goal', 'Blindness', '🙈'],
@@ -3068,7 +3078,7 @@ const ADVANCEMENTS = Object.fromEntries([
   ['fullKit', 'skill', 'Full Kit', 'Win on Hard with No Back and Blind target.', 'challenge', 'Netherite Chestplate', '🛡️'],
   ['quick', 'speed', 'Quick Thinker', 'Win in under 60 seconds.', 'goal', 'Sugar', '⚡'],
   ['speedrunner', 'speed', 'Speedrunner', 'Win in under 30 seconds.', 'challenge', 'Potion of Swiftness', '🏃'],
-  ['sprinter', 'speed', 'Sprinter', 'Win a par 4+ game in under 45 seconds.', 'challenge', 'Rabbit\'s Foot', '🐇'],
+  ['sprinter', 'speed', 'Sprinter', 'Win in under 45 seconds.', 'challenge', 'Rabbit\'s Foot', '🐇', { minPar: 4 }],
   ['regular', 'keep', 'Regular', 'Win 10 games.', 'task', 'Iron Ingot', '🥉', { of: 10, tally: 'wins', unit: 'wins' }],
   ['veteran', 'keep', 'Veteran', 'Win 50 games.', 'goal', 'Gold Ingot', '🥈', { of: 50, tally: 'wins', unit: 'wins' }],
   ['legend', 'keep', 'Wiki Legend', 'Win 100 games.', 'challenge', 'Diamond', '💎', { of: 100, tally: 'wins', unit: 'wins' }],
@@ -3098,10 +3108,13 @@ const ADVANCEMENTS = Object.fromEntries([
   ['herobrine', 'secret', 'He Is Watching', 'Land on Herobrine.', 'task', 'Herobrine', '👁️', { secret: true }],
   ['cake', 'secret', 'The Cake Is Real', 'Land on Cake.', 'task', 'Cake', '🎂', { secret: true }],
   ['rags', 'secret', 'Rags to Riches', 'Win from Dirt to Diamond.', 'goal', 'Diamond Ore', '⛏️', { secret: true }],
-  ['soClose', 'secret', 'So Close', 'Run out of Six clicks one click from the target.', 'task', 'Fishing Rod', '🎣', { secret: true }],
+  ['soClose', 'secret', 'So Close', 'Run out of Six clicks one click from winning.', 'task', 'Fishing Rod', '🎣', { secret: true }],
   ['scenic', 'secret', 'Scenic Route', 'Win in 15 or more clicks.', 'task', 'Boat', '🛶', { secret: true }],
   ['fullCircle', 'secret', 'Full Circle', 'Click your way back to the start page, without Back, outside a Round trip.', 'task', 'Recovery Compass', '🔄', { secret: true }],
 ].map(([key, group, name, how, tier, icon, emoji, x]) => [key, { group, name, how, tier, icon, emoji, ...x }]));
+const advGate = a => ADV_GATES[a.gate ?? ADV_GROUPS[a.group].gate];
+// What a skill or speed one asks of the game besides its own how, said with it when it is picked.
+const advNeeds = (a, g = advGate(a)) => g ? `Par ${a.minPar ?? g.minPar}+${a.group === 'speed' ? ', Timer on' : ''}, and only ${g.only}.` : '';
 
 // Read through savedAdvancements, which keeps only what advancements would write: storage is open to the player.
 const advEmpty = () => ({ got: {}, wins: 0, visits: 0, blasts: 0, xp: 0, pages: new Set(), topics: [], instruments: new Set() });
@@ -3242,19 +3255,24 @@ function advArrive(title, back) {
     });
   } catch { /* no advancement */ }
 }
-// A game's end, from finish, with whether it was the pair's first game and a new personal best. What it needs of the
+// A game's end, from finish, with whether the pair had no game before, and no win, and whether it is a new personal best. What it needs of the
 // game is read before the first await, since Same cards again may start another; par and the arrivals' counts are
 // waited for. Its toasts come once the result's fanfare has played (ADV_AFTER_RESULT).
 const ADV_AFTER_RESULT = 1200;
-async function advFinish(rec, first, newBest, dailyFirst) {
+async function advFinish(rec, firstGame, firstWin, newBest, dailyFirst) {
   const at = performance.now() + ADV_AFTER_RESULT, path = game.path, parReady = game.parReady, rules = game.rules, has = k => rules.includes(k);
   const lines = game.xp, fresh = game.fresh;
-  const g = { exact: !!game.exact, roundTrip: game.roundTrip, checkpoints: checkpoints(), timed: game.timed, challenge: game.challenge, rebuilt: game.rebuilt };
+  const g = { exact: !!game.exact, roundTrip: game.roundTrip, checkpoints: checkpoints(), challenge: game.challenge, rebuilt: game.rebuilt, lastStop: lastStop() };
   try {
     if (rec.won) { adv.wins++; saveAdv(); }
     const par = rec.par ?? await parReady.then(route => route ? route.length - 1 : null, () => null);
     await Promise.all(path.map(p => p.measured));
-    const won = rec.won, skill = won && first && par >= ADV_PAR, speed = skill && g.timed;
+    const won = rec.won;
+    // The checks of the gated ones, each held to its gate.
+    const gated = checks => Object.fromEntries(Object.entries(checks).map(([k, ok]) => {
+      const a = ADVANCEMENTS[k], gate = advGate(a);
+      return [k, ok && won && (gate === ADV_GATES.feat ? firstGame : firstWin) && par >= (a.minPar ?? gate.minPar)];
+    }));
     if (won) {
       gainXp(lines, par ? `Win (par ${par})` : 'Win', 2 * Math.max(1, par ?? 1));
       if (!g.exact && par && rec.clicks <= par) gainXp(lines, ...rec.clicks < par ? ['Under par', 6] : ['At par', 3]);
@@ -3265,15 +3283,17 @@ async function advFinish(rec, first, newBest, dailyFirst) {
     advEarn({
       hello: won, daily: !!rec.daily, relay: won && has('checkpoint'), treasure: won && has('scavenger'), measure: won && g.exact,
       thereBack: won && g.roundTrip, accepted: won && g.challenge,
-      par: skill && !g.exact && rec.clicks === par, birdie: skill && !g.exact && rec.clicks < par, hardcore: skill && has('nohubs'),
-      noTakeBacks: skill && has('noback'), blindfolded: skill && has('blind'), sixShooter: skill && has('limit'), topNotch: skill && has('lead'),
-      longWay: skill && g.exact && rec.exact - par >= 5, grandTour: skill && g.roundTrip && g.checkpoints === 3 && !has('scavenger'),
-      kinds: skill && !!rec.kinds, fullKit: skill && has('nohubs') && has('noback') && has('blind'),
-      quick: speed && rec.ms < 60000, speedrunner: speed && rec.ms < 30000, sprinter: speed && par >= 4 && rec.ms < 45000,
+      ...gated({
+        par: !g.exact && rec.clicks === par, birdie: !g.exact && rec.clicks < par, hardcore: has('nohubs'),
+        noTakeBacks: has('noback'), blindfolded: has('blind'), sixShooter: has('limit'), topNotch: has('lead'),
+        longWay: g.exact && rec.exact - par >= 5, grandTour: g.roundTrip && g.checkpoints === 3 && !has('scavenger'),
+        kinds: !!rec.kinds, fullKit: has('nohubs') && has('noback') && has('blind'),
+        quick: rec.ms < 60000, speedrunner: rec.ms < 30000, sprinter: rec.ms < 45000,
+      }),
       selfImprovement: newBest, pieces: won && g.rebuilt,
       hotStreak: won && has('distance') && !g.exact && par >= 4 && path.slice(1, -1).every((p, i) => p.via || p.found || gotCloser(path, i + 1, false)),
       rags: won && rec.start === 'Dirt' && rec.goal === 'Diamond' && !rec.vias && !g.roundTrip,
-      soClose: !!rec.outOfClicks && !g.exact && path.at(-1).togo === 1, scenic: won && rec.clicks >= 15,
+      soClose: !!rec.outOfClicks && !g.exact && g.lastStop && path.at(-1).togo === 1, scenic: won && rec.clicks >= 15,
     }, lines);
     showXp(lines);
   } catch { /* no advancement */ }
@@ -3354,6 +3374,7 @@ function advDetail() {
   return `${advFrame(key, hidden, !!at)}<div>
     <div><span class="name">${hidden ? '???' : esc(a.name)}</span><span class="tier">${ADV_TIERS[a.tier].label}</span></div>
     <p class="how">${hidden ? 'A secret. Keep playing.' : esc(a.how)}</p>
+    ${!hidden && advNeeds(a) ? `<p class="note how">${esc(advNeeds(a))}</p>` : ''}
     ${at ? `<p class="when">Earned ${esc(shortDate(new Date(at)))}</p>`
       : n !== null ? `<div class="bar"><i style="width: ${100 * n / a.of}%"></i></div><p class="note how">${fmtCount(n)} of ${fmtCount(a.of)} ${a.unit}</p>` : ''}</div>`;
 }
@@ -5556,8 +5577,9 @@ function finish(won, lost = null) {
     ...(target?.topic && { topic: target.topic }),
     ...(target?.reach && (game.par === null || REACHES[target.reach].fits?.(game.par) !== false) && { reach: target.reach }),
     ...(game.content.length && { content: game.content }), ...(game.par !== null && { par: game.par }), ...(game.exact && { exact: game.limit }), rules: game.rules, won, ...(lost && { [lost]: true }), clicks: clicks(), ...(game.timed && { ms }), at: Date.now(), path: game.path.map(p => p.title) };
-  const saved = storedGames(), hist = saved?.filter(isRecord) ?? [], first = !hist.some(r => recordKey(r) === recordKey(rec));   // the pair's first game, for advancements
-  const best = hist.filter(r => r.won && recordKey(r) === recordKey(rec) && sameRules(r, rec))
+  const saved = storedGames(), hist = saved?.filter(isRecord) ?? [], key = recordKey(rec);
+  const played = hist.filter(r => recordKey(r) === key), wins = played.filter(r => r.won);   // the pair's, for advancements and the best
+  const best = wins.filter(r => sameRules(r, rec))
     .reduce((b, r) => !b || beats(r, b) ? r : b, null);
   if (saved) store.set('mwr.history', [rec, ...saved].slice(0, 50));
   const dailyFirst = won && game.daily && !savedDailies()[game.daily]?.won;   // the daily's first win, for more fireworks
@@ -5575,7 +5597,7 @@ function finish(won, lost = null) {
       p.stranded && '⛔'].filter(Boolean).map(w => ` <span class="note">${esc(w)}</span>`).join('') +
     (toGoText(p) ? ` <span class="note togo${worse(p, i) ? ' worse' : ''}">${toGoText(p)}</span>` : '') + '</li>').join('');
   const newBest = won && best && beats(rec, best);
-  advFinish(rec, first, !!newBest, dailyFirst);
+  advFinish(rec, !played.length, !wins.length, !!newBest, dailyFirst);
   const bestNote = !won || !best ? '' : newBest ? '<p class="best new">New personal best for this game!</p>'
     : `<p class="best note">Your best for this game: ${wonText(best)}.</p>`;
   // The heading: the outcome, with a loss's reason under it. Exact clicks's column holds a route of its count.

@@ -256,7 +256,12 @@ On the TNT article, a blast that reaches the infobox's big picture of TNT lights
 **🏆 Advancements**, at the right of the Recent games heading, opens the panel with how many you've earned.
 Each is earned once and kept, and pops up as a Minecraft toast in the top right: a task's says "Advancement Made!", a goal's "Goal Reached!" and a challenge's "Challenge Complete!". Hidden ones show as ??? until earned. **Reset advancements**, at the panel's foot, forgets them all and your XP.
 
-Skill advancements need par 3 or more, the first time you play that game, so playing it again or typing in an easy one won't earn them. Speed ones need that and the Timer on.
+Skill and Speed advancements need a real game you haven't beaten yet, and picking one in the panel says what it needs:
+
+- **Skill ones**: par 2 or more, and only your first win of that game. A retry after losing or giving up still counts.
+- **Par for the Course, Birdie and the Speed ones**: par 3 or more (Sprinter par 4 or more), and only the first time you play that game, since any game's end shows the shortest route. Speed ones also need the Timer on.
+
+Changing the other rules doesn't make it a new game, though a Round trip or another Exact clicks count does. Only your last 50 games are remembered for this, and Clear history forgets them.
 
 | Group | Name | Tier | How to earn it | Hidden |
 |---|---|---|---|---|
@@ -268,8 +273,8 @@ Skill advancements need par 3 or more, the first time you play that game, so pla
 | Getting started | Measure Twice | Task | Win an Exact clicks game. | |
 | Getting started | There and Back Again | Task | Win a Round trip. | |
 | Getting started | Accepted | Task | Win a game opened from a challenge link. | |
-| Skill | Par for the Course | Goal | Win at par. | |
-| Skill | Birdie | Challenge | Beat par, by a way it doesn't count: a shortcut the offline copy lacks, a version page on Relaxed or one of a hunt's extra finds. | Yes |
+| Skill | Par for the Course | Goal | Win a par 3+ game at par. | |
+| Skill | Birdie | Challenge | Beat par on a par 3+ game, by a way it doesn't count: a shortcut the offline copy lacks, a version page on Relaxed or one of a hunt's extra finds. | Yes |
 | Skill | Hardcore | Goal | Win on Hard. | |
 | Skill | No Take-Backs | Task | Win with No Back. | |
 | Skill | Blindfolded | Goal | Win with Blind target. | |
@@ -279,8 +284,8 @@ Skill advancements need par 3 or more, the first time you play that game, so pla
 | Skill | Grand Tour | Challenge | Win a Round trip Relay with 3 checkpoints. | |
 | Skill | Kind Collector | Task | Win a Scavenger hunt of kinds. | |
 | Skill | Full Kit | Challenge | Win on Hard with No Back and Blind target. | |
-| Speed | Quick Thinker | Goal | Win in under 60 seconds. | |
-| Speed | Speedrunner | Challenge | Win in under 30 seconds. | |
+| Speed | Quick Thinker | Goal | Win a par 3+ game in under 60 seconds. | |
+| Speed | Speedrunner | Challenge | Win a par 3+ game in under 30 seconds. | |
 | Speed | Sprinter | Challenge | Win a par 4+ game in under 45 seconds. | |
 | Keeping at it | Regular | Task | Win 10 games. | |
 | Keeping at it | Veteran | Goal | Win 50 games. | |
@@ -310,11 +315,11 @@ Skill advancements need par 3 or more, the first time you play that game, so pla
 | Secret | He Is Watching | Task | Land on Herobrine. | Yes |
 | Secret | The Cake Is Real | Task | Land on Cake. | Yes |
 | Secret | Rags to Riches | Goal | Win from Dirt to Diamond. | Yes |
-| Secret | So Close | Task | Run out of Six clicks one click from the target. | Yes |
+| Secret | So Close | Task | Run out of Six clicks one click from winning. | Yes |
 | Secret | Scenic Route | Task | Win in 15 or more clicks. | Yes |
 | Secret | Full Circle | Task | Click your way back to the start page, without Back, outside a Round trip. | Yes |
 
-Hot Streak doesn't need the clicks that reach a checkpoint or a find, or the last one, to be cheered. The streak ones count only dailies won on their own day, and Clear history ends the streak.
+Hot Streak doesn't need the clicks that reach a checkpoint or a find, or the last one, to be cheered, and those clicks don't break On a Roll's run. The streak ones count only dailies won on their own day, and Clear history ends the streak.
 
 ## XP
 

@@ -2215,7 +2215,87 @@ check('Dirt to Diamond in 15 clicks earns Rags to Riches and Scenic Route, and o
 await ev('closeModal(); toSetup()');
 await playRoute(`#start=${enc(four[0])}&target=${enc(four.at(-1))}&rules=nonav,limit`, [four[0], ...detours.slice(0, 5), four.at(-2)]);
 check('running out of Six clicks one click from the target earns So Close', await until(`!game.active && savedGames()[0].outOfClicks && !!adv.got.soClose`, 5000), await ev(earnedKeys));
-await ev("closeModal(); toSetup(); ['mwr.advancements', 'mwr.history'].forEach(k => localStorage.removeItem(k))");
+// So Close is one click from winning: with nothing after that stop, whatever the game.
+const forgetAll = "closeModal(); toSetup(); ['mwr.advancements', 'mwr.history'].forEach(k => localStorage.removeItem(k)); adv = advEmpty()";
+const outOfClicks = async (name, hash, route, earns) => {
+  await ev(forgetAll);
+  await playRoute(hash, route);
+  // Its advancements are in by the time its XP shows.
+  const over = await until('!game.active && savedGames()[0].outOfClicks && game.path.at(-1).togo === 1', 5000) && await xpUntil();
+  check(name, over && await ev(`${earns} === !!adv.got.soClose`), await ev('JSON.stringify([!!adv.got.soClose, savedGames()[0].outOfClicks, game.path.at(-1).togo])'));
+};
+const nearGoal = four.at(-2), wandering = detours.slice(0, 5), finds = `#start=${enc(four[0])}&via=${enc(detours[0])}&via=${enc(detours[1])}&target=${enc(four.at(-1))}`;
+await outOfClicks('out of Six clicks one click from a Relay\'s checkpoint, the target still to go, isn\'t So Close',
+  `#start=${enc(four[0])}&via=${enc(four.at(-1))}&target=Diamond&rules=nonav,checkpoint,limit`, [four[0], ...wandering, nearGoal], false);
+await outOfClicks('nor one click from a find with more to find', `#start=${enc(four[0])}&via=${enc(four.at(-1))}&via=Diamond&target=Bamboo&rules=nonav,scavenger,limit`, [four[0], ...wandering, nearGoal], false);
+await outOfClicks('nor from a round trip\'s target, with the way home to go', `#start=${enc(four[0])}&target=${enc(four.at(-1))}&rules=nonav,roundtrip,limit`, [four[0], ...wandering, nearGoal], false);
+await outOfClicks('nor from a Scavenger round trip\'s last find', finds + '&rules=nonav,scavenger,roundtrip,limit', [four[0], ...wandering, nearGoal], false);
+await outOfClicks('but from a Relay\'s target with its checkpoints done, it is', `#start=${enc(four[0])}&via=${enc(detours[0])}&target=${enc(four.at(-1))}&rules=nonav,checkpoint,limit`, [four[0], ...wandering, nearGoal], true);
+await outOfClicks('and from a hunt\'s last find', finds + '&rules=nonav,scavenger,limit', [four[0], ...wandering, nearGoal], true);
+// On a Roll: clicks in a row, those reaching a checkpoint or find having no closer to get.
+await ev(forgetAll);
+await open(`#start=${enc(four[0])}&via=${enc(four[2])}&target=${enc(four.at(-1))}&rules=nonav,checkpoint,distance`);
+await play();
+await walk([four[0], four[1]]);
+await until('game.cheerRun === 1', 5000);
+await walk([four[0], four[2]]);
+await sleep(500);
+const atCheckpoint = await ev('game.cheerRun');
+await walk([four[0], four[3]]);
+check('reaching a checkpoint doesn\'t break a run of Distance\'s cheers, and the next cheer adds to it', atCheckpoint === 1 && await until('game.cheerRun === 2', 5000), `${atCheckpoint} ${await ev('game.cheerRun')}`);
+await ev(forgetAll);
+await open(`#start=${enc(four[0])}&via=${enc(four[1])}&via=Diamond&target=Bamboo&rules=nonav,scavenger,distance`);
+await play();
+await ev('game.cheerRun = 2');
+await walk([four[0], four[1]]);
+await sleep(500);
+check('nor does reaching a find', await ev('game.path.at(-1).found?.length === 1 && game.cheerRun === 2'), await ev('game.cheerRun'));
+await ev("$('#btnGiveUp').click(); $('#gQuit').click()");
+await ev(forgetAll);
+await open(`#start=${enc(four[0])}&target=${enc(four.at(-1))}&rules=nonav,distance`);
+await play();
+await walk([four[0], four[1]]);
+await until('game.cheerRun === 1', 5000);
+await walk([four[0], four[0]]);
+check('a click that gets no closer does', await until('game.cheerRun === 0', 5000), await ev('game.cheerRun'));
+// A rule asks only for a real game, and the first win, so nearly any game rolled can earn it.
+const two = await pairFor(['nonav'], 2, 2);
+await ev(forgetAll);
+await playRoute(`#start=${enc(two[0])}&target=${enc(two.at(-1))}&rules=nonav,limit`, two);
+check('a par 2 Six clicks game won at par earns Six Shooter, but not Par for the Course or the speed ones',
+  await until('!game.active && !!adv.got.sixShooter', 5000) && await ev("savedGames()[0].par === 2 && savedGames()[0].clicks === 2 && savedGames()[0].ms < 30000 && !['par', 'quick', 'speedrunner'].some(k => adv.got[k])"), await ev(earnedKeys));
+const three = await pairFor(['nonav'], 3, 3), feats = ['par', 'quick', 'speedrunner', 'sprinter'], noneOf = keys => `!${JSON.stringify(keys)}.some(k => adv.got[k])`;
+await ev(forgetAll);
+await playRoute(`#start=${enc(three[0])}&target=${enc(three.at(-1))}&rules=nonav`, three);
+check('a par 3 game won at par within 30 s earns Par for the Course and the speed ones but Sprinter', await until(`!game.active && ${got(['par', 'quick', 'speedrunner'])}`, 5000)
+  && await xpUntil() && await ev('!adv.got.sprinter'), await ev(earnedKeys));
+await ev(forgetAll);
+await playRoute(`#start=${enc(four[0])}&target=${enc(four.at(-1))}&rules=nonav`, four);
+check('and a par 4 game Sprinter too', await until(`!game.active && ${got(['sprinter'])}`, 5000), await ev(earnedKeys));
+await ev(forgetAll);
+await open(`#start=${enc(four[0])}&target=${enc(four.at(-1))}&rules=nonav`);
+await ev("$('#timerToggle').click()");
+await play();
+await walk(four);
+check('without the Timer it earns Par for the Course but no speed one', await until('!game.active && !game.timed && !!adv.got.par', 5000) && await xpUntil() && await ev(noneOf(feats.slice(1))), await ev(earnedKeys));
+await ev("closeModal(); toSetup(); $('#timerToggle').click()");
+await ev(forgetAll);
+await open(`#start=${enc(four[0])}&target=${enc(four.at(-1))}&rules=nonav,noback`);
+await play();
+await ev("$('#btnGiveUp').click(); $('#gQuit').click()");
+await ev("$('#mSame').click()");
+await until('game.active && game.path.length === 1 && !game.loading');
+await walk(four);
+check('after giving up on a pair its first win earns a rule\'s, but none where the clicks or time are the feat, the route having been shown',
+  await until('!game.active && !!adv.got.noTakeBacks', 5000) && await xpUntil() && await ev(noneOf(feats)), await ev(earnedKeys));
+await ev("closeModal(); openAdvancements()");
+const detailOf = k => ev(`($('[data-adv-key=${k}]').click(), $('#aDetail').textContent)`);
+check('picked in the panel, each says what it needs of the game: a rule\'s par 2, a feat\'s par 3, Sprinter\'s par 4, the Speed ones the Timer, the rest nothing',
+  (await detailOf('sixShooter')).includes('Par 2+, and only your first win of that game.') && (await detailOf('par')).includes('Par 3+, and only the first time you play that game.')
+  && (await detailOf('sprinter')).includes('Par 4+, Timer on, and only the first time you play that game.') && (await detailOf('quick')).includes('Par 3+, Timer on,') && !(await detailOf('regular')).includes('Par '),
+  await detailOf('sprinter'));
+check('and a secret one nothing until it is earned', !(await detailOf('birdie')).includes('Par '), await detailOf('birdie'));
+await ev(forgetAll);
 
 // The background: its settings and their defaults, Roll by itself turning off at a change on the page but not in its
 // own box, the cards marked with the route only as a spoiler and nothing past the start under Blind target, the facts

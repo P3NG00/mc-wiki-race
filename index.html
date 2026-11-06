@@ -3037,8 +3037,8 @@ const ADV_RULE_PAR = 2, ADV_PAR = 3;
 // after a loss still counts. feat: the clicks or the time are the feat. Par 2 makes that too easy, and it means nothing
 // on a retry, since any game's end shows the shortest route, so it takes the first game of the pair.
 const ADV_GATES = {
-  rule: { minPar: ADV_RULE_PAR, only: 'your first win of that game' },
-  feat: { minPar: ADV_PAR, only: 'the first time you play that game' },
+  rule: { minPar: ADV_RULE_PAR, only: 'your first win with the same cards' },
+  feat: { minPar: ADV_PAR, only: 'your first game with the same cards' },
 };
 const ADV_TIERS = {
   task: { label: 'Task', title: 'Advancement Made!', sound: 'checkpoint' },
@@ -3047,8 +3047,8 @@ const ADV_TIERS = {
 };
 const ADV_GROUPS = {
   start: { label: 'Getting started' },
-  skill: { label: 'Skill', gate: 'rule', note: `Par ${ADV_RULE_PAR}+, and only your first win of a game, unless it says otherwise.` },
-  speed: { label: 'Speed', gate: 'feat', note: `Timer on, par ${ADV_PAR}+, and only the first time you play a game.` },
+  skill: { label: 'Skill', gate: 'rule', note: `Par ${ADV_RULE_PAR}+. Only ${ADV_GATES.rule.only} counts, unless it says otherwise.` },
+  speed: { label: 'Speed', gate: 'feat', note: `Timer on, par ${ADV_PAR}+. Only ${ADV_GATES.feat.only} counts.` },
   keep: { label: 'Keeping at it' },
   explore: { label: 'Exploring' },
   items: { label: 'Items' },
@@ -3114,7 +3114,7 @@ const ADVANCEMENTS = Object.fromEntries([
 ].map(([key, group, name, how, tier, icon, emoji, x]) => [key, { group, name, how, tier, icon, emoji, ...x }]));
 const advGate = a => ADV_GATES[a.gate ?? ADV_GROUPS[a.group].gate];
 // What a skill or speed one asks of the game besides its own how, said with it when it is picked.
-const advNeeds = (a, g = advGate(a)) => g ? `Par ${a.minPar ?? g.minPar}+${a.group === 'speed' ? ', Timer on' : ''}, and only ${g.only}.` : '';
+const advNeeds = (a, g = advGate(a)) => g ? `Par ${a.minPar ?? g.minPar}+${a.group === 'speed' ? ', Timer on' : ''}. Only ${g.only} counts.` : '';
 
 // Read through savedAdvancements, which keeps only what advancements would write: storage is open to the player.
 const advEmpty = () => ({ got: {}, wins: 0, visits: 0, blasts: 0, xp: 0, pages: new Set(), topics: [], instruments: new Set() });

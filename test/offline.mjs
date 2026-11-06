@@ -2291,9 +2291,12 @@ check('after giving up on a pair its first win earns a rule\'s, but none where t
 await ev("closeModal(); openAdvancements()");
 const detailOf = k => ev(`($('[data-adv-key=${k}]').click(), $('#aDetail').textContent)`);
 check('picked in the panel, each says what it needs of the game: a rule\'s par 2, a feat\'s par 3, Sprinter\'s par 4, the Speed ones the Timer, the rest nothing',
-  (await detailOf('sixShooter')).includes('Par 2+, and only your first win of that game.') && (await detailOf('par')).includes('Par 3+, and only the first time you play that game.')
-  && (await detailOf('sprinter')).includes('Par 4+, Timer on, and only the first time you play that game.') && (await detailOf('quick')).includes('Par 3+, Timer on,') && !(await detailOf('regular')).includes('Par '),
+  (await detailOf('sixShooter')).includes('Par 2+. Only your first win with the same cards counts.') && (await detailOf('par')).includes('Par 3+. Only your first game with the same cards counts.')
+  && (await detailOf('sprinter')).includes('Par 4+, Timer on. Only your first game with the same cards counts.') && (await detailOf('quick')).includes('Par 3+, Timer on.') && !(await detailOf('regular')).includes('Par '),
   await detailOf('sprinter'));
+check('and the Skill and Speed headings what they all ask', await ev(`(n => n.includes('Par 2+. Only your first win with the same cards counts, unless it says otherwise.')
+  && n.includes('Timer on, par 3+. Only your first game with the same cards counts.'))([...document.querySelectorAll('.adv-group .note')].map(p => p.textContent))`),
+  await ev("JSON.stringify([...document.querySelectorAll('.adv-group .note')].map(p => p.textContent))"));
 check('and a secret one nothing until it is earned', !(await detailOf('birdie')).includes('Par '), await detailOf('birdie'));
 await ev(forgetAll);
 

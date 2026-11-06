@@ -256,12 +256,12 @@ On the TNT article, a blast that reaches the infobox's big picture of TNT lights
 **🏆 Advancements**, at the right of the Recent games heading, opens the panel with how many you've earned.
 Each is earned once and kept, and pops up as a Minecraft toast in the top right: a task's says "Advancement Made!", a goal's "Goal Reached!" and a challenge's "Challenge Complete!". Hidden ones show as ??? until earned. **Reset advancements**, at the panel's foot, forgets them all and your XP.
 
-Skill and Speed advancements need a real game you haven't beaten yet, and picking one in the panel says what it needs:
+Skill and Speed advancements ask two more things of the game, and picking one in the panel says what they are:
 
-- **Skill ones**: par 2 or more, and only your first win of that game. A retry after losing or giving up still counts.
-- **Par for the Course, Birdie and the Speed ones**: par 3 or more (Sprinter par 4 or more), and only the first time you play that game, since any game's end shows the shortest route. Speed ones also need the Timer on.
+- **Skill ones**: par 2 or more, and only your first win with the same cards. A retry after losing or giving up still counts.
+- **Par for the Course, Birdie and the Speed ones**: par 3 or more (Sprinter par 4 or more), and only your first game with the same cards, since any game's end shows the shortest route. Speed ones also need the Timer on.
 
-Changing the other rules doesn't make it a new game, though a Round trip or another Exact clicks count does. Only your last 50 games are remembered for this, and Clear history forgets them.
+Changing the other rules doesn't make the cards new, though a Round trip or another Exact clicks count does. Only your last 50 games are remembered for this, and Clear history forgets them.
 
 | Group | Name | Tier | How to earn it | Hidden |
 |---|---|---|---|---|
